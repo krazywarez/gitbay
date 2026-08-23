@@ -13,12 +13,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"golang.org/x/crypto/ssh"
 
 	"github.com/krazywarez/forge/internal/config"
 	"github.com/krazywarez/forge/internal/control"
+	"github.com/krazywarez/forge/internal/gitutil"
+	"github.com/krazywarez/forge/internal/hookd"
+	"github.com/krazywarez/forge/internal/policy"
 	"github.com/krazywarez/forge/internal/protocol"
 	"github.com/krazywarez/forge/internal/store"
 )
@@ -183,18 +185,16 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 	}
 	_ = s.st.TouchSSHKey(keyID)
 
-	if name, _, ok := strings.Cut(cmdline, " "); ok || name != "" {
-		switch name {
-		case "git-upload-pack", "git-receive-pack", "git-upload-archive":
-			fmt.Fprintln(ch.Stderr(), "git transport not implemented (M2)")
-			return protocol.ExitFailure
-		}
-	}
-
 	argv, err := protocol.Tokenize(cmdline)
 	if err != nil {
 		fmt.Fprintf(ch.Stderr(), "cannot parse command: %v\n", err)
 		return protocol.ExitUsage
+	}
+	if len(argv) > 0 {
+		switch argv[0] {
+		case "git-upload-pack", "git-receive-pack", "git-upload-archive":
+			return s.runGit(ch, user, ext["scope"], argv)
+		}
 	}
 	ctx := &control.Ctx{
 		User:   user,
@@ -206,4 +206,49 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 		Stderr: ch.Stderr(),
 	}
 	return control.Dispatch(ctx, argv)
+}
+
+// runGit streams a git transport service after access checks.
+func (s *Server) runGit(ch ssh.Channel, user store.User, scope string, argv []string) int {
+	service := argv[0]
+	if len(argv) != 2 {
+		fmt.Fprintf(ch.Stderr(), "usage: %s <path>\n", service)
+		return protocol.ExitUsage
+	}
+	write := service == "git-receive-pack"
+
+	repo, err := s.st.RepoByPath(argv[1])
+	if err != nil {
+		fmt.Fprintln(ch.Stderr(), "repository not found")
+		return protocol.ExitNotFound
+	}
+	grant, err := s.st.AccessRole(repo.ID, user.ID)
+	if err != nil {
+		fmt.Fprintln(ch.Stderr(), "internal error")
+		return protocol.ExitFailure
+	}
+	if !policy.CanRead(user, repo, grant) {
+		// Same answer as nonexistence: private repos must not be enumerable.
+		fmt.Fprintln(ch.Stderr(), "repository not found")
+		return protocol.ExitNotFound
+	}
+	if !policy.ScopeAllowsGit(scope, repo.Path(), write) {
+		fmt.Fprintf(ch.Stderr(), "this key's scope (%s) does not allow %s on %s\n", scope, service, repo.Path())
+		return protocol.ExitDenied
+	}
+	if write && !policy.CanWrite(user, repo, grant) {
+		fmt.Fprintf(ch.Stderr(), "write access to %s denied\n", repo.Path())
+		return protocol.ExitDenied
+	}
+
+	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	env := []string{
+		hookd.EnvSocket + "=" + hookd.SocketPath(s.cfg.Server.Root),
+		hookd.EnvRepoID + "=" + strconv.FormatInt(repo.ID, 10),
+		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
+	}
+	if err := gitutil.Transport(service, dir, ch, ch.Stderr(), env); err != nil {
+		return protocol.ExitFailure
+	}
+	return protocol.ExitOK
 }

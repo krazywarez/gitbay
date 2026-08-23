@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/krazywarez/forge/internal/config"
+	"github.com/krazywarez/forge/internal/control"
+	"github.com/krazywarez/forge/internal/hookd"
 	"github.com/krazywarez/forge/internal/policy"
 	"github.com/krazywarez/forge/internal/sshd"
 	"github.com/krazywarez/forge/internal/store"
@@ -47,6 +49,7 @@ func main() {
 		serveCmd(),
 		migrateCmd(),
 		adminCmd(),
+		hookCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -96,6 +99,22 @@ func serveCmd() *cobra.Command {
 			if cfg.SSH.Mode != "embedded" {
 				return fmt.Errorf("ssh.mode = %q not implemented (M9)", cfg.SSH.Mode)
 			}
+
+			// Regenerate hook scripts so a moved binary self-heals, then
+			// start the hook policy socket.
+			self, err := os.Executable()
+			if err != nil {
+				return err
+			}
+			if err := hookd.WriteHookScripts(control.HooksDir(cfg.Server.Root), self); err != nil {
+				return err
+			}
+			stopHookd, err := hookd.Serve(cfg.Server.Root, st)
+			if err != nil {
+				return err
+			}
+			defer stopHookd()
+
 			srv, err := sshd.New(cfg, st)
 			if err != nil {
 				return err
