@@ -16,6 +16,7 @@ type Repo struct {
 	Name          string
 	Visibility    string // public | private
 	DefaultBranch string
+	ForkOf        int64 // 0 when not a fork
 	Settings      RepoSettings
 }
 
@@ -50,10 +51,10 @@ func (s *Store) RepoByPath(path string) (Repo, error) {
 	var r Repo
 	var settingsJSON string
 	err := s.DB.QueryRow(`
-		SELECT r.id, r.owner_kind, r.owner_id, u.username, r.name, r.visibility, r.default_branch, r.settings_json
+		SELECT r.id, r.owner_kind, r.owner_id, u.username, r.name, r.visibility, r.default_branch, COALESCE(r.fork_of, 0), r.settings_json
 		FROM repos r JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
 		WHERE u.username = ? AND r.name = ?`, owner, name).
-		Scan(&r.ID, &r.OwnerKind, &r.OwnerID, &r.OwnerName, &r.Name, &r.Visibility, &r.DefaultBranch, &settingsJSON)
+		Scan(&r.ID, &r.OwnerKind, &r.OwnerID, &r.OwnerName, &r.Name, &r.Visibility, &r.DefaultBranch, &r.ForkOf, &settingsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Repo{}, ErrNotFound
 	}
@@ -72,6 +73,11 @@ func (s *Store) SetRepoSettings(repoID int64, settings RepoSettings) error {
 		return err
 	}
 	_, err = s.DB.Exec("UPDATE repos SET settings_json = ? WHERE id = ?", string(raw), repoID)
+	return err
+}
+
+func (s *Store) SetForkOf(repoID, parentID int64) error {
+	_, err := s.DB.Exec("UPDATE repos SET fork_of = ? WHERE id = ?", parentID, repoID)
 	return err
 }
 
@@ -176,10 +182,10 @@ func (s *Store) RepoByID(id int64) (Repo, error) {
 	var r Repo
 	var settingsJSON string
 	err := s.DB.QueryRow(`
-		SELECT r.id, r.owner_kind, r.owner_id, u.username, r.name, r.visibility, r.default_branch, r.settings_json
+		SELECT r.id, r.owner_kind, r.owner_id, u.username, r.name, r.visibility, r.default_branch, COALESCE(r.fork_of, 0), r.settings_json
 		FROM repos r JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
 		WHERE r.id = ?`, id).
-		Scan(&r.ID, &r.OwnerKind, &r.OwnerID, &r.OwnerName, &r.Name, &r.Visibility, &r.DefaultBranch, &settingsJSON)
+		Scan(&r.ID, &r.OwnerKind, &r.OwnerID, &r.OwnerName, &r.Name, &r.Visibility, &r.DefaultBranch, &r.ForkOf, &settingsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Repo{}, ErrNotFound
 	}

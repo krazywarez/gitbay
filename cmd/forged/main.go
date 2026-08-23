@@ -112,7 +112,7 @@ func serveCmd() *cobra.Command {
 			if err := hookd.WriteHookScripts(control.HooksDir(cfg.Server.Root), self); err != nil {
 				return err
 			}
-			stopHookd, err := hookd.Serve(cfg.Server.Root, st)
+			stopHookd, err := hookd.Serve(cfg, st)
 			if err != nil {
 				return err
 			}

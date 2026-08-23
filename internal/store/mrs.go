@@ -1,0 +1,233 @@
+package store
+
+import (
+	"database/sql"
+	"errors"
+)
+
+type MR struct {
+	ID           int64
+	RepoID       int64
+	Number       int64
+	Author       string
+	SourceRepoID int64 // 0 when the source repo is gone
+	SourcePath   string // owner/name of source repo, "" when gone
+	SourceRef    string
+	TargetRef    string
+	Title        string
+	Body         string
+	State        string // open | merged | closed | source_gone
+	HeadSHA      string
+	CreatedAt    string
+	UpdatedAt    string
+}
+
+type MRReview struct {
+	Reviewer  string
+	Verdict   string
+	HeadSHA   string
+	Stale     bool
+	CreatedAt string
+}
+
+func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, targetRef, title, body, headSHA string) (int64, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("UPDATE repos SET mr_counter = mr_counter + 1 WHERE id = ?", repoID); err != nil {
+		return 0, err
+	}
+	var n int64
+	if err := tx.QueryRow("SELECT mr_counter FROM repos WHERE id = ?", repoID).Scan(&n); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO merge_requests (repo_id, number, author_id, source_repo_id, source_ref, target_ref, title, body, head_sha)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA); err != nil {
+		return 0, err
+	}
+	return n, tx.Commit()
+}
+
+const mrSelect = `
+	SELECT m.id, m.repo_id, m.number, u.username,
+	       COALESCE(m.source_repo_id, 0),
+	       COALESCE(su.username || '/' || sr.name, ''),
+	       m.source_ref, m.target_ref, m.title, m.body, m.state, m.head_sha,
+	       m.created_at, m.updated_at
+	FROM merge_requests m
+	JOIN users u ON u.id = m.author_id
+	LEFT JOIN repos sr ON sr.id = m.source_repo_id
+	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id`
+
+func scanMR(row interface{ Scan(...any) error }) (MR, error) {
+	var m MR
+	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.State, &m.HeadSHA, &m.CreatedAt, &m.UpdatedAt)
+	return m, err
+}
+
+func (s *Store) MRByNumber(repoID, number int64) (MR, error) {
+	m, err := scanMR(s.DB.QueryRow(mrSelect+" WHERE m.repo_id = ? AND m.number = ?", repoID, number))
+	if errors.Is(err, sql.ErrNoRows) {
+		return m, ErrNotFound
+	}
+	return m, err
+}
+
+func (s *Store) ListMRs(repoID int64, state string) ([]MR, error) {
+	q := mrSelect + " WHERE m.repo_id = ?"
+	args := []any{repoID}
+	if state != "all" {
+		q += " AND m.state = ?"
+		args = append(args, state)
+	}
+	q += " ORDER BY m.number DESC"
+	rows, err := s.DB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MR
+	for rows.Next() {
+		m, err := scanMR(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// OpenMRsBySource returns open (and source_gone) MRs fed by the given source
+// repo branch — the cross-repo hook effect consults this.
+func (s *Store) OpenMRsBySource(sourceRepoID int64, sourceRef string) ([]MR, error) {
+	rows, err := s.DB.Query(
+		mrSelect+" WHERE m.source_repo_id = ? AND m.source_ref = ? AND m.state IN ('open','source_gone')",
+		sourceRepoID, sourceRef)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MR
+	for rows.Next() {
+		m, err := scanMR(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SetMRState(mrID int64, state string) error {
+	res, err := s.DB.Exec(
+		"UPDATE merge_requests SET state = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+		state, mrID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateMRHead records a new head and marks every review at another head
+// stale, in one transaction.
+func (s *Store) UpdateMRHead(mrID int64, headSHA string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(
+		"UPDATE merge_requests SET head_sha = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+		headSHA, mrID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		"UPDATE mr_reviews SET stale = 1 WHERE mr_id = ? AND head_sha <> ?", mrID, headSHA); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// MarkSourceGoneForRepo flags every open MR sourced from the repo; called
+// when a fork is deleted. Head refs in the target repos are retained.
+func (s *Store) MarkSourceGoneForRepo(sourceRepoID int64) error {
+	_, err := s.DB.Exec(
+		"UPDATE merge_requests SET state = 'source_gone', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE source_repo_id = ? AND state = 'open'",
+		sourceRepoID)
+	return err
+}
+
+func (s *Store) AddMRComment(mrID, authorID int64, body string) error {
+	_, err := s.DB.Exec(
+		"INSERT INTO mr_comments (mr_id, author_id, body) VALUES (?, ?, ?)", mrID, authorID, body)
+	return err
+}
+
+func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
+	rows, err := s.DB.Query(`
+		SELECT u.username, c.body, c.created_at
+		FROM mr_comments c JOIN users u ON u.id = c.author_id
+		WHERE c.mr_id = ? ORDER BY c.id`, mrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []IssueComment
+	for rows.Next() {
+		var c IssueComment
+		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) AddMRReview(mrID, reviewerID int64, verdict, headSHA string) error {
+	_, err := s.DB.Exec(
+		"INSERT INTO mr_reviews (mr_id, reviewer_id, verdict, head_sha) VALUES (?, ?, ?, ?)",
+		mrID, reviewerID, verdict, headSHA)
+	return err
+}
+
+func (s *Store) ListMRReviews(mrID int64) ([]MRReview, error) {
+	rows, err := s.DB.Query(`
+		SELECT u.username, r.verdict, r.head_sha, r.stale, r.created_at
+		FROM mr_reviews r JOIN users u ON u.id = r.reviewer_id
+		WHERE r.mr_id = ? ORDER BY r.id`, mrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MRReview
+	for rows.Next() {
+		var r MRReview
+		var stale int
+		if err := rows.Scan(&r.Reviewer, &r.Verdict, &r.HeadSHA, &stale, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.Stale = stale != 0
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// PrimaryVerifiedEmail returns the user's primary email if verified, else "".
+func (s *Store) PrimaryVerifiedEmail(userID int64) (string, error) {
+	var addr string
+	err := s.DB.QueryRow(
+		"SELECT address FROM emails WHERE user_id = ? AND is_primary = 1 AND verified_at IS NOT NULL",
+		userID).Scan(&addr)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return addr, err
+}

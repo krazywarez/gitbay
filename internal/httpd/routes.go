@@ -39,6 +39,8 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/archive/{file}", Handler: s.archive},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/issues", Handler: s.issues},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/issues/{n}", Handler: s.issue},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs", Handler: s.mrs},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs/{n}", Handler: s.mr},
 	)
 
 	// Account-mode routes (login, web edits) are appended here in M8 —

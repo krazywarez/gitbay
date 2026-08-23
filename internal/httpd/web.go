@@ -244,6 +244,30 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+type diffLine struct {
+	Class string
+	Text  string
+}
+
+func classifyDiff(patch string) []diffLine {
+	var lines []diffLine
+	for _, l := range strings.Split(patch, "\n") {
+		class := ""
+		switch {
+		case strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "):
+			class = "meta"
+		case strings.HasPrefix(l, "@@"):
+			class = "hunk"
+		case strings.HasPrefix(l, "+"):
+			class = "add"
+		case strings.HasPrefix(l, "-"):
+			class = "del"
+		}
+		lines = append(lines, diffLine{class, l})
+	}
+	return lines
+}
+
 type sigView struct {
 	State       string
 	Signer      string
@@ -329,25 +353,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	patch, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
-	type diffLine struct {
-		Class string
-		Text  string
-	}
-	var lines []diffLine
-	for _, l := range strings.Split(patch, "\n") {
-		class := ""
-		switch {
-		case strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "):
-			class = "meta"
-		case strings.HasPrefix(l, "@@"):
-			class = "hunk"
-		case strings.HasPrefix(l, "+"):
-			class = "add"
-		case strings.HasPrefix(l, "-"):
-			class = "del"
-		}
-		lines = append(lines, diffLine{class, l})
-	}
+	lines := classifyDiff(patch)
 	committerEmail := ""
 	if parsed.CommitterEmail != parsed.AuthorEmail {
 		committerEmail = parsed.CommitterEmail
@@ -411,6 +417,65 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		Issue    store.Issue
 		Comments []store.IssueComment
 	}{p, iss, comments})
+}
+
+func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		state = "open"
+	}
+	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
+	if !valid[state] {
+		state = "open"
+	}
+	mrs, err := s.st.ListMRs(p.Repo.ID, state)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "mrs.html", struct {
+		repoPage
+		State string
+		MRs   []store.MR
+	}{p, state, mrs})
+}
+
+func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	m, err := s.st.MRByNumber(p.Repo.ID, n)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	comments, _ := s.st.ListMRComments(m.ID)
+	reviews, _ := s.st.ListMRReviews(m.ID)
+
+	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
+	var lines []diffLine
+	if base, err := gitutil.MergeBase(p.Dir, "refs/heads/"+m.TargetRef, headRef); err == nil {
+		if patch, err := gitutil.Diff(p.Dir, base, headRef, 4<<20); err == nil {
+			lines = classifyDiff(patch)
+		}
+	}
+	s.render(w, "mr.html", struct {
+		repoPage
+		MR        store.MR
+		Comments  []store.IssueComment
+		Reviews   []store.MRReview
+		DiffLines []diffLine
+	}{p, m, comments, reviews, lines})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

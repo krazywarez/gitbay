@@ -1,18 +1,27 @@
 // Package hookd is the unix-socket bridge between git hooks and the daemon.
 // The hook process (forged in hook mode) computes git facts — it inherits
 // git's quarantine environment, which the daemon does not see — and sends
-// them here; the daemon answers with a pure policy decision.
+// them here; the daemon answers with a policy decision.
+//
+// pre-receive is two-phase when the repo requires signed commits: the first
+// response sets NeedCommits, and the hook answers with the raw commit
+// objects (only the hook can read them out of quarantine) for verification.
 package hookd
 
 import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 
+	"github.com/krazywarez/forge/internal/config"
+	"github.com/krazywarez/forge/internal/control"
+	"github.com/krazywarez/forge/internal/gitutil"
 	"github.com/krazywarez/forge/internal/policy"
+	"github.com/krazywarez/forge/internal/sig"
 	"github.com/krazywarez/forge/internal/store"
 )
 
@@ -31,9 +40,20 @@ type Request struct {
 	Updates []policy.RefUpdate `json:"updates"`
 }
 
+type RawCommit struct {
+	SHA string `json:"sha"`
+	Raw []byte `json:"raw"`
+}
+
+// CommitsPayload is the hook's second message when NeedCommits was set.
+type CommitsPayload struct {
+	Commits []RawCommit `json:"commits"`
+}
+
 type Response struct {
-	Allow   bool   `json:"allow"`
-	Message string `json:"message,omitempty"`
+	Allow       bool   `json:"allow"`
+	Message     string `json:"message,omitempty"`
+	NeedCommits bool   `json:"need_commits,omitempty"`
 }
 
 // SocketPath returns the hook socket location. It prefers the server root,
@@ -51,18 +71,19 @@ func SocketPath(root string) string {
 }
 
 type Server struct {
-	st *store.Store
+	cfg config.Config
+	st  *store.Store
 }
 
 // Serve listens on the unix socket until the listener is closed.
-func Serve(root string, st *store.Store) (func() error, error) {
-	path := SocketPath(root)
+func Serve(cfg config.Config, st *store.Store) (func() error, error) {
+	path := SocketPath(cfg.Server.Root)
 	os.Remove(path)
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{st: st}
+	s := &Server{cfg: cfg, st: st}
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -77,48 +98,153 @@ func Serve(root string, st *store.Store) (func() error, error) {
 
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
+	dec := json.NewDecoder(conn)
+	enc := json.NewEncoder(conn)
 	var req Request
-	if err := json.NewDecoder(conn).Decode(&req); err != nil {
-		json.NewEncoder(conn).Encode(Response{Allow: false, Message: "bad hook request"})
+	if err := dec.Decode(&req); err != nil {
+		enc.Encode(Response{Allow: false, Message: "bad hook request"})
 		return
 	}
-	json.NewEncoder(conn).Encode(s.decide(req))
-}
-
-func (s *Server) decide(req Request) Response {
 	switch req.Hook {
 	case "pre-receive":
-		repo, err := s.st.RepoByID(req.RepoID)
-		if err != nil {
-			return Response{Allow: false, Message: "unknown repository"}
-		}
-		if msg := policy.CheckPush(repo, req.Updates); msg != "" {
-			return Response{Allow: false, Message: msg}
-		}
-		return Response{Allow: true}
+		s.preReceive(req, dec, enc)
 	case "post-receive":
-		// Event recording and signature verification enqueue land in M4.
-		return Response{Allow: true}
+		s.postReceive(req)
+		enc.Encode(Response{Allow: true})
 	default:
-		return Response{Allow: false, Message: fmt.Sprintf("unknown hook %q", req.Hook)}
+		enc.Encode(Response{Allow: false, Message: fmt.Sprintf("unknown hook %q", req.Hook)})
 	}
 }
 
-// Ask sends one request from the hook process to the daemon.
-func Ask(socketPath string, req Request) (Response, error) {
+func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
+	repo, err := s.st.RepoByID(req.RepoID)
+	if err != nil {
+		enc.Encode(Response{Allow: false, Message: "unknown repository"})
+		return
+	}
+	if msg := policy.CheckPush(repo, req.Updates); msg != "" {
+		enc.Encode(Response{Allow: false, Message: msg})
+		return
+	}
+	if !repo.Settings.RequireSignedCommits {
+		enc.Encode(Response{Allow: true})
+		return
+	}
+
+	// Phase two: ask the hook for the incoming commit objects.
+	if err := enc.Encode(Response{Allow: true, NeedCommits: true}); err != nil {
+		return
+	}
+	var payload CommitsPayload
+	if err := dec.Decode(&payload); err != nil {
+		enc.Encode(Response{Allow: false, Message: "bad commits payload"})
+		return
+	}
+	db := store.SigDB{Store: s.st}
+	for _, rc := range payload.Commits {
+		parsed, err := sig.ParseCommit(rc.Raw)
+		if err != nil {
+			enc.Encode(Response{Allow: false, Message: fmt.Sprintf("unparseable commit %s", rc.SHA)})
+			return
+		}
+		res, err := sig.VerifyCommit(db, parsed)
+		if err != nil || res.State != sig.Verified {
+			state := "error"
+			if err == nil {
+				state = string(res.State)
+			}
+			enc.Encode(Response{Allow: false, Message: fmt.Sprintf(
+				"this repository requires signed commits: %.10s is %s", rc.SHA, state)})
+			return
+		}
+	}
+	enc.Encode(Response{Allow: true})
+}
+
+// postReceive applies the cross-repo MR effect: a push to a source branch
+// refreshes refs/merge-requests/N/head in every target repo, by fetching —
+// the target owns the objects, so the MR outlives the fork. This is the only
+// place a hook writes outside its own repository.
+func (s *Server) postReceive(req Request) {
+	for _, u := range req.Updates {
+		branch, ok := cutHeads(u.Ref)
+		if !ok {
+			continue
+		}
+		mrs, err := s.st.OpenMRsBySource(req.RepoID, branch)
+		if err != nil {
+			slog.Error("post-receive: listing MRs", "err", err)
+			continue
+		}
+		srcRepo, err := s.st.RepoByID(req.RepoID)
+		if err != nil {
+			continue
+		}
+		srcDir := control.RepoDir(s.cfg.Server.Root, srcRepo.OwnerName, srcRepo.Name)
+		for _, mr := range mrs {
+			target, err := s.st.RepoByID(mr.RepoID)
+			if err != nil {
+				continue
+			}
+			if u.IsDelete {
+				if mr.State == "open" {
+					s.st.SetMRState(mr.ID, "source_gone")
+				}
+				continue // head ref retained: the diff stays viewable
+			}
+			dstDir := control.RepoDir(s.cfg.Server.Root, target.OwnerName, target.Name)
+			headRef := fmt.Sprintf("refs/merge-requests/%d/head", mr.Number)
+			if err := gitutil.FetchInto(dstDir, srcDir, u.New, headRef); err != nil {
+				slog.Error("post-receive: refreshing MR head", "mr", mr.Number, "err", err)
+				continue
+			}
+			if err := s.st.UpdateMRHead(mr.ID, u.New); err != nil {
+				slog.Error("post-receive: recording MR head", "mr", mr.Number, "err", err)
+			}
+			if mr.State == "source_gone" {
+				s.st.SetMRState(mr.ID, "open") // branch came back
+			}
+		}
+	}
+}
+
+func cutHeads(ref string) (string, bool) {
+	const p = "refs/heads/"
+	if len(ref) > len(p) && ref[:len(p)] == p {
+		return ref[len(p):], true
+	}
+	return "", false
+}
+
+// Ask sends one request from the hook process to the daemon. commits is
+// called if the daemon asks for the incoming commit objects.
+func Ask(socketPath string, req Request, commits func() (CommitsPayload, error)) (Response, error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
 		return Response{}, err
 	}
 	defer conn.Close()
-	if err := json.NewEncoder(conn).Encode(req); err != nil {
+	enc := json.NewEncoder(conn)
+	dec := json.NewDecoder(conn)
+	if err := enc.Encode(req); err != nil {
 		return Response{}, err
 	}
 	var resp Response
-	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+	if err := dec.Decode(&resp); err != nil {
 		return Response{}, err
 	}
-	return resp, nil
+	if !resp.NeedCommits {
+		return resp, nil
+	}
+	payload, err := commits()
+	if err != nil {
+		return Response{}, err
+	}
+	if err := enc.Encode(payload); err != nil {
+		return Response{}, err
+	}
+	err = dec.Decode(&resp)
+	return resp, err
 }
 
 // WriteHookScripts (re)generates the shared hooks directory. Called at

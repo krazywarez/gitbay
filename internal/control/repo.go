@@ -188,6 +188,11 @@ func runRepoDelete(c *Ctx, args []string) int {
 	if !yes {
 		return c.fail(protocol.ExitUsage, "repo delete is permanent; re-run with --yes")
 	}
+	// Open MRs sourced from this repo keep working (targets own the
+	// objects) but must show that the source is gone.
+	if err := c.Store.MarkSourceGoneForRepo(repo.ID); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	if err := c.Store.DeleteRepo(repo.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

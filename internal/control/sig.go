@@ -92,6 +92,9 @@ func runPGPRemove(c *Ctx, args []string) int {
 	})
 }
 
+// sigParse is a package-local alias so callers avoid importing sig directly.
+func sigParse(raw []byte) (*sig.Commit, error) { return sig.ParseCommit(raw) }
+
 // VerifyCommitCached verifies one commit with the epoch cache. Shared with
 // the web UI.
 func VerifyCommitCached(st *store.Store, repo store.Repo, parsed *sig.Commit, sha string) (sig.Result, error) {

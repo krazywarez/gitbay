@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,36 @@ import (
 	"github.com/krazywarez/forge/internal/hookd"
 	"github.com/krazywarez/forge/internal/policy"
 )
+
+// collectIncomingCommits lists the commits this push introduces and reads
+// their raw objects. It runs in the hook process, which inherits git's
+// quarantine environment — the daemon cannot see these objects yet.
+func collectIncomingCommits(updates []policy.RefUpdate) (hookd.CommitsPayload, error) {
+	seen := map[string]bool{}
+	var payload hookd.CommitsPayload
+	for _, u := range updates {
+		if u.IsDelete {
+			continue
+		}
+		// Everything reachable from the new tip that no existing ref has.
+		out, err := exec.Command("git", "rev-list", u.New, "--not", "--all").Output()
+		if err != nil {
+			return payload, fmt.Errorf("rev-list %s: %w", u.New, err)
+		}
+		for _, sha := range strings.Fields(string(out)) {
+			if seen[sha] {
+				continue
+			}
+			seen[sha] = true
+			raw, err := exec.Command("git", "cat-file", "commit", sha).Output()
+			if err != nil {
+				return payload, fmt.Errorf("cat-file %s: %w", sha, err)
+			}
+			payload.Commits = append(payload.Commits, hookd.RawCommit{SHA: sha, Raw: raw})
+		}
+	}
+	return payload, nil
+}
 
 // hookCmd runs inside a git hook. It computes git facts here — the hook
 // process inherits git's quarantine environment, so incoming objects are
@@ -57,6 +88,8 @@ func hookCmd() *cobra.Command {
 				RepoID:  repoID,
 				UserID:  userID,
 				Updates: updates,
+			}, func() (hookd.CommitsPayload, error) {
+				return collectIncomingCommits(updates)
 			})
 			if err != nil {
 				return fmt.Errorf("forge daemon unreachable: %w", err)

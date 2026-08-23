@@ -1,0 +1,16 @@
+{{define "title"}}merge requests · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<h2>merge requests ({{.State}})</h2>
+<p class="crumbs"><a href="?state=open">open</a> · <a href="?state=merged">merged</a> · <a href="?state=closed">closed</a> · <a href="?state=all">all</a></p>
+<table>
+{{range .MRs}}<tr>
+  <td>!{{.Number}}</td>
+  <td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></td>
+  <td>{{.State}}</td>
+  <td>{{.Author}}</td>
+  <td>{{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</td>
+</tr>
+{{else}}<tr><td>no merge requests</td></tr>{{end}}
+</table>
+{{end}}
