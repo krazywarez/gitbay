@@ -1,13 +1,17 @@
-// forge is the client CLI. It speaks to a forge server over the system ssh
-// binary; it is ergonomics on top of a control plane that is fully usable
-// from bare OpenSSH.
+// forge is the client CLI. It is ergonomics over a control plane that is
+// fully usable from bare OpenSSH: most commands pass through to the server
+// over the system ssh binary, adding instance resolution, repo inference
+// from the origin remote, and $EDITOR for long text.
 package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 
 	"github.com/krazywarez/forge/internal/protocol"
 )
@@ -19,8 +23,6 @@ func main() {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().Bool("json", false, "machine-readable output")
-	root.PersistentFlags().String("repo", "", "owner/name (default: inferred from the origin remote)")
 
 	root.AddCommand(
 		authCmd(),
@@ -28,26 +30,95 @@ func main() {
 		issueCmd(),
 		mrCmd(),
 		webCmd(),
-		adminCmd(),
 		remoteCmd(),
 		initCmd(),
+		manCmd(root),
 	)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "forge:", err)
-		os.Exit(protocol.ExitFailure)
+		os.Exit(protocol.ExitUsage)
 	}
 }
 
-// stub returns a leaf command that fails until its milestone lands.
-func stub(use, short string) *cobra.Command {
+// passOpts describes how one CLI command maps onto the server command.
+type passOpts struct {
+	server    []string // server-side command path
+	needsRepo bool     // prepend inferred owner/name unless given
+	stdinOK   bool     // wire local stdin through (keys add, --file -)
+	editor    string   // open $EDITOR for a body when none given
+}
+
+// pass builds a passthrough command. Flags are parsed by the server, which
+// is the single source of truth for them; the CLI stays thin.
+func pass(use, short string, o passOpts) *cobra.Command {
 	return &cobra.Command{
-		Use:   use,
-		Short: short,
+		Use:                use,
+		Short:              short,
+		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("not implemented")
+			// cobra still owns `forge <cmd> --help`.
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					return cmd.Help()
+				}
+			}
+			os.Exit(runPass(o, args))
+			return nil
 		},
 	}
+}
+
+func runPass(o passOpts, args []string) int {
+	t, err := resolveTarget()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "forge:", err)
+		return protocol.ExitFailure
+	}
+	if o.needsRepo {
+		args, err = withRepo(t, args)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "forge:", err)
+			return protocol.ExitUsage
+		}
+	}
+
+	var stdin io.Reader = strings.NewReader("")
+	if o.editor != "" {
+		extended, body, ok, err := maybeEditor(args, o.editor)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "forge:", err)
+			return protocol.ExitFailure
+		}
+		if !ok {
+			return protocol.ExitFailure
+		}
+		args = extended
+		if body != nil {
+			stdin = body
+		}
+	}
+	if stdin == nil || isEmptyReader(stdin) {
+		if o.stdinOK && usesStdin(args) {
+			stdin = os.Stdin
+		}
+	}
+	return runSSH(t, append(o.server, args...), stdin)
+}
+
+func isEmptyReader(r io.Reader) bool {
+	sr, ok := r.(*strings.Reader)
+	return ok && sr.Len() == 0
+}
+
+// usesStdin reports whether the arguments request stdin content.
+func usesStdin(args []string) bool {
+	for i, a := range args {
+		if a == "--file" && i+1 < len(args) && args[i+1] == "-" {
+			return true
+		}
+	}
+	return false
 }
 
 func group(use, short string, subs ...*cobra.Command) *cobra.Command {
@@ -56,88 +127,151 @@ func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 	return c
 }
 
+// local wraps a locally-implemented command (git plumbing, config).
+func local(use, short string, fn func(args []string) int) *cobra.Command {
+	return &cobra.Command{
+		Use:                use,
+		Short:              short,
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					return cmd.Help()
+				}
+			}
+			os.Exit(fn(args))
+			return nil
+		},
+	}
+}
+
 func authCmd() *cobra.Command {
-	return group("auth", "identity: keys, emails, whoami",
-		stub("whoami", "show the authenticated account"),
+	keysAdd := pass("add", "register an SSH public key (reads the key from stdin or --file -)",
+		passOpts{server: []string{"keys", "add"}, stdinOK: true})
+	// keys add always reads stdin on the server; wire it through directly.
+	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
+		t, err := resolveTarget()
+		if err != nil {
+			return err
+		}
+		os.Exit(runSSH(t, append([]string{"keys", "add"}, args...), os.Stdin))
+		return nil
+	}
+	pgpAdd := &cobra.Command{
+		Use: "add", Short: "register an OpenPGP public key (armored, on stdin)",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			t, err := resolveTarget()
+			if err != nil {
+				return err
+			}
+			os.Exit(runSSH(t, append([]string{"pgp", "add"}, args...), os.Stdin))
+			return nil
+		},
+	}
+	return group("auth", "identity: whoami, SSH and PGP keys",
+		pass("whoami", "show the authenticated account", passOpts{server: []string{"whoami"}}),
 		group("keys", "manage SSH keys",
-			stub("list", "list registered SSH keys"),
-			stub("add", "register an SSH key"),
-			stub("remove", "remove an SSH key"),
+			pass("list", "list registered SSH keys", passOpts{server: []string{"keys", "list"}}),
+			keysAdd,
+			pass("remove", "remove an SSH key by fingerprint", passOpts{server: []string{"keys", "remove"}}),
 		),
 		group("pgp", "manage OpenPGP keys",
-			stub("list", "list registered PGP keys"),
-			stub("add", "register a PGP key"),
-			stub("remove", "remove a PGP key"),
-		),
-		group("email", "manage email addresses",
-			stub("add", "add an address"),
-			stub("verify", "confirm a verification code"),
+			pass("list", "list registered PGP keys", passOpts{server: []string{"pgp", "list"}}),
+			pgpAdd,
+			pass("remove", "remove a PGP key by fingerprint", passOpts{server: []string{"pgp", "remove"}}),
 		),
 	)
 }
 
 func repoCmd() *cobra.Command {
 	return group("repo", "create and manage repositories",
-		stub("create", "create a repository"),
-		stub("list", "list repositories"),
-		stub("show", "show repository details"),
-		stub("clone", "clone via ssh"),
-		stub("rename", "rename a repository"),
-		stub("delete", "delete a repository"),
-		stub("fork", "fork a repository"),
-		stub("import", "server-side mirror from a foreign URL"),
-		stub("settings", "get or set repository settings"),
+		pass("create", "create a repository: forge repo create <owner/name> [--private]",
+			passOpts{server: []string{"repo", "create"}}),
+		pass("list", "list repositories you own or can access", passOpts{server: []string{"repo", "list"}}),
+		pass("show", "show repository details", passOpts{server: []string{"repo", "show"}, needsRepo: true}),
+		pass("log", "commit log with signature states", passOpts{server: []string{"repo", "log"}, needsRepo: true}),
+		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
+		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
+		local("clone", "clone via ssh: forge repo clone <owner/name> [dir]", cmdRepoClone),
+		group("access", "manage access grants",
+			pass("grant", "grant access: ... <user> read|write|admin", passOpts{server: []string{"repo", "access", "grant"}, needsRepo: true}),
+			pass("revoke", "revoke access: ... <user>", passOpts{server: []string{"repo", "access", "revoke"}, needsRepo: true}),
+			pass("list", "list access grants", passOpts{server: []string{"repo", "access", "list"}, needsRepo: true}),
+		),
+		group("settings", "repository settings",
+			pass("show", "show settings", passOpts{server: []string{"repo", "settings", "show"}, needsRepo: true}),
+			pass("protect", "protect a branch", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
+			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
+			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
+			pass("git-daemon", "expose over git://: ... on|off", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),
+		),
 	)
 }
 
 func issueCmd() *cobra.Command {
 	return group("issue", "issues",
-		stub("create", "open an issue"),
-		stub("list", "list issues"),
-		stub("show", "show an issue"),
-		stub("comment", "comment on an issue"),
-		stub("close", "close an issue"),
-		stub("reopen", "reopen an issue"),
-		stub("label", "add or remove labels"),
-		stub("assign", "assign users"),
+		pass("create", "open an issue: --title <t> [--body|--file -|$EDITOR]",
+			passOpts{server: []string{"issue", "create"}, needsRepo: true, stdinOK: true, editor: "issue"}),
+		pass("list", "list issues [--state open|closed|all]", passOpts{server: []string{"issue", "list"}, needsRepo: true}),
+		pass("show", "show an issue with comments", passOpts{server: []string{"issue", "show"}, needsRepo: true}),
+		pass("comment", "comment on an issue [--message|--file -|$EDITOR]",
+			passOpts{server: []string{"issue", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
+		pass("close", "close an issue", passOpts{server: []string{"issue", "close"}, needsRepo: true}),
+		pass("reopen", "reopen an issue", passOpts{server: []string{"issue", "reopen"}, needsRepo: true}),
+		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"issue", "label"}, needsRepo: true}),
+		pass("assign", "assign users: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
 	)
 }
 
 func mrCmd() *cobra.Command {
 	return group("mr", "merge requests",
-		stub("create", "open a merge request"),
-		stub("list", "list merge requests"),
-		stub("show", "show a merge request"),
-		stub("diff", "show the diff"),
-		stub("checkout", "fetch and check out the MR head locally"),
-		stub("comment", "comment on a merge request"),
-		stub("review", "approve or request changes"),
-		stub("merge", "merge (fast-forward or merge-commit)"),
-		stub("close", "close without merging"),
+		pass("create", "open a merge request: --source <branch> --target <branch> --title <t>",
+			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request"}),
+		pass("list", "list merge requests [--state ...]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
+		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
+		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
+		local("checkout", "fetch and check out the MR head locally: forge mr checkout <n>", cmdMRCheckout),
+		pass("comment", "comment on a merge request", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
+		pass("review", "review: --approve|--request-changes|--comment", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
+		pass("merge", "merge (fast-forward or merge-commit): [--strategy ff|merge]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
+		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
 	)
 }
 
 func webCmd() *cobra.Command {
 	return group("web", "browser session",
-		stub("login", "mint a one-time browser login URL over ssh"),
-	)
-}
-
-func adminCmd() *cobra.Command {
-	return group("admin", "instance administration (admin accounts only)",
-		stub("user", "manage users"),
-		stub("invite", "issue registration invites"),
-		stub("stats", "instance statistics"),
+		pass("login", "mint a one-time browser login URL over ssh", passOpts{server: []string{"web", "login"}}),
 	)
 }
 
 func remoteCmd() *cobra.Command {
 	return group("remote", "local instance profiles (no server contact)",
-		stub("add", "add a named forge instance"),
-		stub("list", "list configured instances"),
+		local("add", "add a named forge instance: forge remote add <name> <host> [--port n] [--user u] [--ssh-option o]... [--default]",
+			cmdRemoteAdd),
+		local("list", "list configured instances", func([]string) int { return cmdRemoteList() }),
 	)
 }
 
 func initCmd() *cobra.Command {
-	return stub("init", "git init + repo create + set origin, in one step")
+	return local("init", "git init + repo create + set origin, in one step: forge init [name] [--private]", cmdInit)
+}
+
+// manCmd generates man pages; a CLI-first tool without man pages is not
+// CLI-first.
+func manCmd(root *cobra.Command) *cobra.Command {
+	var dir string
+	cmd := &cobra.Command{
+		Use:    "man",
+		Short:  "generate man pages into a directory",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return err
+			}
+			return doc.GenManTree(root, &doc.GenManHeader{Title: "FORGE", Section: "1"}, dir)
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "man", "output directory")
+	return cmd
 }
