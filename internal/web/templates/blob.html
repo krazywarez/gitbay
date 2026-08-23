@@ -2,7 +2,7 @@
 {{define "content"}}
 {{template "repoheader" .}}
 <p class="crumbs">{{.Ref}}: {{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}{{.Base}}
- · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a></p>
+ · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">edit</a>{{end}}</p>
 {{if .Binary}}<p>binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
 {{else}}<div class="code">{{.CodeHTML}}</div>{{end}}
 {{end}}

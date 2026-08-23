@@ -9,4 +9,10 @@
 {{range .Comments}}
 <div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><pre class="message">{{.Body}}</pre></div>
 {{end}}
+{{if .Viewer}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment">
+<p><textarea name="body" rows="4" style="width:100%" placeholder="comment as {{.Viewer}}"></textarea></p>
+<p><button type="submit">comment</button></p>
+</form>
+{{end}}
 {{end}}

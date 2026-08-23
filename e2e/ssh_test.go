@@ -46,6 +46,11 @@ func freePort(t *testing.T) int {
 }
 
 func startInstance(t *testing.T) *instance {
+	return startInstanceWith(t, "")
+}
+
+// startInstanceWith appends extra TOML to the instance config.
+func startInstanceWith(t *testing.T, extra string) *instance {
 	t.Helper()
 	inst := &instance{
 		forged:   buildForged(t),
@@ -69,6 +74,7 @@ tls = "off"
 enabled = true
 port = %d
 `, inst.root, inst.port, inst.httpPort, inst.gitPort)
+	cfg += extra + "\n"
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}

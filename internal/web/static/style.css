@@ -40,6 +40,7 @@ pre.diff .add { color: var(--ok); }
 pre.diff .del { color: var(--bad); }
 pre.diff .hunk { color: var(--link); }
 pre.diff .meta { color: var(--muted); }
+.error { color: var(--bad); }
 .badge {
   display: inline-block; padding: 0.05rem 0.5rem; border-radius: 10px;
   font-size: 12px; border: 1px solid;

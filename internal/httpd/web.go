@@ -3,6 +3,8 @@ package httpd
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/krazywarez/forge/internal/policy"
 	"html/template"
 	"net/http"
 	"path"
@@ -50,15 +52,32 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	var viewer store.User
+	var mine []store.Repo
+	if s.cfg.Web.Mode == "accounts" {
+		if viewer = s.viewer(r); viewer.ID != 0 {
+			all, err := s.st.ListReposForUser(viewer.ID)
+			if err == nil {
+				for _, rp := range all {
+					if rp.Visibility == "private" {
+						mine = append(mine, rp)
+					}
+				}
+			}
+		}
+	}
 	s.render(w, "index.html", struct {
-		Site  string
-		Repos []store.Repo
-	}{s.siteName(), repos})
+		Site   string
+		Viewer string
+		Repos  []store.Repo
+		Mine   []store.Repo
+	}{s.siteName(), viewer.Username, repos, mine})
 }
 
 // repoPage is the shared context for repo-scoped pages.
 type repoPage struct {
 	Site     string
+	Viewer   string
 	Repo     store.Repo
 	Ref      string
 	CloneURL string
@@ -66,10 +85,24 @@ type repoPage struct {
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
-// The anonymous web sees public repos only — private and missing repos are
-// indistinguishable.
+// Anonymous visitors see public repos only; in accounts mode a logged-in
+// viewer additionally sees repos their grants allow. Private and missing
+// repos are indistinguishable either way.
 func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (repoPage, bool) {
-	repo, ok := s.publicRepo(r.PathValue("owner"), r.PathValue("repo"))
+	var repo store.Repo
+	var viewer store.User
+	if s.cfg.Web.Mode == "accounts" {
+		viewer = s.viewer(r)
+	}
+	repo, err := s.st.RepoByPath(r.PathValue("owner") + "/" + r.PathValue("repo"))
+	ok := err == nil
+	if ok {
+		grant := ""
+		if viewer.ID != 0 {
+			grant, _ = s.st.AccessRole(repo.ID, viewer.ID)
+		}
+		ok = policyCanRead(viewer, repo, grant)
+	}
 	if !ok {
 		http.NotFound(w, r)
 		return repoPage{}, false
@@ -79,6 +112,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	}
 	return repoPage{
 		Site:     s.siteName(),
+		Viewer:   viewer.Username,
 		Repo:     repo,
 		Ref:      ref,
 		CloneURL: s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
@@ -510,4 +544,8 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", prefix+".tar.gz"))
 	gitutil.Archive(p.Dir, ref, prefix, w)
+}
+
+func policyCanRead(u store.User, repo store.Repo, grant string) bool {
+	return policy.CanRead(u, repo, grant)
 }

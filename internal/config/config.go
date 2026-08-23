@@ -152,6 +152,10 @@ func (c Config) Validate() error {
 		errs = append(errs, errors.New(
 			"web.password_auth = true is meaningless with web.mode = \"view_only\": no login route exists"))
 	}
+	if c.Web.PasswordAuth && c.Web.Mode == "accounts" {
+		errs = append(errs, errors.New(
+			"web.password_auth is not implemented yet; browser sessions are minted over SSH (forge web login)"))
+	}
 
 	return errors.Join(errs...)
 }

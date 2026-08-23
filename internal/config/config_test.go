@@ -61,6 +61,11 @@ func TestContradictions(t *testing.T) {
 			"password_auth",
 		},
 		{
+			"password auth not implemented",
+			minimal + "\n[web]\nmode = \"accounts\"\npassword_auth = true\n",
+			"not implemented",
+		},
+		{
 			"bad ssh mode",
 			minimal + "\n[ssh]\nmode = \"tcp\"\n",
 			"ssh.mode",
@@ -103,8 +108,8 @@ func TestValidCombinations(t *testing.T) {
 			minimal + "\n[ssh]\nmode = \"system\"\n",
 		},
 		{
-			"accounts web with password auth",
-			minimal + "\n[web]\nmode = \"accounts\"\npassword_auth = true\n",
+			"accounts web without password auth",
+			minimal + "\n[web]\nmode = \"accounts\"\n",
 		},
 		{
 			"closed registration, no smtp at all",

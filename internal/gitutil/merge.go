@@ -115,3 +115,60 @@ func MergeBase(dir, a, b string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
+
+// CommitFileChange writes content at path on branch as a new commit and
+// advances the branch with compare-and-swap. Used by web edits; hooks do not
+// run, so callers enforce policy themselves.
+func CommitFileChange(dir, branch, path string, content []byte, name, email, message string) (string, error) {
+	branchRef := "refs/heads/" + branch
+	parent, err := ResolveRef(dir, branchRef)
+	if err != nil {
+		return "", fmt.Errorf("branch %s: %w", branch, err)
+	}
+
+	// Hash the new blob.
+	hb := exec.Command("git", "-C", dir, "hash-object", "-w", "--stdin")
+	hb.Stdin = strings.NewReader(string(content))
+	out, err := hb.Output()
+	if err != nil {
+		return "", fmt.Errorf("hash-object: %w", err)
+	}
+	blob := strings.TrimSpace(string(out))
+
+	// Stage the parent tree in a temporary index, splice the blob in, and
+	// write the new tree.
+	idx, err := os.CreateTemp("", "forge-index-*")
+	if err != nil {
+		return "", err
+	}
+	idx.Close()
+	defer os.Remove(idx.Name())
+	env := append(os.Environ(), "GIT_INDEX_FILE="+idx.Name())
+
+	rt := exec.Command("git", "-C", dir, "read-tree", parent+"^{tree}")
+	rt.Env = env
+	if out, err := rt.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("read-tree: %v\n%s", err, out)
+	}
+	ui := exec.Command("git", "-C", dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+","+path)
+	ui.Env = env
+	if out, err := ui.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("update-index: %v\n%s", err, out)
+	}
+	wt := exec.Command("git", "-C", dir, "write-tree")
+	wt.Env = env
+	out, err = wt.Output()
+	if err != nil {
+		return "", fmt.Errorf("write-tree: %w", err)
+	}
+	tree := strings.TrimSpace(string(out))
+
+	sha, err := CommitTree(dir, tree, []string{parent}, name, email, message)
+	if err != nil {
+		return "", err
+	}
+	if err := UpdateRefCAS(dir, branchRef, sha, parent); err != nil {
+		return "", fmt.Errorf("branch moved during edit; reload and retry: %w", err)
+	}
+	return sha, nil
+}

@@ -33,11 +33,30 @@ func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
 	}
 }
 
+// TestAccountsModeHasLoginRoute is the positive counterpart: switching the
+// mode on registers the session routes.
+func TestAccountsModeHasLoginRoute(t *testing.T) {
+	cfg := config.Default()
+	cfg.Web.Mode = "accounts"
+	s := New(cfg, nil)
+	found := false
+	for _, r := range s.Routes() {
+		if r.Pattern == "/login" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("accounts mode is missing the /login route")
+	}
+}
+
 // TestTopLevelRouteWordsAreReserved keeps the route table and the reserved
 // username list in agreement: every literal first path segment must be an
 // unclaimable username.
 func TestTopLevelRouteWordsAreReserved(t *testing.T) {
-	s := New(config.Default(), nil)
+	cfg := config.Default()
+	cfg.Web.Mode = "accounts" // superset of routes
+	s := New(cfg, nil)
 	for _, r := range s.Routes() {
 		seg := strings.TrimPrefix(r.Pattern, "/")
 		seg, _, _ = strings.Cut(seg, "/")

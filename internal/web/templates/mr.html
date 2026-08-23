@@ -9,6 +9,12 @@
 {{range .Comments}}
 <div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><pre class="message">{{.Body}}</pre></div>
 {{end}}
+{{if .Viewer}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}/comment">
+<p><textarea name="body" rows="4" style="width:100%" placeholder="comment as {{.Viewer}}"></textarea></p>
+<p><button type="submit">comment</button></p>
+</form>
+{{end}}
 <h3>diff</h3>
 <pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
 {{end}}</pre>

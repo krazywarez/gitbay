@@ -43,8 +43,28 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs/{n}", Handler: s.mr},
 	)
 
-	// Account-mode routes (login, web edits) are appended here in M8 —
-	// and only when s.cfg.Web.Mode == "accounts".
+	// Account-mode routes exist only when web.mode = "accounts". In
+	// view_only they are never registered — the structural guarantee.
+	if s.cfg.Web.Mode == "accounts" {
+		routes = append(routes,
+			Route{Method: "GET", Pattern: "/login", Handler: s.login, Mutating: true}, // consumes a one-time token
+			Route{Method: "POST", Pattern: "/logout", Mutating: true,
+				Handler: s.checkOrigin(s.logout)},
+			Route{Method: "GET", Pattern: "/new", Handler: s.requireUser(s.newRepoForm)},
+			Route{Method: "POST", Pattern: "/new", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.newRepoSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/new", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.issueCreateSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/{n}/comment", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.issueCommentSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/comment", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.mrCommentSubmit))},
+			Route{Method: "GET", Pattern: "/{owner}/{repo}/edit/{ref}/{path...}",
+				Handler: s.requireUser(s.editForm)},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/edit/{ref}/{path...}", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.editSubmit))},
+		)
+	}
 	return routes
 }
 

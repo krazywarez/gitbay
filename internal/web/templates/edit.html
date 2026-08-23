@@ -1,0 +1,11 @@
+{{define "title"}}edit {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+<h1>edit {{.Repo.OwnerName}}/{{.Repo.Name}} : {{.Path}} @ {{.Ref}}</h1>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">
+<p><textarea name="content" rows="24" style="width:100%" spellcheck="false">{{.Content}}</textarea></p>
+<p><input name="message" placeholder="commit message" style="width:60%">
+<button type="submit">commit to {{.Ref}}</button></p>
+<p class="crumbs">this commit will be unsigned and authored as {{.Viewer}}</p>
+</form>
+{{end}}

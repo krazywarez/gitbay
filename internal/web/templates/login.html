@@ -1,0 +1,9 @@
+{{define "title"}}login · {{.Site}}{{end}}
+{{define "content"}}
+<h1>log in</h1>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<p>Browser sessions are minted over SSH — there is no password. From a machine
+with your registered key:</p>
+<pre class="message">ssh git@{{.Site}} web login</pre>
+<p>then open the printed URL within five minutes.</p>
+{{end}}
