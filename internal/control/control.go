@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"slices"
 
 	"github.com/krazywarez/forge/internal/config"
@@ -91,6 +92,10 @@ func (emptyReader) Read([]byte) (int, error) { return 0, io.EOF }
 // emit writes data as the command result: a JSON envelope under --json,
 // otherwise via the plain formatter.
 func (c *Ctx) emit(data any, plain func(w io.Writer)) int {
+	// A nil slice would serialize as null; consumers should see [].
+	if v := reflect.ValueOf(data); v.Kind() == reflect.Slice && v.IsNil() {
+		data = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	}
 	if c.JSON {
 		enc := json.NewEncoder(c.Stdout)
 		enc.SetEscapeHTML(false)

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -362,6 +363,54 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		DiffLines                                                             []diffLine
 	}{p, full, full[:10], parsed.AuthorName, parsed.AuthorEmail, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg, v, lines})
+}
+
+func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	state := r.URL.Query().Get("state")
+	if state != "closed" && state != "all" {
+		state = "open"
+	}
+	issues, err := s.st.ListIssues(p.Repo.ID, state)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "issues.html", struct {
+		repoPage
+		State  string
+		Issues []store.Issue
+	}{p, state, issues})
+}
+
+func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	iss, err := s.st.IssueByNumber(p.Repo.ID, n)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	comments, err := s.st.ListIssueComments(iss.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "issue.html", struct {
+		repoPage
+		Issue    store.Issue
+		Comments []store.IssueComment
+	}{p, iss, comments})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

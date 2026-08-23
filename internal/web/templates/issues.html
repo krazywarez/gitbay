@@ -1,0 +1,16 @@
+{{define "title"}}issues · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<h2>issues ({{.State}})</h2>
+<p class="crumbs"><a href="?state=open">open</a> · <a href="?state=closed">closed</a> · <a href="?state=all">all</a></p>
+<table>
+{{range .Issues}}<tr>
+  <td>#{{.Number}}</td>
+  <td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues/{{.Number}}">{{.Title}}</a></td>
+  <td>{{.State}}</td>
+  <td>{{.Author}}</td>
+  <td>{{range .Labels}}<span class="badge badge-unsigned">{{.}}</span> {{end}}</td>
+</tr>
+{{else}}<tr><td>no issues</td></tr>{{end}}
+</table>
+{{end}}
