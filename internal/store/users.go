@@ -142,20 +142,35 @@ func (s *Store) TouchSSHKey(id int64) error {
 }
 
 // AddEmail adds an address; verifiedBy is "" (unverified), "smtp", or "admin".
+// Adding an already-verified address bumps the key epoch: it is a trust input
+// for signature states.
 func (s *Store) AddEmail(userID int64, address, verifiedBy string, primary bool) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	var vAt, vBy any
 	if verifiedBy != "" {
 		vAt = "now"
 		vBy = verifiedBy
 	}
-	_, err := s.DB.Exec(
+	_, err = tx.Exec(
 		`INSERT INTO emails (user_id, address, verified_at, verified_by, is_primary)
 		 VALUES (?, ?, CASE WHEN ? IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END, ?, ?)`,
 		userID, address, vAt, vBy, boolInt(primary))
 	if isUniqueErr(err) {
 		return fmt.Errorf("address %q is already in use", address)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if verifiedBy != "" {
+		if err := bumpKeyEpoch(tx); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) KeyEpoch() (int64, error) {

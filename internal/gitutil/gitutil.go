@@ -74,3 +74,29 @@ func ZeroSHA(s string) bool {
 	}
 	return true
 }
+
+// RevList returns up to limit commit SHAs reachable from ref, newest first.
+func RevList(dir, ref string, limit int) ([]string, error) {
+	cmd := exec.Command("git", "-C", dir, "rev-list", fmt.Sprintf("--max-count=%d", limit), ref)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("rev-list %s: %w", ref, err)
+	}
+	var shas []string
+	for _, l := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if l != "" {
+			shas = append(shas, l)
+		}
+	}
+	return shas, nil
+}
+
+// ReadCommit returns the raw commit object bytes.
+func ReadCommit(dir, sha string) ([]byte, error) {
+	cmd := exec.Command("git", "-C", dir, "cat-file", "commit", sha)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("cat-file commit %s: %w", sha, err)
+	}
+	return out, nil
+}

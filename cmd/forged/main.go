@@ -298,13 +298,7 @@ func adminEmailVerifyCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("user %s: %w", args[0], err)
 			}
-			res, err := st.DB.Exec(
-				`UPDATE emails SET verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), verified_by = 'admin'
-				 WHERE user_id = ? AND address = ?`, u.ID, args[1])
-			if err != nil {
-				return err
-			}
-			if n, _ := res.RowsAffected(); n == 0 {
+			if err := st.VerifyEmail(u.ID, args[1], "admin"); err != nil {
 				return fmt.Errorf("no address %s on user %s", args[1], args[0])
 			}
 			fmt.Println("verified", args[1])
