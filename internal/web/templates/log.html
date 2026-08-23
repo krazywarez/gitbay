@@ -1,0 +1,15 @@
+{{define "title"}}log · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<table class="log">
+{{range .Commits}}<tr>
+  <td><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code></td>
+  <td>{{.Subject}}</td>
+  <td>{{.AuthorName}} &lt;{{.AuthorEmail}}&gt;</td>
+  <td>{{.Date}}</td>
+  <td>{{template "sigbadge" .Sig}}</td>
+</tr>
+{{end}}
+</table>
+{{if .NextSHA}}<p><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.NextSHA}}">older →</a></p>{{end}}
+{{end}}

@@ -17,6 +17,9 @@ func (i *instance) gitEnv(key string) []string {
 		key, filepath.Join(i.sshDir, "known_hosts"))
 	return append(os.Environ(),
 		"GIT_SSH_COMMAND="+sshCmd,
+		// Isolate from the developer's own git config (signing, helpers).
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test",
 	)

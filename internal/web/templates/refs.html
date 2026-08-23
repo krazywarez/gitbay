@@ -1,0 +1,8 @@
+{{define "title"}}refs · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<h2>branches</h2>
+<table>{{range .Branches}}<tr><td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{.Name}}/">{{.Name}}</a></td><td><code>{{.SHA}}</code></td></tr>{{end}}</table>
+<h2>tags</h2>
+<table>{{range .Tags}}<tr><td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{.Name}}/">{{.Name}}</a></td><td><code>{{.SHA}}</code></td></tr>{{else}}<tr><td>none</td></tr>{{end}}</table>
+{{end}}

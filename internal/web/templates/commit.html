@@ -1,0 +1,11 @@
+{{define "title"}}{{.ShortSHA}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<h2><code>{{.SHA}}</code></h2>
+<p>{{template "sigbadge" .Sig}}</p>
+<p>author: {{.AuthorName}} &lt;{{.AuthorEmail}}&gt; · {{.Date}}
+{{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
+<pre class="message">{{.Message}}</pre>
+<pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
+{{end}}</pre>
+{{end}}

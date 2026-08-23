@@ -28,15 +28,10 @@ func New(cfg config.Config, st *store.Store) *Server {
 	return &Server{cfg: cfg, st: st}
 }
 
-func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{owner}/{repo}/info/refs", s.infoRefs)
-	mux.HandleFunc("POST /{owner}/{repo}/git-upload-pack", s.uploadPack)
-	// Push endpoints exist only to fail legibly.
-	mux.HandleFunc("POST /{owner}/{repo}/git-receive-pack", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, s.pushRefusalMessage(r.PathValue("owner"), r.PathValue("repo")), http.StatusForbidden)
-	})
-	return mux
+// receivePackRefusal exists only to fail legibly if a client POSTs without
+// reading the advertisement first.
+func (s *Server) receivePackRefusal(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, s.pushRefusalMessage(r.PathValue("owner"), r.PathValue("repo")), http.StatusForbidden)
 }
 
 // publicRepo resolves owner/name and returns it only if it exists and is

@@ -191,3 +191,25 @@ func (s *Store) RepoByID(id int64) (Repo, error) {
 	}
 	return r, nil
 }
+
+// ListPublicRepos returns all public repositories, for the anonymous index.
+func (s *Store) ListPublicRepos() ([]Repo, error) {
+	rows, err := s.DB.Query(`
+		SELECT r.id, r.owner_kind, r.owner_id, u.username, r.name, r.visibility, r.default_branch, r.settings_json
+		FROM repos r JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		WHERE r.visibility = 'public' ORDER BY u.username, r.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Repo
+	for rows.Next() {
+		var r Repo
+		var settingsJSON string
+		if err := rows.Scan(&r.ID, &r.OwnerKind, &r.OwnerID, &r.OwnerName, &r.Name, &r.Visibility, &r.DefaultBranch, &settingsJSON); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

@@ -5,6 +5,7 @@
 package hookd
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -35,8 +36,19 @@ type Response struct {
 	Message string `json:"message,omitempty"`
 }
 
-// SocketPath returns the hook socket location under the server root.
-func SocketPath(root string) string { return filepath.Join(root, "hook.sock") }
+// SocketPath returns the hook socket location. It prefers the server root,
+// but unix socket paths are capped (~104 bytes on macOS, 108 on Linux), so
+// deep roots fall back to a hashed name under the system temp directory.
+// Hooks receive the chosen path via FORGE_HOOK_SOCKET, so both sides always
+// agree.
+func SocketPath(root string) string {
+	p := filepath.Join(root, "hook.sock")
+	if len(p) <= 100 {
+		return p
+	}
+	sum := sha256.Sum256([]byte(root))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("forge-%x.sock", sum[:8]))
+}
 
 type Server struct {
 	st *store.Store

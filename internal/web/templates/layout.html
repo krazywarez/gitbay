@@ -1,0 +1,30 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{template "title" .}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <nav><a class="site" href="/">{{.Site}}</a></nav>
+</header>
+<main>
+{{template "content" .}}
+</main>
+</body>
+</html>{{end}}
+
+{{define "repoheader"}}
+<h1><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.OwnerName}}/{{.Repo.Name}}</a></h1>
+<nav class="tabs">
+  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
+  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
+  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
+  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">archive</a>
+</nav>
+<p class="clone">clone: <code>git clone {{.CloneURL}}</code></p>
+{{end}}
+
+{{define "sigbadge"}}<span class="badge badge-{{.State}}" title="{{.Fingerprint}}">{{.State}}{{if .Signer}} · {{.Signer}}{{end}}</span>{{end}}

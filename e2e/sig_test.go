@@ -67,7 +67,13 @@ type commitSpec struct {
 func buildCommits(t *testing.T, dir string, env []string, specs []commitSpec) []string {
 	t.Helper()
 	tree := strings.TrimSpace(mustGit(t, dir, env, "mktree"))
-	parent := ""
+	return buildChain(t, dir, env, tree, "", specs)
+}
+
+// buildChain constructs signed commit objects on top of parent ("" for a
+// root commit) using the given tree, and points refs/heads/main at the tip.
+func buildChain(t *testing.T, dir string, env []string, tree, parent string, specs []commitSpec) []string {
+	t.Helper()
 	base := time.Now().Add(-time.Duration(len(specs)) * time.Minute).Unix()
 	var shas []string
 	for i, spec := range specs {

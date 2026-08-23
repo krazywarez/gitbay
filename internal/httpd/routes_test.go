@@ -1,0 +1,51 @@
+package httpd
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/krazywarez/forge/internal/config"
+	"github.com/krazywarez/forge/internal/policy"
+)
+
+// TestViewOnlyHasNoMutatingRoutes is the structural guarantee from the plan:
+// under web.mode = "view_only" the route table must contain no mutating
+// route — not hidden ones, none at all.
+func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
+	cfg := config.Default()
+	cfg.Web.Mode = "view_only"
+	s := New(cfg, nil)
+
+	for _, r := range s.Routes() {
+		if r.Mutating {
+			t.Errorf("view_only route table contains mutating route %s %s", r.Method, r.Pattern)
+		}
+		// The only POSTs allowed are the git transport endpoints: a pure
+		// read (upload-pack) and a static refusal (receive-pack).
+		if r.Method != "GET" && !strings.Contains(r.Pattern, "git-upload-pack") && !strings.Contains(r.Pattern, "git-receive-pack") {
+			t.Errorf("view_only route table contains non-GET route %s %s", r.Method, r.Pattern)
+		}
+		for _, word := range []string{"login", "logout", "register", "edit", "new", "settings"} {
+			if strings.Contains(r.Pattern, "/"+word) {
+				t.Errorf("view_only route table contains account-mode pattern %s %s", r.Method, r.Pattern)
+			}
+		}
+	}
+}
+
+// TestTopLevelRouteWordsAreReserved keeps the route table and the reserved
+// username list in agreement: every literal first path segment must be an
+// unclaimable username.
+func TestTopLevelRouteWordsAreReserved(t *testing.T) {
+	s := New(config.Default(), nil)
+	for _, r := range s.Routes() {
+		seg := strings.TrimPrefix(r.Pattern, "/")
+		seg, _, _ = strings.Cut(seg, "/")
+		if seg == "" || strings.HasPrefix(seg, "{") {
+			continue // wildcard or root
+		}
+		if !policy.Reserved(seg) {
+			t.Errorf("top-level route word %q is not in the reserved username list", seg)
+		}
+	}
+}

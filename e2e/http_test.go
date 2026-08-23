@@ -53,7 +53,7 @@ func anonEnv() []string {
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_ASKPASS=false",
 		"GIT_CONFIG_NOSYSTEM=1",
-		"HOME=/nonexistent-forge-e2e", // no ~/.gitconfig credential helpers
+		"GIT_CONFIG_GLOBAL=/dev/null", // no ~/.gitconfig credential helpers or signing
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test",
 	)

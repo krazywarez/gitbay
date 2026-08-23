@@ -1,0 +1,14 @@
+{{define "title"}}{{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<p class="crumbs">{{.Ref}}: {{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</p>
+<table class="tree">
+{{range .Entries}}<tr>
+  <td class="mode">{{.Mode}}</td>
+  {{if eq .Type "tree"}}<td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}/</a></td><td></td>
+  {{else}}<td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}</a></td><td class="size">{{.Size}}</td>{{end}}
+</tr>
+{{else}}<tr><td>empty</td></tr>{{end}}
+</table>
+{{if .ReadmeHTML}}<section class="readme">{{.ReadmeHTML}}</section>{{end}}
+{{end}}
