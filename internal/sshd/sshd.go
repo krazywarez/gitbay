@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -184,70 +185,78 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
+	return Exec(s.cfg, s.st, user, ext["scope"], cmdline, ch, ch, ch.Stderr())
+}
 
+// Exec runs one SSH exec command line for an authenticated key. It is the
+// single dispatch path shared by the embedded listener and the system-sshd
+// forced command (forged shell).
+func Exec(cfg config.Config, st *store.Store, user store.User, scope, cmdline string,
+	stdin io.Reader, stdout, stderr io.Writer) int {
 	argv, err := protocol.Tokenize(cmdline)
 	if err != nil {
-		fmt.Fprintf(ch.Stderr(), "cannot parse command: %v\n", err)
+		fmt.Fprintf(stderr, "cannot parse command: %v\n", err)
 		return protocol.ExitUsage
 	}
 	if len(argv) > 0 {
 		switch argv[0] {
 		case "git-upload-pack", "git-receive-pack", "git-upload-archive":
-			return s.runGit(ch, user, ext["scope"], argv)
+			return runGit(cfg, st, user, scope, argv, stdin, stdout, stderr)
 		}
 	}
 	ctx := &control.Ctx{
 		User:   user,
-		Scope:  ext["scope"],
-		Store:  s.st,
-		Cfg:    s.cfg,
-		Stdin:  ch,
-		Stdout: ch,
-		Stderr: ch.Stderr(),
+		Scope:  scope,
+		Store:  st,
+		Cfg:    cfg,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	}
 	return control.Dispatch(ctx, argv)
 }
 
 // runGit streams a git transport service after access checks.
-func (s *Server) runGit(ch ssh.Channel, user store.User, scope string, argv []string) int {
+func runGit(cfg config.Config, st *store.Store, user store.User, scope string, argv []string,
+	stdin io.Reader, stdout, stderr io.Writer) int {
 	service := argv[0]
 	if len(argv) != 2 {
-		fmt.Fprintf(ch.Stderr(), "usage: %s <path>\n", service)
+		fmt.Fprintf(stderr, "usage: %s <path>\n", service)
 		return protocol.ExitUsage
 	}
 	write := service == "git-receive-pack"
 
-	repo, err := s.st.RepoByPath(argv[1])
+	repo, err := st.RepoByPath(argv[1])
 	if err != nil {
-		fmt.Fprintln(ch.Stderr(), "repository not found")
+		fmt.Fprintln(stderr, "repository not found")
 		return protocol.ExitNotFound
 	}
-	grant, err := s.st.AccessRole(repo.ID, user.ID)
+	grant, err := st.AccessRole(repo.ID, user.ID)
 	if err != nil {
-		fmt.Fprintln(ch.Stderr(), "internal error")
+		fmt.Fprintln(stderr, "internal error")
 		return protocol.ExitFailure
 	}
 	if !policy.CanRead(user, repo, grant) {
 		// Same answer as nonexistence: private repos must not be enumerable.
-		fmt.Fprintln(ch.Stderr(), "repository not found")
+		fmt.Fprintln(stderr, "repository not found")
 		return protocol.ExitNotFound
 	}
 	if !policy.ScopeAllowsGit(scope, repo.Path(), write) {
-		fmt.Fprintf(ch.Stderr(), "this key's scope (%s) does not allow %s on %s\n", scope, service, repo.Path())
+		fmt.Fprintf(stderr, "this key's scope (%s) does not allow %s on %s\n", scope, service, repo.Path())
 		return protocol.ExitDenied
 	}
 	if write && !policy.CanWrite(user, repo, grant) {
-		fmt.Fprintf(ch.Stderr(), "write access to %s denied\n", repo.Path())
+		fmt.Fprintf(stderr, "write access to %s denied\n", repo.Path())
 		return protocol.ExitDenied
 	}
 
-	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	dir := control.RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name)
 	env := []string{
-		hookd.EnvSocket + "=" + hookd.SocketPath(s.cfg.Server.Root),
+		hookd.EnvSocket + "=" + hookd.SocketPath(cfg.Server.Root),
 		hookd.EnvRepoID + "=" + strconv.FormatInt(repo.ID, 10),
 		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
 	}
-	if err := gitutil.Transport(service, dir, ch, ch.Stderr(), env); err != nil {
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK

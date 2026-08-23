@@ -53,6 +53,8 @@ func main() {
 		migrateCmd(),
 		adminCmd(),
 		hookCmd(),
+		authorizedKeysCmd(),
+		shellCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -99,10 +101,6 @@ func serveCmd() *cobra.Command {
 			}
 			defer st.Close()
 
-			if cfg.SSH.Mode != "embedded" {
-				return fmt.Errorf("ssh.mode = %q not implemented (M9)", cfg.SSH.Mode)
-			}
-
 			// Regenerate hook scripts so a moved binary self-heals, then
 			// start the hook policy socket.
 			self, err := os.Executable()
@@ -118,18 +116,24 @@ func serveCmd() *cobra.Command {
 			}
 			defer stopHookd()
 
-			srv, err := sshd.New(cfg, st)
-			if err != nil {
-				return err
-			}
-			ln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(cfg.SSH.Port)))
-			if err != nil {
-				return err
-			}
-			slog.Info("ssh listening", "addr", ln.Addr())
-
 			errCh := make(chan error, 3)
-			go func() { errCh <- srv.Serve(ln) }()
+			if cfg.SSH.Mode == "embedded" {
+				srv, err := sshd.New(cfg, st)
+				if err != nil {
+					return err
+				}
+				ln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(cfg.SSH.Port)))
+				if err != nil {
+					return err
+				}
+				slog.Info("ssh listening", "addr", ln.Addr())
+				go func() { errCh <- srv.Serve(ln) }()
+			} else {
+				// system mode: the host sshd owns the SSH port and invokes
+				// this binary via AuthorizedKeysCommand + forced command.
+				slog.Info("ssh handled by host sshd (ssh.mode = system)")
+			}
+
 
 			web := httpd.New(cfg, st)
 			hs := &http.Server{Addr: cfg.HTTP.Addr, Handler: web.Handler()}

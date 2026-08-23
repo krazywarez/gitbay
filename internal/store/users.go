@@ -198,3 +198,14 @@ func boolInt(b bool) int {
 func isUniqueErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
+
+func (s *Store) SSHKeyByID(id int64) (SSHKey, error) {
+	var k SSHKey
+	err := s.DB.QueryRow(
+		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE id = ?",
+		id).Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope)
+	if errors.Is(err, sql.ErrNoRows) {
+		return k, ErrNotFound
+	}
+	return k, err
+}
