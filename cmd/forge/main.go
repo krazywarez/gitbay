@@ -194,6 +194,7 @@ func repoCmd() *cobra.Command {
 		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
 		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
 		local("clone", "clone via ssh: forge repo clone <owner/name> [dir]", cmdRepoClone),
+		importCmd(),
 		group("access", "manage access grants",
 			pass("grant", "grant access: ... <user> read|write|admin", passOpts{server: []string{"repo", "access", "grant"}, needsRepo: true}),
 			pass("revoke", "revoke access: ... <user>", passOpts{server: []string{"repo", "access", "revoke"}, needsRepo: true}),
@@ -237,6 +238,41 @@ func mrCmd() *cobra.Command {
 		pass("merge", "merge (fast-forward or merge-commit): [--strategy ff|merge]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
 	)
+}
+
+// importCmd passes repo import through with stdin wired for --token-stdin.
+func importCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:                "import",
+		Short:              "server-side mirror of a foreign repo: forge repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					return cmd.Help()
+				}
+			}
+			t, err := resolveTarget()
+			if err != nil {
+				return err
+			}
+			var stdin io.Reader = strings.NewReader("")
+			if usesTokenStdin(args) {
+				stdin = os.Stdin
+			}
+			os.Exit(runSSH(t, append([]string{"repo", "import"}, args...), stdin))
+			return nil
+		},
+	}
+}
+
+func usesTokenStdin(args []string) bool {
+	for _, a := range args {
+		if a == "--token-stdin" {
+			return true
+		}
+	}
+	return false
 }
 
 func webCmd() *cobra.Command {

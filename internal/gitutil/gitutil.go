@@ -3,6 +3,7 @@
 package gitutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -99,4 +100,49 @@ func ReadCommit(dir, sha string) ([]byte, error) {
 		return nil, fmt.Errorf("cat-file commit %s: %w", sha, err)
 	}
 	return out, nil
+}
+
+// FetchMirror pulls all branches, tags, and notes from a foreign URL into
+// the bare repository at dir, forcing updates. Progress streams to errW so
+// an interactive caller can watch. extraEnv carries credentials via
+// GIT_ASKPASS; the URL itself must never contain them.
+func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--progress", "--no-write-fetch-head", url,
+		"+refs/heads/*:refs/heads/*",
+		"+refs/tags/*:refs/tags/*",
+		"+refs/notes/*:refs/notes/*")
+	cmd.Env = append(os.Environ(), extraEnv...)
+	cmd.Stderr = errW
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("fetch from %s: %w", url, err)
+	}
+	return nil
+}
+
+// RemoteDefaultBranch asks the remote which branch HEAD points at.
+func RemoteDefaultBranch(ctx context.Context, url string, extraEnv []string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", url, "HEAD")
+	cmd.Env = append(os.Environ(), extraEnv...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("ls-remote %s: %w", url, err)
+	}
+	// "ref: refs/heads/<branch>\tHEAD"
+	for _, line := range strings.Split(string(out), "\n") {
+		if rest, ok := strings.CutPrefix(line, "ref: refs/heads/"); ok {
+			if branch, _, ok := strings.Cut(rest, "\t"); ok {
+				return branch, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("remote %s did not advertise a default branch", url)
+}
+
+// SetHead points the bare repo's HEAD at a branch.
+func SetHead(dir, branch string) error {
+	cmd := exec.Command("git", "-C", dir, "symbolic-ref", "HEAD", "refs/heads/"+branch)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("symbolic-ref: %v\n%s", err, out)
+	}
+	return nil
 }

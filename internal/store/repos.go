@@ -219,3 +219,8 @@ func (s *Store) ListPublicRepos() ([]Repo, error) {
 	}
 	return out, rows.Err()
 }
+
+func (s *Store) UpdateDefaultBranch(repoID int64, branch string) error {
+	_, err := s.DB.Exec("UPDATE repos SET default_branch = ? WHERE id = ?", branch, repoID)
+	return err
+}
