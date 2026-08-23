@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,7 +16,9 @@ import (
 
 	"github.com/krazywarez/forge/internal/config"
 	"github.com/krazywarez/forge/internal/control"
+	"github.com/krazywarez/forge/internal/gitd"
 	"github.com/krazywarez/forge/internal/hookd"
+	"github.com/krazywarez/forge/internal/httpd"
 	"github.com/krazywarez/forge/internal/policy"
 	"github.com/krazywarez/forge/internal/sshd"
 	"github.com/krazywarez/forge/internal/store"
@@ -124,7 +127,34 @@ func serveCmd() *cobra.Command {
 				return err
 			}
 			slog.Info("ssh listening", "addr", ln.Addr())
-			return srv.Serve(ln)
+
+			errCh := make(chan error, 3)
+			go func() { errCh <- srv.Serve(ln) }()
+
+			web := httpd.New(cfg, st)
+			hs := &http.Server{Addr: cfg.HTTP.Addr, Handler: web.Handler()}
+			go func() {
+				slog.Info("http listening", "addr", cfg.HTTP.Addr, "tls", cfg.HTTP.TLS)
+				switch cfg.HTTP.TLS {
+				case "off":
+					errCh <- hs.ListenAndServe()
+				case "files":
+					errCh <- hs.ListenAndServeTLS(cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
+				default:
+					errCh <- fmt.Errorf("http.tls = %q not implemented yet; use \"files\" or \"off\"", cfg.HTTP.TLS)
+				}
+			}()
+
+			if cfg.GitDaemon.Enabled {
+				gln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(cfg.GitDaemon.Port)))
+				if err != nil {
+					return err
+				}
+				slog.Info("git-daemon listening", "addr", gln.Addr())
+				go func() { errCh <- gitd.New(cfg, st).Serve(gln) }()
+			}
+
+			return <-errCh
 		},
 	}
 }

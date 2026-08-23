@@ -34,8 +34,10 @@ type SSH struct {
 }
 
 type HTTP struct {
-	Addr string `toml:"addr"`
-	TLS  string `toml:"tls"` // acme | files | off
+	Addr     string `toml:"addr"`
+	TLS      string `toml:"tls"` // acme | files | off
+	CertFile string `toml:"cert_file"`
+	KeyFile  string `toml:"key_file"`
 }
 
 type GitDaemon struct {
@@ -125,6 +127,9 @@ func (c Config) Validate() error {
 	}
 	if err := oneOf("http.tls", c.HTTP.TLS, "acme", "files", "off"); err != nil {
 		errs = append(errs, err)
+	}
+	if c.HTTP.TLS == "files" && (c.HTTP.CertFile == "" || c.HTTP.KeyFile == "") {
+		errs = append(errs, errors.New("http.tls = \"files\" requires cert_file and key_file"))
 	}
 	if err := oneOf("web.mode", c.Web.Mode, "view_only", "accounts"); err != nil {
 		errs = append(errs, err)

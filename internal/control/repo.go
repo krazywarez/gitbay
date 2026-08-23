@@ -44,6 +44,8 @@ func init() {
 		Summary: "protect a branch: repo settings protect <owner/name> <branch>", Run: runProtect})
 	register(Command{Path: []string{"repo", "settings", "unprotect"},
 		Summary: "unprotect a branch: repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
+	register(Command{Path: []string{"repo", "settings", "git-daemon"},
+		Summary: "expose over git://: repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
 }
 
 // resolveRepo loads a repo and checks the given permission for c.User.
@@ -274,9 +276,32 @@ func runSettingsShow(c *Ctx, args []string) int {
 		return code
 	}
 	return c.emit(repo.Settings, func(w io.Writer) {
-		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\n",
-			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits)
+		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\ngit_daemon: %v\n",
+			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon)
 	})
+}
+
+func runGitDaemon(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: repo settings git-daemon <owner/name> on|off")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	on := args[1] == "on"
+	if on && repo.Visibility != "public" {
+		return c.fail(protocol.ExitUsage, "git:// serves only public repositories; %s is private", repo.Path())
+	}
+	if on && !c.Cfg.GitDaemon.Enabled {
+		return c.fail(protocol.ExitUsage, "this instance does not run the git:// daemon ([git_daemon] enabled = false)")
+	}
+	s := repo.Settings
+	s.GitDaemon = on
+	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "git-daemon %s on %s\n", args[1], repo.Path()) })
 }
 
 func runProtect(c *Ctx, args []string) int   { return setProtect(c, args, true) }

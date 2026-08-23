@@ -22,6 +22,7 @@ type Repo struct {
 type RepoSettings struct {
 	ProtectedBranches    []string `json:"protected_branches,omitempty"`
 	RequireSignedCommits bool     `json:"require_signed_commits,omitempty"`
+	GitDaemon            bool     `json:"git_daemon,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

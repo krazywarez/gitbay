@@ -14,12 +14,14 @@ import (
 )
 
 type instance struct {
-	forged  string // path to built binary
-	root    string
-	config  string
-	port    int
-	proc    *exec.Cmd
-	sshDir  string // per-user client keys live here
+	forged   string // path to built binary
+	root     string
+	config   string
+	port     int
+	httpPort int
+	gitPort  int
+	proc     *exec.Cmd
+	sshDir   string // per-user client keys live here
 }
 
 func buildForged(t *testing.T) string {
@@ -46,10 +48,12 @@ func freePort(t *testing.T) int {
 func startInstance(t *testing.T) *instance {
 	t.Helper()
 	inst := &instance{
-		forged: buildForged(t),
-		root:   t.TempDir(),
-		port:   freePort(t),
-		sshDir: t.TempDir(),
+		forged:   buildForged(t),
+		root:     t.TempDir(),
+		port:     freePort(t),
+		httpPort: freePort(t),
+		gitPort:  freePort(t),
+		sshDir:   t.TempDir(),
 	}
 	inst.config = filepath.Join(inst.root, "config.toml")
 	cfg := fmt.Sprintf(`
@@ -58,7 +62,13 @@ root = %q
 site_url = "https://forge.test"
 [ssh]
 port = %d
-`, inst.root, inst.port)
+[http]
+addr = "127.0.0.1:%d"
+tls = "off"
+[git_daemon]
+enabled = true
+port = %d
+`, inst.root, inst.port, inst.httpPort, inst.gitPort)
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
