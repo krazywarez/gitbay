@@ -193,6 +193,22 @@ func TestCLI(t *testing.T) {
 		t.Fatalf("init-created repo: %s", out)
 	}
 
+	// A clone whose origin points at a FOREIGN host must not hijack the
+	// command: the configured default instance is used, and repo inference
+	// is dropped rather than guessed across hosts.
+	foreign := filepath.Join(t.TempDir(), "f")
+	os.MkdirAll(foreign, 0o755)
+	mustGit(t, foreign, cliGitEnv, "init", "-q")
+	mustGit(t, foreign, cliGitEnv, "remote", "add", "origin", "git@github.example:someone/thing.git")
+	out = c.must(t, foreign, "", "auth", "whoami")
+	if strings.TrimSpace(out) != "alice" {
+		t.Fatalf("foreign-origin whoami hit the wrong host: %q", out)
+	}
+	_, errOut2, code2 := c.run(t, foreign, "", "issue", "list")
+	if code2 != 2 || !strings.Contains(errOut2, "none inferable") {
+		t.Fatalf("foreign-origin repo inference: exit %d, %s", code2, errOut2)
+	}
+
 	// Man pages and completions generate.
 	manDir := t.TempDir()
 	c.must(t, "", "", "man", "--dir", manDir)

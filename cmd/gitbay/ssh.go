@@ -20,39 +20,40 @@ type target struct {
 	repo string // owner/name, "" when not inferable
 }
 
-// resolveTarget picks the instance and repo. Inside a git repo whose origin
-// remote points at a configured (or any ssh) forge host, that wins;
-// otherwise the configured default instance.
+// resolveTarget picks the instance and repo. An origin remote matching a
+// CONFIGURED instance wins and carries repo inference; otherwise the
+// default instance is used with no inference — a clone from some other
+// host (github, a different forge) must never hijack the command. The
+// raw origin serves as an ad-hoc instance only when nothing is configured
+// at all.
 func resolveTarget() (target, error) {
 	cfg, err := cliconfig.Load()
 	if err != nil {
 		return target{}, err
 	}
 
-	if url := originURL(); url != "" {
-		if parsed, repo, ok := cliconfig.ParseRemoteURL(url); ok {
-			// Prefer a configured instance for the same host+port: it may
-			// carry ssh_options the bare URL cannot express.
-			norm := func(p int) int {
-				if p == 0 {
-					return 22
-				}
-				return p
+	parsed, repo, originOK := cliconfig.ParseRemoteURL(originURL())
+	if originOK {
+		norm := func(p int) int {
+			if p == 0 {
+				return 22
 			}
-			for _, inst := range cfg.Instances {
-				if inst.Host == parsed.Host && norm(inst.Port) == norm(parsed.Port) {
-					return target{inst: inst, repo: repo}, nil
-				}
+			return p
+		}
+		for _, inst := range cfg.Instances {
+			if inst.Host == parsed.Host && norm(inst.Port) == norm(parsed.Port) {
+				return target{inst: inst, repo: repo}, nil
 			}
-			return target{inst: parsed, repo: repo}, nil
 		}
 	}
 
-	inst, _, err := cfg.DefaultInstance()
-	if err != nil {
-		return target{}, err
+	if inst, _, err := cfg.DefaultInstance(); err == nil {
+		return target{inst: inst}, nil
 	}
-	return target{inst: inst}, nil
+	if originOK {
+		return target{inst: parsed, repo: repo}, nil
+	}
+	return target{}, fmt.Errorf("no gitbay instance configured; run: gitbay remote add <name> <host>")
 }
 
 func originURL() string {
