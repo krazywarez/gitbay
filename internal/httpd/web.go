@@ -55,6 +55,19 @@ func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
 	w.Write(web.FaviconSVG)
 }
 
+// notFound renders the designed 404 page with a 404 status. Falls back to
+// the stock plain-text response if the template fails.
+func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if err := web.Render(&buf, "404.html", struct{ Site string }{s.siteName()}); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	buf.WriteTo(w)
+}
+
 // describedRepo pairs a repo with its description for listings.
 type describedRepo struct {
 	store.Repo
@@ -129,7 +142,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		ok = policyCanRead(viewer, repo, grant)
 	}
 	if !ok {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return repoPage{}, false
 	}
 	if ref == "" {
@@ -186,7 +199,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		kind, ownerID = "org", o.ID
 		members, _ = s.st.OrgMembers(o.ID)
 	} else {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	profile, _ := s.st.OwnerProfile(kind, ownerID)
@@ -251,7 +264,7 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	}
 	entries, err := gitutil.ListTree(p.Dir, p.Ref, dirPath)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	prefix := ""
@@ -286,7 +299,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	filePath := strings.Trim(r.PathValue("path"), "/")
 	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, maxRenderBytes+1)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	binary := gitutil.IsBinary(data) || len(data) > maxRenderBytes
@@ -338,7 +351,7 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	filePath := strings.Trim(r.PathValue("path"), "/")
 	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, s.cfg.Limits.MaxBlobBytes)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	// Serve inert: never let repo content execute in the forge's origin.
@@ -577,7 +590,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 	const pageSize = 50
 	shas, err := gitutil.RevList(p.Dir, p.Ref, pageSize+1)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	next := ""
@@ -617,12 +630,12 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	sha := r.PathValue("sha")
 	full, err := gitutil.ResolveRef(p.Dir, sha)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	v, parsed := s.sigFor(p.Repo, p.Dir, full)
 	if parsed == nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	patch, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
@@ -708,12 +721,12 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 	p.Tab = "issues"
 	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	iss, err := s.st.IssueByNumber(p.Repo.ID, n)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	comments, err := s.st.ListIssueComments(iss.ID)
@@ -764,12 +777,12 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	p.Tab = "merge requests"
 	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	m, err := s.st.MRByNumber(p.Repo.ID, n)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	comments, _ := s.st.ListMRComments(m.ID)
@@ -827,11 +840,11 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request) {
 	file := r.PathValue("file")
 	ref, ok := strings.CutSuffix(file, ".tar.gz")
 	if !ok {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	if _, err := gitutil.ResolveRef(p.Dir, ref); err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	prefix := fmt.Sprintf("%s-%s", p.Repo.Name, ref)

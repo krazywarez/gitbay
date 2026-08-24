@@ -463,6 +463,18 @@ button {
 }
 button:hover { filter: brightness(1.08); }
 
+/* 404 */
+.notfound { text-align: center; padding: var(--sp-6) 0; }
+.notfound .bigcode {
+  font-family: var(--mono);
+  font-size: 4rem;
+  color: var(--faint);
+  -webkit-text-stroke: 1px var(--line);
+  margin: 0;
+  line-height: 1;
+}
+.notfound h1 { margin-top: var(--sp-3); }
+
 /* footer */
 footer {
   max-width: 64rem;
