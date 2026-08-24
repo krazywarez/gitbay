@@ -242,7 +242,7 @@ func mrCmd() *cobra.Command {
 		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),
 		pass("comment", "comment on a merge request", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("review", "review: --approve|--request-changes|--comment", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
-		pass("merge", "merge (fast-forward or merge-commit): [--strategy ff|merge]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
+		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
 	)
 }

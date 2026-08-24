@@ -33,7 +33,7 @@ func init() {
 	register(Command{Path: []string{"mr", "review"},
 		Summary: "review: mr review <owner/name> <n> --approve|--request-changes|--comment", Run: runMRReview})
 	register(Command{Path: []string{"mr", "merge"},
-		Summary: "merge: mr merge <owner/name> <n> [--strategy ff|merge]", Run: runMRMerge})
+		Summary: "merge: mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
 	register(Command{Path: []string{"mr", "close"},
 		Summary: "close without merging: mr close <owner/name> <n>", Run: runMRClose})
 }
@@ -438,7 +438,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--strategy" {
 			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--strategy requires ff|merge")
+				return c.fail(protocol.ExitUsage, "--strategy requires ff|merge|squash|rebase")
 			}
 			strategy = args[i+1]
 			i++
@@ -446,8 +446,9 @@ func runMRMerge(c *Ctx, args []string) int {
 		}
 		rest = append(rest, args[i])
 	}
-	if strategy != "" && strategy != "ff" && strategy != "merge" {
-		return c.fail(protocol.ExitUsage, "--strategy must be ff or merge")
+	valid := map[string]bool{"": true, "ff": true, "merge": true, "squash": true, "rebase": true}
+	if !valid[strategy] {
+		return c.fail(protocol.ExitUsage, "--strategy must be ff, merge, squash, or rebase")
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanWrite)
 	if code >= 0 {
@@ -481,11 +482,13 @@ func runMRMerge(c *Ctx, args []string) int {
 	}
 
 	// Signature policy matrix: with require_signed_commits, only
-	// fast-forward is allowed — a server-created merge commit would be
-	// unsigned, violating the branch's own policy — and every landed
-	// commit must be verified.
+	// fast-forward is allowed — squash, rebase-replay, and merge commits
+	// are all server-created and unsigned, violating the branch's own
+	// policy — and every landed commit must be verified. An explicit
+	// rebase when fast-forward is already possible IS a fast-forward
+	// (nothing is rewritten), so it stays legal.
 	if repo.Settings.RequireSignedCommits {
-		if strategy == "merge" || !ffPossible {
+		if strategy == "merge" || strategy == "squash" || !ffPossible {
 			return c.fail(protocol.ExitDenied,
 				"%s requires signed commits, so only fast-forward merges are allowed; rebase %s onto %s locally, re-push, and merge again",
 				repo.Path(), mr.SourceRef, mr.TargetRef)
@@ -521,6 +524,25 @@ func runMRMerge(c *Ctx, args []string) int {
 			strategy = "merge"
 		}
 	}
+	if strategy == "rebase" && ffPossible {
+		// Nothing to rewrite: a rebase onto an ancestor is a fast-forward,
+		// and taking it keeps the original commits and their signatures.
+		strategy = "ff"
+	}
+
+	// Every server-created commit needs the merger's verified identity.
+	mergerEmail := ""
+	if strategy != "ff" {
+		email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if email == "" {
+			return c.fail(protocol.ExitDenied,
+				"%s merges create commits carrying your identity: verify a primary email first (or use a fast-forward merge)", strategy)
+		}
+		mergerEmail = email
+	}
 
 	var newSHA string
 	switch strategy {
@@ -530,15 +552,8 @@ func runMRMerge(c *Ctx, args []string) int {
 				"fast-forward not possible: %s has diverged from the MR head; use --strategy merge or rebase and re-push", mr.TargetRef)
 		}
 		newSHA = headSHA
+
 	case "merge":
-		email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if email == "" {
-			return c.fail(protocol.ExitDenied,
-				"merge commits carry your identity: verify a primary email first (ask an admin, or use a fast-forward merge)")
-		}
 		tree, conflict, err := gitutil.MergeTree(dir, targetSHA, headSHA)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
@@ -548,10 +563,96 @@ func runMRMerge(c *Ctx, args []string) int {
 				"merge conflicts between %s and the MR head; resolve locally and re-push", mr.TargetRef)
 		}
 		msg := fmt.Sprintf("Merge request !%d: %s\n\nMerged %s into %s", mr.Number, mr.Title, mr.SourceRef, mr.TargetRef)
-		newSHA, err = gitutil.CommitTree(dir, tree, []string{targetSHA, headSHA}, c.User.Username, email, msg)
+		newSHA, err = gitutil.CommitTree(dir, tree, []string{targetSHA, headSHA}, c.User.Username, mergerEmail, msg)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
+
+	case "squash":
+		// One new commit with the merged tree. Authorship credit goes to
+		// the MR author (their verified identity when they have one); the
+		// committer is the merger.
+		tree := ""
+		if ffPossible {
+			t, err := gitutil.ResolveTree(dir, headSHA)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			tree = t
+		} else {
+			t, conflict, err := gitutil.MergeTree(dir, targetSHA, headSHA)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			if conflict {
+				return c.fail(protocol.ExitUsage,
+					"merge conflicts between %s and the MR head; resolve locally and re-push", mr.TargetRef)
+			}
+			tree = t
+		}
+		authorName, authorEmail := c.User.Username, mergerEmail
+		if author, err := c.Store.UserByUsername(mr.Author); err == nil {
+			if ae, err := c.Store.PrimaryVerifiedEmail(author.ID); err == nil && ae != "" {
+				authorName, authorEmail = author.Username, ae
+			}
+		}
+		msg := fmt.Sprintf("%s (!%d)", mr.Title, mr.Number)
+		if mr.Body != "" {
+			msg += "\n\n" + mr.Body
+		}
+		var err error
+		newSHA, err = gitutil.CommitTreeIdent(dir, tree, []string{targetSHA},
+			authorName, authorEmail, "", c.User.Username, mergerEmail, msg)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+
+	case "rebase":
+		commits, err := gitutil.RevListRange(dir, targetSHA, headSHA)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		// Oldest first.
+		for i, j := 0, len(commits)-1; i < j; i, j = i+1, j-1 {
+			commits[i], commits[j] = commits[j], commits[i]
+		}
+		onto := targetSHA
+		for _, sha := range commits {
+			parents, err := gitutil.CommitParents(dir, sha)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			if len(parents) > 1 {
+				return c.fail(protocol.ExitUsage,
+					"the MR contains merge commit %.10s; a rebase merge needs linear history — use --strategy merge or squash", sha)
+			}
+			base := onto // root commit: replay against the new tip itself
+			if len(parents) == 1 {
+				base = parents[0]
+			}
+			tree, conflict, err := gitutil.MergeTreeOnto(dir, base, onto, sha)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			if conflict {
+				return c.fail(protocol.ExitUsage,
+					"commit %.10s does not apply cleanly onto %s; rebase locally and re-push", sha, mr.TargetRef)
+			}
+			aName, aEmail, aDate, err := gitutil.AuthorIdent(dir, sha)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			msg, err := gitutil.CommitMessage(dir, sha)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			onto, err = gitutil.CommitTreeIdent(dir, tree, []string{onto},
+				aName, aEmail, aDate, c.User.Username, mergerEmail, msg)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+		}
+		newSHA = onto
 	}
 
 	// CAS so a concurrent push between our read and this write fails the

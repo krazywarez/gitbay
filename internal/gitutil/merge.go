@@ -172,3 +172,86 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	}
 	return sha, nil
 }
+
+// CommitParents returns the parent SHAs of a commit.
+func CommitParents(dir, sha string) ([]string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-list", "--parents", "-n1", sha).Output()
+	if err != nil {
+		return nil, fmt.Errorf("rev-list --parents %s: %w", sha, err)
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) < 1 {
+		return nil, fmt.Errorf("no output for %s", sha)
+	}
+	return fields[1:], nil
+}
+
+// AuthorIdent returns a commit's author name, email, and ISO date.
+func AuthorIdent(dir, sha string) (name, email, date string, err error) {
+	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%an%x1f%ae%x1f%aI", sha).Output()
+	if err != nil {
+		return "", "", "", fmt.Errorf("log %s: %w", sha, err)
+	}
+	parts := strings.SplitN(strings.TrimSpace(string(out)), "\x1f", 3)
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("bad ident for %s", sha)
+	}
+	return parts[0], parts[1], parts[2], nil
+}
+
+// CommitMessage returns a commit's full message.
+func CommitMessage(dir, sha string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%B", sha).Output()
+	if err != nil {
+		return "", fmt.Errorf("log %s: %w", sha, err)
+	}
+	return strings.TrimRight(string(out), "\n"), nil
+}
+
+// MergeTreeOnto replays commit's changes (relative to base) onto onto,
+// returning the resulting tree. conflict=true when it cannot apply cleanly.
+func MergeTreeOnto(dir, base, onto, commit string) (tree string, conflict bool, err error) {
+	cmd := exec.Command("git", "-C", dir, "merge-tree", "--write-tree", "--merge-base="+base, onto, commit)
+	out, runErr := cmd.Output()
+	tree = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	if runErr != nil {
+		if ee, ok := runErr.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return "", true, nil
+		}
+		return "", false, fmt.Errorf("merge-tree: %w", runErr)
+	}
+	return tree, false, nil
+}
+
+// CommitTreeIdent creates a commit with distinct author and committer
+// identities. Empty authorDate means now.
+func CommitTreeIdent(dir, tree string, parents []string,
+	authorName, authorEmail, authorDate, committerName, committerEmail, message string) (string, error) {
+	args := []string{"-C", dir, "commit-tree", tree, "-m", message}
+	for _, p := range parents {
+		args = append(args, "-p", p)
+	}
+	cmd := exec.Command("git", args...)
+	env := append(os.Environ(),
+		"GIT_AUTHOR_NAME="+authorName, "GIT_AUTHOR_EMAIL="+authorEmail,
+		"GIT_COMMITTER_NAME="+committerName, "GIT_COMMITTER_EMAIL="+committerEmail,
+	)
+	if authorDate != "" {
+		env = append(env, "GIT_AUTHOR_DATE="+authorDate)
+	}
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("commit-tree: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// ResolveTree returns the tree id of a commit.
+func ResolveTree(dir, sha string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", sha+"^{tree}").Output()
+	if err != nil {
+		return "", fmt.Errorf("rev-parse %s^{tree}: %w", sha, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
