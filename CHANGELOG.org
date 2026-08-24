@@ -4,7 +4,7 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v0.2.0 — 2026-08-24
 
 - Deploy keys: repo-bound CI keys (=repo deploy-key=), ro/rw, rename- and
   transfer-proof.
@@ -39,9 +39,34 @@ anything beyond "replace the binary and restart" is needed.
   =go install gitbay.org/gitbay/cmd/...@latest= works.
 - Release script: =deploy/release.sh <tag>= builds reproducible
   linux/amd64, linux/arm64, and darwin/arm64 binaries with SHA256SUMS.
+- Repository maintenance: =admin gc= (repack/prune, per-repo sizes),
+  =admin stats= (counts + disk usage), weekly =gitbay-gc.timer=.
+- Releases: tag-anchored notes and binary assets (=release= commands,
+  assets over SSH stdin/stdout, web releases tab with downloads).
+- GitHub history import: =repo import-issues= brings issues and PRs
+  (as merged/closed MRs) with comments, labels, and state, attributed
+  inline and resumable.
+- Push and pull mirroring (=repo mirror=): background sync, read-only
+  pull mirrors, per-mirror status; credentials server-side, SSRF-guarded.
+- Web signup at =/register= for open and invite instances.
+- Audit log (=audit=, =gitbayd admin audit=): every mutating command
+  with source key fingerprint, registrations, force-pushes, auth
+  failures. Hardening: per-IP auth-failure throttling
+  (=ssh_auth_rate=), =max_pack_bytes= enforced, =admin user
+  disable/enable=.
+- Account migration: =gitbay migrate --from <host>= (bundle
+  export/replay + client-side git mirror); =gitbay auth export= as a
+  user-level backup.
+- Editable issues and MRs (=issue edit=, =mr edit=, web forms).
+- Commit references appear as system messages with linked shas.
+- Design: top nav, repo listing rows (topics, license, last updated),
+  file table headers, README relative-link resolution, branch
+  dropdown, web pinning, org owner picker, label filters, linked
+  usernames and commit parents, =/privacy= page, blue accent.
 
-Upgrade notes: migrations 0006–0014 apply on start. No config changes
-required; =[go_import]= and =web.mode = "accounts"= are opt-in.
+Upgrade notes: migrations 0006–0019 apply on start. No config changes
+required; =[go_import]=, =[mirrors]=, =web.privacy_notice=, and
+=web.mode = "accounts"= are opt-in.
 
 * v0.1.0 — 2026-08-24
 
