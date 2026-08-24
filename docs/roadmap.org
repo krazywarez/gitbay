@@ -76,6 +76,29 @@ Bigger bets, each valuable independently; order by appetite.
 - [[https://gitbay.org/krz/gitbay/issues/21][#21]] teams within orgs
 - [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis
 
+* Phase S — security (cross-cutting)
+
+Not a sequential phase: items land alongside whatever phase is active,
+and the whole set gates flipping gitbay.org to open registration.
+
+- [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging, rate limiting, quotas, user disable — the
+  multi-user half
+- [[https://gitbay.org/krz/gitbay/issues/28][#28]] hardening umbrella — the rest, both layers:
+  - software: fuzz all attacker-facing parsers (pkt-line, SSHSIG,
+    commit, armor), web security headers (CSP et al.), govulncheck,
+    constant-time comparison audit, a written threat model, signed
+    releases
+  - host: unattended OS patching, tighter systemd sandboxing
+    (SystemCallFilter and friends), auth throttling on both SSH
+    surfaces, database file modes and continuous replication,
+    service/disk/cert monitoring
+
+Already true and worth preserving (the threat model will write these
+down): the forge never executes repository content; no server signing
+key; repo-authored HTML never renders on the forge origin; tokens and
+sessions stored as hashes only; SSRF guards at registration and dial
+time; private repositories indistinguishable from nonexistent.
+
 * Explicitly not planned
 
 Recorded so their absence reads as a decision, not an oversight:
