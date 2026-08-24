@@ -61,6 +61,8 @@ work to it.
 - [[https://gitbay.org/krz/gitbay/issues/8][#8]] releases (notes + assets; also hosts gitbay's own binaries)
 - [[https://gitbay.org/krz/gitbay/issues/17][#17]] issue/PR history import from GitHub
 - [[https://gitbay.org/krz/gitbay/issues/18][#18]] push/pull mirroring for gradual migration
+- [[https://gitbay.org/krz/gitbay/issues/29][#29]] account migration between gitbay instances — no lock-in,
+  ever; the export bundle doubles as a user-level backup
 - [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging and multi-user hardening
 - [[https://gitbay.org/krz/gitbay/issues/9][#9]] web signup for open/invite instances
 
@@ -75,6 +77,11 @@ Bigger bets, each valuable independently; order by appetite.
 - [[https://gitbay.org/krz/gitbay/issues/11][#11]] iOS app (hutch-based) and [[https://gitbay.org/krz/gitbay/issues/12][#12]] Android
 - [[https://gitbay.org/krz/gitbay/issues/21][#21]] teams within orgs
 - [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis
+
+When #15 (pages) and #25 (wikis) land, =docs/= moves out of the blob
+view and becomes gitbay.org's own published documentation site — the
+docs dogfooding the features the same way the tracker and MRs already
+do.
 
 * Phase S — security (cross-cutting)
 
