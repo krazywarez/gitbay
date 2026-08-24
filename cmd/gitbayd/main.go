@@ -215,7 +215,7 @@ func adminCmd() *cobra.Command {
 		userCmd,
 		emailCmd,
 		notImplemented("invite", "issue registration invites"),
-		notImplemented("backup", "consistent backup: repos first, then database"),
+		backupCmd(),
 		notImplemented("gc", "run git gc across repositories"),
 		notImplemented("stats", "instance statistics"),
 	)

@@ -1,0 +1,162 @@
+package main
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/store"
+)
+
+// backupCmd produces one tar.gz holding a consistent database snapshot plus
+// every repository and the SSH host keys. Restore by extracting the archive
+// into a fresh server.root.
+//
+// Ordering: the database is snapshotted BEFORE the repositories are read.
+// A push that lands mid-backup then shows up only as unreferenced git
+// objects in the archive (harmless); the reverse order could leave database
+// rows pointing at objects the archive never captured.
+func backupCmd() *cobra.Command {
+	var out string
+	cmd := &cobra.Command{
+		Use:   "backup",
+		Short: "write a consistent backup archive (database snapshot first, then repositories)",
+		Long: `Writes a tar.gz of the server root: a consistent SQLite snapshot,
+all repositories, and the SSH host keys. Transient state (hook socket,
+regenerated hook scripts, askpass helper, WAL files) is excluded.
+
+Restore: extract into an empty directory, point server.root at it, start
+gitbayd. Host keys are preserved, so clients keep their known_hosts entries.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+			if out == "" {
+				out = fmt.Sprintf("gitbay-backup-%s.tar.gz", time.Now().UTC().Format("20060102-150405"))
+			}
+			return runBackup(cfg, out)
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz)")
+	return cmd
+}
+
+func runBackup(cfg config.Config, out string) error {
+	st, err := openStore(cfg)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	// 1. Consistent database snapshot, before any repository is read.
+	snap := filepath.Join(os.TempDir(), fmt.Sprintf("gitbay-snap-%d.db", os.Getpid()))
+	os.Remove(snap)
+	defer os.Remove(snap)
+	if err := snapshotDB(st, snap); err != nil {
+		return fmt.Errorf("database snapshot: %w", err)
+	}
+
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+
+	if err := addFile(tw, snap, "gitbay.db"); err != nil {
+		return err
+	}
+
+	// 2. Everything under the root except transient or regenerated state.
+	skip := map[string]bool{
+		"gitbay.db": true, "gitbay.db-wal": true, "gitbay.db-shm": true,
+		"hook.sock": true, "askpass.sh": true, "hooks": true,
+	}
+	repoCount := 0
+	root := cfg.Server.Root
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if top, _, _ := strings.Cut(rel, string(filepath.Separator)); skip[top] {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() && !d.IsDir() {
+			return nil // sockets, symlinks
+		}
+		if d.IsDir() {
+			if strings.HasSuffix(rel, ".git") {
+				repoCount++
+			}
+			return nil // directories are implied by member paths
+		}
+		return addFile(tw, path, filepath.ToSlash(rel))
+	})
+	if err != nil {
+		return err
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	info, _ := os.Stat(out)
+	fmt.Printf("wrote %s (%d repositories, %.1f MB)\n", out, repoCount, float64(info.Size())/1e6)
+	return nil
+}
+
+// snapshotDB writes a consistent copy of the live database. VACUUM INTO
+// takes a read snapshot, so concurrent daemon writes are safe under WAL.
+func snapshotDB(st *store.Store, dest string) error {
+	quoted := strings.ReplaceAll(dest, "'", "''")
+	_, err := st.DB.Exec(fmt.Sprintf("VACUUM INTO '%s'", quoted))
+	return err
+}
+
+func addFile(tw *tar.Writer, path, name string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	hdr, err := tar.FileInfoHeader(info, "")
+	if err != nil {
+		return err
+	}
+	hdr.Name = name
+	if err := tw.WriteHeader(hdr); err != nil {
+		return err
+	}
+	src, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	_, err = io.Copy(tw, src)
+	return err
+}
