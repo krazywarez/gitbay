@@ -115,6 +115,10 @@ func TestValidCombinations(t *testing.T) {
 			"closed registration, no smtp at all",
 			minimal,
 		},
+		{
+			"acme with public https host",
+			"[server]\nroot = \"/var/lib/gitbay\"\nsite_url = \"https://gitbay.org\"\n[http]\ntls = \"acme\"\nacme_email = \"noreply@gitbay.org\"\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -8,11 +8,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
 	"gitbay.org/gitbay/internal/config"
@@ -146,8 +147,30 @@ func serveCmd() *cobra.Command {
 					errCh <- hs.ListenAndServe()
 				case "files":
 					errCh <- hs.ListenAndServeTLS(cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
-				default:
-					errCh <- fmt.Errorf("http.tls = %q not implemented yet; use \"files\" or \"off\"", cfg.HTTP.TLS)
+				case "acme":
+					host := cfg.SiteHost()
+					m := &autocert.Manager{
+						Prompt:     autocert.AcceptTOS,
+						Cache:      autocert.DirCache(filepath.Join(cfg.Server.Root, "acme")),
+						HostPolicy: autocert.HostWhitelist(host),
+						Email:      cfg.HTTP.ACMEEmail,
+					}
+					// TLS-ALPN-01 rides the HTTPS port itself. The optional
+					// plain-HTTP listener adds HTTP-01 and a redirect; losing
+					// it (port 80 taken, no privileges) is not fatal.
+					if addr := cfg.HTTP.ACMEHTTPAddr; addr != "" && addr != "off" {
+						redirect := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusMovedPermanently)
+						})
+						go func() {
+							slog.Info("acme http listening", "addr", addr)
+							if err := http.ListenAndServe(addr, m.HTTPHandler(redirect)); err != nil {
+								slog.Warn("acme http listener failed; continuing with TLS-ALPN only", "err", err)
+							}
+						}()
+					}
+					hs.TLSConfig = m.TLSConfig()
+					errCh <- hs.ListenAndServeTLS("", "")
 				}
 			}()
 

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -38,6 +39,12 @@ type HTTP struct {
 	TLS      string `toml:"tls"` // acme | files | off
 	CertFile string `toml:"cert_file"`
 	KeyFile  string `toml:"key_file"`
+	// ACME (Let's Encrypt by default). Certificates are cached under
+	// server.root/acme. acme_http_addr serves HTTP-01 challenges and
+	// redirects to HTTPS; "off" disables it (TLS-ALPN-01 on the HTTPS
+	// port still works).
+	ACMEEmail    string `toml:"acme_email"`
+	ACMEHTTPAddr string `toml:"acme_http_addr"`
 }
 
 type GitDaemon struct {
@@ -73,7 +80,7 @@ func Default() Config {
 	return Config{
 		Server: Server{Root: "/var/lib/gitbay"},
 		SSH:    SSH{Mode: "embedded", Port: 22},
-		HTTP:   HTTP{Addr: ":443", TLS: "acme"},
+		HTTP:   HTTP{Addr: ":443", TLS: "acme", ACMEHTTPAddr: ":80"},
 		Web:    Web{Mode: "view_only"},
 		Registration: Registration{
 			Mode: "closed",
@@ -133,6 +140,15 @@ func (c Config) Validate() error {
 	if c.HTTP.TLS == "files" && (c.HTTP.CertFile == "" || c.HTTP.KeyFile == "") {
 		errs = append(errs, errors.New("http.tls = \"files\" requires cert_file and key_file"))
 	}
+	if c.HTTP.TLS == "acme" {
+		host := c.SiteHost()
+		switch {
+		case !strings.HasPrefix(c.Server.SiteURL, "https://"):
+			errs = append(errs, errors.New("http.tls = \"acme\" requires an https:// site_url: certificates are issued for that host"))
+		case host == "" || host == "localhost" || net.ParseIP(host) != nil:
+			errs = append(errs, fmt.Errorf("http.tls = \"acme\" cannot issue a certificate for %q: use a public DNS name in site_url", host))
+		}
+	}
 	if err := oneOf("web.mode", c.Web.Mode, "view_only", "accounts"); err != nil {
 		errs = append(errs, err)
 	}
@@ -163,6 +179,19 @@ func (c Config) Validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// SiteHost returns the bare hostname from site_url (no scheme, port, path).
+func (c Config) SiteHost() string {
+	h := strings.TrimPrefix(strings.TrimPrefix(c.Server.SiteURL, "https://"), "http://")
+	h = strings.TrimSuffix(h, "/")
+	if i := strings.IndexByte(h, '/'); i >= 0 {
+		h = h[:i]
+	}
+	if host, _, err := net.SplitHostPort(h); err == nil {
+		return host
+	}
+	return h
 }
 
 // CheckHost performs environment probes that only make sense on the target
