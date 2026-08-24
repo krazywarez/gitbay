@@ -19,5 +19,7 @@
 {{end}}
 <h3>diff</h3>
 <pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
-{{end}}</pre>
+{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="crumbs">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div><pre class="diff">{{end}}{{end}}</pre>
+{{if .DetachedThreads}}<h3>threads on earlier revisions</h3>
+{{range .DetachedThreads}}<div class="thread stale"><p class="crumbs">{{if .Stale}}stale · {{end}}{{if .Resolved}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div>{{end}}{{end}}
 {{end}}

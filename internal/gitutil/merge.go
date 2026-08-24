@@ -255,3 +255,18 @@ func ResolveTree(dir, sha string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
+
+// DiffFiles lists the paths changed between old and new.
+func DiffFiles(dir, old, new string) ([]string, error) {
+	out, err := exec.Command("git", "-C", dir, "diff", "--name-only", old, new).Output()
+	if err != nil {
+		return nil, fmt.Errorf("diff --name-only: %w", err)
+	}
+	var files []string
+	for _, l := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if l != "" {
+			files = append(files, l)
+		}
+	}
+	return files, nil
+}

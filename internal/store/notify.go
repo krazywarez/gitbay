@@ -71,7 +71,8 @@ func (s *Store) MRParticipants(mrID int64) ([]int64, error) {
 	return s.idQuery(`
 		SELECT author_id FROM merge_requests WHERE id = ?
 		UNION SELECT author_id FROM mr_comments WHERE mr_id = ?
-		UNION SELECT reviewer_id FROM mr_reviews WHERE mr_id = ?`, mrID, mrID, mrID)
+		UNION SELECT reviewer_id FROM mr_reviews WHERE mr_id = ?
+		UNION SELECT author_id FROM mr_diff_comments WHERE mr_id = ?`, mrID, mrID, mrID, mrID)
 }
 
 // RepoNotifyTargets returns who should hear about new activity on a repo:

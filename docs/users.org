@@ -166,6 +166,20 @@ Semantics worth knowing:
   verified commits merge; everything server-created is refused with
   instructions to rebase locally.
 
+Review threads anchor to diff lines:
+
+#+begin_src sh
+gitbay mr diff-comment 4 --path main.go --line 12 --message "use log here"
+gitbay mr diff-comment 4 --reply 7 --message "done"     # join thread 7
+gitbay mr threads 4                                     # threads with staleness
+gitbay mr resolve 4 7 / unresolve 4 7
+#+end_src
+
+Threads render inline on the MR page. A force-push marks them stale
+(shown under "threads on earlier revisions") rather than guessing new
+anchors; =mr show= reports the unresolved count. Resolving is for the
+thread author, the MR author, or anyone with write.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you: someone

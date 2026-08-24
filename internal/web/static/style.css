@@ -60,3 +60,6 @@ pre.diff .meta { color: var(--muted); }
 .check-success { color: var(--ok); border-color: var(--ok); }
 .check-pending { color: var(--warn); border-color: var(--warn); }
 .check-failure, .check-error { color: var(--bad); border-color: var(--bad); }
+.thread { border: 1px solid var(--line); border-left: 3px solid var(--link); border-radius: 6px; padding: 0.5rem 0.8rem; margin: 0.3rem 0 0.3rem 2rem; }
+.thread.resolved { border-left-color: var(--ok); opacity: 0.75; }
+.thread.stale { border-left-color: var(--warn); }

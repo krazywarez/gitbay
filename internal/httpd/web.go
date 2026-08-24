@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -424,27 +425,105 @@ func renderReadme(name string, raw []byte) template.HTML {
 }
 
 type diffLine struct {
-	Class string
-	Text  string
+	Class   string
+	Text    string
+	Path    string // file this line belongs to
+	NewLine int64  // line number in the new file (0 when absent)
+	OldLine int64  // line number in the old file (0 when absent)
+	Threads []diffThread
 }
 
+var hunkPat = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
+
+// classifyDiff parses a unified diff into rendered lines, tracking the
+// file and old/new line numbers so review threads can anchor inline.
 func classifyDiff(patch string) []diffLine {
 	var lines []diffLine
+	path := ""
+	var oldN, newN int64
 	for _, l := range strings.Split(patch, "\n") {
-		class := ""
+		d := diffLine{Text: l}
 		switch {
-		case strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "):
-			class = "meta"
+		case strings.HasPrefix(l, "+++ "):
+			d.Class = "meta"
+			path = strings.TrimPrefix(strings.TrimPrefix(l, "+++ "), "b/")
+		case strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "):
+			d.Class = "meta"
 		case strings.HasPrefix(l, "@@"):
-			class = "hunk"
+			d.Class = "hunk"
+			if m := hunkPat.FindStringSubmatch(l); m != nil {
+				oldN, _ = strconv.ParseInt(m[1], 10, 64)
+				newN, _ = strconv.ParseInt(m[2], 10, 64)
+			}
 		case strings.HasPrefix(l, "+"):
-			class = "add"
+			d.Class, d.Path, d.NewLine = "add", path, newN
+			newN++
 		case strings.HasPrefix(l, "-"):
-			class = "del"
+			d.Class, d.Path, d.OldLine = "del", path, oldN
+			oldN++
+		default:
+			d.Path, d.OldLine, d.NewLine = path, oldN, newN
+			oldN++
+			newN++
 		}
-		lines = append(lines, diffLine{class, l})
+		lines = append(lines, d)
 	}
 	return lines
+}
+
+type diffThread struct {
+	ID       int64
+	Resolved string
+	Stale    bool
+	Comments []renderedComment
+}
+
+// attachThreads injects review threads under their anchored diff lines;
+// threads whose anchor no longer appears (stale after force-push, or on a
+// context line outside the current diff) are returned separately.
+func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA string) ([]diffLine, []diffThread) {
+	type anchor struct {
+		path string
+		side string
+		line int64
+	}
+	threads := map[int64]*diffThread{}
+	anchors := map[int64]anchor{}
+	var order []int64
+	for _, cm := range comments {
+		if cm.ReplyTo == 0 {
+			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
+				Comments: []renderedComment{{cm.Author, cm.CreatedAt, mdHTML(cm.Body)}}}
+			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
+			order = append(order, cm.ID)
+		} else if th, ok := threads[cm.ReplyTo]; ok {
+			th.Comments = append(th.Comments, renderedComment{cm.Author, cm.CreatedAt, mdHTML(cm.Body)})
+		}
+	}
+	placed := map[int64]bool{}
+	for i := range lines {
+		for _, id := range order {
+			if placed[id] || threads[id].Stale {
+				continue
+			}
+			a := anchors[id]
+			if lines[i].Path != a.path {
+				continue
+			}
+			if (a.side == "new" && lines[i].NewLine == a.line && lines[i].Class != "del") ||
+				(a.side == "old" && lines[i].OldLine == a.line && lines[i].Class == "del") {
+				lines[i].Threads = append(lines[i].Threads, *threads[id])
+				placed[id] = true
+			}
+		}
+	}
+	var unplaced []diffThread
+	for _, id := range order {
+		if !placed[id] {
+			unplaced = append(unplaced, *threads[id])
+		}
+	}
+	return lines, unplaced
 }
 
 type sigView struct {
@@ -644,6 +723,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	comments, _ := s.st.ListMRComments(m.ID)
 	reviews, _ := s.st.ListMRReviews(m.ID)
 	checks, _ := s.st.ListCommitStatuses(p.Repo.ID, m.HeadSHA)
+	diffComments, _ := s.st.ListDiffComments(m.ID)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
 	var lines []diffLine
@@ -658,16 +738,19 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			lines = classifyDiff(patch)
 		}
 	}
+	var detachedThreads []diffThread
+	lines, detachedThreads = attachThreads(lines, diffComments, m.HeadSHA)
 	s.render(w, "mr.html", struct {
 		repoPage
-		MR        store.MR
-		BodyHTML  template.HTML
-		Checks    []store.CommitStatus
-		Combined  string
-		Comments  []renderedComment
-		Reviews   []store.MRReview
-		DiffLines []diffLine
-	}{p, m, mdHTML(m.Body), checks, store.CombinedStatus(checks), renderComments(comments), reviews, lines})
+		MR              store.MR
+		BodyHTML        template.HTML
+		Checks          []store.CommitStatus
+		Combined        string
+		Comments        []renderedComment
+		Reviews         []store.MRReview
+		DiffLines       []diffLine
+		DetachedThreads []diffThread
+	}{p, m, mdHTML(m.Body), checks, store.CombinedStatus(checks), renderComments(comments), reviews, lines, detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

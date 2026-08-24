@@ -332,6 +332,10 @@ func runMRShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	unresolved, err := c.Store.UnresolvedThreadCount(mr.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	type commentOut struct {
 		Author    string `json:"author"`
 		Body      string `json:"body"`
@@ -361,11 +365,12 @@ func runMRShow(c *Ctx, args []string) int {
 	}
 	d := struct {
 		mrOut
-		Checks   []checkOut   `json:"checks,omitempty"`
-		Combined string       `json:"checks_combined,omitempty"`
-		Comments []commentOut `json:"comments,omitempty"`
-		Reviews  []reviewOut  `json:"reviews,omitempty"`
-	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), cs, rs}
+		Checks            []checkOut   `json:"checks,omitempty"`
+		Combined          string       `json:"checks_combined,omitempty"`
+		UnresolvedThreads int          `json:"unresolved_threads,omitempty"`
+		Comments          []commentOut `json:"comments,omitempty"`
+		Reviews           []reviewOut  `json:"reviews,omitempty"`
+	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), unresolved, cs, rs}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
 		if d.Body != "" {
@@ -373,6 +378,9 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 		for _, x := range checks {
 			fmt.Fprintf(w, "check: %s %s\n", x.Context, x.State)
+		}
+		if d.UnresolvedThreads > 0 {
+			fmt.Fprintf(w, "unresolved threads: %d\n", d.UnresolvedThreads)
 		}
 		for _, r := range rs {
 			stale := ""
