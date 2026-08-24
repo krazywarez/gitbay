@@ -35,6 +35,7 @@ func main() {
 		milestoneCmd(),
 		mrCmd(),
 		releaseCmd(),
+		migrateCmd(),
 		webCmd(),
 		orgCmd(),
 		group("profile", "user and org profiles",
@@ -199,6 +200,8 @@ func authCmd() *cobra.Command {
 		pass("revoke", "revoke a token by name", passOpts{server: []string{"token", "revoke"}}),
 	)
 	return group("auth", "identity: whoami, SSH and PGP keys",
+		pass("export", "write your account bundle (a user-level backup) to stdout",
+			passOpts{server: []string{"account", "export"}}),
 		tokens,
 		pass("whoami", "show the authenticated account", passOpts{server: []string{"whoami"}}),
 		group("keys", "manage SSH keys",

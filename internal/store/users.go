@@ -60,6 +60,24 @@ func (s *Store) UserByUsername(name string) (User, error) {
 	return u, err
 }
 
+// UserEmailAddresses returns every address on the account, verified or not.
+func (s *Store) UserEmailAddresses(userID int64) ([]string, error) {
+	rows, err := s.DB.Query("SELECT address FROM emails WHERE user_id = ? ORDER BY is_primary DESC, address", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // SetUserDisabled suspends or restores an account. Disabling also drops
 // the user's web sessions; their keys and tokens stay registered but are
 // refused at every entry point until re-enabled.

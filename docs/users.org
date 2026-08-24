@@ -130,6 +130,19 @@ gitbay repo import you/mirror --from https://github.com/you/repo.git \
 gitbay repo import-issues you/mirror --from you/repo --token-stdin
 #+end_src
 
+Moving between gitbay instances (no lock-in): run on the TARGET, with
+your key registered on both sides. Profile, repos with settings,
+issues, MRs, and comments replay with attribution; git data mirrors
+client-side through your own key. Keys never transfer and emails
+arrive unverified — trust is per-instance. Re-running resumes.
+Push-blocking policies (require-signed, protected branches) are
+deferred and printed for you to re-apply after the data lands.
+=gitbay auth export= alone doubles as a user-level backup.
+
+#+begin_src sh
+gitbay migrate --from old-instance.example [--from-port 22]
+#+end_src
+
 Mirroring keeps a foreign remote in sync during a gradual migration
 (repo admin; https remotes; the token is stored server-side for the
 recurring sync and never echoed back):
