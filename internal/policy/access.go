@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/store"
@@ -39,19 +40,26 @@ func isOwner(user store.User, repo store.Repo) bool {
 	return repo.OwnerKind == "user" && repo.OwnerID == user.ID
 }
 
-// ScopeAllowsGit reports whether an SSH key scope permits the requested git
-// transport on repoPath ("owner/name"). write=true for receive-pack.
+// ScopeAllowsGit reports whether an account-scoped SSH key permits git
+// transport at all. Deploy scopes are decided by DeployScopeAllows instead.
 func ScopeAllowsGit(scope, repoPath string, write bool) bool {
 	switch scope {
 	case "full", "git":
 		return true
 	}
+	return false
+}
+
+// DeployScopeAllows authorizes a deploy key purely by its scope: the key is
+// bound to a repository ID (rename- and transfer-proof), grants nothing
+// anywhere else, and never inherits the access of whoever registered it.
+func DeployScopeAllows(scope string, repoID int64, write bool) bool {
 	rest, ok := strings.CutPrefix(scope, "deploy:")
 	if !ok {
 		return false
 	}
-	target, mode, ok := strings.Cut(rest, ":")
-	if !ok || target != repoPath {
+	idStr, mode, ok := strings.Cut(rest, ":")
+	if !ok || idStr != strconv.FormatInt(repoID, 10) {
 		return false
 	}
 	switch mode {
@@ -62,6 +70,9 @@ func ScopeAllowsGit(scope, repoPath string, write bool) bool {
 	}
 	return false
 }
+
+// IsDeployScope reports whether a key scope is a deploy binding.
+func IsDeployScope(scope string) bool { return strings.HasPrefix(scope, "deploy:") }
 
 // RefUpdate is one proposed ref change, with git facts computed by the hook
 // process (which can see quarantined objects; the daemon cannot).

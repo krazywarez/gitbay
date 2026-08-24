@@ -270,23 +270,33 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		fmt.Fprintln(stderr, "repository not found")
 		return protocol.ExitNotFound
 	}
-	grant, err := st.AccessRole(repo.ID, user.ID)
-	if err != nil {
-		fmt.Fprintln(stderr, "internal error")
-		return protocol.ExitFailure
-	}
-	if !policy.CanRead(user, repo, grant) {
-		// Same answer as nonexistence: private repos must not be enumerable.
-		fmt.Fprintln(stderr, "repository not found")
-		return protocol.ExitNotFound
-	}
-	if !policy.ScopeAllowsGit(scope, repo.Path(), write) {
-		fmt.Fprintf(stderr, "this key's scope (%s) does not allow %s on %s\n", scope, service, repo.Path())
-		return protocol.ExitDenied
-	}
-	if write && !policy.CanWrite(user, repo, grant) {
-		fmt.Fprintf(stderr, "write access to %s denied\n", repo.Path())
-		return protocol.ExitDenied
+	if policy.IsDeployScope(scope) {
+		// A deploy key authorizes by its binding alone: one repository,
+		// its mode, nothing inherited from whoever registered it. Any
+		// mismatch reads as nonexistence, same as the access rules.
+		if !policy.DeployScopeAllows(scope, repo.ID, write) {
+			fmt.Fprintln(stderr, "repository not found")
+			return protocol.ExitNotFound
+		}
+	} else {
+		grant, err := st.AccessRole(repo.ID, user.ID)
+		if err != nil {
+			fmt.Fprintln(stderr, "internal error")
+			return protocol.ExitFailure
+		}
+		if !policy.CanRead(user, repo, grant) {
+			// Same answer as nonexistence: private repos must not be enumerable.
+			fmt.Fprintln(stderr, "repository not found")
+			return protocol.ExitNotFound
+		}
+		if !policy.ScopeAllowsGit(scope, repo.Path(), write) {
+			fmt.Fprintf(stderr, "this key's scope (%s) does not allow %s on %s\n", scope, service, repo.Path())
+			return protocol.ExitDenied
+		}
+		if write && !policy.CanWrite(user, repo, grant) {
+			fmt.Fprintf(stderr, "write access to %s denied\n", repo.Path())
+			return protocol.ExitDenied
+		}
 	}
 
 	dir := control.RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name)

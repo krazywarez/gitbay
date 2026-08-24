@@ -217,3 +217,46 @@ func (s *Store) SSHKeyByID(id int64) (SSHKey, error) {
 	}
 	return k, err
 }
+
+// ListDeployKeys returns the deploy keys bound to a repository.
+func (s *Store) ListDeployKeys(repoID int64) ([]SSHKey, error) {
+	rows, err := s.DB.Query(
+		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE scope LIKE 'deploy:' || ? || ':%' ORDER BY id",
+		repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var keys []SSHKey
+	for rows.Next() {
+		var k SSHKey
+		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope); err != nil {
+			return nil, err
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
+// RemoveDeployKey removes a deploy key from a repository by fingerprint;
+// any repo admin may remove it regardless of who added it.
+func (s *Store) RemoveDeployKey(repoID int64, fingerprint string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(
+		"DELETE FROM ssh_keys WHERE fingerprint = ? AND scope LIKE 'deploy:' || ? || ':%'",
+		fingerprint, repoID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	if err := bumpKeyEpoch(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

@@ -55,16 +55,33 @@ func TestScopeAllowsGit(t *testing.T) {
 	}{
 		{"full", "a/b", true, true},
 		{"git", "a/b", true, true},
-		{"deploy:a/b:ro", "a/b", false, true},
-		{"deploy:a/b:ro", "a/b", true, false},
-		{"deploy:a/b:rw", "a/b", true, true},
-		{"deploy:a/b:rw", "a/c", false, false}, // wrong repo
-		{"deploy:a/b", "a/b", false, false},    // malformed
+		{"deploy:7:ro", "a/b", false, false}, // deploy keys never pass the account path
 		{"", "a/b", false, false},
 	}
 	for _, tc := range cases {
 		if got := ScopeAllowsGit(tc.scope, tc.repo, tc.write); got != tc.want {
 			t.Errorf("ScopeAllowsGit(%q, %q, write=%v) = %v, want %v", tc.scope, tc.repo, tc.write, got, tc.want)
+		}
+	}
+}
+
+func TestDeployScopeAllows(t *testing.T) {
+	cases := []struct {
+		scope  string
+		repoID int64
+		write  bool
+		want   bool
+	}{
+		{"deploy:7:ro", 7, false, true},
+		{"deploy:7:ro", 7, true, false},
+		{"deploy:7:rw", 7, true, true},
+		{"deploy:7:rw", 8, false, false}, // wrong repo
+		{"deploy:7", 7, false, false},    // malformed
+		{"full", 7, false, false},        // not a deploy scope
+	}
+	for _, tc := range cases {
+		if got := DeployScopeAllows(tc.scope, tc.repoID, tc.write); got != tc.want {
+			t.Errorf("DeployScopeAllows(%q, %d, write=%v) = %v, want %v", tc.scope, tc.repoID, tc.write, got, tc.want)
 		}
 	}
 }
