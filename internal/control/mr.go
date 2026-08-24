@@ -22,11 +22,11 @@ func init() {
 		Summary:    "open a merge request: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -]",
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
-		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all]", Run: runMRList})
+		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
-		Summary: "show a merge request: mr show <owner/name> <n>", Run: runMRShow})
+		Summary: "show a merge request: mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
 	register(Command{Path: []string{"mr", "diff"},
-		Summary: "show the diff: mr diff <owner/name> <n>", Run: runMRDiff})
+		Summary: "show the diff: mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
 	register(Command{Path: []string{"mr", "comment"},
 		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -]",
 		ReadsStdin: true, Run: runMRComment})

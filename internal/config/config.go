@@ -19,6 +19,7 @@ type Config struct {
 	GitDaemon    GitDaemon    `toml:"git_daemon"`
 	Web          Web          `toml:"web"`
 	Registration Registration `toml:"registration"`
+	API          API          `toml:"api"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
 }
@@ -59,6 +60,13 @@ type Web struct {
 
 type Registration struct {
 	Mode string `toml:"mode"` // closed | invite | open
+}
+
+// API controls the HTTPS/JSON control-plane API (bearer tokens minted over
+// SSH). Off by default: an instance that never enables it has no
+// credential-bearing HTTP surface at all.
+type API struct {
+	Enabled bool `toml:"enabled"`
 }
 
 type Limits struct {

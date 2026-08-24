@@ -19,9 +19,9 @@ func init() {
 		Summary:    "open an issue: issue create <owner/name> --title <t> [--body <b> | --file -]",
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
-		Summary: "list issues: issue list <owner/name> [--state open|closed|all]", Run: runIssueList})
+		Summary: "list issues: issue list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
-		Summary: "show an issue with comments: issue show <owner/name> <n>", Run: runIssueShow})
+		Summary: "show an issue with comments: issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
 	register(Command{Path: []string{"issue", "comment"},
 		Summary:    "comment: issue comment <owner/name> <n> [--message <m> | --file -]",
 		ReadsStdin: true, Run: runIssueComment})

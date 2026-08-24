@@ -15,12 +15,14 @@ func init() {
 	register(Command{
 		Path:    []string{"whoami"},
 		Summary: "show the authenticated account",
-		Run:     runWhoami,
+		ReadOnly: true,
+		Run:      runWhoami,
 	})
 	register(Command{
 		Path:    []string{"keys", "list"},
 		Summary: "list registered SSH keys",
-		Run:     runKeysList,
+		ReadOnly: true,
+		Run:      runKeysList,
 	})
 	register(Command{
 		Path:       []string{"keys", "add"},

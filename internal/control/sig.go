@@ -19,11 +19,11 @@ func init() {
 	register(Command{Path: []string{"pgp", "add"},
 		Summary: "register an OpenPGP public key (armored, on stdin)", ReadsStdin: true, Run: runPGPAdd})
 	register(Command{Path: []string{"pgp", "list"},
-		Summary: "list registered OpenPGP keys", Run: runPGPList})
+		Summary: "list registered OpenPGP keys", ReadOnly: true, Run: runPGPList})
 	register(Command{Path: []string{"pgp", "remove"},
 		Summary: "remove an OpenPGP key by fingerprint", Run: runPGPRemove})
 	register(Command{Path: []string{"repo", "log"},
-		Summary: "commit log with signature states: repo log <owner/name> [--limit n]", Run: runRepoLog})
+		Summary: "commit log with signature states: repo log <owner/name> [--limit n]", ReadOnly: true, Run: runRepoLog})
 }
 
 func runPGPAdd(c *Ctx, args []string) int {

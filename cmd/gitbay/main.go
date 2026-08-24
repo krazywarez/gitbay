@@ -172,7 +172,13 @@ func authCmd() *cobra.Command {
 			return nil
 		},
 	}
+	tokens := group("token", "API tokens (minted over SSH, used with the JSON API)",
+		pass("create", "mint a token: --name <n> [--scope full|read] [--ttl 30d]", passOpts{server: []string{"token", "create"}}),
+		pass("list", "list API tokens", passOpts{server: []string{"token", "list"}}),
+		pass("revoke", "revoke a token by name", passOpts{server: []string{"token", "revoke"}}),
+	)
 	return group("auth", "identity: whoami, SSH and PGP keys",
+		tokens,
 		pass("whoami", "show the authenticated account", passOpts{server: []string{"whoami"}}),
 		group("keys", "manage SSH keys",
 			pass("list", "list registered SSH keys", passOpts{server: []string{"keys", "list"}}),

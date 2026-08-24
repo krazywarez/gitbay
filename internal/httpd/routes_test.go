@@ -33,6 +33,26 @@ func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
 	}
 }
 
+// TestAPIRouteGating: the API route exists only when [api] enabled = true.
+func TestAPIRouteGating(t *testing.T) {
+	has := func(cfg config.Config) bool {
+		for _, r := range New(cfg, nil).Routes() {
+			if r.Pattern == "/api/v1/cmd" {
+				return true
+			}
+		}
+		return false
+	}
+	if has(config.Default()) {
+		t.Fatal("API route present with api disabled (the default)")
+	}
+	cfg := config.Default()
+	cfg.API.Enabled = true
+	if !has(cfg) {
+		t.Fatal("API route missing with api enabled")
+	}
+}
+
 // TestAccountsModeHasLoginRoute is the positive counterpart: switching the
 // mode on registers the session routes.
 func TestAccountsModeHasLoginRoute(t *testing.T) {

@@ -14,9 +14,9 @@ func init() {
 	register(Command{Path: []string{"org", "create"},
 		Summary: "create an organization (you become its first admin): org create <name>", Run: runOrgCreate})
 	register(Command{Path: []string{"org", "list"},
-		Summary: "list organizations you belong to", Run: runOrgList})
+		Summary: "list organizations you belong to", ReadOnly: true, Run: runOrgList})
 	register(Command{Path: []string{"org", "show"},
-		Summary: "show an organization and its members: org show <name>", Run: runOrgShow})
+		Summary: "show an organization and its members: org show <name>", ReadOnly: true, Run: runOrgShow})
 	register(Command{Path: []string{"org", "delete"},
 		Summary: "delete an empty organization: org delete <name> --yes", Run: runOrgDelete})
 	register(Command{Path: []string{"org", "members", "add"},
@@ -24,7 +24,7 @@ func init() {
 	register(Command{Path: []string{"org", "members", "remove"},
 		Summary: "remove a member: org members remove <org> <user>", Run: runOrgMembersRemove})
 	register(Command{Path: []string{"org", "members", "list"},
-		Summary: "list members: org members list <org>", Run: runOrgMembersList})
+		Summary: "list members: org members list <org>", ReadOnly: true, Run: runOrgMembersList})
 }
 
 // orgAdmin loads an org and requires the caller to be one of its admins.

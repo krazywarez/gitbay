@@ -43,6 +43,13 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs/{n}", Handler: s.mr},
 	)
 
+	// The JSON API is its own opt-in surface, independent of web.mode.
+	if s.cfg.API.Enabled {
+		routes = append(routes,
+			Route{Method: "POST", Pattern: "/api/v1/cmd", Mutating: true, Handler: s.apiCmd},
+		)
+	}
+
 	// Account-mode routes exist only when web.mode = "accounts". In
 	// view_only they are never registered — the structural guarantee.
 	if s.cfg.Web.Mode == "accounts" {

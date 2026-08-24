@@ -27,9 +27,9 @@ func init() {
 	register(Command{Path: []string{"repo", "create"},
 		Summary: "create a repository: repo create <owner/name> [--private]", Run: runRepoCreate})
 	register(Command{Path: []string{"repo", "list"},
-		Summary: "list repositories you own or can access", Run: runRepoList})
+		Summary: "list repositories you own or can access", ReadOnly: true, Run: runRepoList})
 	register(Command{Path: []string{"repo", "show"},
-		Summary: "show repository details: repo show <owner/name>", Run: runRepoShow})
+		Summary: "show repository details: repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
 	register(Command{Path: []string{"repo", "delete"},
 		Summary: "delete a repository: repo delete <owner/name> --yes", Run: runRepoDelete})
 	register(Command{Path: []string{"repo", "access", "grant"},
@@ -37,9 +37,9 @@ func init() {
 	register(Command{Path: []string{"repo", "access", "revoke"},
 		Summary: "revoke access: repo access revoke <owner/name> <user>", Run: runAccessRevoke})
 	register(Command{Path: []string{"repo", "access", "list"},
-		Summary: "list access grants: repo access list <owner/name>", Run: runAccessList})
+		Summary: "list access grants: repo access list <owner/name>", ReadOnly: true, Run: runAccessList})
 	register(Command{Path: []string{"repo", "settings", "show"},
-		Summary: "show settings: repo settings show <owner/name>", Run: runSettingsShow})
+		Summary: "show settings: repo settings show <owner/name>", ReadOnly: true, Run: runSettingsShow})
 	register(Command{Path: []string{"repo", "settings", "protect"},
 		Summary: "protect a branch: repo settings protect <owner/name> <branch>", Run: runProtect})
 	register(Command{Path: []string{"repo", "settings", "unprotect"},

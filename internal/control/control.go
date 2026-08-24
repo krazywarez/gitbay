@@ -24,12 +24,20 @@ type Ctx struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	JSON   bool
+	// ViaAPI marks requests arriving over the HTTP token API. Some
+	// commands (token management) are SSH-only: an API token must never
+	// mint further credentials.
+	ViaAPI bool
+	// ReadOnly is set for read-scoped API tokens.
+	ReadOnly bool
 }
 
 type Command struct {
 	Path       []string // e.g. ["keys", "add"]
 	Summary    string
 	ReadsStdin bool
+	ReadOnly   bool // safe for read-scoped API tokens
+	SSHOnly    bool // refused over the HTTP API (credential minting)
 	Run        func(c *Ctx, args []string) int
 }
 
@@ -69,6 +77,12 @@ func Dispatch(c *Ctx, argv []string) int {
 	}
 	if c.Scope != "full" {
 		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands", c.Scope)
+	}
+	if c.ViaAPI && cmd.SSHOnly {
+		return c.fail(protocol.ExitDenied, "%s is only available over SSH", joinPath(cmd.Path))
+	}
+	if c.ReadOnly && !cmd.ReadOnly {
+		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state", joinPath(cmd.Path))
 	}
 	if c.User.Pending && !pendingAllowed(cmd.Path) {
 		return c.fail(protocol.ExitDenied,
@@ -132,8 +146,9 @@ func (c *Ctx) fail(code int, format string, args ...any) int {
 
 func init() {
 	register(Command{
-		Path:    []string{"help"},
-		Summary: "list available commands",
+		Path:     []string{"help"},
+		Summary:  "list available commands",
+		ReadOnly: true,
 		Run: func(c *Ctx, args []string) int {
 			for _, cmd := range registry {
 				fmt.Fprintf(c.Stdout, "%-24s %s\n", joinPath(cmd.Path), cmd.Summary)
