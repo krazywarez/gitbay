@@ -50,6 +50,26 @@ func init() {
 		Summary: "set the repository description: repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
 		Summary: "expose over git://: repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
+	register(Command{Path: []string{"repo", "archive"},
+		Summary: "archive a repository (read-only: pushes and issue/MR writes refused): repo archive <owner/name>", Run: runArchive})
+	register(Command{Path: []string{"repo", "unarchive"},
+		Summary: "unarchive a repository: repo unarchive <owner/name>", Run: runUnarchive})
+	register(Command{Path: []string{"repo", "topics"},
+		Summary: "list topics: repo topics <owner/name>", ReadOnly: true, Run: runTopicsList})
+	register(Command{Path: []string{"repo", "topics", "add"},
+		Summary: "add topics: repo topics add <owner/name> <topic>...", Run: runTopicsAdd})
+	register(Command{Path: []string{"repo", "topics", "remove"},
+		Summary: "remove topics: repo topics remove <owner/name> <topic>...", Run: runTopicsRemove})
+}
+
+// refuseArchived blocks content writes (pushes are refused in the transport
+// layer) on archived repositories. Settings, access, and lifecycle commands
+// stay available so an archived repo can be managed and unarchived.
+func refuseArchived(c *Ctx, repo store.Repo) int {
+	if repo.Settings.Archived {
+		return c.fail(protocol.ExitDenied, "%s is archived and read-only", repo.Path())
+	}
+	return -1
 }
 
 // resolveRepo loads a repo and checks the given permission for c.User.
@@ -159,15 +179,20 @@ func runRepoList(c *Ctx, args []string) int {
 		Path        string `json:"path"`
 		Visibility  string `json:"visibility"`
 		Description string `json:"description,omitempty"`
+		Archived    bool   `json:"archived,omitempty"`
 	}
 	var ds []out
 	for _, r := range repos {
 		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
-		ds = append(ds, out{r.Path(), r.Visibility, desc})
+		ds = append(ds, out{r.Path(), r.Visibility, desc, r.Settings.Archived})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Path, d.Visibility, d.Description)
+			mark := ""
+			if d.Archived {
+				mark = "\t[archived]"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s%s\n", d.Path, d.Visibility, d.Description, mark)
 		}
 	})
 }
@@ -186,13 +211,27 @@ func runRepoShow(c *Ctx, args []string) int {
 		Visibility        string   `json:"visibility"`
 		DefaultBranch     string   `json:"default_branch"`
 		ProtectedBranches []string `json:"protected_branches,omitempty"`
+		Archived          bool     `json:"archived,omitempty"`
+		Topics            []string `json:"topics,omitempty"`
 	}
 	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
-	d := out{repo.Path(), desc, repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches}
+	topics, err := c.Store.ListTopics(repo.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	d := out{repo.Path(), desc, repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches,
+		repo.Settings.Archived, topics}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s\t%s\tdefault: %s\n", d.Path, d.Visibility, d.DefaultBranch)
+		line := fmt.Sprintf("%s\t%s\tdefault: %s", d.Path, d.Visibility, d.DefaultBranch)
+		if d.Archived {
+			line += "\t[archived]"
+		}
+		fmt.Fprintln(w, line)
 		if d.Description != "" {
 			fmt.Fprintf(w, "%s\n", d.Description)
+		}
+		if len(d.Topics) > 0 {
+			fmt.Fprintf(w, "topics: %s\n", strings.Join(d.Topics, ", "))
 		}
 		if len(d.ProtectedBranches) > 0 {
 			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
@@ -368,8 +407,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 		return code
 	}
 	return c.emit(repo.Settings, func(w io.Writer) {
-		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\ngit_daemon: %v\n",
-			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon)
+		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
+			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
 	})
 }
 
@@ -411,6 +450,111 @@ func runGitDaemon(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "git-daemon %s on %s\n", args[1], repo.Path()) })
+}
+
+func runArchive(c *Ctx, args []string) int   { return setArchived(c, args, true) }
+func runUnarchive(c *Ctx, args []string) int { return setArchived(c, args, false) }
+
+func setArchived(c *Ctx, args []string, archived bool) int {
+	verb := "archive"
+	if !archived {
+		verb = "unarchive"
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	if repo.Settings.Archived == archived {
+		return c.fail(protocol.ExitUsage, "%s is already %sd", repo.Path(), verb)
+	}
+	s := repo.Settings
+	s.Archived = archived
+	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "repo."+verb+"d", "{}")
+	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "%sd %s\n", verb, repo.Path()) })
+}
+
+func runTopicsList(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo topics <owner/name>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	topics, err := c.Store.ListTopics(repo.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(topics, func(w io.Writer) {
+		for _, t := range topics {
+			fmt.Fprintln(w, t)
+		}
+	})
+}
+
+func runTopicsAdd(c *Ctx, args []string) int    { return editTopics(c, args, true) }
+func runTopicsRemove(c *Ctx, args []string) int { return editTopics(c, args, false) }
+
+func editTopics(c *Ctx, args []string, add bool) int {
+	verb := "add"
+	if !add {
+		verb = "remove"
+	}
+	if len(args) < 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo topics %s <owner/name> <topic>...", verb)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	topics := args[1:]
+	if add {
+		for _, t := range topics {
+			if err := policy.ValidateTopic(t); err != nil {
+				return c.fail(protocol.ExitUsage, "%v", err)
+			}
+		}
+		have, err := c.Store.ListTopics(repo.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		added := 0
+		for _, t := range topics {
+			if !slices.Contains(have, t) {
+				added++
+			}
+		}
+		if len(have)+added > policy.MaxTopics {
+			return c.fail(protocol.ExitUsage, "a repository can have at most %d topics", policy.MaxTopics)
+		}
+		for _, t := range topics {
+			if err := c.Store.AddTopic(repo.ID, t); err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+		}
+	} else {
+		for _, t := range topics {
+			if err := c.Store.RemoveTopic(repo.ID, t); err != nil {
+				if errors.Is(err, store.ErrNotFound) {
+					return c.fail(protocol.ExitNotFound, "%s has no topic %q", repo.Path(), t)
+				}
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+		}
+	}
+	now, err := c.Store.ListTopics(repo.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(now, func(w io.Writer) {
+		fmt.Fprintf(w, "topics on %s: %s\n", repo.Path(), strings.Join(now, ", "))
+	})
 }
 
 func runProtect(c *Ctx, args []string) int   { return setProtect(c, args, true) }

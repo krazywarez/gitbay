@@ -130,6 +130,9 @@ func runIssueCreate(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -256,6 +259,9 @@ func runIssueComment(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -280,6 +286,9 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	// Author may close/reopen their own issue; otherwise write access.
 	repo, issue, code := issueRef(c, args, policy.CanRead)
 	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
 	if len(args) != 2 {
@@ -348,6 +357,9 @@ func runIssueLabel(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	for _, l := range adds {
 		if err := c.Store.SetIssueLabel(repo.ID, issue.ID, l, true); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
@@ -380,6 +392,9 @@ func runIssueAssign(c *Ctx, args []string) int {
 	}
 	repo, issue, code := issueRef(c, rest, policy.CanWrite)
 	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
 	resolve := func(name string) (store.User, int) {

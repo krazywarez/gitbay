@@ -69,6 +69,9 @@ func runDiffComment(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	if replyTo == 0 && (path == "" || line == 0) {
 		return c.fail(protocol.ExitUsage, "a new thread needs --path and --line (or reply to one with --reply <id>)")
 	}
@@ -201,6 +204,9 @@ func setThreadResolved(c *Ctx, args []string, resolved bool) int {
 	}
 	repo, mr, code := mrRef(c, args[:2], policy.CanRead)
 	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
 	threadID, err := strconv.ParseInt(args[2], 10, 64)

@@ -64,6 +64,9 @@ func runStatusSet(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	full, err := gitutil.ResolveRef(dir, sha)
 	if err != nil {

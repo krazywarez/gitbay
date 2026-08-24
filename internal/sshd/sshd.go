@@ -298,6 +298,10 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 			return protocol.ExitDenied
 		}
 	}
+	if write && repo.Settings.Archived {
+		fmt.Fprintf(stderr, "%s is archived and read-only\n", repo.Path())
+		return protocol.ExitDenied
+	}
 
 	dir := control.RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name)
 	env := []string{

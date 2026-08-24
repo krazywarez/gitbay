@@ -27,6 +27,7 @@ type RepoSettings struct {
 	RequireApprovals     int      `json:"require_approvals,omitempty"`
 	RequireResolved      bool     `json:"require_resolved,omitempty"`
 	GitDaemon            bool     `json:"git_daemon,omitempty"`
+	Archived             bool     `json:"archived,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

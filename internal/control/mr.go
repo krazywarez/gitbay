@@ -241,6 +241,9 @@ func runMRCreate(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	if target == "" {
 		target = repo.DefaultBranch
 	}
@@ -488,6 +491,9 @@ func runMRComment(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -529,6 +535,9 @@ func runMRReview(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
 	if mr.State != "open" {
 		return c.fail(protocol.ExitUsage, "MR !%d is %s", mr.Number, mr.State)
 	}
@@ -564,6 +573,9 @@ func runMRMerge(c *Ctx, args []string) int {
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanWrite)
 	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
 	if mr.State != "open" && mr.State != "source_gone" {
@@ -924,6 +936,9 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 func runMRClose(c *Ctx, args []string) int {
 	repo, mr, code := mrRef(c, args, policy.CanRead)
 	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
 	if len(args) != 2 {
