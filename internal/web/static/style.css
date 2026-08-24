@@ -629,6 +629,10 @@ article.comment .rendered { padding: 0 var(--sp-4); }
 article.comment .rendered > :first-child { margin-top: var(--sp-3); }
 article.comment .rendered > :last-child { margin-bottom: var(--sp-3); }
 form.commentform { margin: var(--sp-4) 0; }
+details.editbox { margin: var(--sp-2) 0; max-width: 48rem; }
+details.editbox summary { cursor: pointer; color: var(--muted); font-size: var(--fs-2); }
+details.editbox summary:hover { color: var(--accent); }
+details.editbox input[type="text"] { width: 100%; }
 .syscomment {
   max-width: 48rem;
   color: var(--muted);

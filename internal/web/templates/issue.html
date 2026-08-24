@@ -7,6 +7,13 @@
 {{if .Issue.Labels}} · {{range .Issue.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.}}">{{.}}</a> {{end}}{{end}}
 {{if .Issue.Assignees}} · assigned to {{range .Issue.Assignees}}{{.}} {{end}}{{end}}
 {{if .Issue.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a>{{end}}</p>
+{{if .CanEdit}}<details class="editbox"><summary>edit</summary>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/edit" class="commentform">
+<p><input type="text" name="title" value="{{.Issue.Title}}" required></p>
+<p><textarea name="body" rows="8">{{.Issue.Body}}</textarea></p>
+<p><input type="text" name="labels" value="{{range $i, $l := .Issue.Labels}}{{if $i}} {{end}}{{$l}}{{end}}" placeholder="labels, space-separated (write access)"></p>
+<p><button type="submit">save</button></p>
+</form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.Issue.Author}}">{{.Issue.Author}}</a></strong> <span class="when">{{when .Issue.CreatedAt}}</span></header>
   <div class="rendered">{{.BodyHTML}}</div>

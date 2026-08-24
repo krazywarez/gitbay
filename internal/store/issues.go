@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type Issue struct {
@@ -121,6 +122,30 @@ func (s *Store) ListIssues(repoID int64, state string) ([]Issue, error) {
 		out = append(out, i)
 	}
 	return out, rows.Err()
+}
+
+// UpdateIssueText edits title and/or body; nil leaves a field unchanged.
+func (s *Store) UpdateIssueText(issueID int64, title, body *string) error {
+	set, args := []string{}, []any{}
+	if title != nil {
+		set, args = append(set, "title = ?"), append(args, *title)
+	}
+	if body != nil {
+		set, args = append(set, "body = ?"), append(args, *body)
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	set = append(set, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')")
+	args = append(args, issueID)
+	res, err := s.DB.Exec("UPDATE issues SET "+strings.Join(set, ", ")+" WHERE id = ?", args...)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) SetIssueState(issueID int64, state string) error {

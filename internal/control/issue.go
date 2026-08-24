@@ -22,6 +22,9 @@ func init() {
 		Summary: "list issues: issue list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
 		Summary: "show an issue with comments: issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
+	register(Command{Path: []string{"issue", "edit"},
+		Summary:    "edit title or body: issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -]",
+		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
 		Summary:    "comment: issue comment <owner/name> <n> [--message <m> | --file -]",
 		ReadsStdin: true, Run: runIssueComment})
@@ -317,6 +320,78 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	}
 	return c.emit(map[string]any{"number": issue.Number, "state": state}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s#%d is now %s\n", repo.Path(), issue.Number, state)
+	})
+}
+
+// editText parses --title/--body/--file - and authorizes: author or write.
+func editText(c *Ctx, args []string, kind string) (rest []string, title, body *string, code int) {
+	var titleV, bodyV, file string
+	haveTitle, haveBody := false, false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--title", "--body", "--file":
+			if i+1 >= len(args) {
+				return nil, nil, nil, c.fail(protocol.ExitUsage, "%s requires a value", args[i])
+			}
+			switch args[i] {
+			case "--title":
+				titleV, haveTitle = args[i+1], true
+			case "--body":
+				bodyV, haveBody = args[i+1], true
+			case "--file":
+				file = args[i+1]
+			}
+			i++
+		default:
+			rest = append(rest, args[i])
+		}
+	}
+	if file != "" {
+		b, err := bodyFrom(c, "", file)
+		if err != nil {
+			return nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+		}
+		bodyV, haveBody = b, true
+	}
+	if !haveTitle && !haveBody {
+		return nil, nil, nil, c.fail(protocol.ExitUsage, "usage: %s edit <owner/name> <n> [--title <t>] [--body <b> | --file -]", kind)
+	}
+	if haveTitle {
+		if strings.TrimSpace(titleV) == "" {
+			return nil, nil, nil, c.fail(protocol.ExitUsage, "--title must not be empty")
+		}
+		title = &titleV
+	}
+	if haveBody {
+		body = &bodyV
+	}
+	return rest, title, body, -1
+}
+
+func runIssueEdit(c *Ctx, args []string) int {
+	rest, title, body, code := editText(c, args, "issue")
+	if code >= 0 {
+		return code
+	}
+	repo, issue, code := issueRef(c, rest, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if issue.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
+		return c.fail(protocol.ExitDenied, "only the author or users with write access can edit this issue")
+	}
+	if err := c.Store.UpdateIssueText(issue.ID, title, body); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]any{"number": issue.Number}, func(w io.Writer) {
+		fmt.Fprintf(w, "edited %s#%d\n", repo.Path(), issue.Number)
 	})
 }
 

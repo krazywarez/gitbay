@@ -1175,8 +1175,26 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		Issue       store.Issue
 		BodyHTML    template.HTML
 		Comments    []renderedComment
+		CanEdit     bool
 		LabelColors map[string]template.CSS
-	}{p, iss, md(iss.Body), renderComments(comments, md), s.labelColors(p.Repo.ID)})
+	}{p, iss, md(iss.Body), renderComments(comments, md),
+		s.canEditItem(r, p.Repo, iss.Author), s.labelColors(p.Repo.ID)})
+}
+
+// canEditItem: the author or anyone with write access may edit.
+func (s *Server) canEditItem(r *http.Request, repo store.Repo, author string) bool {
+	if s.cfg.Web.Mode != "accounts" {
+		return false
+	}
+	u := s.viewer(r)
+	if u.ID == 0 {
+		return false
+	}
+	if u.Username == author {
+		return true
+	}
+	grant, _ := s.st.AccessRole(repo.ID, u.ID)
+	return policy.CanWrite(u, repo, grant)
 }
 
 func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
@@ -1267,8 +1285,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Reviews         []store.MRReview
 		DiffLines       []diffLine
 		Stat            diffStat
+		CanEdit         bool
 		DetachedThreads []diffThread
-	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md), reviews, lines, stat, detachedThreads})
+	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
+		reviews, lines, stat, s.canEditItem(r, p.Repo, m.Author), detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ package httpd
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -315,6 +316,79 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 		}
 	}
 	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
+}
+
+// issueEditSubmit edits title/body (author or write) and, with write
+// access, replaces the label set.
+func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
+	iss, err := s.st.IssueByNumber(repo.ID, n)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	grant, _ := s.st.AccessRole(repo.ID, u.ID)
+	canWrite := policy.CanWrite(u, repo, grant)
+	if iss.Author != u.Username && !canWrite {
+		http.Error(w, "only the author or users with write access can edit", http.StatusForbidden)
+		return
+	}
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title == "" {
+		http.Error(w, "title required", http.StatusBadRequest)
+		return
+	}
+	body := r.FormValue("body")
+	if err := s.st.UpdateIssueText(iss.ID, &title, &body); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if canWrite {
+		want := strings.Fields(r.FormValue("labels"))
+		for _, l := range iss.Labels {
+			if !slices.Contains(want, l) {
+				s.st.SetIssueLabel(repo.ID, iss.ID, l, false)
+			}
+		}
+		for _, l := range want {
+			s.st.SetIssueLabel(repo.ID, iss.ID, l, true)
+		}
+	}
+	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
+}
+
+// mrEditSubmit edits an MR's title/body (author or write).
+func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
+	m, err := s.st.MRByNumber(repo.ID, n)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	grant, _ := s.st.AccessRole(repo.ID, u.ID)
+	if m.Author != u.Username && !policy.CanWrite(u, repo, grant) {
+		http.Error(w, "only the author or users with write access can edit", http.StatusForbidden)
+		return
+	}
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title == "" {
+		http.Error(w, "title required", http.StatusBadRequest)
+		return
+	}
+	body := r.FormValue("body")
+	if err := s.st.UpdateMRText(m.ID, &title, &body); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", repo.Path(), n), http.StatusSeeOther)
 }
 
 func (s *Server) issueCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {

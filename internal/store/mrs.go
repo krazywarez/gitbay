@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 type MR struct {
@@ -10,7 +11,7 @@ type MR struct {
 	RepoID       int64
 	Number       int64
 	Author       string
-	SourceRepoID int64 // 0 when the source repo is gone
+	SourceRepoID int64  // 0 when the source repo is gone
 	SourcePath   string // owner/name of source repo, "" when gone
 	SourceRef    string
 	TargetRef    string
@@ -183,6 +184,30 @@ func (s *Store) AddMRComment(mrID, authorID int64, body string) error {
 	_, err := s.DB.Exec(
 		"INSERT INTO mr_comments (mr_id, author_id, body) VALUES (?, ?, ?)", mrID, authorID, body)
 	return err
+}
+
+// UpdateMRText edits title and/or body; nil leaves a field unchanged.
+func (s *Store) UpdateMRText(mrID int64, title, body *string) error {
+	set, args := []string{}, []any{}
+	if title != nil {
+		set, args = append(set, "title = ?"), append(args, *title)
+	}
+	if body != nil {
+		set, args = append(set, "body = ?"), append(args, *body)
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	set = append(set, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')")
+	args = append(args, mrID)
+	res, err := s.DB.Exec("UPDATE merge_requests SET "+strings.Join(set, ", ")+" WHERE id = ?", args...)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // AddMRSystemComment is the informational counterpart of AddMRComment.

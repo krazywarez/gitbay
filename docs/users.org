@@ -180,6 +180,7 @@ gitbay issue create --title "it breaks" [--body "..." | --file -]
 gitbay issue list [--state open|closed|all]
 gitbay issue show 4
 gitbay issue comment 4 --message "same here"
+gitbay issue edit 4 --title "better title" [--body|--file -]  # author or write
 gitbay issue close 4 / reopen 4
 gitbay issue label 4 --add bug --remove wontfix
 gitbay issue assign 4 --add alice

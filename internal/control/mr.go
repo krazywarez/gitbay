@@ -34,6 +34,9 @@ func init() {
 		Summary: "show a merge request: mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
 	register(Command{Path: []string{"mr", "diff"},
 		Summary: "show the diff: mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
+	register(Command{Path: []string{"mr", "edit"},
+		Summary:    "edit title or body: mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -]",
+		ReadsStdin: true, Run: runMREdit})
 	register(Command{Path: []string{"mr", "comment"},
 		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -]",
 		ReadsStdin: true, Run: runMRComment})
@@ -466,6 +469,33 @@ func runMRDiff(c *Ctx, args []string) int {
 	}
 	fmt.Fprint(c.Stdout, patch)
 	return protocol.ExitOK
+}
+
+func runMREdit(c *Ctx, args []string) int {
+	rest, title, body, code := editText(c, args, "mr")
+	if code >= 0 {
+		return code
+	}
+	repo, mr, code := mrRef(c, rest, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if mr.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
+		return c.fail(protocol.ExitDenied, "only the author or users with write access can edit this merge request")
+	}
+	if err := c.Store.UpdateMRText(mr.ID, title, body); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
+		fmt.Fprintf(w, "edited %s!%d\n", repo.Path(), mr.Number)
+	})
 }
 
 func runMRComment(c *Ctx, args []string) int {

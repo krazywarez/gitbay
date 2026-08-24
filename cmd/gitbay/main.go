@@ -289,6 +289,7 @@ func issueCmd() *cobra.Command {
 		pass("reopen", "reopen an issue", passOpts{server: []string{"issue", "reopen"}, needsRepo: true}),
 		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"issue", "label"}, needsRepo: true}),
 		pass("assign", "assign users: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
+		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"issue", "edit"}, needsRepo: true, stdinOK: true}),
 		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"issue", "milestone"}, needsRepo: true}),
 		pass("templates", "list issue templates (.gitbay/issue-template*.md)", passOpts{server: []string{"issue", "templates"}, needsRepo: true}),
 	)
@@ -336,6 +337,7 @@ func mrCmd() *cobra.Command {
 		pass("review", "review: --approve|--request-changes|--comment", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
 		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
+		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),
 		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
 	)
 }

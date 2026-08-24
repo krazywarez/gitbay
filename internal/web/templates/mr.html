@@ -5,6 +5,12 @@
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
 <a href="/{{.MR.Author}}">{{.MR.Author}}</a> wants to merge {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} into {{.MR.TargetRef}}
  at <code>{{short .MR.HeadSHA}}</code>{{if .MR.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.MR.Milestone}}</a>{{end}}</p>
+{{if .CanEdit}}<details class="editbox"><summary>edit</summary>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}/edit" class="commentform">
+<p><input type="text" name="title" value="{{.MR.Title}}" required></p>
+<p><textarea name="body" rows="8">{{.MR.Body}}</textarea></p>
+<p><button type="submit">save</button></p>
+</form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong>{{.MR.Author}}</strong></header>
   <div class="rendered">{{.BodyHTML}}</div>
