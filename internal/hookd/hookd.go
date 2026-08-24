@@ -1,5 +1,5 @@
 // Package hookd is the unix-socket bridge between git hooks and the daemon.
-// The hook process (forged in hook mode) computes git facts — it inherits
+// The hook process (gitbayd in hook mode) computes git facts — it inherits
 // git's quarantine environment, which the daemon does not see — and sends
 // them here; the daemon answers with a policy decision.
 //
@@ -17,20 +17,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/sig"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/sig"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // Env variable names passed to git transport subprocesses and inherited by
 // hooks.
 const (
-	EnvSocket = "FORGE_HOOK_SOCKET"
-	EnvRepoID = "FORGE_REPO_ID"
-	EnvUserID = "FORGE_USER_ID"
+	EnvSocket = "GITBAY_HOOK_SOCKET"
+	EnvRepoID = "GITBAY_REPO_ID"
+	EnvUserID = "GITBAY_USER_ID"
 )
 
 type Request struct {
@@ -59,7 +59,7 @@ type Response struct {
 // SocketPath returns the hook socket location. It prefers the server root,
 // but unix socket paths are capped (~104 bytes on macOS, 108 on Linux), so
 // deep roots fall back to a hashed name under the system temp directory.
-// Hooks receive the chosen path via FORGE_HOOK_SOCKET, so both sides always
+// Hooks receive the chosen path via GITBAY_HOOK_SOCKET, so both sides always
 // agree.
 func SocketPath(root string) string {
 	p := filepath.Join(root, "hook.sock")
@@ -67,7 +67,7 @@ func SocketPath(root string) string {
 		return p
 	}
 	sum := sha256.Sum256([]byte(root))
-	return filepath.Join(os.TempDir(), fmt.Sprintf("forge-%x.sock", sum[:8]))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("gitbay-%x.sock", sum[:8]))
 }
 
 type Server struct {
@@ -250,12 +250,12 @@ func Ask(socketPath string, req Request, commits func() (CommitsPayload, error))
 // WriteHookScripts (re)generates the shared hooks directory. Called at
 // daemon startup so a moved binary self-heals; every repo points here via
 // core.hooksPath.
-func WriteHookScripts(hooksDir, forgedPath string) error {
+func WriteHookScripts(hooksDir, gitbaydPath string) error {
 	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		return err
 	}
 	for _, hook := range []string{"pre-receive", "post-receive"} {
-		script := fmt.Sprintf("#!/bin/sh\nexec %q hook %s\n", forgedPath, hook)
+		script := fmt.Sprintf("#!/bin/sh\nexec %q hook %s\n", gitbaydPath, hook)
 		if err := os.WriteFile(filepath.Join(hooksDir, hook), []byte(script), 0o755); err != nil {
 			return err
 		}

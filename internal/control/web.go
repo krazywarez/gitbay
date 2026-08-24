@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 func newStoredToken() (token, hash string, err error) { return store.NewToken() }

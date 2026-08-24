@@ -1,4 +1,4 @@
-// Package config loads and validates the forged server configuration.
+// Package config loads and validates the gitbayd server configuration.
 package config
 
 import (
@@ -69,7 +69,7 @@ type Mail struct {
 // Default returns the configuration used when a key is absent from the file.
 func Default() Config {
 	return Config{
-		Server: Server{Root: "/var/lib/forge"},
+		Server: Server{Root: "/var/lib/gitbay"},
 		SSH:    SSH{Mode: "embedded", Port: 22},
 		HTTP:   HTTP{Addr: ":443", TLS: "acme"},
 		Web:    Web{Mode: "view_only"},
@@ -154,7 +154,7 @@ func (c Config) Validate() error {
 	}
 	if c.Web.PasswordAuth && c.Web.Mode == "accounts" {
 		errs = append(errs, errors.New(
-			"web.password_auth is not implemented yet; browser sessions are minted over SSH (forge web login)"))
+			"web.password_auth is not implemented yet; browser sessions are minted over SSH (gitbay web login)"))
 	}
 
 	return errors.Join(errs...)

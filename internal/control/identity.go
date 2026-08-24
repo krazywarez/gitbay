@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 func init() {

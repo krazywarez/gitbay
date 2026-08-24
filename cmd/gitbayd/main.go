@@ -1,4 +1,4 @@
-// forged is the forge server daemon. The same binary also runs in hook mode
+// gitbayd is the forge server daemon. The same binary also runs in hook mode
 // (invoked by git via core.hooksPath) and hosts the host-local admin commands.
 package main
 
@@ -14,18 +14,18 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/gitd"
-	"github.com/krazywarez/forge/internal/hookd"
-	"github.com/krazywarez/forge/internal/httpd"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/sshd"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitd"
+	"gitbay.org/gitbay/internal/hookd"
+	"gitbay.org/gitbay/internal/httpd"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/sshd"
+	"gitbay.org/gitbay/internal/store"
 )
 
 func openStore(cfg config.Config) (*store.Store, error) {
-	s, err := store.Open(filepath.Join(cfg.Server.Root, "forge.db"))
+	s, err := store.Open(filepath.Join(cfg.Server.Root, "gitbay.db"))
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +40,12 @@ var configPath string
 
 func main() {
 	root := &cobra.Command{
-		Use:           "forged",
-		Short:         "forge server daemon",
+		Use:           "gitbayd",
+		Short:         "gitbay server daemon",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().StringVar(&configPath, "config", "/etc/forge/config.toml", "path to config file")
+	root.PersistentFlags().StringVar(&configPath, "config", "/etc/gitbay/config.toml", "path to config file")
 
 	root.AddCommand(
 		checkConfigCmd(),
@@ -58,7 +58,7 @@ func main() {
 	)
 
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "forged:", err)
+		fmt.Fprintln(os.Stderr, "gitbayd:", err)
 		os.Exit(1)
 	}
 }
@@ -173,7 +173,7 @@ func migrateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			s, err := store.Open(cfg.Server.Root + "/forge.db")
+			s, err := store.Open(cfg.Server.Root + "/gitbay.db")
 			if err != nil {
 				return err
 			}

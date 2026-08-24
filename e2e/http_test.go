@@ -90,7 +90,7 @@ func TestHTTPTransport(t *testing.T) {
 		}
 		if !strings.Contains(out, "remote error:") ||
 			!strings.Contains(out, "pushes to this forge go over SSH") ||
-			!strings.Contains(out, "git@forge.test:alice/pub.git") {
+			!strings.Contains(out, "git@gitbay.test:alice/pub.git") {
 			t.Fatalf("[%s] push refusal output:\n%s", gitBin, out)
 		}
 		for _, banned := range []string{"Username", "Password", "Authentication failed", "terminal prompts disabled", "401", "403"} {

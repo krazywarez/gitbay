@@ -9,8 +9,8 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/krazywarez/forge/internal/cliconfig"
-	"github.com/krazywarez/forge/internal/protocol"
+	"gitbay.org/gitbay/internal/cliconfig"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 // hasBodyFlag reports whether args already carry body/message input.
@@ -37,7 +37,7 @@ func maybeEditor(args []string, kind string) ([]string, *strings.Reader, bool, e
 		// failing — bodies are optional everywhere.
 		return args, nil, true, nil
 	}
-	f, err := os.CreateTemp("", "forge-"+kind+"-*.md")
+	f, err := os.CreateTemp("", "gitbay-"+kind+"-*.md")
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -75,7 +75,7 @@ func runGitLocal(args ...string) int {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return ee.ExitCode()
 		}
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	return 0
@@ -84,12 +84,12 @@ func runGitLocal(args ...string) int {
 // cmdRepoClone implements `forge repo clone <owner/name> [dir]`.
 func cmdRepoClone(args []string) int {
 	if len(args) < 1 || strings.HasPrefix(args[0], "-") {
-		fmt.Fprintln(os.Stderr, "usage: forge repo clone <owner/name> [dir]")
+		fmt.Fprintln(os.Stderr, "usage: gitbay repo clone <owner/name> [dir]")
 		return protocol.ExitUsage
 	}
 	t, err := resolveTarget()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	gitArgs := append([]string{"clone", t.inst.CloneURL(args[0])}, args[1:]...)
@@ -103,7 +103,7 @@ func cmdRepoClone(args []string) int {
 // origin and check it out as a local branch.
 func cmdMRCheckout(args []string) int {
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: forge mr checkout <n>")
+		fmt.Fprintln(os.Stderr, "usage: gitbay mr checkout <n>")
 		return protocol.ExitUsage
 	}
 	n := args[0]
@@ -124,7 +124,7 @@ func cmdInit(args []string) int {
 		case a == "--private":
 			private = true
 		case strings.HasPrefix(a, "-"):
-			fmt.Fprintln(os.Stderr, "usage: forge init [name] [--private]")
+			fmt.Fprintln(os.Stderr, "usage: gitbay init [name] [--private]")
 			return protocol.ExitUsage
 		default:
 			name = a
@@ -133,7 +133,7 @@ func cmdInit(args []string) int {
 	if name == "" {
 		wd, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "forge:", err)
+			fmt.Fprintln(os.Stderr, "gitbay:", err)
 			return protocol.ExitFailure
 		}
 		name = filepath.Base(wd)
@@ -141,12 +141,12 @@ func cmdInit(args []string) int {
 
 	cfg, err := cliconfig.Load()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	inst, _, err := cfg.DefaultInstance()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	t := target{inst: inst}
@@ -196,7 +196,7 @@ func captureSSH(t target, serverArgv []string) (string, int) {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return "", ee.ExitCode()
 		}
-		fmt.Fprintln(os.Stderr, "forge: running ssh:", err)
+		fmt.Fprintln(os.Stderr, "gitbay: running ssh:", err)
 		return "", protocol.ExitProtocol
 	}
 	return string(out), 0
@@ -210,7 +210,7 @@ func quoteAll(args []string) []string {
 	return out
 }
 
-// cmdRemoteAdd implements `forge remote add <name> <host> [flags]`.
+// cmdRemoteAdd implements `gitbay remote add <name> <host> [flags]`.
 func cmdRemoteAdd(args []string) int {
 	var name, host, user string
 	var port int
@@ -250,19 +250,19 @@ func cmdRemoteAdd(args []string) int {
 			} else if host == "" {
 				host = a
 			} else {
-				fmt.Fprintln(os.Stderr, "usage: forge remote add <name> <host> [--port n] [--user u] [--ssh-option opt]... [--default]")
+				fmt.Fprintln(os.Stderr, "usage: gitbay remote add <name> <host> [--port n] [--user u] [--ssh-option opt]... [--default]")
 				return protocol.ExitUsage
 			}
 			i++
 		}
 	}
 	if name == "" || host == "" {
-		fmt.Fprintln(os.Stderr, "usage: forge remote add <name> <host> [--port n] [--user u] [--ssh-option opt]... [--default]")
+		fmt.Fprintln(os.Stderr, "usage: gitbay remote add <name> <host> [--port n] [--user u] [--ssh-option opt]... [--default]")
 		return protocol.ExitUsage
 	}
 	cfg, err := cliconfig.Load()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	cfg.Instances[name] = cliconfig.Instance{Host: host, Port: port, User: user, SSHOptions: sshOptions}
@@ -270,7 +270,7 @@ func cmdRemoteAdd(args []string) int {
 		cfg.Default = name
 	}
 	if err := cliconfig.Save(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	fmt.Printf("added instance %s (%s)\n", name, host)
@@ -280,7 +280,7 @@ func cmdRemoteAdd(args []string) int {
 func cmdRemoteList() int {
 	cfg, err := cliconfig.Load()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	for name, inst := range cfg.Instances {

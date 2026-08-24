@@ -1,4 +1,4 @@
-module github.com/krazywarez/forge
+module gitbay.org/gitbay
 
 go 1.27.0
 

@@ -8,7 +8,7 @@ import (
 
 func open(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(filepath.Join(t.TempDir(), "forge.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "gitbay.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

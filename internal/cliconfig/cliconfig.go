@@ -46,10 +46,10 @@ type Config struct {
 
 func Path() string {
 	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
-		return filepath.Join(x, "forge", "config.toml")
+		return filepath.Join(x, "gitbay", "config.toml")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "forge", "config.toml")
+	return filepath.Join(home, ".config", "gitbay", "config.toml")
 }
 
 func Load() (Config, error) {
@@ -95,7 +95,7 @@ func (c Config) DefaultInstance() (Instance, string, error) {
 			return inst, name, nil
 		}
 	}
-	return Instance{}, "", fmt.Errorf("no forge instance configured; run: forge remote add <name> <host>")
+	return Instance{}, "", fmt.Errorf("no gitbay instance configured; run: gitbay remote add <name> <host>")
 }
 
 var (

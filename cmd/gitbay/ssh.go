@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/krazywarez/forge/internal/cliconfig"
-	"github.com/krazywarez/forge/internal/protocol"
+	"gitbay.org/gitbay/internal/cliconfig"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 // context is the resolved target for a command: which instance to talk to
@@ -105,7 +105,7 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 		}
 		return code
 	}
-	fmt.Fprintln(os.Stderr, "forge: running ssh:", err)
+	fmt.Fprintln(os.Stderr, "gitbay: running ssh:", err)
 	return protocol.ExitProtocol
 }
 
@@ -117,7 +117,7 @@ func withRepo(t target, args []string) ([]string, error) {
 		return args, nil // explicit owner/name
 	}
 	if t.repo == "" {
-		return nil, fmt.Errorf("no repository given and none inferable: pass <owner/name> or run inside a clone of a forge repository")
+		return nil, fmt.Errorf("no repository given and none inferable: pass <owner/name> or run inside a clone of a gitbay repository")
 	}
 	return append([]string{t.repo}, args...), nil
 }

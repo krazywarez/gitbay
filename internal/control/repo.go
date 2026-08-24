@@ -9,10 +9,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // RepoDir returns the on-disk path for a repository.

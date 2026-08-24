@@ -3,7 +3,7 @@ package policy
 import (
 	"strings"
 
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // CanRead reports whether user may read repo over an authenticated channel.

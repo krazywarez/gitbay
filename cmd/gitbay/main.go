@@ -13,12 +13,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 
-	"github.com/krazywarez/forge/internal/protocol"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 func main() {
 	root := &cobra.Command{
-		Use:           "forge",
+		Use:           "gitbay",
 		Short:         "CLI-first git forge client",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -36,7 +36,7 @@ func main() {
 	)
 
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		os.Exit(protocol.ExitUsage)
 	}
 }
@@ -72,13 +72,13 @@ func pass(use, short string, o passOpts) *cobra.Command {
 func runPass(o passOpts, args []string) int {
 	t, err := resolveTarget()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "forge:", err)
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
 	if o.needsRepo {
 		args, err = withRepo(t, args)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "forge:", err)
+			fmt.Fprintln(os.Stderr, "gitbay:", err)
 			return protocol.ExitUsage
 		}
 	}
@@ -87,7 +87,7 @@ func runPass(o passOpts, args []string) int {
 	if o.editor != "" {
 		extended, body, ok, err := maybeEditor(args, o.editor)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "forge:", err)
+			fmt.Fprintln(os.Stderr, "gitbay:", err)
 			return protocol.ExitFailure
 		}
 		if !ok {
@@ -186,14 +186,14 @@ func authCmd() *cobra.Command {
 
 func repoCmd() *cobra.Command {
 	return group("repo", "create and manage repositories",
-		pass("create", "create a repository: forge repo create <owner/name> [--private]",
+		pass("create", "create a repository: gitbay repo create <owner/name> [--private]",
 			passOpts{server: []string{"repo", "create"}}),
 		pass("list", "list repositories you own or can access", passOpts{server: []string{"repo", "list"}}),
 		pass("show", "show repository details", passOpts{server: []string{"repo", "show"}, needsRepo: true}),
 		pass("log", "commit log with signature states", passOpts{server: []string{"repo", "log"}, needsRepo: true}),
 		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
 		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
-		local("clone", "clone via ssh: forge repo clone <owner/name> [dir]", cmdRepoClone),
+		local("clone", "clone via ssh: gitbay repo clone <owner/name> [dir]", cmdRepoClone),
 		importCmd(),
 		group("access", "manage access grants",
 			pass("grant", "grant access: ... <user> read|write|admin", passOpts{server: []string{"repo", "access", "grant"}, needsRepo: true}),
@@ -232,7 +232,7 @@ func mrCmd() *cobra.Command {
 		pass("list", "list merge requests [--state ...]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
 		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
 		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
-		local("checkout", "fetch and check out the MR head locally: forge mr checkout <n>", cmdMRCheckout),
+		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),
 		pass("comment", "comment on a merge request", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("review", "review: --approve|--request-changes|--comment", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
 		pass("merge", "merge (fast-forward or merge-commit): [--strategy ff|merge]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
@@ -244,7 +244,7 @@ func mrCmd() *cobra.Command {
 func importCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "import",
-		Short:              "server-side mirror of a foreign repo: forge repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		Short:              "server-side mirror of a foreign repo: gitbay repo import <owner/name> --from <url> [--private] [--token-stdin]",
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, a := range args {
@@ -283,14 +283,14 @@ func webCmd() *cobra.Command {
 
 func remoteCmd() *cobra.Command {
 	return group("remote", "local instance profiles (no server contact)",
-		local("add", "add a named forge instance: forge remote add <name> <host> [--port n] [--user u] [--ssh-option o]... [--default]",
+		local("add", "add a named gitbay instance: gitbay remote add <name> <host> [--port n] [--user u] [--ssh-option o]... [--default]",
 			cmdRemoteAdd),
 		local("list", "list configured instances", func([]string) int { return cmdRemoteList() }),
 	)
 }
 
 func initCmd() *cobra.Command {
-	return local("init", "git init + repo create + set origin, in one step: forge init [name] [--private]", cmdInit)
+	return local("init", "git init + repo create + set origin, in one step: gitbay init [name] [--private]", cmdInit)
 }
 
 // manCmd generates man pages; a CLI-first tool without man pages is not

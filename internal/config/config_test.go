@@ -18,8 +18,8 @@ func writeConfig(t *testing.T, body string) string {
 
 const minimal = `
 [server]
-root = "/var/lib/forge"
-site_url = "https://forge.example"
+root = "/var/lib/gitbay"
+site_url = "https://gitbay.example"
 `
 
 func TestLoadMinimal(t *testing.T) {
@@ -52,7 +52,7 @@ func TestContradictions(t *testing.T) {
 		},
 		{
 			"system ssh with open registration",
-			minimal + "\n[ssh]\nmode = \"system\"\n[registration]\nmode = \"open\"\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"forge@example\"\n",
+			minimal + "\n[ssh]\nmode = \"system\"\n[registration]\nmode = \"open\"\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"gitbay@example\"\n",
 			"requires registration.mode = \"closed\"",
 		},
 		{
@@ -72,12 +72,12 @@ func TestContradictions(t *testing.T) {
 		},
 		{
 			"unknown key",
-			"[server]\nroot = \"/var/lib/forge\"\nsite_url = \"https://forge.example\"\nbogus = 1\n",
+			"[server]\nroot = \"/var/lib/gitbay\"\nsite_url = \"https://gitbay.example\"\nbogus = 1\n",
 			"unknown config key",
 		},
 		{
 			"missing site_url",
-			"[server]\nroot = \"/var/lib/forge\"\n",
+			"[server]\nroot = \"/var/lib/gitbay\"\n",
 			"site_url",
 		},
 	}
@@ -101,7 +101,7 @@ func TestValidCombinations(t *testing.T) {
 	}{
 		{
 			"invite with smtp",
-			minimal + "\n[registration]\nmode = \"invite\"\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"forge@example\"\n",
+			minimal + "\n[registration]\nmode = \"invite\"\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"gitbay@example\"\n",
 		},
 		{
 			"system ssh closed registration",

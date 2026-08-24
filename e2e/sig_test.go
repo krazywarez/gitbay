@@ -16,7 +16,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/sig"
+	"gitbay.org/gitbay/internal/sig"
 )
 
 // --- fixture key helpers -------------------------------------------------
@@ -361,7 +361,7 @@ func TestSignatureVerification(t *testing.T) {
 		vc.Dir = dir
 		vc.Env = gpgEnv
 		if out, err := vc.CombinedOutput(); err != nil {
-			t.Errorf("git verify-commit disagrees with forge verification: %v\n%s", err, out)
+			t.Errorf("git verify-commit disagrees with gitbay verification: %v\n%s", err, out)
 		}
 	} else {
 		t.Log("gpg not installed; skipping git verify-commit cross-check")

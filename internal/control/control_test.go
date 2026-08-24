@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/krazywarez/forge/internal/protocol"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 // TestEveryCommandReachableFromBareSSH asserts that each registered command's

@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/sig"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/sig"
+	"gitbay.org/gitbay/internal/store"
 )
 
 func init() {

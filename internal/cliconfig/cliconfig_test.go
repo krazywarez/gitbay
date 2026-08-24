@@ -11,12 +11,12 @@ func TestParseRemoteURL(t *testing.T) {
 		repo string
 		ok   bool
 	}{
-		{"ssh://git@forge.example/alice/proj.git", "forge.example", 0, "git", "alice/proj", true},
-		{"ssh://git@forge.example:2222/alice/proj.git", "forge.example", 2222, "git", "alice/proj", true},
-		{"ssh://forge.example/alice/proj", "forge.example", 0, "", "alice/proj", true},
-		{"git@forge.example:alice/proj.git", "forge.example", 0, "git", "alice/proj", true},
-		{"git@forge.example:alice/proj", "forge.example", 0, "git", "alice/proj", true},
-		{"https://forge.example/alice/proj.git", "", 0, "", "", false},
+		{"ssh://git@gitbay.example/alice/proj.git", "gitbay.example", 0, "git", "alice/proj", true},
+		{"ssh://git@gitbay.example:2222/alice/proj.git", "gitbay.example", 2222, "git", "alice/proj", true},
+		{"ssh://gitbay.example/alice/proj", "gitbay.example", 0, "", "alice/proj", true},
+		{"git@gitbay.example:alice/proj.git", "gitbay.example", 0, "git", "alice/proj", true},
+		{"git@gitbay.example:alice/proj", "gitbay.example", 0, "git", "alice/proj", true},
+		{"https://gitbay.example/alice/proj.git", "", 0, "", "", false},
 		{"/local/path/repo.git", "", 0, "", "", false},
 	}
 	for _, tc := range cases {
@@ -35,12 +35,12 @@ func TestParseRemoteURL(t *testing.T) {
 }
 
 func TestCloneURL(t *testing.T) {
-	i := Instance{Host: "forge.example"}
-	if got := i.CloneURL("a/b"); got != "ssh://git@forge.example/a/b.git" {
+	i := Instance{Host: "gitbay.example"}
+	if got := i.CloneURL("a/b"); got != "ssh://git@gitbay.example/a/b.git" {
 		t.Errorf("CloneURL = %s", got)
 	}
-	i = Instance{Host: "forge.example", Port: 2222, User: "u"}
-	if got := i.CloneURL("a/b"); got != "ssh://u@forge.example:2222/a/b.git" {
+	i = Instance{Host: "gitbay.example", Port: 2222, User: "u"}
+	if got := i.CloneURL("a/b"); got != "ssh://u@gitbay.example:2222/a/b.git" {
 		t.Errorf("CloneURL = %s", got)
 	}
 }

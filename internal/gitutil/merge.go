@@ -137,7 +137,7 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 
 	// Stage the parent tree in a temporary index, splice the blob in, and
 	// write the new tree.
-	idx, err := os.CreateTemp("", "forge-index-*")
+	idx, err := os.CreateTemp("", "gitbay-index-*")
 	if err != nil {
 		return "", err
 	}

@@ -17,13 +17,13 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/hookd"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/hookd"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 type Server struct {
@@ -37,7 +37,7 @@ func New(cfg config.Config, st *store.Store) (*Server, error) {
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
-		ServerVersion:     "SSH-2.0-forged",
+		ServerVersion:     "SSH-2.0-gitbayd",
 	}
 	signers, err := loadHostKeys(cfg)
 	if err != nil {
@@ -158,7 +158,7 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 			return
 		case "shell":
 			req.Reply(true, nil)
-			fmt.Fprintf(ch, "forge control plane: interactive shells are not available.\nTry: ssh %s help\n", s.cfg.Server.SiteURL)
+			fmt.Fprintf(ch, "gitbay control plane: interactive shells are not available.\nTry: ssh %s help\n", s.cfg.Server.SiteURL)
 			sendExit(ch, protocol.ExitUsage)
 			return
 		case "pty-req", "env":
@@ -190,7 +190,7 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
-// forced command (forged shell).
+// forced command (gitbayd shell).
 func Exec(cfg config.Config, st *store.Store, user store.User, scope, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer) int {
 	argv, err := protocol.Tokenize(cmdline)

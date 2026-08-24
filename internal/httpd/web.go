@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/krazywarez/forge/internal/policy"
+	"gitbay.org/gitbay/internal/policy"
 	"html/template"
 	"net/http"
 	"path"
@@ -17,11 +17,11 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/yuin/goldmark"
 
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/sig"
-	"github.com/krazywarez/forge/internal/store"
-	"github.com/krazywarez/forge/internal/web"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/sig"
+	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/web"
 )
 
 const maxRenderBytes = 1 << 20 // largest blob rendered inline

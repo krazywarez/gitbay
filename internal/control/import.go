@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/protocol"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 func init() {
@@ -27,7 +27,7 @@ func init() {
 const askpassScript = `#!/bin/sh
 case "$1" in
   Username*) echo "x-access-token" ;;
-  *)         echo "${FORGE_IMPORT_TOKEN}" ;;
+  *)         echo "${GITBAY_IMPORT_TOKEN}" ;;
 esac
 `
 
@@ -96,7 +96,7 @@ func runRepoImport(c *Ctx, args []string) int {
 		}
 		env = []string{
 			"GIT_ASKPASS=" + askpass,
-			"FORGE_IMPORT_TOKEN=" + token,
+			"GITBAY_IMPORT_TOKEN=" + token,
 			"GIT_TERMINAL_PROMPT=0",
 		}
 	} else {

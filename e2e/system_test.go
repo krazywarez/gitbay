@@ -24,14 +24,14 @@ func TestSystemSSHMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// forged in system mode: no embedded SSH listener; hookd + http still run.
+	// gitbayd in system mode: no embedded SSH listener; hookd + http still run.
 	inst := startInstanceWith(t, "") // placeholder to reuse helpers; killed below
 	inst.proc.Process.Kill()
 	inst.proc.Wait()
 	cfg := fmt.Sprintf(`
 [server]
 root = %q
-site_url = "https://forge.test"
+site_url = "https://gitbay.test"
 [ssh]
 mode = "system"
 [http]
@@ -41,7 +41,7 @@ tls = "off"
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	inst.proc = exec.Command(inst.forged, "--config", inst.config, "serve")
+	inst.proc = exec.Command(inst.gitbayd, "--config", inst.config, "serve")
 	inst.proc.Stderr = os.Stderr
 	if err := inst.proc.Start(); err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ tls = "off"
 	// wrapper script argument — only the command path is ownership-checked.
 	wrapper := filepath.Join(sshdDir, "akc.sh")
 	script := fmt.Sprintf("#!/bin/sh\nexec %q --config %q authorized-keys \"$1\" \"$2\"\n",
-		inst.forged, inst.config)
+		inst.gitbayd, inst.config)
 	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

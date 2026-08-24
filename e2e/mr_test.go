@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/sig"
+	"gitbay.org/gitbay/internal/sig"
 )
 
 type mrShow struct {

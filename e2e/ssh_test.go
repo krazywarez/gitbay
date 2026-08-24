@@ -1,4 +1,4 @@
-// Package e2e drives a real forged with the real ssh and git clients.
+// Package e2e drives a real gitbayd with the real ssh and git clients.
 package e2e
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 type instance struct {
-	forged   string // path to built binary
+	gitbayd   string // path to built binary
 	root     string
 	config   string
 	port     int
@@ -24,13 +24,13 @@ type instance struct {
 	sshDir   string // per-user client keys live here
 }
 
-func buildForged(t *testing.T) string {
+func buildGitbayd(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "forged")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/krazywarez/forge/cmd/forged")
+	bin := filepath.Join(t.TempDir(), "gitbayd")
+	cmd := exec.Command("go", "build", "-o", bin, "gitbay.org/gitbay/cmd/gitbayd")
 	cmd.Dir = ".."
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build forged: %v\n%s", err, out)
+		t.Fatalf("build gitbayd: %v\n%s", err, out)
 	}
 	return bin
 }
@@ -53,7 +53,7 @@ func startInstance(t *testing.T) *instance {
 func startInstanceWith(t *testing.T, extra string) *instance {
 	t.Helper()
 	inst := &instance{
-		forged:   buildForged(t),
+		gitbayd:   buildGitbayd(t),
 		root:     t.TempDir(),
 		port:     freePort(t),
 		httpPort: freePort(t),
@@ -64,7 +64,7 @@ func startInstanceWith(t *testing.T, extra string) *instance {
 	cfg := fmt.Sprintf(`
 [server]
 root = %q
-site_url = "https://forge.test"
+site_url = "https://gitbay.test"
 [ssh]
 port = %d
 [http]
@@ -79,7 +79,7 @@ port = %d
 		t.Fatal(err)
 	}
 
-	inst.proc = exec.Command(inst.forged, "--config", inst.config, "serve")
+	inst.proc = exec.Command(inst.gitbayd, "--config", inst.config, "serve")
 	inst.proc.Stderr = os.Stderr
 	if err := inst.proc.Start(); err != nil {
 		t.Fatal(err)
@@ -98,19 +98,19 @@ port = %d
 			return inst
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("forged did not start listening")
+			t.Fatal("gitbayd did not start listening")
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 }
 
-// admin runs a forged admin command against the instance's database.
+// admin runs a gitbayd admin command against the instance's database.
 func (i *instance) admin(t *testing.T, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(i.forged, append([]string{"--config", i.config}, args...)...)
+	cmd := exec.Command(i.gitbayd, append([]string{"--config", i.config}, args...)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("forged %v: %v\n%s", args, err, out)
+		t.Fatalf("gitbayd %v: %v\n%s", args, err, out)
 	}
 	return string(out)
 }

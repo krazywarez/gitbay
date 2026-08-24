@@ -7,14 +7,14 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/sshd"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/sshd"
 )
 
 // authorizedKeysCmd backs sshd's AuthorizedKeysCommand in system mode:
 //
-//	AuthorizedKeysCommand /usr/bin/forged --config /etc/forge/config.toml authorized-keys %t %k
+//	AuthorizedKeysCommand /usr/bin/gitbayd --config /etc/gitbay/config.toml authorized-keys %t %k
 //	AuthorizedKeysCommandUser git
 //
 // It prints a forced-command authorized_keys line for registered keys and
@@ -90,7 +90,7 @@ func shellCmd() *cobra.Command {
 
 			cmdline := os.Getenv("SSH_ORIGINAL_COMMAND")
 			if cmdline == "" {
-				fmt.Fprintf(os.Stderr, "forge control plane: interactive shells are not available.\nTry: ssh <host> help\n")
+				fmt.Fprintf(os.Stderr, "gitbay control plane: interactive shells are not available.\nTry: ssh <host> help\n")
 				os.Exit(protocol.ExitUsage)
 			}
 			code := sshd.Exec(cfg, st, user, key.Scope, cmdline, os.Stdin, os.Stdout, os.Stderr)

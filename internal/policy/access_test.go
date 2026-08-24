@@ -3,7 +3,7 @@ package policy
 import (
 	"testing"
 
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/store"
 )
 
 var (

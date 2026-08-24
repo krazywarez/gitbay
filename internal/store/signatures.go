@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/krazywarez/forge/internal/sig"
+	"gitbay.org/gitbay/internal/sig"
 )
 
 // AddPGPKey registers an OpenPGP key and bumps the key epoch.

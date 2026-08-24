@@ -31,7 +31,7 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 
 // Transport streams one git transport service (upload-pack, receive-pack,
 // upload-archive). extraEnv entries are appended to the process environment;
-// hooks read the FORGE_* variables from it.
+// hooks read the GITBAY_* variables from it.
 func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string) error {
 	var args []string
 	switch service {

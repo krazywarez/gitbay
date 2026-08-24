@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 type Ctx struct {

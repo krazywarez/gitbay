@@ -10,13 +10,13 @@ import (
 	"testing"
 )
 
-func buildForgeCLI(t *testing.T) string {
+func buildGitbayCLI(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "forge")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/krazywarez/forge/cmd/forge")
+	bin := filepath.Join(t.TempDir(), "gitbay")
+	cmd := exec.Command("go", "build", "-o", bin, "gitbay.org/gitbay/cmd/gitbay")
 	cmd.Dir = ".."
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build forge: %v\n%s", err, out)
+		t.Fatalf("build gitbay: %v\n%s", err, out)
 	}
 	return bin
 }
@@ -51,7 +51,7 @@ func (c *cli) run(t *testing.T, dir, stdin string, args ...string) (string, stri
 	if ee, ok := err.(*exec.ExitError); ok {
 		code = ee.ExitCode()
 	} else if err != nil {
-		t.Fatalf("forge %v: %v", args, err)
+		t.Fatalf("gitbay %v: %v", args, err)
 	}
 	return out.String(), errOut.String(), code
 }
@@ -60,7 +60,7 @@ func (c *cli) must(t *testing.T, dir, stdin string, args ...string) string {
 	t.Helper()
 	out, errOut, code := c.run(t, dir, stdin, args...)
 	if code != 0 {
-		t.Fatalf("forge %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errOut)
+		t.Fatalf("gitbay %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errOut)
 	}
 	return out
 }
@@ -72,7 +72,7 @@ func TestCLI(t *testing.T) {
 		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
 
 	c := &cli{
-		bin:       buildForgeCLI(t),
+		bin:       buildGitbayCLI(t),
 		configDir: t.TempDir(),
 		inst:      inst,
 		key:       aliceKey,

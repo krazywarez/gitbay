@@ -14,9 +14,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/store"
 )
 
 type Server struct {

@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/krazywarez/forge/internal/control"
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/store"
 )
 
-const sessionCookie = "forge_session"
+const sessionCookie = "gitbay_session"
 
 // viewer returns the logged-in user, or a zero User for anonymous visitors.
 // Only meaningful in accounts mode; in view_only no session route exists so

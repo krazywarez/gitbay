@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/krazywarez/forge/internal/gitutil"
-	"github.com/krazywarez/forge/internal/hookd"
-	"github.com/krazywarez/forge/internal/policy"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/hookd"
+	"gitbay.org/gitbay/internal/policy"
 )
 
 // collectIncomingCommits lists the commits this push introduces and reads
@@ -58,7 +58,7 @@ func hookCmd() *cobra.Command {
 			repoID, err1 := strconv.ParseInt(os.Getenv(hookd.EnvRepoID), 10, 64)
 			userID, err2 := strconv.ParseInt(os.Getenv(hookd.EnvUserID), 10, 64)
 			if sock == "" || err1 != nil || err2 != nil {
-				return fmt.Errorf("missing FORGE_* environment; this command only runs as a git hook")
+				return fmt.Errorf("missing GITBAY_* environment; this command only runs as a git hook")
 			}
 
 			var updates []policy.RefUpdate
@@ -92,7 +92,7 @@ func hookCmd() *cobra.Command {
 				return collectIncomingCommits(updates)
 			})
 			if err != nil {
-				return fmt.Errorf("forge daemon unreachable: %w", err)
+				return fmt.Errorf("gitbay daemon unreachable: %w", err)
 			}
 			if !resp.Allow {
 				fmt.Fprintln(os.Stderr, resp.Message)

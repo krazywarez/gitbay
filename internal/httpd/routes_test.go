@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/krazywarez/forge/internal/config"
-	"github.com/krazywarez/forge/internal/policy"
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/policy"
 )
 
 // TestViewOnlyHasNoMutatingRoutes is the structural guarantee from the plan:

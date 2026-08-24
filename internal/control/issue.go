@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/krazywarez/forge/internal/policy"
-	"github.com/krazywarez/forge/internal/protocol"
-	"github.com/krazywarez/forge/internal/store"
+	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 const maxBodyBytes = 64 << 10
