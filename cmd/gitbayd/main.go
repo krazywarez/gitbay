@@ -21,6 +21,7 @@ import (
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/mail"
+	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
@@ -133,6 +134,9 @@ func serveCmd() *cobra.Command {
 			whCtx, whCancel := context.WithCancel(context.Background())
 			defer whCancel()
 			go webhook.New(st, cfg.Webhooks.AllowLocal, retryBase).Run(whCtx)
+			if cfg.Mail.SMTPHost != "" {
+				go notify.New(st, cfg, retryBase).Run(whCtx)
+			}
 
 			errCh := make(chan error, 3)
 			if cfg.SSH.Mode == "embedded" {

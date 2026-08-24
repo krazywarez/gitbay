@@ -233,6 +233,10 @@ func runMRCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "recording MR head: %v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.created", fmt.Sprintf(`{"number":%d}`, n))
+	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
+		notifyUsers(c, targets, mrSubject(repo, n, title),
+			notifyBody(c, fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target), b, fmt.Sprintf("%s/mrs/%d", repo.Path(), n)))
+	}
 	return c.emit(map[string]any{"number": n, "head_sha": headSHA}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s!%d (%s -> %s)\n", repo.Path(), n, source, target)
 	})
@@ -441,6 +445,10 @@ func runMRComment(c *Ctx, args []string) int {
 	if err := c.Store.AddMRComment(mr.ID, c.User.ID, body); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
+			notifyBody(c, fmt.Sprintf("commented on !%d", mr.Number), body, fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+	}
 	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
 		fmt.Fprintf(w, "commented on %s!%d\n", repo.Path(), mr.Number)
 	})
@@ -473,6 +481,10 @@ func runMRReview(c *Ctx, args []string) int {
 	}
 	if err := c.Store.AddMRReview(mr.ID, c.User.ID, verdict, mr.HeadSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
+			notifyBody(c, fmt.Sprintf("reviewed !%d: %s", mr.Number, verdict), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
 	}
 	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict}, func(w io.Writer) {
 		fmt.Fprintf(w, "reviewed %s!%d: %s\n", repo.Path(), mr.Number, verdict)
@@ -735,6 +747,10 @@ func runMRMerge(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
+	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
+			notifyBody(c, fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+	}
 	return c.emit(map[string]any{"number": mr.Number, "strategy": strategy, "sha": newSHA}, func(w io.Writer) {
 		fmt.Fprintf(w, "merged %s!%d into %s (%s) at %.10s\n", repo.Path(), mr.Number, mr.TargetRef, strategy, newSHA)
 	})

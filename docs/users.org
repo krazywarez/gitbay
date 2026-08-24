@@ -166,6 +166,14 @@ Semantics worth knowing:
   verified commits merge; everything server-created is refused with
   instructions to rebase locally.
 
+* Notifications
+
+When the instance has SMTP configured, activity mails you: someone
+opens an issue or MR on your repository, comments where you are a
+participant (author, commenter, reviewer), reviews, closes, or merges.
+You are never mailed about your own actions, and only verified primary
+addresses receive anything. Delivery retries on relay failure.
+
 * Scripting
 
 Every read command takes =--json= and emits one envelope:
