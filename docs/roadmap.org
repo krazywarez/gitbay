@@ -71,7 +71,7 @@ work to it.
 - [[https://gitbay.org/krz/gitbay/issues/27][#27]] repository maintenance — done 2026-08-24 (admin gc/stats, weekly gitbay-gc.timer)
 - [[https://gitbay.org/krz/gitbay/issues/8][#8]] releases — done 2026-08-24 (notes + assets; v0.1.0 binaries hosted)
 - [[https://gitbay.org/krz/gitbay/issues/17][#17]] issue/PR history import from GitHub — done 2026-08-24
-- [[https://gitbay.org/krz/gitbay/issues/18][#18]] push/pull mirroring for gradual migration
+- [[https://gitbay.org/krz/gitbay/issues/18][#18]] push/pull mirroring — done 2026-08-24 (worker sync, read-only pull mirrors)
 - [[https://gitbay.org/krz/gitbay/issues/29][#29]] account migration between gitbay instances — no lock-in,
   ever; the export bundle doubles as a user-level backup
 - [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging and multi-user hardening
