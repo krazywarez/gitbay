@@ -83,6 +83,7 @@ type Webhooks struct {
 type Limits struct {
 	MaxPackBytes    int64 `toml:"max_pack_bytes"`
 	MaxBlobBytes    int64 `toml:"max_blob_bytes"`
+	MaxAssetBytes   int64 `toml:"max_asset_bytes"` // per release asset
 	CloneTimeoutSec int   `toml:"clone_timeout"`
 	SSHAuthRate     int   `toml:"ssh_auth_rate"`
 }
@@ -108,6 +109,7 @@ func Default() Config {
 		Limits: Limits{
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,
+			MaxAssetBytes:   512 << 20,
 			CloneTimeoutSec: 3600,
 			SSHAuthRate:     10,
 		},

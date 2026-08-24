@@ -158,6 +158,19 @@ that is why no =owner/name= appears above. Anywhere else, pass it as the
 first argument. Long text: =--body= inline, =--file -= from stdin, or
 neither on a terminal and =$EDITOR= opens.
 
+Releases anchor notes and binary assets to a pushed tag (write access;
+assets stream over SSH, capped by the instance's =max_asset_bytes=):
+
+#+begin_src sh
+gitbay release create v1.0 --title "First light" [--notes|--file -|$EDITOR]
+gitbay release asset add v1.0 tool-linux-amd64 < dist/tool-linux-amd64
+gitbay release asset get v1.0 tool-linux-amd64 > tool   # or the web download link
+gitbay release list / show v1.0 / delete v1.0 --yes
+#+end_src
+
+The web shows them under the repository's =releases= tab with rendered
+notes, sha256 sums, and download links.
+
 Commit messages act on issues when the commits land on the default
 branch (direct push or MR merge): =closes/fixes/resolves #4= closes the
 issue with a linking comment, and a bare =#4= leaves a reference

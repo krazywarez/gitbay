@@ -514,6 +514,19 @@ ul.issuelist p { margin: 0; }
 ul.issuelist .title a { color: var(--fg); font-weight: 550; }
 ul.issuelist .title a:hover { color: var(--accent); }
 
+/* releases */
+article.release {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  margin: var(--sp-4) 0;
+}
+.releasehead h3 { margin: 0 0 var(--sp-1); }
+.releasehead .meta { margin: 0 0 var(--sp-2); }
+table.assets { margin-top: var(--sp-2); }
+table.assets td.size { color: var(--muted); white-space: nowrap; text-align: right; }
+table.assets td.name { width: 100%; font-family: var(--mono); font-size: var(--fs-1); }
+
 /* milestones */
 ul.milestonelist {
   list-style: none;

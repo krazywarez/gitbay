@@ -95,6 +95,7 @@ contradiction; =--no-host-checks= skips port/path probes.
 ** [limits]
 - =clone_timeout= (3600s) — cap on =repo import= fetches.
 - =max_blob_bytes= (100MB) — cap on raw file serving over the web.
+- =max_asset_bytes= (512MB) — cap per uploaded release asset.
 - =max_pack_bytes=, =ssh_auth_rate= — reserved, not yet enforced.
 
 ** [git_daemon]

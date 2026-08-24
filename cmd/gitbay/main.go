@@ -34,6 +34,7 @@ func main() {
 		issueCmd(),
 		milestoneCmd(),
 		mrCmd(),
+		releaseCmd(),
 		webCmd(),
 		orgCmd(),
 		group("profile", "user and org profiles",
@@ -56,10 +57,11 @@ func main() {
 
 // passOpts describes how one CLI command maps onto the server command.
 type passOpts struct {
-	server    []string // server-side command path
-	needsRepo bool     // prepend inferred owner/name unless given
-	stdinOK   bool     // wire local stdin through (keys add, --file -)
-	editor    string   // open $EDITOR for a body when none given
+	server      []string // server-side command path
+	needsRepo   bool     // prepend inferred owner/name unless given
+	stdinOK     bool     // wire local stdin through (keys add, --file -)
+	alwaysStdin bool     // stdin is the payload (release asset add)
+	editor      string   // open $EDITOR for a body when none given
 }
 
 // pass builds a passthrough command. Flags are parsed by the server, which
@@ -118,7 +120,7 @@ func runPass(o passOpts, args []string) int {
 		}
 	}
 	if stdin == nil || isEmptyReader(stdin) {
-		if o.stdinOK && usesStdin(args) {
+		if o.alwaysStdin || (o.stdinOK && usesStdin(args)) {
 			stdin = os.Stdin
 		}
 	}
@@ -274,6 +276,21 @@ func issueCmd() *cobra.Command {
 		pass("assign", "assign users: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
 		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"issue", "milestone"}, needsRepo: true}),
 		pass("templates", "list issue templates (.gitbay/issue-template*.md)", passOpts{server: []string{"issue", "templates"}, needsRepo: true}),
+	)
+}
+
+func releaseCmd() *cobra.Command {
+	return group("release", "tag-anchored releases with notes and assets",
+		pass("create", "create a release on a pushed tag: <tag> [--title <t>] [--notes|--file -|$EDITOR]",
+			passOpts{server: []string{"release", "create"}, needsRepo: true, stdinOK: true, editor: "release"}),
+		pass("list", "list releases", passOpts{server: []string{"release", "list"}, needsRepo: true}),
+		pass("show", "show a release with assets: <tag>", passOpts{server: []string{"release", "show"}, needsRepo: true}),
+		pass("delete", "delete a release and its assets: <tag> --yes", passOpts{server: []string{"release", "delete"}, needsRepo: true}),
+		group("asset", "binary assets on a release",
+			pass("add", "upload from stdin: <tag> <filename> < file", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true}),
+			pass("get", "download to stdout: <tag> <filename> > file", passOpts{server: []string{"release", "asset", "get"}, needsRepo: true}),
+			pass("remove", "remove an asset: <tag> <filename>", passOpts{server: []string{"release", "asset", "remove"}, needsRepo: true}),
+		),
 	)
 }
 

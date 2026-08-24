@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"hash/fnv"
+	"io"
+	"os"
+	"path/filepath"
 
 	"gitbay.org/gitbay/internal/policy"
 	"html/template"
@@ -381,6 +384,72 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		Size     int
 		CodeHTML template.HTML
 	}{p, cs, base, filePath, binary, len(data), codeHTML})
+}
+
+// releases lists tag-anchored releases with notes and assets.
+func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	p.Tab = "releases"
+	rels, err := s.st.ListReleases(p.Repo.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	md := s.ugcFor(r, p.Repo)
+	type relView struct {
+		store.Release
+		NotesHTML template.HTML
+	}
+	var views []relView
+	for _, rel := range rels {
+		views = append(views, relView{rel, md(rel.Notes)})
+	}
+	s.render(w, "releases.html", struct {
+		repoPage
+		Releases []relView
+	}{p, views})
+}
+
+// releaseAsset streams one uploaded asset. Tags containing '/' are not
+// reachable here (single path segment); SSH download always works.
+func (s *Server) releaseAsset(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	rel, err := s.st.ReleaseByTag(p.Repo.ID, r.PathValue("tag"))
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	name := r.PathValue("name")
+	found := false
+	for _, a := range rel.Assets {
+		if a.Name == name {
+			found = true
+		}
+	}
+	if !found {
+		s.notFound(w, r)
+		return
+	}
+	f, err := os.Open(filepath.Join(control.RepoDir(s.cfg.Server.Root, p.Repo.OwnerName, p.Repo.Name),
+		"gitbay-releases", strconv.FormatInt(rel.ID, 10), name))
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	if fi, err := f.Stat(); err == nil {
+		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+	}
+	io.Copy(w, f)
 }
 
 // milestones lists a repo's milestones with progress.

@@ -1,0 +1,21 @@
+{{define "title"}}releases · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<h2>releases</h2>
+{{range $rel := .Releases}}
+<article class="release">
+  <header class="releasehead">
+    <h3>{{$rel.Title}}</h3>
+    <p class="meta"><span class="refchip">{{$rel.Tag}}</span> {{if $rel.Author}}{{$rel.Author}} · {{end}}{{when $rel.CreatedAt}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/archive/{{$rel.Tag}}.tar.gz">source tar.gz</a></p>
+  </header>
+  {{if $rel.NotesHTML}}<div class="rendered">{{$rel.NotesHTML}}</div>{{end}}
+  {{if $rel.Assets}}<table class="assets">
+  {{range $rel.Assets}}<tr>
+    <td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/download/{{$rel.Tag}}/{{.Name}}">{{.Name}}</a></td>
+    <td class="size">{{.Size}}</td>
+    <td class="sha"><code title="{{.SHA256}}">{{short .SHA256}}</code></td>
+  </tr>{{end}}
+  </table>{{end}}
+</article>
+{{else}}<p class="empty-note">no releases yet — tag a commit, push the tag, then <code>gitbay release create {{.Repo.OwnerName}}/{{.Repo.Name}} v1.0</code></p>{{end}}
+{{end}}

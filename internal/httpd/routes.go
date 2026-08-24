@@ -42,6 +42,8 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/blame/{ref}/{path...}", Handler: s.blame},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/search", Handler: s.search},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/milestones", Handler: s.milestones},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases", Handler: s.releases},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases/download/{tag}/{name}", Handler: s.releaseAsset},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/raw/{ref}/{path...}", Handler: s.raw},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/log", Handler: s.log},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/log/{ref}", Handler: s.log},
