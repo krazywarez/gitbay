@@ -181,6 +181,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	profile, _ := s.st.OwnerProfile(kind, ownerID)
 
 	all, err := s.st.ListReposForOwner(kind, ownerID)
 	if err != nil {
@@ -202,10 +203,11 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Viewer  string
 		Owner   string
 		Kind    string
+		Profile store.Profile
 		Repos   []describedRepo
 		Members []store.OrgMember
 		Orgs    []store.OrgMember
-	}{s.siteName(), viewer.Username, name, kind, s.describeAll(visible), members, orgs})
+	}{s.siteName(), viewer.Username, name, kind, profile, s.describeAll(visible), members, orgs})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {

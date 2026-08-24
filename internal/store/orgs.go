@@ -215,3 +215,28 @@ func (s *Store) RenameOrg(orgID int64, newName string) error {
 	}
 	return tx.Commit()
 }
+
+// Profile is the presentational half of a user or org.
+type Profile struct {
+	Description string
+	Website     string
+}
+
+// OwnerProfile reads the profile for kind "user" or "org".
+func (s *Store) OwnerProfile(kind string, id int64) (Profile, error) {
+	table := map[string]string{"user": "users", "org": "orgs"}[kind]
+	var p Profile
+	err := s.DB.QueryRow(
+		"SELECT description, website FROM "+table+" WHERE id = ?", id).
+		Scan(&p.Description, &p.Website)
+	return p, err
+}
+
+// SetOwnerProfile updates the profile for kind "user" or "org".
+func (s *Store) SetOwnerProfile(kind string, id int64, p Profile) error {
+	table := map[string]string{"user": "users", "org": "orgs"}[kind]
+	_, err := s.DB.Exec(
+		"UPDATE "+table+" SET description = ?, website = ? WHERE id = ?",
+		p.Description, p.Website, id)
+	return err
+}

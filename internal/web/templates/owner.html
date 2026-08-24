@@ -1,6 +1,8 @@
 {{define "title"}}{{.Owner}} · {{.Site}}{{end}}
 {{define "content"}}
 <h1>{{.Owner}} <span class="badge badge-unsigned">{{.Kind}}</span></h1>
+{{if .Profile.Description}}<p class="desc">{{.Profile.Description}}</p>{{end}}
+{{if .Profile.Website}}<p class="crumbs"><a href="{{.Profile.Website}}" rel="nofollow me">{{.Profile.Website}}</a></p>{{end}}
 {{if .Orgs}}<p class="crumbs">member of: {{range .Orgs}}<a href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
 {{if .Members}}<p class="crumbs">members: {{range .Members}}<a href="/{{.Username}}">{{.Username}}</a> ({{.Role}}) {{end}}</p>{{end}}
 <table>
