@@ -21,6 +21,7 @@ import (
 	"github.com/niklasfasching/go-org/org"
 	"github.com/yuin/goldmark"
 
+	"gitbay.org/gitbay/internal/autolink"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/sig"
@@ -403,6 +404,65 @@ func mdHTML(raw string) template.HTML {
 	return template.HTML(buf.String())
 }
 
+// webResolver answers autolink lookups for one viewer. Cross-repo
+// references to repositories the viewer cannot read stay plain text, per
+// the enumeration rule: a link would confirm the repo exists.
+type webResolver struct {
+	s      *Server
+	viewer store.User
+}
+
+func (r webResolver) RefURL(owner, name string, kind byte, n int64) string {
+	repo, err := r.s.st.RepoByPath(owner + "/" + name)
+	if err != nil {
+		return ""
+	}
+	grant := ""
+	if r.viewer.ID != 0 {
+		grant, _ = r.s.st.AccessRole(repo.ID, r.viewer.ID)
+	}
+	if !policy.CanRead(r.viewer, repo, grant) {
+		return ""
+	}
+	if kind == '#' {
+		if _, err := r.s.st.IssueByNumber(repo.ID, n); err != nil {
+			return ""
+		}
+		return autolink.IssueURL(repo.OwnerName, repo.Name, n)
+	}
+	if _, err := r.s.st.MRByNumber(repo.ID, n); err != nil {
+		return ""
+	}
+	return autolink.MRURL(repo.OwnerName, repo.Name, n)
+}
+
+func (r webResolver) UserURL(name string) string {
+	if _, err := r.s.st.UserByUsername(name); err == nil {
+		return "/" + name
+	}
+	if _, err := r.s.st.OrgByName(name); err == nil {
+		return "/" + name
+	}
+	return ""
+}
+
+// ugcFor returns a renderer for user-authored markdown on one repo's pages:
+// mdHTML plus cross-reference and mention autolinking for this viewer.
+func (s *Server) ugcFor(r *http.Request, repo store.Repo) func(string) template.HTML {
+	viewer := store.User{}
+	if s.cfg.Web.Mode == "accounts" {
+		viewer = s.viewer(r)
+	}
+	res := webResolver{s, viewer}
+	return func(raw string) template.HTML {
+		h := mdHTML(raw)
+		if h == "" {
+			return h
+		}
+		return template.HTML(autolink.Rewrite(string(h), repo.OwnerName, repo.Name, res))
+	}
+}
+
 // renderedComment pairs a comment with its rendered body for templates.
 type renderedComment struct {
 	Author    string
@@ -410,10 +470,10 @@ type renderedComment struct {
 	BodyHTML  template.HTML
 }
 
-func renderComments(cs []store.IssueComment) []renderedComment {
+func renderComments(cs []store.IssueComment, md func(string) template.HTML) []renderedComment {
 	var out []renderedComment
 	for _, c := range cs {
-		out = append(out, renderedComment{c.Author, c.CreatedAt, mdHTML(c.Body)})
+		out = append(out, renderedComment{c.Author, c.CreatedAt, md(c.Body)})
 	}
 	return out
 }
@@ -510,7 +570,7 @@ type diffThread struct {
 // attachThreads injects review threads under their anchored diff lines;
 // threads whose anchor no longer appears (stale after force-push, or on a
 // context line outside the current diff) are returned separately.
-func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA string) ([]diffLine, []diffThread) {
+func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA string, md func(string) template.HTML) ([]diffLine, []diffThread) {
 	type anchor struct {
 		path string
 		side string
@@ -522,11 +582,11 @@ func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA strin
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
-				Comments: []renderedComment{{cm.Author, cm.CreatedAt, mdHTML(cm.Body)}}}
+				Comments: []renderedComment{{cm.Author, cm.CreatedAt, md(cm.Body)}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
 			order = append(order, cm.ID)
 		} else if th, ok := threads[cm.ReplyTo]; ok {
-			th.Comments = append(th.Comments, renderedComment{cm.Author, cm.CreatedAt, mdHTML(cm.Body)})
+			th.Comments = append(th.Comments, renderedComment{cm.Author, cm.CreatedAt, md(cm.Body)})
 		}
 	}
 	placed := map[int64]bool{}
@@ -737,13 +797,14 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	md := s.ugcFor(r, p.Repo)
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue       store.Issue
 		BodyHTML    template.HTML
 		Comments    []renderedComment
 		LabelColors map[string]template.CSS
-	}{p, iss, mdHTML(iss.Body), renderComments(comments), s.labelColors(p.Repo.ID)})
+	}{p, iss, md(iss.Body), renderComments(comments, md), s.labelColors(p.Repo.ID)})
 }
 
 func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
@@ -806,8 +867,9 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			lines = classifyDiff(patch)
 		}
 	}
+	md := s.ugcFor(r, p.Repo)
 	var detachedThreads []diffThread
-	lines, detachedThreads = attachThreads(lines, diffComments, m.HeadSHA)
+	lines, detachedThreads = attachThreads(lines, diffComments, m.HeadSHA, md)
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -818,7 +880,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Reviews         []store.MRReview
 		DiffLines       []diffLine
 		DetachedThreads []diffThread
-	}{p, m, mdHTML(m.Body), checks, store.CombinedStatus(checks), renderComments(comments), reviews, lines, detachedThreads})
+	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md), reviews, lines, detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
