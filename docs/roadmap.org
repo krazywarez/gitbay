@@ -85,14 +85,21 @@ Recorded so their absence reads as a decision, not an oversight:
 - email patch flow — revisit only if sourcehut-style demand appears
 - federation (ForgeFed) and Postgres — no current need at this scale
 
-* Open questions
+* Decisions
 
-- **What is gitbay.org?** Today: the author's personal forge and the
-  project's home. Options: keep it closed (flagship demo), invite-only
-  for collaborators, or eventually open registration (which pulls #14,
-  #9, and rate limiting forward). No decision needed until Phase 1
-  lands.
-- **Versioning**: nothing is tagged. Suggest cutting v0.1.0 with #26 and
-  adopting semver for the protocol_version relationship.
-- **Second-contributor readiness**: CONTRIBUTING notes, and whether MRs
-  from outside collaborators imply moving gitbay.org to invite mode.
+- **gitbay.org will eventually be open to all.** (Decided 2026-08-24.)
+  Sequencing consequence: before flipping =registration = "open"=, the
+  instance needs #14 (audit log, rate limiting, quotas), #9 (web
+  signup), an SMTP relay configured for verification mail, and enough
+  of Phase 1 that new users get a credible product. Interim step:
+  invite mode for early collaborators as soon as [mail] is configured.
+- **Versioning**: semver, starting at v0.1.0 on the current state.
+  0.x signals moving surfaces; =protocol_version= increments only on
+  breaking envelope/command changes and is otherwise decoupled from
+  release numbers. v1.0.0 when Phase 1 and #26 land. Tags are
+  annotated and signed.
+- **Second contributors**: invite mode is the on-ramp (their keys and
+  verified emails make signed-main enforceable for them too). A
+  CONTRIBUTING file states the workflow: fork on gitbay.org, MR with
+  signed commits, =go test ./...= green, review required once #19
+  exists. No CLA — 0BSD needs none; sign-off optional.
