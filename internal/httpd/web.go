@@ -75,16 +75,28 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	buf.WriteTo(w)
 }
 
-// describedRepo pairs a repo with its description for listings.
+// describedRepo pairs a repo with the listing metadata: description,
+// topics, license, and last-updated date.
 type describedRepo struct {
 	store.Repo
-	Desc string
+	Desc    string
+	Topics  []string
+	License string
+	Updated string
 }
 
 func (s *Server) describeAll(repos []store.Repo) []describedRepo {
 	var out []describedRepo
 	for _, r := range repos {
-		out = append(out, describedRepo{r, gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, r.OwnerName, r.Name))})
+		dir := control.RepoDir(s.cfg.Server.Root, r.OwnerName, r.Name)
+		d := describedRepo{
+			Repo:    r,
+			Desc:    gitutil.ReadDescription(dir),
+			License: detectLicense(dir, r.DefaultBranch),
+			Updated: gitutil.LastCommitDate(dir, r.DefaultBranch),
+		}
+		d.Topics, _ = s.st.ListTopics(r.ID)
+		out = append(out, d)
 	}
 	return out
 }
@@ -182,8 +194,7 @@ func (s *Server) filterRepos(q string, repos []describedRepo) []describedRepo {
 			out = append(out, d)
 			continue
 		}
-		topics, _ := s.st.ListTopics(d.ID)
-		for _, t := range topics {
+		for _, t := range d.Topics {
 			if strings.Contains(t, q) {
 				out = append(out, d)
 				break
@@ -342,10 +353,13 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 			repoPage
 			Crumbs     []crumb
 			Prefix     string
+			DirPath    string
+			RefKind    string
 			Entries    []gitutil.TreeEntry
+			Branches   []gitutil.Ref
 			ReadmeName string
 			ReadmeHTML template.HTML
-		}{repoPage: p})
+		}{repoPage: p, RefKind: "tree"})
 		return
 	}
 	entries, err := gitutil.ListTree(p.Dir, p.Ref, dirPath)
@@ -362,18 +376,22 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	readmeName := pickReadme(entries)
 	if readmeName != "" {
 		if raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+readmeName, maxRenderBytes); err == nil {
-			readmeHTML = renderReadme(readmeName, raw)
+			readmeHTML = rewriteRelativeLinks(renderReadme(readmeName, raw), p, dirPath)
 		}
 	}
 
+	branches, _ := gitutil.Refs(p.Dir, "heads")
 	s.render(w, "tree.html", struct {
 		repoPage
 		Crumbs     []crumb
 		Prefix     string
+		DirPath    string
+		RefKind    string
 		Entries    []gitutil.TreeEntry
+		Branches   []gitutil.Ref
 		ReadmeName string
 		ReadmeHTML template.HTML
-	}{p, crumbs(p, "tree", dirPath), prefix, entries, readmeName, readmeHTML})
+	}{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches, readmeName, readmeHTML})
 }
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
@@ -400,15 +418,19 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		base = cs[len(cs)-1].Name
 		cs = cs[:len(cs)-1]
 	}
+	branches, _ := gitutil.Refs(p.Dir, "heads")
 	s.render(w, "blob.html", struct {
 		repoPage
 		Crumbs   []crumb
 		Base     string
 		Path     string
+		DirPath  string
+		RefKind  string
 		Binary   bool
 		Size     int
+		Branches []gitutil.Ref
 		CodeHTML template.HTML
-	}{p, cs, base, filePath, binary, len(data), codeHTML})
+	}{p, cs, base, filePath, filePath, "blob", binary, len(data), branches, codeHTML})
 }
 
 // releases lists tag-anchored releases with notes and assets.

@@ -6,14 +6,10 @@
 <p class="toolbar">logged in as <a href="/{{.Viewer}}">{{.Viewer}}</a></p>
 </div>
 {{if .Pinned}}<h2>pinned</h2>
-<div class="repogrid">
-{{range .Pinned}}<div class="repocard">
-  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
-  {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
-  <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
-</div>
+<ul class="repolist">
+{{range .Pinned}}{{template "reporow" .}}
 {{end}}
-</div>{{end}}
+</ul>{{end}}
 <h2>open merge requests <span class="count">{{len .MRs}}</span></h2>
 <ul class="issuelist">
 {{range .MRs}}<li>

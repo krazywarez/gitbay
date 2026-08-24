@@ -8,6 +8,16 @@ import (
 
 const zeroSHA = "0000000000000000000000000000000000000000"
 
+// LastCommitDate returns the committer date (YYYY-MM-DD) of the ref tip,
+// or "" for empty repos.
+func LastCommitDate(dir, ref string) string {
+	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%cs", ref).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // HasCommit reports whether sha names a commit object present in dir.
 func HasCommit(dir, sha string) bool {
 	return exec.Command("git", "-C", dir, "cat-file", "-e", sha+"^{commit}").Run() == nil

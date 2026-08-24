@@ -201,6 +201,33 @@ nav.tabs a.active { color: var(--fg); border-bottom-color: var(--accent); font-w
   color: var(--fg);
 }
 .pathbar .crumbs strong { color: var(--fg); }
+details.refmenu { position: relative; }
+details.refmenu summary { cursor: pointer; list-style: none; }
+details.refmenu summary::-webkit-details-marker { display: none; }
+details.refmenu summary::after { content: " ▾"; color: var(--muted); }
+details.refmenu .refdrop {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 12rem;
+  max-height: 20rem;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: var(--sp-1) 0;
+}
+details.refmenu .refdrop a {
+  display: block;
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+}
+details.refmenu .refdrop a:hover { background: var(--surface); text-decoration: none; }
+details.refmenu .refdrop a.allrefs { color: var(--accent); font-family: var(--sans); border-top: 1px solid var(--faint); margin-top: var(--sp-1); }
 
 /* file and refs tables: bordered cards, rows inside */
 table.tree, table.refs {
@@ -217,6 +244,17 @@ table.tree td, table.refs td {
 }
 table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: none; }
 table.tree tr:hover td, table.refs tr:hover td { background: var(--surface); }
+table.tree tr.cols th {
+  text-align: left;
+  font-weight: 500;
+  font-size: var(--fs-1);
+  color: var(--muted);
+  padding: var(--sp-1) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+table.tree tr.cols:hover th { background: var(--surface); }
+table.tree th.size { text-align: right; }
 table.tree td.name { width: 100%; }
 table.tree td.name a { color: var(--fg); }
 table.tree td.name a:hover { color: var(--accent); }
@@ -281,39 +319,27 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
 svg.icon { vertical-align: -0.125em; }
 .lede { font-size: var(--fs-3); margin: var(--sp-2) 0; }
 
-/* repo listings (index, owner pages): responsive card grid */
-.repogrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-  gap: var(--sp-3);
+/* repo listings (explore, owner pages, dashboard): one row per repo */
+ul.repolist {
+  list-style: none;
   margin: var(--sp-3) 0 var(--sp-5);
-}
-.repogrid .empty { color: var(--muted); grid-column: 1 / -1; }
-.repocard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  padding: var(--sp-3) var(--sp-4);
-  min-width: 0;
-}
-.repocard p { margin: 0; }
-.repocard .reponame {
-  font-weight: 550;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.repocard .desc {
-  font-size: var(--fs-2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.repocard .meta { margin-top: auto; padding-top: var(--sp-1); }
-.repocard .reponame .sep { color: var(--muted); margin: 0 0.1em; }
+ul.repolist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
+ul.repolist li:last-child { border-bottom: none; }
+ul.repolist li:hover { background: var(--surface); }
+ul.repolist li.empty { color: var(--muted); }
+ul.repolist p { margin: 0; }
+ul.repolist .reponame { font-size: var(--fs-3); }
+ul.repolist .reponame a { color: var(--fg); }
+ul.repolist .reponame a strong { color: var(--accent); font-weight: 600; }
+ul.repolist .reponame .sep { color: var(--muted); margin: 0 0.1em; }
+ul.repolist .desc { margin-top: 0.1rem; }
+ul.repolist .topics { margin-top: var(--sp-1); }
+ul.repolist .meta { margin-top: var(--sp-1); }
 
 /* owner profile header */
 .profilehead {

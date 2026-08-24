@@ -2,21 +2,22 @@
 {{define "content"}}
 {{template "repoheader" .}}
 <div class="pathbar">
-  <span class="refchip">{{template "branchicon"}} {{.Ref}}</span>
+  {{template "refmenu" .}}
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</span>
   <span class="spacer"></span>
   <span class="clone">clone: <code>git clone {{.CloneURL}}</code></span>
 </div>
 <table class="tree">
+<tr class="cols"><th>name</th><th class="size">size</th><th class="mode">mode</th></tr>
 {{range .Entries}}<tr>
   {{if eq .Type "tree"}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}/</a></td><td class="size"></td>
   {{else}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}</a></td><td class="size">{{.Size}}</td>{{end}}
   <td class="mode">{{.Mode}}</td>
 </tr>
-{{else}}<tr><td class="name empty">this repository is empty — push something:<br><code>git remote add origin {{.CloneURL}}</code></td></tr>{{end}}
+{{else}}<tr><td class="name empty" colspan="3">this repository is empty — push something:<br><code>git remote add origin {{.CloneURL}}</code></td></tr>{{end}}
 </table>
 {{if .ReadmeHTML}}<section class="readme">
-<div class="cardhead">{{.ReadmeName}}</div>
+<div class="cardhead"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.Prefix}}{{.ReadmeName}}">{{.ReadmeName}}</a></div>
 <div class="rendered">{{.ReadmeHTML}}</div>
 </section>{{end}}
 {{end}}
