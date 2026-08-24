@@ -451,6 +451,7 @@ input[type="text"], input:not([type]), textarea {
   padding: var(--sp-2) var(--sp-3);
 }
 textarea { width: 100%; resize: vertical; }
+textarea[name="content"] { font-family: var(--mono); font-size: var(--fs-1); }
 input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
 button {
   background: var(--accent);
@@ -493,4 +494,10 @@ footer a:hover { color: var(--accent); }
   header { padding: var(--sp-3) var(--sp-4); }
   main { padding: var(--sp-2) var(--sp-4) var(--sp-6); }
   .thread { margin-left: var(--sp-3); }
+  table.tree td.mode { display: none; }
+  .readme, .code { padding: var(--sp-3); }
+  .cardhead {
+    margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3)) var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+  }
 }
