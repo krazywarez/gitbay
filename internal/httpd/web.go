@@ -642,7 +642,13 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
 	var lines []diffLine
-	if base, err := gitutil.MergeBase(p.Dir, "refs/heads/"+m.TargetRef, headRef); err == nil {
+	base := m.MergedBase
+	if base == "" {
+		if b, err := gitutil.MergeBase(p.Dir, "refs/heads/"+m.TargetRef, headRef); err == nil {
+			base = b
+		}
+	}
+	if base != "" {
 		if patch, err := gitutil.Diff(p.Dir, base, headRef, 4<<20); err == nil {
 			lines = classifyDiff(patch)
 		}

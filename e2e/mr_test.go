@@ -248,6 +248,13 @@ func TestMergeRequests(t *testing.T) {
 		t.Fatalf("merge after fork deletion: %s", errOut)
 	}
 
+	// Merged MRs keep their historical diff: after the fast-forward the
+	// live merge-base equals the head, so the recorded base must be used.
+	diffOut2, _, code := inst.ssh(t, aliceKey, "", "mr", "diff", "alice/lib", "1")
+	if code != 0 || !strings.Contains(diffOut2, "feature.txt") {
+		t.Fatalf("post-merge diff empty: %d\n%s", code, diffOut2)
+	}
+
 	// Web read views.
 	status, body := inst.get(t, "/alice/lib/mrs?state=all")
 	if status != 200 || !strings.Contains(body, "add feature") || !strings.Contains(body, "second") {
@@ -256,5 +263,8 @@ func TestMergeRequests(t *testing.T) {
 	status, body = inst.get(t, "/alice/lib/mrs/1")
 	if status != 200 || !strings.Contains(body, "stale") || !strings.Contains(body, "merged") {
 		t.Fatalf("mr detail: %d\n%s", status, body)
+	}
+	if !strings.Contains(body, "feature.txt") {
+		t.Fatalf("merged MR web diff empty:\n%s", body)
 	}
 }

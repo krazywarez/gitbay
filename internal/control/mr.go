@@ -352,9 +352,15 @@ func runMRDiff(c *Ctx, args []string) int {
 	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	head := mrHeadRef(mr.Number)
-	base, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, head)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+	// After a merge (especially fast-forward) the live merge-base equals
+	// the head and the diff would vanish; use the recorded base instead.
+	base := mr.MergedBase
+	if base == "" {
+		b, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, head)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		base = b
 	}
 	patch, err := gitutil.Diff(dir, base, head, 4<<20)
 	if err != nil {
@@ -663,7 +669,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	if err := gitutil.UpdateRefCAS(dir, targetRef, newSHA, targetSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "target branch moved during merge; retry: %v", err)
 	}
-	if err := c.Store.SetMRState(mr.ID, "merged"); err != nil {
+	if err := c.Store.MarkMerged(mr.ID, targetSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
