@@ -51,7 +51,8 @@ step.
 - [[https://gitbay.org/krz/gitbay/issues/23][#23]] archived repos and topics — done 2026-08-24 (topic
   filtering rides along with search, #7)
 - [[https://gitbay.org/krz/gitbay/issues/24][#24]] blame view — done 2026-08-24
-- [[https://gitbay.org/krz/gitbay/issues/7][#7]] search (repo-name filter first; code search later)
+- [[https://gitbay.org/krz/gitbay/issues/7][#7]] search — done 2026-08-24 (repo search by name/desc/topic,
+  per-repo git grep on web+SSH; cross-repo indexer only if ever needed)
 - [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates
 
 * Phase 3 — other people's forges
