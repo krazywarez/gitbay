@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -108,6 +109,54 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 	}
 	fmt.Fprintln(os.Stderr, "gitbay: running ssh:", err)
 	return protocol.ExitProtocol
+}
+
+// sshCapture runs a server command and returns its stdout, discarding
+// stderr. Used for quiet metadata fetches like issue templates.
+func sshCapture(t target, serverArgv []string) (string, int) {
+	args := []string{}
+	if t.inst.Port != 0 && t.inst.Port != 22 {
+		args = append(args, "-p", strconv.Itoa(t.inst.Port))
+	}
+	args = append(args, t.inst.SSHOptions...)
+	quoted := make([]string, len(serverArgv))
+	for i, a := range serverArgv {
+		quoted[i] = shellQuote(a)
+	}
+	args = append(args, t.inst.SSHUser()+"@"+t.inst.Host, "--", strings.Join(quoted, " "))
+	out, err := exec.Command("ssh", args...).Output()
+	if err != nil {
+		code := protocol.ExitProtocol
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() != 255 {
+			code = ee.ExitCode()
+		}
+		return "", code
+	}
+	return string(out), 0
+}
+
+// fetchIssueTemplate returns the repo's default issue template body, or ""
+// when there is none (or anything fails — prefill is best-effort).
+func fetchIssueTemplate(t target, repoPath string) string {
+	out, code := sshCapture(t, []string{"issue", "templates", repoPath, "--json"})
+	if code != 0 {
+		return ""
+	}
+	var env struct {
+		Data []struct {
+			Name string `json:"name"`
+			Body string `json:"body"`
+		} `json:"data"`
+	}
+	if json.Unmarshal([]byte(out), &env) != nil || len(env.Data) == 0 {
+		return ""
+	}
+	for _, tpl := range env.Data {
+		if tpl.Name == "issue-template.md" {
+			return tpl.Body
+		}
+	}
+	return env.Data[0].Body
 }
 
 // withRepo prepends the repo path to args unless the user already gave one

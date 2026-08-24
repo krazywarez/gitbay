@@ -32,6 +32,7 @@ func main() {
 		),
 		repoCmd(),
 		issueCmd(),
+		milestoneCmd(),
 		mrCmd(),
 		webCmd(),
 		orgCmd(),
@@ -97,7 +98,13 @@ func runPass(o passOpts, args []string) int {
 
 	var stdin io.Reader = strings.NewReader("")
 	if o.editor != "" {
-		extended, body, ok, err := maybeEditor(args, o.editor)
+		// Issue bodies prefill from the repo's .gitbay/issue-template*.md.
+		var prefill func() string
+		if o.editor == "issue" && len(args) > 0 && strings.Contains(args[0], "/") {
+			repoPath := args[0]
+			prefill = func() string { return fetchIssueTemplate(t, repoPath) }
+		}
+		extended, body, ok, err := maybeEditor(args, o.editor, prefill)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "gitbay:", err)
 			return protocol.ExitFailure
@@ -265,6 +272,19 @@ func issueCmd() *cobra.Command {
 		pass("reopen", "reopen an issue", passOpts{server: []string{"issue", "reopen"}, needsRepo: true}),
 		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"issue", "label"}, needsRepo: true}),
 		pass("assign", "assign users: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
+		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"issue", "milestone"}, needsRepo: true}),
+		pass("templates", "list issue templates (.gitbay/issue-template*.md)", passOpts{server: []string{"issue", "templates"}, needsRepo: true}),
+	)
+}
+
+func milestoneCmd() *cobra.Command {
+	return group("milestone", "group issues and MRs toward a release",
+		pass("create", "create a milestone: <title> [--description <d>] [--due YYYY-MM-DD]",
+			passOpts{server: []string{"milestone", "create"}, needsRepo: true}),
+		pass("list", "list milestones with progress [--state open|closed|all]",
+			passOpts{server: []string{"milestone", "list"}, needsRepo: true}),
+		pass("close", "close a milestone: <title>", passOpts{server: []string{"milestone", "close"}, needsRepo: true}),
+		pass("reopen", "reopen a milestone: <title>", passOpts{server: []string{"milestone", "reopen"}, needsRepo: true}),
 	)
 }
 
@@ -284,6 +304,7 @@ func mrCmd() *cobra.Command {
 		pass("review", "review: --approve|--request-changes|--comment", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
 		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
+		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
 	)
 }
 

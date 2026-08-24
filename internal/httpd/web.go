@@ -383,6 +383,41 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}{p, cs, base, filePath, binary, len(data), codeHTML})
 }
 
+// milestones lists a repo's milestones with progress.
+func (s *Server) milestones(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	p.Tab = "issues"
+	state := r.URL.Query().Get("state")
+	if state != "closed" && state != "all" {
+		state = "open"
+	}
+	ms, err := s.st.ListMilestones(p.Repo.ID, state)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	type msView struct {
+		store.Milestone
+		Percent int
+	}
+	var views []msView
+	for _, m := range ms {
+		v := msView{Milestone: m}
+		if total := m.OpenItems + m.ClosedItems; total > 0 {
+			v.Percent = m.ClosedItems * 100 / total
+		}
+		views = append(views, v)
+	}
+	s.render(w, "milestones.html", struct {
+		repoPage
+		State      string
+		Milestones []msView
+	}{p, state, views})
+}
+
 // search runs a bounded literal git grep over the repo's default branch.
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")

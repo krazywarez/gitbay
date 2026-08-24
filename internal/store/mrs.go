@@ -17,6 +17,7 @@ type MR struct {
 	Title        string
 	Body         string
 	State        string // open | merged | closed | source_gone
+	Milestone    string
 	HeadSHA      string
 	MergedBase   string // target tip at merge time; base for historical diffs
 	CreatedAt    string
@@ -57,18 +58,20 @@ const mrSelect = `
 	SELECT m.id, m.repo_id, m.number, u.username,
 	       COALESCE(m.source_repo_id, 0),
 	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
-	       m.source_ref, m.target_ref, m.title, m.body, m.state, m.head_sha,
+	       m.source_ref, m.target_ref, m.title, m.body, m.state,
+	       COALESCE(ms.title, ''), m.head_sha,
 	       m.merged_base, m.created_at, m.updated_at
 	FROM merge_requests m
 	JOIN users u ON u.id = m.author_id
 	LEFT JOIN repos sr ON sr.id = m.source_repo_id
 	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id
-	LEFT JOIN orgs so  ON sr.owner_kind = 'org'  AND so.id = sr.owner_id`
+	LEFT JOIN orgs so  ON sr.owner_kind = 'org'  AND so.id = sr.owner_id
+	LEFT JOIN milestones ms ON ms.id = m.milestone_id`
 
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
-		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.State, &m.HeadSHA, &m.MergedBase, &m.CreatedAt, &m.UpdatedAt)
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase, &m.CreatedAt, &m.UpdatedAt)
 	return m, err
 }
 

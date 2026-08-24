@@ -514,6 +514,31 @@ ul.issuelist p { margin: 0; }
 ul.issuelist .title a { color: var(--fg); font-weight: 550; }
 ul.issuelist .title a:hover { color: var(--accent); }
 
+/* milestones */
+ul.milestonelist {
+  list-style: none;
+  margin: var(--sp-2) 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+ul.milestonelist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
+ul.milestonelist li:last-child { border-bottom: none; }
+ul.milestonelist li.empty { color: var(--muted); }
+ul.milestonelist p { margin: 0; }
+ul.milestonelist .title { font-weight: 550; }
+.progress {
+  height: 6px;
+  background: var(--faint);
+  border-radius: var(--r-pill);
+  margin-top: var(--sp-2);
+  overflow: hidden;
+  max-width: 24rem;
+}
+.progress .bar { height: 100%; background: var(--ok); }
+.listhead .spacer { flex: 1; }
+
 /* issue / MR detail */
 h2.issuetitle { margin-bottom: var(--sp-1); font-size: var(--fs-5); }
 .issuenumber { color: var(--muted); font-weight: 400; }

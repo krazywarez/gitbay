@@ -4,7 +4,7 @@
 <h2 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h2>
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
 {{.MR.Author}} wants to merge {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} into {{.MR.TargetRef}}
- at <code>{{short .MR.HeadSHA}}</code></p>
+ at <code>{{short .MR.HeadSHA}}</code>{{if .MR.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.MR.Milestone}}</a>{{end}}</p>
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong>{{.MR.Author}}</strong></header>
   <div class="rendered">{{.BodyHTML}}</div>

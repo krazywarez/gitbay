@@ -27,7 +27,7 @@ func hasBodyFlag(args []string) bool {
 // body, none was given, and we are on a terminal. The result is passed to
 // the server via --file - on stdin. Returns the (possibly extended) args,
 // the stdin to use, and ok=false if the user aborted.
-func maybeEditor(args []string, kind string) ([]string, *strings.Reader, bool, error) {
+func maybeEditor(args []string, kind string, prefill func() string) ([]string, *strings.Reader, bool, error) {
 	if hasBodyFlag(args) || !term.IsTerminal(int(os.Stdin.Fd())) {
 		return args, nil, true, nil
 	}
@@ -42,6 +42,11 @@ func maybeEditor(args []string, kind string) ([]string, *strings.Reader, bool, e
 		return nil, nil, false, err
 	}
 	defer os.Remove(f.Name())
+	if prefill != nil {
+		if body := prefill(); body != "" {
+			fmt.Fprintf(f, "%s\n", strings.TrimRight(body, "\n"))
+		}
+	}
 	fmt.Fprintf(f, "\n# Write the %s body above. Lines starting with '#' are ignored.\n# Save an empty file to skip the body.\n", kind)
 	f.Close()
 

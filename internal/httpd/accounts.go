@@ -164,6 +164,40 @@ func (s *Server) repoForUser(w http.ResponseWriter, r *http.Request, u store.Use
 	return repo, true
 }
 
+// issueCreateForm renders the new-issue form, prefilled from the repo's
+// default issue template when one exists.
+func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	p.Tab = "issues"
+	templates := control.IssueTemplates(p.Dir, p.Repo.DefaultBranch)
+	body, tplName := "", ""
+	if want := r.URL.Query().Get("template"); want != "" {
+		for _, t := range templates {
+			if t.Name == want {
+				body, tplName = t.Body, t.Name
+			}
+		}
+	} else {
+		for _, t := range templates {
+			if t.Name == "issue-template.md" || body == "" {
+				body, tplName = t.Body, t.Name
+			}
+			if t.Name == "issue-template.md" {
+				break
+			}
+		}
+	}
+	s.render(w, "issuenew.html", struct {
+		repoPage
+		Body      string
+		Template  string
+		Templates []control.IssueTemplate
+	}{p, body, tplName, templates})
+}
+
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
 	if !ok {

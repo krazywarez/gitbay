@@ -1,0 +1,23 @@
+{{define "title"}}milestones · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<div class="listhead">
+  <h2>milestones</h2>
+  <nav class="filters">
+    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+  </nav>
+</div>
+<ul class="milestonelist">
+{{range .Milestones}}<li>
+  <div class="msmain">
+    <p class="title">{{.Title}} <span class="chip {{if eq .State "open"}}chip-open{{else}}chip-done{{end}}">{{.State}}</span></p>
+    {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
+    <p class="meta">{{if .DueDate}}due {{.DueDate}} · {{end}}{{.ClosedItems}} closed, {{.OpenItems}} open · {{.Percent}}%</p>
+    <div class="progress"><div class="bar" style="width: {{.Percent}}%"></div></div>
+  </div>
+</li>
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}milestones — create one with <code>gitbay milestone create {{.Repo.OwnerName}}/{{.Repo.Name}} "v1.0"</code></li>{{end}}
+</ul>
+{{end}}

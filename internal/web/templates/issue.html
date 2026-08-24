@@ -5,7 +5,8 @@
 <p class="issuemeta"><span class="chip {{if eq .Issue.State "open"}}chip-open{{else}}chip-done{{end}}">{{.Issue.State}}</span>
 {{.Issue.Author}} opened this on {{when .Issue.CreatedAt}}
 {{if .Issue.Labels}} · {{range .Issue.Labels}}<span class="chip label" style="{{index $.LabelColors .}}">{{.}}</span> {{end}}{{end}}
-{{if .Issue.Assignees}} · assigned to {{range .Issue.Assignees}}{{.}} {{end}}{{end}}</p>
+{{if .Issue.Assignees}} · assigned to {{range .Issue.Assignees}}{{.}} {{end}}{{end}}
+{{if .Issue.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a>{{end}}</p>
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong>{{.Issue.Author}}</strong> <span class="when">{{when .Issue.CreatedAt}}</span></header>
   <div class="rendered">{{.BodyHTML}}</div>

@@ -14,6 +14,7 @@ type Issue struct {
 	Title     string
 	Body      string
 	State     string // open | closed
+	Milestone string
 	CreatedAt string
 	UpdatedAt string
 	Labels    []string
@@ -52,10 +53,12 @@ func (s *Store) CreateIssue(repoID, authorID int64, title, body string) (int64, 
 func (s *Store) IssueByNumber(repoID, number int64) (Issue, error) {
 	var i Issue
 	err := s.DB.QueryRow(`
-		SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state, i.created_at, i.updated_at
+		SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state,
+		       COALESCE(m.title, ''), i.created_at, i.updated_at
 		FROM issues i JOIN users u ON u.id = i.author_id
+		LEFT JOIN milestones m ON m.id = i.milestone_id
 		WHERE i.repo_id = ? AND i.number = ?`, repoID, number).
-		Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.CreatedAt, &i.UpdatedAt)
+		Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return i, ErrNotFound
 	}
@@ -92,8 +95,11 @@ func (s *Store) issueStrings(issueID int64, query string) ([]string, error) {
 
 // ListIssues returns issues for a repo; state is "open", "closed", or "all".
 func (s *Store) ListIssues(repoID int64, state string) ([]Issue, error) {
-	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state, i.created_at, i.updated_at
-	      FROM issues i JOIN users u ON u.id = i.author_id WHERE i.repo_id = ?`
+	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state,
+	             COALESCE(m.title, ''), i.created_at, i.updated_at
+	      FROM issues i JOIN users u ON u.id = i.author_id
+	      LEFT JOIN milestones m ON m.id = i.milestone_id
+	      WHERE i.repo_id = ?`
 	args := []any{repoID}
 	if state != "all" {
 		q += " AND i.state = ?"
@@ -108,7 +114,7 @@ func (s *Store) ListIssues(repoID int64, state string) ([]Issue, error) {
 	var out []Issue
 	for rows.Next() {
 		var i Issue
-		if err := rows.Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.CreatedAt, &i.UpdatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, i)

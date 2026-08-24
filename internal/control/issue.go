@@ -78,6 +78,7 @@ type issueOut struct {
 	Title     string   `json:"title"`
 	State     string   `json:"state"`
 	Author    string   `json:"author"`
+	Milestone string   `json:"milestone,omitempty"`
 	Labels    []string `json:"labels,omitempty"`
 	Assignees []string `json:"assignees,omitempty"`
 	Body      string   `json:"body,omitempty"`
@@ -86,7 +87,7 @@ type issueOut struct {
 
 func issueToOut(i store.Issue, withBody bool) issueOut {
 	o := issueOut{Number: i.Number, Title: i.Title, State: i.State, Author: i.Author,
-		Labels: i.Labels, Assignees: i.Assignees, CreatedAt: i.CreatedAt}
+		Milestone: i.Milestone, Labels: i.Labels, Assignees: i.Assignees, CreatedAt: i.CreatedAt}
 	if withBody {
 		o.Body = i.Body
 	}
