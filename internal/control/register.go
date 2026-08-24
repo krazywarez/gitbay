@@ -17,6 +17,13 @@ import (
 )
 
 func init() {
+	register(Command{Path: []string{"register"},
+		Summary: "create an account (only meaningful for unregistered keys)",
+		Run: func(c *Ctx, args []string) int {
+			return c.fail(protocol.ExitUsage,
+				"this SSH key already belongs to %s. To register a new account, connect with the key it should use:\n  ssh -F /dev/null -i <newkey> git@<host> register ...",
+				c.User.Username)
+		}})
 	register(Command{Path: []string{"email", "add"},
 		Summary: "add an address and mail a verification code: email add <address>", Run: runEmailAdd})
 	register(Command{Path: []string{"email", "verify"},
@@ -123,25 +130,20 @@ func RunRegister(cfg config.Config, st *store.Store, pub ssh.PublicKey, argv []s
 		return fail(protocol.ExitUsage, "%v", err)
 	}
 
+	fp := ssh.FingerprintSHA256(pub)
 	switch cfg.Registration.Mode {
 	case "invite":
 		if invite == "" {
 			return fail(protocol.ExitDenied, "this instance is invite-only: register --username <name> --invite <code>")
 		}
-		addr, err := st.ConsumeInvite(store.HashToken(invite))
+		// One transaction: a failure at any step leaves the invite
+		// redeemable and no partial account behind.
+		_, err := st.RedeemInvite(store.HashToken(invite), username, fp, pub.Type(), pub.Marshal())
 		if err != nil {
-			return fail(protocol.ExitDenied, "that invite is invalid or already used")
-		}
-		uid, err := st.CreateRegisteredUser(username, false)
-		if err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
-		}
-		// Possession of the emailed invite code proves the mailbox.
-		if err := st.AddEmail(uid, addr, "smtp", true); err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
-		}
-		if err := addRegisteredKey(st, uid, pub); err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
+			if errors.Is(err, store.ErrNotFound) {
+				return fail(protocol.ExitDenied, "that invite is invalid or already used")
+			}
+			return fail(protocol.ExitUsage, "%v", err)
 		}
 		fmt.Fprintf(stdout, "welcome, %s — your account is active\n", username)
 		return protocol.ExitOK
@@ -150,15 +152,9 @@ func RunRegister(cfg config.Config, st *store.Store, pub ssh.PublicKey, argv []s
 		if email == "" || !strings.Contains(email, "@") {
 			return fail(protocol.ExitUsage, "usage: register --username <name> --email <address>")
 		}
-		uid, err := st.CreateRegisteredUser(username, true)
+		uid, err := st.RegisterOpen(username, email, fp, pub.Type(), pub.Marshal())
 		if err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
-		}
-		if err := st.AddEmail(uid, email, "", true); err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
-		}
-		if err := addRegisteredKey(st, uid, pub); err != nil {
-			return fail(protocol.ExitFailure, "%v", err)
+			return fail(protocol.ExitUsage, "%v", err)
 		}
 		if err := sendVerification(cfg, st, uid, email); err != nil {
 			return fail(protocol.ExitFailure, "sending verification mail: %v", err)
@@ -173,6 +169,4 @@ func RunRegister(cfg config.Config, st *store.Store, pub ssh.PublicKey, argv []s
 	}
 }
 
-func addRegisteredKey(st *store.Store, uid int64, pub ssh.PublicKey) error {
-	return st.AddSSHKey(uid, ssh.FingerprintSHA256(pub), pub.Type(), pub.Marshal(), "full")
-}
+

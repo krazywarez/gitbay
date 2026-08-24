@@ -123,6 +123,14 @@ func TestOpenRegistration(t *testing.T) {
 		t.Fatalf("stranger whoami: exit %d, %s", code, errOut)
 	}
 
+	// Registering with an address already on an account is refused
+	// atomically (the username stays free for the real attempt).
+	inst.admin(t, "admin", "user", "create", "existing", "--key", inst.newKey(t, "existing")+".pub", "--email", "taken@example.test")
+	_, errOut2, code2 := inst.ssh(t, newKey, "", "register", "--username", "dana", "--email", "taken@example.test")
+	if code2 != 2 || !strings.Contains(errOut2, "already belongs") {
+		t.Fatalf("open register with taken email: exit %d, %s", code2, errOut2)
+	}
+
 	// Register: account created pending, verification mail sent.
 	out, errOut, code := inst.ssh(t, newKey, "", "register", "--username", "dana", "--email", "dana@example.test")
 	if code != 0 {
@@ -217,5 +225,28 @@ func TestInviteRegistration(t *testing.T) {
 	_, errOut, code = inst.ssh(t, otherKey, "", "register", "--username", "fake", "--invite", inviteCode)
 	if code != 4 || !strings.Contains(errOut, "already used") {
 		t.Fatalf("invite reuse: exit %d, %s", code, errOut)
+	}
+
+	// Atomicity: a failed redemption (taken username) leaves the invite
+	// redeemable and no partial account.
+	inst.admin(t, "admin", "invite", "--email", "gray@example.test")
+	code2 := extractCode(t, smtp.waitMail(t, 1))
+	if _, errOut, code = inst.ssh(t, otherKey, "", "register", "--username", "erin", "--invite", code2); code != 2 || !strings.Contains(errOut, "taken") {
+		t.Fatalf("taken-name register: exit %d, %s", code, errOut)
+	}
+	if _, errOut, code = inst.ssh(t, otherKey, "", "register", "--username", "gray", "--invite", code2); code != 0 {
+		t.Fatalf("invite not redeemable after failed attempt: %s", errOut)
+	}
+
+	// Inviting an address that already has an account is refused.
+	out2 := inst.forgedAdminErr(t, "admin", "invite", "--email", "erin@example.test")
+	if !strings.Contains(out2, "already belongs") {
+		t.Fatalf("invite to existing address: %s", out2)
+	}
+
+	// A registered key running register gets a pointer, not confusion.
+	_, errOut, code = inst.ssh(t, otherKey, "", "register", "--username", "again", "--invite", "x")
+	if code != 2 || !strings.Contains(errOut, "already belongs to gray") {
+		t.Fatalf("register with known key: exit %d, %s", code, errOut)
 	}
 }

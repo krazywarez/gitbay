@@ -281,6 +281,11 @@ func adminInviteCmd() *cobra.Command {
 			}
 			defer st.Close()
 
+			if used, err := st.EmailInUse(email); err != nil {
+				return err
+			} else if used {
+				return fmt.Errorf("%s already belongs to an account; invites are for new users", email)
+			}
 			code, hash, err := store.NewToken()
 			if err != nil {
 				return err
