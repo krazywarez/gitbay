@@ -148,6 +148,44 @@ func TestWebUI(t *testing.T) {
 		t.Fatal("archive missing content")
 	}
 
+	// README formats: org-mode renders, HTML renders sanitized, unknown
+	// extensions fall back to plaintext, and richer formats win conflicts.
+	readmeRepo := func(name, file, content string) {
+		t.Helper()
+		if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/"+name); code != 0 {
+			t.Fatalf("repo create %s failed", name)
+		}
+		w := t.TempDir()
+		mustGit(t, w, env, "clone", inst.sshURL("alice/"+name), "r")
+		d := filepath.Join(w, "r")
+		os.WriteFile(filepath.Join(d, file), []byte(content), 0o644)
+		mustGit(t, d, env, "checkout", "-q", "-b", "main")
+		mustGit(t, d, env, "add", ".")
+		mustGit(t, d, env, "commit", "-q", "-m", "readme")
+		mustGit(t, d, env, "push", "-q", "origin", "main")
+	}
+
+	readmeRepo("orgdoc", "README.org", "* Heading\n\nSome /emphasis/ here.\n")
+	status, body = inst.get(t, "/alice/orgdoc")
+	if status != 200 || !strings.Contains(body, "headline-1") || !strings.Contains(body, "<em>emphasis</em>") {
+		t.Fatalf("org README not rendered:\n%s", body)
+	}
+
+	readmeRepo("htmldoc", "README.html", "<p id=\"ok\">fine</p><script>alert(1)</script>")
+	status, body = inst.get(t, "/alice/htmldoc")
+	if status != 200 || !strings.Contains(body, "fine</p>") {
+		t.Fatalf("html README not rendered:\n%s", body)
+	}
+	if strings.Contains(body, "<script>alert") {
+		t.Fatal("repo HTML script survived sanitization")
+	}
+
+	readmeRepo("txtdoc", "README.txt", "plain <text> & stuff\n")
+	status, body = inst.get(t, "/alice/txtdoc")
+	if status != 200 || !strings.Contains(body, "plain &lt;text&gt; &amp; stuff") {
+		t.Fatalf("txt README not escaped-plaintext:\n%s", body)
+	}
+
 	// Private repo pages: 404, indistinguishable from nonexistent.
 	for _, p := range []string{"/alice/secret", "/alice/secret/log", "/alice/nothere"} {
 		if status, _ := inst.get(t, p); status != 404 {

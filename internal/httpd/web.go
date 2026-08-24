@@ -15,6 +15,8 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/microcosm-cc/bluemonday"
+	"github.com/niklasfasching/go-org/org"
 	"github.com/yuin/goldmark"
 
 	"gitbay.org/gitbay/internal/control"
@@ -178,25 +180,9 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	}
 
 	var readmeHTML template.HTML
-	for _, e := range entries {
-		if e.Type != "blob" {
-			continue
-		}
-		lower := strings.ToLower(e.Name)
-		if lower == "readme" || lower == "readme.md" || lower == "readme.markdown" {
-			raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+e.Name, maxRenderBytes)
-			if err == nil {
-				var buf bytes.Buffer
-				if strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".markdown") {
-					// goldmark's default renderer drops raw HTML: safe.
-					if goldmark.Convert(raw, &buf) == nil {
-						readmeHTML = template.HTML(buf.String())
-					}
-				} else {
-					readmeHTML = template.HTML("<pre>" + template.HTMLEscapeString(string(raw)) + "</pre>")
-				}
-			}
-			break
+	if name := pickReadme(entries); name != "" {
+		if raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+name, maxRenderBytes); err == nil {
+			readmeHTML = renderReadme(name, raw)
 		}
 	}
 
@@ -276,6 +262,68 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(data)
+}
+
+// readmeRank orders competing README files: richer renderers win.
+var readmeRank = map[string]int{".md": 1, ".markdown": 1, ".org": 2, ".html": 3, ".htm": 3}
+
+// pickReadme returns the best README-ish blob in a tree listing: any file
+// named "readme" or "readme.<ext>" (case-insensitive), preferring formats
+// we can render richly.
+func pickReadme(entries []gitutil.TreeEntry) string {
+	best, bestRank := "", 1<<30
+	for _, e := range entries {
+		if e.Type != "blob" {
+			continue
+		}
+		lower := strings.ToLower(e.Name)
+		if lower != "readme" && !strings.HasPrefix(lower, "readme.") {
+			continue
+		}
+		rank, ok := readmeRank[path.Ext(lower)]
+		if !ok {
+			rank = 10 // plaintext fallback
+		}
+		if rank < bestRank {
+			best, bestRank = e.Name, rank
+		}
+	}
+	return best
+}
+
+// ugcPolicy sanitizes rendered repo content before it enters the forge's
+// origin: markdown is already safe (goldmark drops raw HTML), but org-mode
+// output and repo-authored HTML are not.
+var ugcPolicy = bluemonday.UGCPolicy()
+
+// renderReadme renders a README by extension: markdown, org-mode, and
+// (sanitized) HTML richly; everything else as escaped plaintext.
+func renderReadme(name string, raw []byte) template.HTML {
+	plain := func() template.HTML {
+		return template.HTML("<pre>" + template.HTMLEscapeString(string(raw)) + "</pre>")
+	}
+	if gitutil.IsBinary(raw) {
+		return ""
+	}
+	switch path.Ext(strings.ToLower(name)) {
+	case ".md", ".markdown":
+		var buf bytes.Buffer
+		if goldmark.Convert(raw, &buf) != nil {
+			return plain()
+		}
+		return template.HTML(buf.String())
+	case ".org":
+		doc := org.New().Parse(bytes.NewReader(raw), name)
+		html, err := doc.Write(org.NewHTMLWriter())
+		if err != nil {
+			return plain()
+		}
+		return template.HTML(ugcPolicy.Sanitize(html))
+	case ".html", ".htm":
+		return template.HTML(ugcPolicy.Sanitize(string(raw)))
+	default:
+		return plain()
+	}
 }
 
 type diffLine struct {
