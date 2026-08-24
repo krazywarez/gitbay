@@ -1,0 +1,67 @@
+#+title: contributing to gitbay
+
+Development happens on [[https://gitbay.org/krz/gitbay][gitbay.org]] — gitbay is built with gitbay. GitHub
+is not used.
+
+* Getting an account
+
+The instance is currently invite-based. Ask for an invite (hello@gitbay.org)
+and register with the SSH key you will push with:
+
+#+begin_src sh
+ssh git@gitbay.org register --username you --invite <code>
+#+end_src
+
+* The workflow
+
+1. Fork and branch:
+   #+begin_src sh
+   gitbay repo fork krz/gitbay          # or: ssh git@gitbay.org repo fork krz/gitbay
+   gitbay repo clone you/gitbay && cd gitbay
+   git checkout -b my-change
+   #+end_src
+2. Make the change. =go build ./...= and =go test ./...= must be green —
+   the e2e suite drives real =git=, =ssh=, =sshd=, and =gpg= binaries and
+   takes about two minutes.
+3. **Sign your commits.** =main= requires verified signatures: register
+   your signing key (=gitbay auth pgp add= for OpenPGP, or sign with a
+   registered SSH key) and make sure your author email is verified on
+   your account. Unsigned work cannot merge.
+4. Push and open a merge request:
+   #+begin_src sh
+   git push origin my-change
+   gitbay mr create krz/gitbay --source you/gitbay:my-change --target main --title "..."
+   #+end_src
+5. Merges are fast-forward only on =main=; if it moves under you, rebase
+   and re-push (your reviews go stale on force-push — that is by design).
+
+* What holds the design together
+
+Read =docs/roadmap.org= for direction. The invariants that reviews will
+hold you to:
+
+- every control command must work from bare OpenSSH; the registry test
+  enforces reachability, and the CLI stays a thin passthrough
+- one source of truth: SSH and the JSON API front the same handlers
+- the forge never executes repository content, and there is no server
+  signing key — server-created commits are honestly unsigned
+- private repositories are indistinguishable from nonexistent ones on
+  every surface
+- all git access goes through the =git= binary; no go-git
+- features land with e2e coverage against real binaries, not mocks
+
+* Style
+
+Plain, direct prose in code comments, commit messages, and docs — no
+hype, no filler. Commit messages state facts of the change. Match the
+surrounding code; keep diffs surgical.
+
+* Issues
+
+File at [[https://gitbay.org/krz/gitbay/issues][the tracker]] (=gitbay issue create= from a clone). Check
+=docs/roadmap.org= first — it maps the filed issues to phases.
+
+* License
+
+0BSD. By contributing you agree your work is released under it. No CLA,
+no copyright assignment; sign-off lines are welcome but not required.
