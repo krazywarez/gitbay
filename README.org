@@ -105,6 +105,7 @@ via =gitbay man=, completions via =gitbay completion <shell>=.
 - [[file:docs/users.org][user guide]] — accounts, keys, verified commits, repos, issues, MRs, scripting
 - [[file:docs/admin.org][admin guide]] — install, full configuration reference, backup/restore, upgrades
 - [[file:docs/api.org][API and webhooks]] — the JSON API contract, tokens, webhook payloads and HMAC
+- [[file:docs/roadmap.org][roadmap]] — status, phased plan, and what is deliberately not planned
 
 * Development
 

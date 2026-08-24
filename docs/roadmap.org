@@ -1,0 +1,98 @@
+#+title: gitbay roadmap
+
+Status and direction as of 2026-08-24. Issue numbers reference this
+repository's tracker; this file is the narrative, the tracker is the
+truth.
+
+* Where things stand
+
+Everything in the original plan is built, tested end-to-end against real
+git/ssh/sshd/gpg, and running in production at gitbay.org: the SSH
+control plane (usable from bare OpenSSH, enforced by test), git over
+SSH/HTTPS/git://, signature verification with six states and epoch
+caching, protected branches and =require_signed_commits= (push-time and
+merge-time), issues, merge requests with four merge strategies, orgs
+with membership-derived access, rename/transfer, repo import, invite and
+open registration with SMTP verification, ACME TLS, the read-only and
+accounts web modes, the JSON API fronting the whole command registry,
+signed webhooks with retries and dead-lettering, restore-tested backups,
+the =gitbay= CLI, and docs. The instance hosts 65 repositories including
+this one, and its own development already runs through its issues and
+merge requests.
+
+What it is today: an excellent forge for its author and for CLI-native
+individuals. What it is not yet: a forge a GitHub-habituated *team*
+would stay on, or a project outsiders can easily run themselves.
+
+* Phase 1 — collaboration credibility
+
+Goal: a second contributor works here for a week and misses nothing they
+would act on. These compound: statuses gate merges, notifications close
+the feedback loop, inline comments make review real.
+
+- [[https://gitbay.org/krz/gitbay/issues/22][#22]] deploy keys — smallest item, unblocks CI checkout; the scope
+  already exists in the policy layer
+- [[https://gitbay.org/krz/gitbay/issues/1][#1]] commit statuses API and MR check display
+- [[https://gitbay.org/krz/gitbay/issues/3][#3]] email notifications for issue/MR activity
+- [[https://gitbay.org/krz/gitbay/issues/2][#2]] inline review comments on MR diffs
+- [[https://gitbay.org/krz/gitbay/issues/19][#19]] required approvals and CODEOWNERS (builds on #1 and #2)
+
+* Phase 2 — a product, not a debug view
+
+Goal: the site looks and reads like something you would recommend.
+Mostly web-layer; descriptions and profiles already landed as the first
+step.
+
+- [[https://gitbay.org/krz/gitbay/issues/10][#10]] design revamp (umbrella: tokens, typography, identity, mobile)
+- [[https://gitbay.org/krz/gitbay/issues/6][#6]] cross-references (#N) and @mentions
+- [[https://gitbay.org/krz/gitbay/issues/23][#23]] archived repos and topics
+- [[https://gitbay.org/krz/gitbay/issues/24][#24]] blame view
+- [[https://gitbay.org/krz/gitbay/issues/7][#7]] search (repo-name filter first; code search later)
+- [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates
+
+* Phase 3 — other people's forges
+
+Goal: someone who is not the author runs an instance and moves their
+work to it.
+
+- [[https://gitbay.org/krz/gitbay/issues/26][#26]] release engineering: versioned builds, go-install vanity
+  imports, Homebrew/deb — the adoption gate for everything below
+- [[https://gitbay.org/krz/gitbay/issues/27][#27]] repository maintenance (admin gc/stats, scheduled repack)
+- [[https://gitbay.org/krz/gitbay/issues/8][#8]] releases (notes + assets; also hosts gitbay's own binaries)
+- [[https://gitbay.org/krz/gitbay/issues/17][#17]] issue/PR history import from GitHub
+- [[https://gitbay.org/krz/gitbay/issues/18][#18]] push/pull mirroring for gradual migration
+- [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging and multi-user hardening
+- [[https://gitbay.org/krz/gitbay/issues/9][#9]] web signup for open/invite instances
+
+* Phase 4 — reach
+
+Bigger bets, each valuable independently; order by appetite.
+
+- [[https://gitbay.org/krz/gitbay/issues/13][#13]] CI/CD via external runners (after #1; the forge never executes
+  repository content)
+- [[https://gitbay.org/krz/gitbay/issues/16][#16]] Git LFS
+- [[https://gitbay.org/krz/gitbay/issues/15][#15]] static page hosting (needs the separate-origin decision)
+- [[https://gitbay.org/krz/gitbay/issues/11][#11]] iOS app (hutch-based) and [[https://gitbay.org/krz/gitbay/issues/12][#12]] Android
+- [[https://gitbay.org/krz/gitbay/issues/21][#21]] teams within orgs
+- [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis
+
+* Explicitly not planned
+
+Recorded so their absence reads as a decision, not an oversight:
+
+- container/package registry — scope creep away from "forge"; external
+  registries integrate via CI
+- email patch flow — revisit only if sourcehut-style demand appears
+- federation (ForgeFed) and Postgres — no current need at this scale
+
+* Open questions
+
+- **What is gitbay.org?** Today: the author's personal forge and the
+  project's home. Options: keep it closed (flagship demo), invite-only
+  for collaborators, or eventually open registration (which pulls #14,
+  #9, and rate limiting forward). No decision needed until Phase 1
+  lands.
+- **Versioning**: nothing is tagged. Suggest cutting v0.1.0 with #26 and
+  adopting semver for the protocol_version relationship.
+- **Second-contributor readiness**: CONTRIBUTING notes, and whether MRs
+  from outside collaborators imply moving gitbay.org to invite mode.
