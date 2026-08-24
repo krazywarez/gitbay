@@ -235,3 +235,23 @@ func (s *Store) UpdateDefaultBranch(repoID int64, branch string) error {
 	_, err := s.DB.Exec("UPDATE repos SET default_branch = ? WHERE id = ?", branch, repoID)
 	return err
 }
+
+// ListReposForOwner returns every repo owned by one user or org; the caller
+// filters by viewer visibility.
+func (s *Store) ListReposForOwner(ownerKind string, ownerID int64) ([]Repo, error) {
+	rows, err := s.DB.Query(repoSelect+" WHERE r.owner_kind = ? AND r.owner_id = ? ORDER BY r.name",
+		ownerKind, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Repo
+	for rows.Next() {
+		r, err := scanRepo(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

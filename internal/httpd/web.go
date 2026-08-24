@@ -141,6 +141,57 @@ func crumbs(p repoPage, kind, filePath string) []crumb {
 	return cs
 }
 
+// ownerPage renders /{owner} for users and orgs: the repositories the
+// viewer may see, org membership either direction. Owner names are not
+// secret (they are on every commit); repository visibility rules hold.
+func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("owner")
+	var viewer store.User
+	if s.cfg.Web.Mode == "accounts" {
+		viewer = s.viewer(r)
+	}
+
+	kind := "user"
+	var ownerID int64
+	var members []store.OrgMember
+	var orgs []store.OrgMember
+	if u, err := s.st.UserByUsername(name); err == nil {
+		ownerID = u.ID
+		orgs, _ = s.st.ListOrgsForUser(u.ID)
+	} else if o, err := s.st.OrgByName(name); err == nil {
+		kind, ownerID = "org", o.ID
+		members, _ = s.st.OrgMembers(o.ID)
+	} else {
+		http.NotFound(w, r)
+		return
+	}
+
+	all, err := s.st.ListReposForOwner(kind, ownerID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	var visible []store.Repo
+	for _, repo := range all {
+		grant := ""
+		if viewer.ID != 0 {
+			grant, _ = s.st.AccessRole(repo.ID, viewer.ID)
+		}
+		if policy.CanRead(viewer, repo, grant) {
+			visible = append(visible, repo)
+		}
+	}
+	s.render(w, "owner.html", struct {
+		Site    string
+		Viewer  string
+		Owner   string
+		Kind    string
+		Repos   []store.Repo
+		Members []store.OrgMember
+		Orgs    []store.OrgMember
+	}{s.siteName(), viewer.Username, name, kind, visible, members, orgs})
+}
+
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {

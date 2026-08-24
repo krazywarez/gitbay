@@ -4,7 +4,7 @@
 <form method="post" action="/logout" style="display:inline"><button type="submit">logout</button></form></p>{{end}}
 <h1>repositories</h1>
 <table>
-{{range .Repos}}<tr><td><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}/{{.Name}}</a></td><td>{{.DefaultBranch}}</td></tr>
+{{range .Repos}}<tr><td><a href="/{{.OwnerName}}">{{.OwnerName}}</a>/<a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></td><td>{{.DefaultBranch}}</td></tr>
 {{else}}<tr><td>no public repositories</td></tr>{{end}}
 </table>
 {{if .Mine}}<h2>your private repositories</h2>

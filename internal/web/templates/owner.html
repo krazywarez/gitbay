@@ -1,0 +1,14 @@
+{{define "title"}}{{.Owner}} · {{.Site}}{{end}}
+{{define "content"}}
+<h1>{{.Owner}} <span class="badge badge-unsigned">{{.Kind}}</span></h1>
+{{if .Orgs}}<p class="crumbs">member of: {{range .Orgs}}<a href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
+{{if .Members}}<p class="crumbs">members: {{range .Members}}<a href="/{{.Username}}">{{.Username}}</a> ({{.Role}}) {{end}}</p>{{end}}
+<table>
+{{range .Repos}}<tr>
+  <td><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></td>
+  <td>{{.Visibility}}</td>
+  <td>{{.DefaultBranch}}</td>
+</tr>
+{{else}}<tr><td>no visible repositories</td></tr>{{end}}
+</table>
+{{end}}

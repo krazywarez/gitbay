@@ -151,4 +151,8 @@ func TestOrganizations(t *testing.T) {
 	if status, _ := inst.get(t, "/puborg/site"); status != 200 {
 		t.Fatalf("org repo page: %d", status)
 	}
+	status, body = inst.get(t, "/puborg")
+	if status != 200 || !strings.Contains(body, "org") || !strings.Contains(body, "alice") || !strings.Contains(body, ">site<") {
+		t.Fatalf("org owner page: %d\n%s", status, body)
+	}
 }

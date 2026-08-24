@@ -186,6 +186,18 @@ func TestWebUI(t *testing.T) {
 		t.Fatalf("txt README not escaped-plaintext:\n%s", body)
 	}
 
+	// Owner page: lists visible repos only; unknown owners 404.
+	status, body = inst.get(t, "/alice")
+	if status != 200 || !strings.Contains(body, ">site<") || !strings.Contains(body, "user") {
+		t.Fatalf("owner page: %d", status)
+	}
+	if strings.Contains(body, "secret") {
+		t.Fatal("owner page leaks private repo")
+	}
+	if status, _ := inst.get(t, "/nobody"); status != 404 {
+		t.Fatalf("unknown owner: %d, want 404", status)
+	}
+
 	// Private repo pages: 404, indistinguishable from nonexistent.
 	for _, p := range []string{"/alice/secret", "/alice/secret/log", "/alice/nothere"} {
 		if status, _ := inst.get(t, p); status != 404 {
