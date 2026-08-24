@@ -116,11 +116,15 @@ gitbay repo archive you/project                     # read-only: pushes and issu
 gitbay repo unarchive you/project                   #   writes refused, browsing intact
 #+end_src
 
-Import from another forge (git data only — issues and PRs do not
-transfer):
+Import from another forge — git data first, then optionally the GitHub
+issue and PR history (issues keep state/labels/comments; PRs land as
+closed or merged MRs with their discussion; originals are attributed
+inline since foreign authors have no local account; re-running resumes
+where it stopped):
 #+begin_src sh
 gitbay repo import you/mirror --from https://github.com/you/repo.git \
     [--private] [--token-stdin]        # token on stdin, never in the URL
+gitbay repo import-issues you/mirror --from you/repo --token-stdin
 #+end_src
 
 * Organizations

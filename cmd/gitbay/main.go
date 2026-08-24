@@ -138,6 +138,9 @@ func usesStdin(args []string) bool {
 		if a == "--file" && i+1 < len(args) && args[i+1] == "-" {
 			return true
 		}
+		if a == "--token-stdin" {
+			return true
+		}
 	}
 	return false
 }
@@ -233,6 +236,8 @@ func repoCmd() *cobra.Command {
 		pass("unarchive", "unarchive a repository", passOpts{server: []string{"repo", "unarchive"}, needsRepo: true}),
 		local("clone", "clone via ssh: gitbay repo clone <owner/name> [dir]", cmdRepoClone),
 		importCmd(),
+		pass("import-issues", "import GitHub issue/PR history: --from <ghowner/ghrepo> [--token-stdin]",
+			passOpts{server: []string{"repo", "import-issues"}, needsRepo: true, stdinOK: true}),
 		group("deploy-key", "repository-bound CI keys",
 			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, stdinOK: true}),
 			pass("list", "list deploy keys", passOpts{server: []string{"repo", "deploy-key", "list"}, needsRepo: true}),

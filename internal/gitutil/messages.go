@@ -8,6 +8,11 @@ import (
 
 const zeroSHA = "0000000000000000000000000000000000000000"
 
+// HasCommit reports whether sha names a commit object present in dir.
+func HasCommit(dir, sha string) bool {
+	return exec.Command("git", "-C", dir, "cat-file", "-e", sha+"^{commit}").Run() == nil
+}
+
 type CommitMsg struct {
 	SHA     string
 	Message string
