@@ -5,6 +5,8 @@
 <p class="crumbs">by {{.MR.Author}} · {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} → {{.MR.TargetRef}}
  @ <code>{{.MR.HeadSHA}}</code></p>
 {{if .BodyHTML}}<div class="rendered">{{.BodyHTML}}</div>{{end}}
+{{if .Checks}}<p>checks: <span class="badge check-{{.Combined}}">{{.Combined}}</span>
+{{range .Checks}} · {{if .TargetURL}}<a href="{{.TargetURL}}" rel="nofollow">{{.Context}}</a>{{else}}{{.Context}}{{end}} <span class="check-{{.State}}">{{.State}}</span>{{end}}</p>{{end}}
 {{range .Reviews}}<p>review: {{.Reviewer}} — {{.Verdict}}{{if .Stale}} <span class="badge badge-signed_key_expired">stale</span>{{end}}</p>{{end}}
 {{range .Comments}}
 <div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div></div>

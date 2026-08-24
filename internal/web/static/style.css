@@ -57,3 +57,6 @@ pre.diff .meta { color: var(--muted); }
 .badge-signed_key_expired { color: var(--warn); border-color: var(--warn); }
 .badge-signed_key_revoked { color: var(--bad); border-color: var(--bad); }
 .badge-bad_signature { color: var(--bad); border-color: var(--bad); }
+.check-success { color: var(--ok); border-color: var(--ok); }
+.check-pending { color: var(--warn); border-color: var(--warn); }
+.check-failure, .check-error { color: var(--bad); border-color: var(--bad); }

@@ -16,6 +16,8 @@ import (
 func init() {
 	register(Command{Path: []string{"repo", "fork"},
 		Summary: "fork a repository under your account: repo fork <owner/name> [--name <n>]", Run: runRepoFork})
+	register(Command{Path: []string{"repo", "settings", "require-checks"},
+		Summary: "gate merges on green statuses: repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
 	register(Command{Path: []string{"repo", "settings", "require-signed"},
 		Summary: "require verified commit signatures: repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
 	register(Command{Path: []string{"mr", "create"},
@@ -94,6 +96,24 @@ func runRepoFork(c *Ctx, args []string) int {
 	forkPath := c.User.Username + "/" + name
 	return c.emit(map[string]string{"path": forkPath, "fork_of": src.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "forked %s to %s\n", src.Path(), forkPath)
+	})
+}
+
+func runRequireChecks(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: repo settings require-checks <owner/name> on|off")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	s := repo.Settings
+	s.RequireChecks = args[1] == "on"
+	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(s, func(w io.Writer) {
+		fmt.Fprintf(w, "require_checks %s on %s\n", args[1], repo.Path())
 	})
 }
 
@@ -304,6 +324,10 @@ func runMRShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	statuses, err := c.Store.ListCommitStatuses(repo.ID, mr.HeadSHA)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	type commentOut struct {
 		Author    string `json:"author"`
 		Body      string `json:"body"`
@@ -313,6 +337,15 @@ func runMRShow(c *Ctx, args []string) int {
 		Reviewer string `json:"reviewer"`
 		Verdict  string `json:"verdict"`
 		Stale    bool   `json:"stale"`
+	}
+	type checkOut struct {
+		Context string `json:"context"`
+		State   string `json:"state"`
+		URL     string `json:"url,omitempty"`
+	}
+	var checks []checkOut
+	for _, st := range statuses {
+		checks = append(checks, checkOut{st.Context, st.State, st.TargetURL})
 	}
 	var cs []commentOut
 	for _, cm := range comments {
@@ -324,13 +357,18 @@ func runMRShow(c *Ctx, args []string) int {
 	}
 	d := struct {
 		mrOut
+		Checks   []checkOut   `json:"checks,omitempty"`
+		Combined string       `json:"checks_combined,omitempty"`
 		Comments []commentOut `json:"comments,omitempty"`
 		Reviews  []reviewOut  `json:"reviews,omitempty"`
-	}{mrToOut(repo, mr, true), cs, rs}
+	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), cs, rs}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
 		if d.Body != "" {
 			fmt.Fprintf(w, "\n%s\n", d.Body)
+		}
+		for _, x := range checks {
+			fmt.Fprintf(w, "check: %s %s\n", x.Context, x.State)
 		}
 		for _, r := range rs {
 			stale := ""
@@ -476,6 +514,30 @@ func runMRMerge(c *Ctx, args []string) int {
 	headSHA, err := gitutil.ResolveRef(dir, mrHeadRef(mr.Number))
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "MR head ref: %v", err)
+	}
+
+	// Check gate: with require_checks, the MR head must carry statuses
+	// and every one of them must be green.
+	if repo.Settings.RequireChecks {
+		statuses, err := c.Store.ListCommitStatuses(repo.ID, headSHA)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		switch store.CombinedStatus(statuses) {
+		case "success":
+		case "":
+			return c.fail(protocol.ExitDenied,
+				"%s requires green checks and none were reported on %.10s", repo.Path(), headSHA)
+		default:
+			var bad []string
+			for _, st := range statuses {
+				if st.State != "success" {
+					bad = append(bad, st.Context+"="+st.State)
+				}
+			}
+			return c.fail(protocol.ExitDenied,
+				"%s requires green checks; %.10s has %s", repo.Path(), headSHA, strings.Join(bad, ", "))
+		}
 	}
 
 	upToDate, err := gitutil.IsAncestor(dir, headSHA, targetSHA)

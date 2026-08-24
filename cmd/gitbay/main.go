@@ -26,6 +26,10 @@ func main() {
 
 	root.AddCommand(
 		authCmd(),
+		group("status", "commit statuses (CI)",
+			pass("set", "report a status: <sha> --context <c> --state <s> [--description d] [--url u]", passOpts{server: []string{"status", "set"}, needsRepo: true}),
+			pass("list", "statuses on a commit: <sha>", passOpts{server: []string{"status", "list"}, needsRepo: true}),
+		),
 		repoCmd(),
 		issueCmd(),
 		mrCmd(),
@@ -228,6 +232,7 @@ func repoCmd() *cobra.Command {
 			pass("show", "show settings", passOpts{server: []string{"repo", "settings", "show"}, needsRepo: true}),
 			pass("protect", "protect a branch", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
 			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
+			pass("require-checks", "gate merges on green statuses: ... on|off", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
 			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
 			pass("description", "set the repository description: <text>", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
 			pass("git-daemon", "expose over git://: ... on|off", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),

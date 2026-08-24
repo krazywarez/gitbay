@@ -537,6 +537,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	if parsed.CommitterEmail != parsed.AuthorEmail {
 		committerEmail = parsed.CommitterEmail
 	}
+	checks, _ := s.st.ListCommitStatuses(p.Repo.ID, full)
 	msg := ""
 	if i := bytes.Index(parsed.Payload, []byte("\n\n")); i >= 0 {
 		msg = string(parsed.Payload[i+2:])
@@ -545,9 +546,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		repoPage
 		SHA, ShortSHA, AuthorName, AuthorEmail, CommitterEmail, Date, Message string
 		Sig                                                                   sigView
+		Checks                                                                []store.CommitStatus
 		DiffLines                                                             []diffLine
 	}{p, full, full[:10], parsed.AuthorName, parsed.AuthorEmail, committerEmail,
-		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg, v, lines})
+		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg, v, checks, lines})
 }
 
 func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
@@ -641,6 +643,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	comments, _ := s.st.ListMRComments(m.ID)
 	reviews, _ := s.st.ListMRReviews(m.ID)
+	checks, _ := s.st.ListCommitStatuses(p.Repo.ID, m.HeadSHA)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
 	var lines []diffLine
@@ -659,10 +662,12 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		repoPage
 		MR        store.MR
 		BodyHTML  template.HTML
+		Checks    []store.CommitStatus
+		Combined  string
 		Comments  []renderedComment
 		Reviews   []store.MRReview
 		DiffLines []diffLine
-	}{p, m, mdHTML(m.Body), renderComments(comments), reviews, lines})
+	}{p, m, mdHTML(m.Body), checks, store.CombinedStatus(checks), renderComments(comments), reviews, lines})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

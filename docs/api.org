@@ -58,6 +58,24 @@ printf '{"argv":["issue","create","you/project","--title","t","--file","-"],"std
 curl -s -H "Authorization: Bearer $TOKEN" -d @- https://gitbay.org/api/v1/cmd
 #+end_src
 
+* Commit statuses (CI reporting)
+
+CI reports results through the same command surface (over SSH or the
+JSON API with a full-scope token; reporting requires write access):
+
+#+begin_src sh
+gitbay status set <owner/name> <sha> --context build --state pending
+gitbay status set <owner/name> <sha> --context build --state success --url https://ci.example/run/1
+gitbay status list <owner/name> <sha> --json    # {"combined": "...", "statuses": [...]}
+#+end_src
+
+One row per (commit, context): re-reporting updates in place. States:
+=pending=, =success=, =failure=, =error=; the combined state is the
+worst of them. Statuses appear on commit pages, MR pages, and
+=mr show=. With =repo settings require-checks <repo> on=, merging
+requires the MR head to carry statuses and all of them green. Each
+report also emits a =status= event to webhooks.
+
 * Webhooks
 
 Per-repository outbound POSTs for repository events. Managed by repo
