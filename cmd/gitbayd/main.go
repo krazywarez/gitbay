@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"path/filepath"
 	"strconv"
 
@@ -16,6 +17,7 @@ import (
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/mail"
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
@@ -214,12 +216,58 @@ func adminCmd() *cobra.Command {
 	admin.AddCommand(
 		userCmd,
 		emailCmd,
-		notImplemented("invite", "issue registration invites"),
+		adminInviteCmd(),
 		backupCmd(),
 		notImplemented("gc", "run git gc across repositories"),
 		notImplemented("stats", "instance statistics"),
 	)
 	return admin
+}
+
+func adminInviteCmd() *cobra.Command {
+	var email string
+	cmd := &cobra.Command{
+		Use:   "invite",
+		Short: "issue a registration invite and email its code",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if email == "" {
+				return fmt.Errorf("--email is required")
+			}
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+			st, err := openStore(cfg)
+			if err != nil {
+				return err
+			}
+			defer st.Close()
+
+			code, hash, err := store.NewToken()
+			if err != nil {
+				return err
+			}
+			if err := st.CreateInvite(hash, email); err != nil {
+				return err
+			}
+			host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(cfg.Server.SiteURL, "https://"), "http://"), "/")
+			body := fmt.Sprintf(
+				"You have been invited to %s.\n\nCreate your account by running (with the SSH key you want to use):\n\n"+
+					"    ssh git@%s register --username <name> --invite %s\n\n"+
+					"The invite is single-use and tied to this address.\n", host, host, code)
+			if cfg.Mail.SMTPHost != "" {
+				if err := mail.Send(cfg, email, "your invite to "+host, body); err != nil {
+					return fmt.Errorf("invite stored but mail failed: %w (code: %s)", err, code)
+				}
+				fmt.Printf("invite emailed to %s\n", email)
+			} else {
+				fmt.Printf("invite for %s (no SMTP configured; deliver it yourself):\n%s\n", email, code)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&email, "email", "", "address to invite (the account's verified email)")
+	return cmd
 }
 
 func adminUserCreateCmd() *cobra.Command {

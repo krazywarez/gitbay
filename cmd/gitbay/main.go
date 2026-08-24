@@ -32,6 +32,8 @@ func main() {
 		webCmd(),
 		remoteCmd(),
 		initCmd(),
+		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
+			passOpts{server: []string{"register"}}),
 		manCmd(root),
 	)
 
@@ -175,6 +177,10 @@ func authCmd() *cobra.Command {
 			pass("list", "list registered SSH keys", passOpts{server: []string{"keys", "list"}}),
 			keysAdd,
 			pass("remove", "remove an SSH key by fingerprint", passOpts{server: []string{"keys", "remove"}}),
+		),
+		group("email", "manage email addresses",
+			pass("add", "add an address and get a verification code by mail", passOpts{server: []string{"email", "add"}}),
+			pass("verify", "confirm a verification code", passOpts{server: []string{"email", "verify"}}),
 		),
 		group("pgp", "manage OpenPGP keys",
 			pass("list", "list registered PGP keys", passOpts{server: []string{"pgp", "list"}}),

@@ -62,8 +62,10 @@ type Limits struct {
 }
 
 type Mail struct {
-	SMTPHost string `toml:"smtp_host"`
+	SMTPHost string `toml:"smtp_host"` // host:port (port defaults to 587)
 	From     string `toml:"from"`
+	SMTPUser string `toml:"smtp_user,omitempty"`
+	SMTPPass string `toml:"smtp_pass,omitempty"`
 }
 
 // Default returns the configuration used when a key is absent from the file.
@@ -139,6 +141,9 @@ func (c Config) Validate() error {
 	}
 
 	// Contradictions.
+	if c.Mail.SMTPHost != "" && c.Mail.From == "" {
+		errs = append(errs, errors.New("[mail] from is required when smtp_host is set"))
+	}
 	if c.Registration.Mode != "closed" && c.Mail.SMTPHost == "" {
 		errs = append(errs, fmt.Errorf(
 			"registration.mode = %q requires [mail] smtp_host: email verification cannot run without SMTP",

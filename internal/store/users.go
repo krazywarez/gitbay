@@ -11,6 +11,7 @@ type User struct {
 	ID       int64
 	Username string
 	IsAdmin  bool
+	Pending  bool // self-registered, email not yet verified
 }
 
 type SSHKey struct {
@@ -41,25 +42,27 @@ func (s *Store) CreateUser(username string, isAdmin bool) (int64, error) {
 
 func (s *Store) UserByUsername(name string) (User, error) {
 	var u User
-	var admin int
-	err := s.DB.QueryRow("SELECT id, username, is_admin FROM users WHERE username = ?", name).
-		Scan(&u.ID, &u.Username, &admin)
+	var admin, pending int
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending FROM users WHERE username = ?", name).
+		Scan(&u.ID, &u.Username, &admin, &pending)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
+	u.Pending = pending != 0
 	return u, err
 }
 
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
-	var admin int
-	err := s.DB.QueryRow("SELECT id, username, is_admin FROM users WHERE id = ?", id).
-		Scan(&u.ID, &u.Username, &admin)
+	var admin, pending int
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending FROM users WHERE id = ?", id).
+		Scan(&u.ID, &u.Username, &admin, &pending)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
+	u.Pending = pending != 0
 	return u, err
 }
 

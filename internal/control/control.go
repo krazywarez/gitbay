@@ -70,6 +70,10 @@ func Dispatch(c *Ctx, argv []string) int {
 	if c.Scope != "full" {
 		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands", c.Scope)
 	}
+	if c.User.Pending && !pendingAllowed(cmd.Path) {
+		return c.fail(protocol.ExitDenied,
+			"your account is not active yet: verify your email first (email verify <code>, or ask for the mail again with email add)")
+	}
 	// Strip the global --json flag wherever it appears.
 	args := rest[:0:0]
 	for _, a := range rest {
@@ -83,6 +87,12 @@ func Dispatch(c *Ctx, argv []string) int {
 		c.Stdin = emptyReader{}
 	}
 	return cmd.Run(c, args)
+}
+
+// pendingAllowed lists what an unverified self-registered account may do.
+func pendingAllowed(path []string) bool {
+	key := joinPath(path)
+	return key == "email verify" || key == "email add" || key == "whoami" || key == "help"
 }
 
 type emptyReader struct{}

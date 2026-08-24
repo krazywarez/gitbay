@@ -5,6 +5,7 @@ package sshd
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -95,11 +96,18 @@ func generateHostKey(path string) error {
 }
 
 // authenticate resolves the presented key to a registered account. The SSH
-// username is ignored; identity comes from the key alone.
+// username is ignored; identity comes from the key alone. When registration
+// is open or invite-based, unknown keys are admitted to run exactly one
+// command: register.
 func (s *Server) authenticate(_ ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Permissions, error) {
 	fp := ssh.FingerprintSHA256(pub)
 	key, err := s.st.SSHKeyByFingerprint(fp)
 	if err != nil {
+		if s.cfg.Registration.Mode != "closed" {
+			return &ssh.Permissions{Extensions: map[string]string{
+				"anon-key": base64.StdEncoding.EncodeToString(pub.Marshal()),
+			}}, nil
+		}
 		return nil, fmt.Errorf("unknown key %s", fp)
 	}
 	return &ssh.Permissions{Extensions: map[string]string{
@@ -177,6 +185,9 @@ func sendExit(ch ssh.Channel, code int) {
 
 func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) int {
 	ext := sconn.Permissions.Extensions
+	if blob := ext["anon-key"]; blob != "" {
+		return s.runAnonymous(ch, blob, cmdline)
+	}
 	userID, _ := strconv.ParseInt(ext["user-id"], 10, 64)
 	keyID, _ := strconv.ParseInt(ext["key-id"], 10, 64)
 	user, err := s.st.UserByID(userID)
@@ -186,6 +197,30 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 	}
 	_ = s.st.TouchSSHKey(keyID)
 	return Exec(s.cfg, s.st, user, ext["scope"], cmdline, ch, ch, ch.Stderr())
+}
+
+// runAnonymous handles a session from an unregistered key: the register
+// command and nothing else.
+func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
+	raw, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		return protocol.ExitFailure
+	}
+	pub, err := ssh.ParsePublicKey(raw)
+	if err != nil {
+		return protocol.ExitFailure
+	}
+	argv, err := protocol.Tokenize(cmdline)
+	if err != nil {
+		fmt.Fprintf(ch.Stderr(), "cannot parse command: %v\n", err)
+		return protocol.ExitUsage
+	}
+	if len(argv) == 0 || argv[0] != "register" {
+		fmt.Fprintf(ch.Stderr(), "this key is not registered here. Create an account with:\n  ssh <host> register --username <name> %s\n",
+			map[string]string{"open": "--email <address>", "invite": "--invite <code>"}[s.cfg.Registration.Mode])
+		return protocol.ExitDenied
+	}
+	return control.RunRegister(s.cfg, s.st, pub, argv, ch, ch.Stderr())
 }
 
 // Exec runs one SSH exec command line for an authenticated key. It is the
@@ -201,6 +236,10 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, cmdline st
 	if len(argv) > 0 {
 		switch argv[0] {
 		case "git-upload-pack", "git-receive-pack", "git-upload-archive":
+			if user.Pending {
+				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
+				return protocol.ExitDenied
+			}
 			return runGit(cfg, st, user, scope, argv, stdin, stdout, stderr)
 		}
 	}
