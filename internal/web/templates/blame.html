@@ -1,0 +1,25 @@
+{{define "title"}}blame: {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<div class="pathbar">
+  <span class="refchip">{{template "branchicon"}} {{.Ref}}</span>
+  <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}<strong>{{.Base}}</strong></span>
+  <span class="spacer"></span>
+  <span class="actions"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.Path}}">view</a> · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a></span>
+</div>
+{{if .Binary}}<p class="empty-note">binary file — blame unavailable</p>
+{{else}}
+<div class="blame">
+{{range .Hunks}}<div class="blamehunk">
+  <div class="blameinfo">
+    <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Summary}}</a></p>
+    <p class="meta"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code> <span title="{{.AuthorEmail}}">{{.AuthorName}}</span> · {{.Date}} {{template "sigbadge" .Sig}}</p>
+  </div>
+  <pre class="blamecode">{{range .Numbered}}<span class="lineno">{{.N}}</span>{{.Text}}
+{{end}}</pre>
+</div>
+{{else}}<p class="empty-note">empty file</p>{{end}}
+</div>
+{{if gt .Pages 1}}<p class="pager">page {{.Page}} of {{.Pages}}{{if gt .Page 1}} · <a href="?page={{sub .Page 1}}">← earlier lines</a>{{end}}{{if lt .Page .Pages}} · <a href="?page={{add .Page 1}}">later lines →</a>{{end}}</p>{{end}}
+{{end}}
+{{end}}

@@ -44,6 +44,8 @@ var funcs = template.FuncMap{
 		}
 		return s
 	},
+	"add": func(a, b int) int { return a + b },
+	"sub": func(a, b int) int { return a - b },
 	// when formats a stored RFC3339 timestamp for display; unparseable
 	// values pass through unchanged.
 	"when": func(s string) string {

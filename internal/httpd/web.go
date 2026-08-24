@@ -329,6 +329,88 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}{p, cs, base, filePath, binary, len(data), codeHTML})
 }
 
+// blamePageSize caps how many lines one blame page renders; blame is a
+// per-line subprocess cost, so large files paginate.
+const blamePageSize = 1000
+
+func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, r.PathValue("ref"))
+	if !ok {
+		return
+	}
+	p.Tab = "files"
+	filePath := strings.Trim(r.PathValue("path"), "/")
+	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, s.cfg.Limits.MaxBlobBytes)
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	total := bytes.Count(data, []byte("\n"))
+	if len(data) > 0 && !bytes.HasSuffix(data, []byte("\n")) {
+		total++
+	}
+	binary := gitutil.IsBinary(data)
+
+	type hunkView struct {
+		gitutil.BlameHunk
+		ShortSHA string
+		Date     string
+		Sig      sigView
+		Numbered []numberedLine
+	}
+	var hunks []hunkView
+	page, pages := 1, (total+blamePageSize-1)/blamePageSize
+	if pages == 0 {
+		pages = 1
+	}
+	if n, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && n >= 1 && n <= pages {
+		page = n
+	}
+	if !binary && total > 0 {
+		start := (page-1)*blamePageSize + 1
+		end := min(total, page*blamePageSize)
+		raw, err := gitutil.Blame(p.Dir, p.Ref, filePath, start, end)
+		if err != nil {
+			s.notFound(w, r)
+			return
+		}
+		sigs := map[string]sigView{}
+		for _, h := range raw {
+			v, ok := sigs[h.SHA]
+			if !ok {
+				v, _ = s.sigFor(p.Repo, p.Dir, h.SHA)
+				sigs[h.SHA] = v
+			}
+			hv := hunkView{BlameHunk: h, ShortSHA: h.SHA[:10],
+				Date: time.Unix(h.AuthorUnix, 0).UTC().Format("2006-01-02"), Sig: v}
+			for i, l := range h.Lines {
+				hv.Numbered = append(hv.Numbered, numberedLine{h.StartLine + i, l})
+			}
+			hunks = append(hunks, hv)
+		}
+	}
+	cs := crumbs(p, "blame", filePath)
+	base := ""
+	if len(cs) > 0 {
+		base = cs[len(cs)-1].Name
+		cs = cs[:len(cs)-1]
+	}
+	s.render(w, "blame.html", struct {
+		repoPage
+		Crumbs      []crumb
+		Base        string
+		Path        string
+		Binary      bool
+		Hunks       []hunkView
+		Page, Pages int
+	}{p, cs, base, filePath, binary, hunks, page, pages})
+}
+
+type numberedLine struct {
+	N    int
+	Text string
+}
+
 func highlight(filePath string, data []byte) template.HTML {
 	lexer := lexers.Match(filePath)
 	if lexer == nil {

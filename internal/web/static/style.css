@@ -495,6 +495,50 @@ footer p { margin: 0; }
 footer a { color: var(--muted); text-decoration: underline; }
 footer a:hover { color: var(--accent); }
 
+/* blame */
+.blame {
+  border: 1px solid var(--line);
+  border-radius: var(--rad-2, 6px);
+  overflow: hidden;
+}
+.blamehunk {
+  display: flex;
+  gap: var(--sp-3);
+  border-top: 1px solid var(--line);
+  align-items: flex-start;
+}
+.blamehunk:first-child { border-top: none; }
+.blameinfo {
+  flex: none;
+  width: 17rem;
+  padding: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+.blameinfo .subject {
+  margin: 0;
+  font-size: var(--fs-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blameinfo .meta { margin: 0; font-size: var(--fs-1); color: var(--muted); }
+.blamecode {
+  flex: 1;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) 0;
+  overflow-x: auto;
+  border-left: 1px solid var(--line);
+  align-self: stretch;
+}
+.lineno {
+  display: inline-block;
+  min-width: 3.5em;
+  padding-right: 1em;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+}
+
 /* mobile */
 @media (max-width: 40rem) {
   header { padding: var(--sp-3) var(--sp-4); }
@@ -502,6 +546,9 @@ footer a:hover { color: var(--accent); }
   .thread { margin-left: var(--sp-3); }
   table.tree td.mode { display: none; }
   .readme, .code { padding: var(--sp-3); }
+  .blamehunk { flex-direction: column; gap: 0; }
+  .blameinfo { width: auto; }
+  .blamecode { border-left: none; padding-left: var(--sp-3); width: 100%; }
   .cardhead {
     margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3)) var(--sp-3);
     padding: var(--sp-2) var(--sp-3);

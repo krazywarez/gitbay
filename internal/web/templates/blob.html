@@ -5,7 +5,7 @@
   <span class="refchip">{{template "branchicon"}} {{.Ref}}</span>
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}<strong>{{.Base}}</strong></span>
   <span class="spacer"></span>
-  <span class="actions"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">edit</a>{{end}}</span>
+  <span class="actions">{{if not .Binary}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blame/{{.Ref}}/{{.Path}}">blame</a> · {{end}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">edit</a>{{end}}</span>
 </div>
 {{if .Binary}}<p class="empty-note">binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
 {{else}}<div class="code">{{.CodeHTML}}</div>{{end}}
