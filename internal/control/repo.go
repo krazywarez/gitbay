@@ -60,6 +60,23 @@ func init() {
 		Summary: "add topics: repo topics add <owner/name> <topic>...", Run: runTopicsAdd})
 	register(Command{Path: []string{"repo", "topics", "remove"},
 		Summary: "remove topics: repo topics remove <owner/name> <topic>...", Run: runTopicsRemove})
+	register(Command{Path: []string{"repo", "search"},
+		Summary: "find repositories by name, description, or topic: repo search <query>", ReadOnly: true, Run: runRepoSearch})
+	register(Command{Path: []string{"repo", "grep"},
+		Summary: "search file contents: repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
+}
+
+const (
+	minQueryLen    = 2
+	maxQueryLen    = 200
+	maxGrepMatches = 200
+)
+
+func validQuery(q string) error {
+	if len(q) < minQueryLen || len(q) > maxQueryLen {
+		return fmt.Errorf("query must be %d to %d characters", minQueryLen, maxQueryLen)
+	}
+	return nil
 }
 
 // refuseArchived blocks content writes (pushes are refused in the transport
@@ -554,6 +571,122 @@ func editTopics(c *Ctx, args []string, add bool) int {
 	}
 	return c.emit(now, func(w io.Writer) {
 		fmt.Fprintf(w, "topics on %s: %s\n", repo.Path(), strings.Join(now, ", "))
+	})
+}
+
+// runRepoSearch matches the query against name, owner/name, description,
+// and topics of every repository the caller can see.
+func runRepoSearch(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo search <query>")
+	}
+	if err := validQuery(args[0]); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	q := strings.ToLower(args[0])
+
+	public, err := c.Store.ListPublicRepos()
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	own, err := c.Store.ListReposForUser(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	seen := map[int64]bool{}
+	type out struct {
+		Path        string   `json:"path"`
+		Visibility  string   `json:"visibility"`
+		Description string   `json:"description,omitempty"`
+		Topics      []string `json:"topics,omitempty"`
+	}
+	var ds []out
+	for _, r := range append(public, own...) {
+		if seen[r.ID] {
+			continue
+		}
+		seen[r.ID] = true
+		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
+		topics, _ := c.Store.ListTopics(r.ID)
+		if !matchesRepo(q, r, desc, topics) {
+			continue
+		}
+		ds = append(ds, out{r.Path(), r.Visibility, desc, topics})
+	}
+	return c.emit(ds, func(w io.Writer) {
+		for _, d := range ds {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Path, d.Visibility, d.Description)
+		}
+	})
+}
+
+func matchesRepo(q string, r store.Repo, desc string, topics []string) bool {
+	if strings.Contains(strings.ToLower(r.Path()), q) ||
+		strings.Contains(strings.ToLower(desc), q) {
+		return true
+	}
+	for _, t := range topics {
+		if strings.Contains(t, q) {
+			return true
+		}
+	}
+	return false
+}
+
+func runRepoGrep(c *Ctx, args []string) int {
+	var path, query, ref string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--ref":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--ref requires a value")
+			}
+			ref = args[i+1]
+			i++
+		default:
+			if path == "" {
+				path = args[i]
+			} else if query == "" {
+				query = args[i]
+			} else {
+				return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
+			}
+		}
+	}
+	if path == "" || query == "" {
+		return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
+	}
+	if err := validQuery(query); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	repo, code := resolveRepo(c, path, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if _, err := gitutil.ResolveRef(dir, ref); err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", ref, repo.Path())
+	}
+	matches, err := gitutil.Grep(dir, ref, query, maxGrepMatches)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	type out struct {
+		Path string `json:"path"`
+		Line int    `json:"line"`
+		Text string `json:"text"`
+	}
+	var ds []out
+	for _, m := range matches {
+		ds = append(ds, out{m.Path, m.Line, m.Text})
+	}
+	return c.emit(ds, func(w io.Writer) {
+		for _, d := range ds {
+			fmt.Fprintf(w, "%s:%d:%s\n", d.Path, d.Line, d.Text)
+		}
 	})
 }
 

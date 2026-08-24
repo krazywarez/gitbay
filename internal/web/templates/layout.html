@@ -31,6 +31,7 @@
   <a {{if eq .Tab "refs"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
   <a {{if eq .Tab "issues"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
   <a {{if eq .Tab "merge requests"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
+  <a {{if eq .Tab "search"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search">search</a>
   <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">archive</a>
 </nav>
 </div>

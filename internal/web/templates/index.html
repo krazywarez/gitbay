@@ -2,6 +2,9 @@
 {{define "content"}}
 <div class="headrow">
 <h1>repositories</h1>
+<form method="get" action="/" class="searchform compact">
+  <input type="search" name="q" value="{{.Query}}" placeholder="filter by name, description, topic">
+</form>
 <span class="spacer"></span>
 {{if .Viewer}}<p class="toolbar">logged in as {{.Viewer}} · <a href="/new">new repository</a> ·
 <form method="post" action="/logout" class="inline"><button type="submit" class="linklike">logout</button></form></p>{{end}}

@@ -96,6 +96,8 @@ gitbay repo settings protect you/project main       # no force-push, no delete
 gitbay repo settings require-signed you/project on  # every commit must verify
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
+gitbay repo search forge                            # find repos by name/description/topic
+gitbay repo grep you/project "some string"          # literal git grep over the default branch
 gitbay repo archive you/project                     # read-only: pushes and issue/MR
 gitbay repo unarchive you/project                   #   writes refused, browsing intact
 #+end_src

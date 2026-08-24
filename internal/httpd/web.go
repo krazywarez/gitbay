@@ -103,12 +103,40 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	s.render(w, "index.html", struct {
 		Site   string
 		Viewer string
+		Query  string
 		Repos  []describedRepo
 		Mine   []describedRepo
-	}{s.siteName(), viewer.Username, s.describeAll(repos), s.describeAll(mine)})
+	}{s.siteName(), viewer.Username, q,
+		s.filterRepos(q, s.describeAll(repos)), s.filterRepos(q, s.describeAll(mine))})
+}
+
+// filterRepos keeps repos whose path, description, or topics contain the
+// query, case-insensitively. An empty query keeps everything.
+func (s *Server) filterRepos(q string, repos []describedRepo) []describedRepo {
+	if q == "" {
+		return repos
+	}
+	q = strings.ToLower(q)
+	var out []describedRepo
+	for _, d := range repos {
+		if strings.Contains(strings.ToLower(d.Path()), q) ||
+			strings.Contains(strings.ToLower(d.Desc), q) {
+			out = append(out, d)
+			continue
+		}
+		topics, _ := s.st.ListTopics(d.ID)
+		for _, t := range topics {
+			if strings.Contains(t, q) {
+				out = append(out, d)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // repoPage is the shared context for repo-scoped pages.
@@ -329,6 +357,66 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}{p, cs, base, filePath, binary, len(data), codeHTML})
 }
 
+// search runs a bounded literal git grep over the repo's default branch.
+func (s *Server) search(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	p.Tab = "search"
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	type matchView struct {
+		Path     string
+		Line     int
+		TextHTML template.HTML
+	}
+	var matches []matchView
+	var queryErr string
+	if q != "" {
+		if len(q) < 2 || len(q) > 200 {
+			queryErr = "query must be 2 to 200 characters"
+		} else if _, err := gitutil.ResolveRef(p.Dir, p.Ref); err == nil {
+			raw, err := gitutil.Grep(p.Dir, p.Ref, q, 200)
+			if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			for _, m := range raw {
+				matches = append(matches, matchView{m.Path, m.Line, markMatch(m.Text, q)})
+			}
+		}
+	}
+	s.render(w, "search.html", struct {
+		repoPage
+		Query    string
+		QueryErr string
+		Matches  []matchView
+		Capped   bool
+	}{p, q, queryErr, matches, len(matches) == 200})
+}
+
+// markMatch escapes a matched line and wraps case-insensitive occurrences
+// of the query in <mark>.
+func markMatch(text, q string) template.HTML {
+	lower, lq := strings.ToLower(text), strings.ToLower(q)
+	var b strings.Builder
+	pos := 0
+	for {
+		i := strings.Index(lower[pos:], lq)
+		if i < 0 {
+			break
+		}
+		i += pos
+		b.WriteString(template.HTMLEscapeString(text[pos:i]))
+		b.WriteString("<mark>")
+		b.WriteString(template.HTMLEscapeString(text[i : i+len(q)]))
+		b.WriteString("</mark>")
+		pos = i + len(q)
+	}
+	b.WriteString(template.HTMLEscapeString(text[pos:]))
+	return template.HTML(b.String())
+}
+
 // blamePageSize caps how many lines one blame page renders; blame is a
 // per-line subprocess cost, so large files paginate.
 const blamePageSize = 1000
@@ -417,7 +505,8 @@ func highlight(filePath string, data []byte) template.HTML {
 		lexer = lexers.Fallback
 	}
 	style := styles.Get("friendly")
-	formatter := html.New(html.WithLineNumbers(true), html.LineNumbersInTable(false))
+	formatter := html.New(html.WithLineNumbers(true), html.LineNumbersInTable(false),
+		html.WithLinkableLineNumbers(true, "L"))
 	iterator, err := lexer.Tokenise(nil, string(data))
 	if err != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")

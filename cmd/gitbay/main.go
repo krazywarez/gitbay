@@ -216,6 +216,8 @@ func repoCmd() *cobra.Command {
 		pass("transfer", "move a repository to another owner: <new-owner>", passOpts{server: []string{"repo", "transfer"}, needsRepo: true}),
 		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
 		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
+		pass("search", "find repositories by name, description, or topic: <query>", passOpts{server: []string{"repo", "search"}}),
+		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
 		pass("archive", "archive a repository (read-only)", passOpts{server: []string{"repo", "archive"}, needsRepo: true}),
 		pass("unarchive", "unarchive a repository", passOpts{server: []string{"repo", "unarchive"}, needsRepo: true}),
 		local("clone", "clone via ssh: gitbay repo clone <owner/name> [dir]", cmdRepoClone),

@@ -578,6 +578,36 @@ footer p { margin: 0; }
 footer a { color: var(--muted); text-decoration: underline; }
 footer a:hover { color: var(--accent); }
 
+/* search */
+form.searchform {
+  display: flex;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0 var(--sp-4);
+}
+form.searchform input[type="search"] { flex: 1; max-width: 32rem; }
+form.searchform.compact { margin: 0; }
+form.searchform.compact input[type="search"] {
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-2);
+  min-width: 18rem;
+}
+ul.matchlist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
+ul.matchlist li { margin-bottom: var(--sp-3); }
+ul.matchlist .matchpath { font-family: var(--mono); font-size: var(--fs-1); }
+pre.matchline {
+  background: var(--code-bg);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-md);
+  padding: var(--sp-1) var(--sp-3);
+  margin: var(--sp-1) 0 0;
+  overflow-x: auto;
+}
+pre.matchline mark {
+  background: color-mix(in srgb, var(--warn) 25%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
 /* blame */
 .blame {
   border: 1px solid var(--line);
