@@ -127,6 +127,26 @@ gitbayd admin invite --email b@example.org       # mails a code; prints it if no
 records which. Verified emails are what make commit signatures
 meaningful — an unverified address never produces a =verified= badge.
 
+* Audit and account control
+
+The audit log is the security feed (events are the product feed): every
+successful mutating command with its argv and source credential (SSH key
+fingerprint or API), registrations, admin actions, force-pushes, and
+auth failures/throttling. Secrets never appear — they travel on stdin,
+never in argv.
+
+#+begin_src sh
+gitbayd admin audit [--limit n]      # host-local
+ssh git@<host> audit [--limit n]     # instance admins, SSH only
+gitbayd admin user disable <name>    # suspend: SSH, web, API all refused;
+gitbayd admin user enable <name>     #   sessions dropped, nothing deleted
+#+end_src
+
+=limits.ssh_auth_rate= (10) throttles per-IP authentication *failures*
+per minute — successful auths never count and clear the slate.
+=limits.max_pack_bytes= is enforced as =receive.maxInputSize= on every
+push.
+
 * Maintenance
 
 #+begin_src sh

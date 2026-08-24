@@ -245,7 +245,7 @@ func adminCmd() *cobra.Command {
 		Short: "host-local administration",
 	}
 	userCmd := &cobra.Command{Use: "user", Short: "manage users"}
-	userCmd.AddCommand(adminUserCreateCmd())
+	userCmd.AddCommand(adminUserCreateCmd(), adminUserDisableCmd(), adminUserEnableCmd())
 	emailCmd := &cobra.Command{Use: "email", Short: "manage user emails"}
 	emailCmd.AddCommand(adminEmailVerifyCmd())
 	admin.AddCommand(
@@ -255,6 +255,7 @@ func adminCmd() *cobra.Command {
 		backupCmd(),
 		gcCmd(),
 		statsCmd(),
+		adminAuditCmd(),
 	)
 	return admin
 }
@@ -299,6 +300,7 @@ func adminInviteCmd() *cobra.Command {
 				if err := mail.Send(cfg, email, "your invite to "+host, body); err != nil {
 					return fmt.Errorf("invite stored but mail failed: %w (code: %s)", err, code)
 				}
+				st.Audit(0, "admin invite.issued", map[string]any{"email": email})
 				fmt.Printf("invite emailed to %s\n", email)
 			} else {
 				fmt.Printf("invite for %s (no SMTP configured; deliver it yourself):\n%s\n", email, code)
@@ -360,6 +362,7 @@ func adminUserCreateCmd() *cobra.Command {
 				}
 				fmt.Println("key", fp)
 			}
+			st.Audit(0, "admin user.created", map[string]any{"user": username})
 			fmt.Println("created user", username)
 			return nil
 		},
@@ -391,8 +394,10 @@ func adminEmailVerifyCmd() *cobra.Command {
 				return fmt.Errorf("user %s: %w", args[0], err)
 			}
 			if err := st.VerifyEmail(u.ID, args[1], "admin"); err != nil {
+				st.Audit(0, "admin email.verify_failed", map[string]any{"user": args[0], "email": args[1]})
 				return fmt.Errorf("no address %s on user %s", args[1], args[0])
 			}
+			st.Audit(0, "admin email.verified", map[string]any{"user": args[0], "email": args[1]})
 			fmt.Println("verified", args[1])
 			return nil
 		},

@@ -31,12 +31,16 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 
 // Transport streams one git transport service (upload-pack, receive-pack,
 // upload-archive). extraEnv entries are appended to the process environment;
-// hooks read the GITBAY_* variables from it.
-func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string) error {
+// hooks read the GITBAY_* variables from it. maxPack caps incoming pack
+// bytes on receive-pack (0 = unlimited).
+func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string, maxPack int64) error {
 	var args []string
 	switch service {
 	case "git-upload-pack", "git-receive-pack", "git-upload-archive":
-		args = []string{strings.TrimPrefix(service, "git-"), repoPath}
+		if service == "git-receive-pack" && maxPack > 0 {
+			args = []string{"-c", fmt.Sprintf("receive.maxInputSize=%d", maxPack)}
+		}
+		args = append(args, strings.TrimPrefix(service, "git-"), repoPath)
 	default:
 		return fmt.Errorf("unknown service %q", service)
 	}

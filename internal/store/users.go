@@ -12,6 +12,7 @@ type User struct {
 	Username string
 	IsAdmin  bool
 	Pending  bool // self-registered, email not yet verified
+	Disabled bool // administratively suspended
 }
 
 type SSHKey struct {
@@ -47,27 +48,50 @@ func (s *Store) CreateUser(username string, isAdmin bool) (int64, error) {
 
 func (s *Store) UserByUsername(name string) (User, error) {
 	var u User
-	var admin, pending int
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending FROM users WHERE username = ?", name).
-		Scan(&u.ID, &u.Username, &admin, &pending)
+	var admin, pending, disabled int
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled FROM users WHERE username = ?", name).
+		Scan(&u.ID, &u.Username, &admin, &pending, &disabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
 	u.Pending = pending != 0
+	u.Disabled = disabled != 0
 	return u, err
+}
+
+// SetUserDisabled suspends or restores an account. Disabling also drops
+// the user's web sessions; their keys and tokens stay registered but are
+// refused at every entry point until re-enabled.
+func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
+	v := 0
+	if disabled {
+		v = 1
+	}
+	res, err := s.DB.Exec("UPDATE users SET disabled = ? WHERE id = ?", v, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	if disabled {
+		_, err = s.DB.Exec("DELETE FROM web_sessions WHERE user_id = ?", userID)
+	}
+	return err
 }
 
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
-	var admin, pending int
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending FROM users WHERE id = ?", id).
-		Scan(&u.ID, &u.Username, &admin, &pending)
+	var admin, pending, disabled int
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled FROM users WHERE id = ?", id).
+		Scan(&u.ID, &u.Username, &admin, &pending, &disabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
 	u.Pending = pending != 0
+	u.Disabled = disabled != 0
 	return u, err
 }
 

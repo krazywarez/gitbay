@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -28,13 +29,14 @@ import (
 )
 
 type Server struct {
-	cfg   config.Config
-	st    *store.Store
-	sshCfg *ssh.ServerConfig
+	cfg         config.Config
+	st          *store.Store
+	sshCfg      *ssh.ServerConfig
+	authLimiter *rateLimiter
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
-	s := &Server{cfg: cfg, st: st}
+	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute)}
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
@@ -99,7 +101,15 @@ func generateHostKey(path string) error {
 // username is ignored; identity comes from the key alone. When registration
 // is open or invite-based, unknown keys are admitted to run exactly one
 // command: register.
-func (s *Server) authenticate(_ ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Permissions, error) {
+func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Permissions, error) {
+	ip := remoteIP(meta.RemoteAddr())
+	if !s.authLimiter.allow(ip) {
+		// One audit entry per throttled window, not per rejected attempt.
+		if s.authLimiter.firstThrottle(ip) {
+			s.st.Audit(0, "auth.throttled", map[string]any{"ip": ip, "rate": s.cfg.Limits.SSHAuthRate})
+		}
+		return nil, fmt.Errorf("too many authentication attempts; try again shortly")
+	}
 	fp := ssh.FingerprintSHA256(pub)
 	key, err := s.st.SSHKeyByFingerprint(fp)
 	if err != nil {
@@ -108,11 +118,15 @@ func (s *Server) authenticate(_ ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Permi
 				"anon-key": base64.StdEncoding.EncodeToString(pub.Marshal()),
 			}}, nil
 		}
+		s.authLimiter.fail(ip)
+		s.st.Audit(0, "auth.failed", map[string]any{"ip": ip, "fingerprint": fp})
 		return nil, fmt.Errorf("unknown key %s", fp)
 	}
+	s.authLimiter.success(ip)
 	return &ssh.Permissions{Extensions: map[string]string{
 		"user-id": strconv.FormatInt(key.UserID, 10),
 		"key-id":  strconv.FormatInt(key.ID, 10),
+		"key-fp":  fp,
 		"scope":   key.Scope,
 	}}, nil
 }
@@ -196,7 +210,7 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, ext["scope"], cmdline, ch, ch, ch.Stderr())
+	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr())
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -226,8 +240,12 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell).
-func Exec(cfg config.Config, st *store.Store, user store.User, scope, cmdline string,
+func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer) int {
+	if user.Disabled {
+		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
+		return protocol.ExitDenied
+	}
 	argv, err := protocol.Tokenize(cmdline)
 	if err != nil {
 		fmt.Fprintf(stderr, "cannot parse command: %v\n", err)
@@ -246,6 +264,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, cmdline st
 	ctx := &control.Ctx{
 		User:   user,
 		Scope:  scope,
+		Source: source,
 		Store:  st,
 		Cfg:    cfg,
 		Stdin:  stdin,
@@ -315,7 +334,7 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		hookd.EnvRepoID + "=" + strconv.FormatInt(repo.ID, 10),
 		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env); err != nil {
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, cfg.Limits.MaxPackBytes); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK

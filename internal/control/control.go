@@ -30,6 +30,9 @@ type Ctx struct {
 	ViaAPI bool
 	// ReadOnly is set for read-scoped API tokens.
 	ReadOnly bool
+	// Source identifies the credential behind this session for the audit
+	// log: an SSH key fingerprint, or "api" for token requests.
+	Source string
 }
 
 type Command struct {
@@ -100,7 +103,17 @@ func Dispatch(c *Ctx, argv []string) int {
 	if !cmd.ReadsStdin {
 		c.Stdin = emptyReader{}
 	}
-	return cmd.Run(c, args)
+	code := cmd.Run(c, args)
+	// Every successful mutating command lands in the audit log. Argv is
+	// safe to record by construction: secrets travel on stdin, never as
+	// arguments.
+	if code == protocol.ExitOK && !cmd.ReadOnly {
+		c.Store.Audit(c.User.ID, "cmd "+joinPath(cmd.Path), map[string]any{
+			"argv":   args,
+			"source": c.Source,
+		})
+	}
+	return code
 }
 
 // pendingAllowed lists what an unverified self-registered account may do.

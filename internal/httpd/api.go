@@ -50,6 +50,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:     user,
+		Source:   "api",
 		Scope:    "full", // key scopes are an SSH concept; token scope is below
 		Store:    s.st,
 		Cfg:      s.cfg,

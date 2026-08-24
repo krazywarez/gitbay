@@ -161,6 +161,7 @@ func RegisterAccount(cfg config.Config, st *store.Store, pub ssh.PublicKey, user
 			}
 			return "", err.Error(), protocol.ExitUsage
 		}
+		st.Audit(0, "auth.registered", map[string]any{"user": username, "mode": "invite", "fingerprint": fp})
 		return fmt.Sprintf("welcome, %s — your account is active\n", username), "", protocol.ExitOK
 
 	case "open":
@@ -174,6 +175,7 @@ func RegisterAccount(cfg config.Config, st *store.Store, pub ssh.PublicKey, user
 		if err := sendVerification(cfg, st, uid, email); err != nil {
 			return "", "sending verification mail: " + err.Error(), protocol.ExitFailure
 		}
+		st.Audit(uid, "auth.registered", map[string]any{"user": username, "mode": "open", "fingerprint": fp})
 		return fmt.Sprintf(
 			"account %s created. A verification code was sent to %s.\nActivate with:\n\n    ssh git@%s email verify <code>\n",
 			username, email, siteHost(cfg)), "", protocol.ExitOK

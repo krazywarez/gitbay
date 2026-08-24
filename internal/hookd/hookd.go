@@ -185,6 +185,10 @@ func (s *Server) postReceive(req Request) {
 		}
 		// Any branch/tag update schedules the push mirrors.
 		s.st.MarkMirrorsDirty(req.RepoID, "push")
+		if u.IsForce {
+			s.st.Audit(req.UserID, "push.forced", map[string]any{
+				"repo": req.RepoID, "ref": u.Ref, "old": u.Old, "new": u.New})
+		}
 		mrs, err := s.st.OpenMRsBySource(req.RepoID, branch)
 		if err != nil {
 			slog.Error("post-receive: listing MRs", "err", err)
