@@ -218,8 +218,8 @@ func (s *Store) RenameOrg(orgID int64, newName string) error {
 
 // Profile is the presentational half of a user or org.
 type Profile struct {
-	Description string
-	Website     string
+	Description string `json:"description,omitempty"`
+	Website     string `json:"website,omitempty"`
 }
 
 // OwnerProfile reads the profile for kind "user" or "org".
