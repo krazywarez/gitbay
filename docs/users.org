@@ -1,0 +1,190 @@
+#+title: gitbay user guide
+
+Everything here works from stock OpenSSH — replace =gitbay= with
+=ssh git@<host>= in any command and it behaves identically. The CLI adds
+convenience (instance profiles, repo inference, =$EDITOR=), nothing more.
+=ssh git@<host> help= lists every command the server knows.
+
+* Getting an account
+
+How you join depends on the instance's registration mode:
+
+- closed :: an admin creates your account on the host and registers your
+  first SSH key. Nothing for you to do but hand over your public key.
+- invite :: you receive a single-use code by email. With the SSH key you
+  want to use:
+  #+begin_src sh
+  ssh git@<host> register --username you --invite <code>
+  #+end_src
+  Your account is active immediately; the invited address is your
+  verified email.
+- open ::
+  #+begin_src sh
+  ssh git@<host> register --username you --email you@example.org
+  #+end_src
+  A verification code arrives by mail. Until you run
+  =ssh git@<host> email verify <code>=, the account is pending: you can
+  run =whoami= and the email commands, and nothing else — no git, no
+  repos.
+
+* SSH keys
+
+Your key is your identity; there are no passwords anywhere. The SSH
+username is always =git= — the key alone determines who you are.
+
+#+begin_src sh
+gitbay auth keys list
+gitbay auth keys add --scope git < ~/.ssh/ci_key.pub   # key on stdin
+gitbay auth keys remove SHA256:...
+#+end_src
+
+Scopes: =full= (default; git plus every control command) or =git= (git
+transport only — right for CI and automation keys, which then cannot
+touch issues, settings, or your account).
+
+A key belongs to exactly one account instance-wide. Registering a key
+someone else already holds is refused without telling you whose it is.
+
+* Verified commits
+
+The commit badge is driven by the *author* email and the signing key:
+=verified= means the signature is valid, the key is registered to an
+account, and the author email is a verified address on that account.
+
+For OpenPGP signing (git's default):
+#+begin_src sh
+gpg --armor --export you@example.org | gitbay auth pgp add
+#+end_src
+
+For SSH signing (=git config gpg.format ssh=): sign with any key
+registered on your account; your verified addresses act as the principal
+set. No separate registration step.
+
+Add and verify additional addresses with =email add <address>= /
+=email verify <code>= (requires the instance to have SMTP; otherwise an
+admin can assert an address for you).
+
+The states you will see, in decreasing order of trust: =verified=,
+=signed_unknown_key= (valid signature, key not registered here — register
+it and history upgrades retroactively), =signed_email_mismatch= (real
+key, author line claims someone else), =signed_key_expired= /
+=signed_key_revoked=, =bad_signature=, =unsigned=. Server-created commits
+(web edits, merge commits) are always =unsigned= — the server holds no
+signing key on principle.
+
+* Repositories
+
+#+begin_src sh
+gitbay repo create you/project [--private]
+gitbay repo clone you/project
+gitbay repo list
+gitbay repo show you/project
+gitbay repo log you/project --limit 20      # commits with signature states
+gitbay repo fork other/project [--name mine]
+gitbay repo delete you/project --yes
+#+end_src
+
+Pushing is SSH-only. Public repositories are anonymously readable over
+HTTPS (and =git://= where enabled); private repositories exist only over
+SSH and answer "not found" to everyone without access.
+
+Access and settings (owner or =admin= grant):
+#+begin_src sh
+gitbay repo access grant you/project alice write    # read | write | admin
+gitbay repo access revoke you/project alice
+gitbay repo settings protect you/project main       # no force-push, no delete
+gitbay repo settings require-signed you/project on  # every commit must verify
+gitbay repo settings git-daemon you/project on      # expose over git://
+#+end_src
+
+Import from another forge (git data only — issues and PRs do not
+transfer):
+#+begin_src sh
+gitbay repo import you/mirror --from https://github.com/you/repo.git \
+    [--private] [--token-stdin]        # token on stdin, never in the URL
+#+end_src
+
+* Organizations
+
+Orgs share the owner namespace with users and own repositories at
+=org/repo=. Members get write on all org repos; org admins get repo
+admin, create repos under the org, and manage membership.
+
+#+begin_src sh
+gitbay org create krz
+gitbay org members add krz alice [--role admin]
+gitbay org show krz
+gitbay org rename krz newname     # clone URLs change
+gitbay org delete krz --yes       # only when it owns no repositories
+#+end_src
+
+* Issues
+
+Anyone who can read a repository can file and comment. Closing/reopening
+is for the author or anyone with write; labels and assignees need write.
+
+#+begin_src sh
+gitbay issue create --title "it breaks" [--body "..." | --file -]
+gitbay issue list [--state open|closed|all]
+gitbay issue show 4
+gitbay issue comment 4 --message "same here"
+gitbay issue close 4 / reopen 4
+gitbay issue label 4 --add bug --remove wontfix
+gitbay issue assign 4 --add alice
+#+end_src
+
+Inside a clone, the repository is inferred from the =origin= remote —
+that is why no =owner/name= appears above. Anywhere else, pass it as the
+first argument. Long text: =--body= inline, =--file -= from stdin, or
+neither on a terminal and =$EDITOR= opens.
+
+* Merge requests
+
+#+begin_src sh
+gitbay mr create --source feature --target main --title "add thing"
+gitbay mr create other/upstream --source you/fork:feature --target main --title "..."
+gitbay mr list / show 4 / diff 4
+gitbay mr checkout 4              # local branch mr/4 from the MR head
+gitbay mr review 4 --approve      # or --request-changes / --comment
+gitbay mr merge 4 [--strategy ff|merge|squash|rebase]
+gitbay mr close 4
+#+end_src
+
+Semantics worth knowing:
+
+- the MR head lives in the *target* repository as
+  =refs/merge-requests/N/head= (fetchable by any reader), so an MR
+  survives deletion of its source branch or fork.
+- force-pushing the source updates the MR and marks existing reviews
+  stale.
+- default strategy: fast-forward when possible, else a merge commit.
+  Squash makes one commit authored by the MR author, committed by the
+  merger. Rebase replays a linear range preserving authors; it refuses
+  ranges containing merge commits, and when fast-forward is possible it
+  *is* one (original commits and signatures land untouched).
+- on =require_signed_commits= branches only fast-forwards of fully
+  verified commits merge; everything server-created is refused with
+  instructions to rebase locally.
+
+* Scripting
+
+Every read command takes =--json= and emits one envelope:
+={"protocol_version": 1, "data": ...}=. stdout is data, stderr is
+messages. Exit codes are stable: 0 ok, 1 failure, 2 usage, 3 not found,
+4 denied, 5 server/protocol error. Nothing ever prompts; destructive
+commands take =--yes=.
+
+For HTTP automation see =docs/api.org=.
+
+* CLI setup
+
+#+begin_src sh
+gitbay remote add myforge forge.example.org [--port n] [--user u] --default
+gitbay remote list
+gitbay init [name] [--private]   # git init + repo create + origin, in one step
+#+end_src
+
+Configuration lives at =~/.config/gitbay/config.toml=. The CLI shells
+out to your real =ssh=, so =~/.ssh/config=, the agent, and hardware keys
+all apply. Man pages: =gitbay man --dir <dir>=; completions:
+=gitbay completion bash|zsh|fish=.

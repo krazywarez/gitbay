@@ -100,6 +100,12 @@ Every read command takes =--json=; stdout is data, stderr is messages;
 exit codes are stable (0 ok, 2 usage, 3 not found, 4 denied). Man pages
 via =gitbay man=, completions via =gitbay completion <shell>=.
 
+* Documentation
+
+- [[file:docs/users.org][user guide]] — accounts, keys, verified commits, repos, issues, MRs, scripting
+- [[file:docs/admin.org][admin guide]] — install, full configuration reference, backup/restore, upgrades
+- [[file:docs/api.org][API and webhooks]] — the JSON API contract, tokens, webhook payloads and HMAC
+
 * Development
 
 #+begin_src sh
