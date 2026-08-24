@@ -1,15 +1,18 @@
 {{define "title"}}log · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
-<table class="log">
-{{range .Commits}}<tr>
-  <td><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code></td>
-  <td>{{.Subject}}</td>
-  <td>{{.AuthorName}} &lt;{{.AuthorEmail}}&gt;</td>
-  <td>{{.Date}}</td>
-  <td>{{template "sigbadge" .Sig}}</td>
-</tr>
-{{end}}
-</table>
-{{if .NextSHA}}<p><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.NextSHA}}">older →</a></p>{{end}}
+<ul class="loglist">
+{{range .Commits}}<li>
+  <div class="commitmain">
+    <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a></p>
+    <p class="meta"><span title="{{.AuthorEmail}}">{{.AuthorName}}</span> · {{.Date}}</p>
+  </div>
+  <div class="commitside">
+    {{template "sigbadge" .Sig}}
+    <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code>
+  </div>
+</li>
+{{else}}<li class="empty">no commits on {{.Ref}} yet</li>{{end}}
+</ul>
+{{if .NextSHA}}<p class="pager"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.NextSHA}}">older →</a></p>{{end}}
 {{end}}

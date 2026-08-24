@@ -150,12 +150,87 @@ nav.tabs a {
 nav.tabs a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
 nav.tabs a.active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 550; }
 
-p.clone code {
+.clone { color: var(--muted); font-size: var(--fs-2); }
+.clone code {
   background: var(--surface);
   border: 1px solid var(--faint);
   padding: 0.15rem 0.5rem;
   border-radius: var(--r-sm);
 }
+
+/* path bar on tree and blob pages */
+.pathbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin: var(--sp-3) 0;
+  font-size: var(--fs-2);
+}
+.pathbar .spacer { flex: 1; }
+.refchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--surface);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-md);
+  padding: 0.1rem 0.55rem;
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  color: var(--fg);
+}
+.pathbar .crumbs strong { color: var(--fg); }
+
+/* file table */
+table.tree td.name { width: 100%; }
+table.tree td.name a { color: var(--fg); }
+table.tree td.name a:hover { color: var(--accent); }
+table.tree td.size { text-align: right; }
+table.tree td.empty, table.refs td.empty, li.empty, ul.loglist li.empty { color: var(--muted); }
+
+/* refs page */
+table.refs td.name { width: 100%; }
+table.refs td.sha { color: var(--muted); }
+
+/* card header (README) */
+.cardhead {
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  color: var(--muted);
+  border-bottom: 1px solid var(--faint);
+  margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-5)) var(--sp-4);
+  padding: var(--sp-2) var(--sp-5);
+  background: var(--surface);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+
+/* log */
+ul.loglist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
+ul.loglist li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--faint);
+}
+ul.loglist .commitmain { flex: 1; min-width: 0; }
+ul.loglist p { margin: 0; }
+ul.loglist .subject a { color: var(--fg); font-weight: 550; }
+ul.loglist .subject a:hover { color: var(--accent); }
+ul.loglist .commitside {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+p.pager { margin-top: var(--sp-4); }
+
+/* commit page */
+.commithead p { margin: var(--sp-1) 0; }
+.commithead h2 { margin-bottom: var(--sp-1); }
+code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
+.empty-note { color: var(--muted); }
 .crumbs { color: var(--muted); font-size: var(--fs-2); }
 .desc, td.desc { color: var(--muted); }
 .error { color: var(--bad); }

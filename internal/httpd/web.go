@@ -243,6 +243,7 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 			Crumbs     []crumb
 			Prefix     string
 			Entries    []gitutil.TreeEntry
+			ReadmeName string
 			ReadmeHTML template.HTML
 		}{repoPage: p})
 		return
@@ -258,9 +259,10 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	}
 
 	var readmeHTML template.HTML
-	if name := pickReadme(entries); name != "" {
-		if raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+name, maxRenderBytes); err == nil {
-			readmeHTML = renderReadme(name, raw)
+	readmeName := pickReadme(entries)
+	if readmeName != "" {
+		if raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+readmeName, maxRenderBytes); err == nil {
+			readmeHTML = renderReadme(readmeName, raw)
 		}
 	}
 
@@ -269,8 +271,9 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		Crumbs     []crumb
 		Prefix     string
 		Entries    []gitutil.TreeEntry
+		ReadmeName string
 		ReadmeHTML template.HTML
-	}{p, crumbs(p, "tree", dirPath), prefix, entries, readmeHTML})
+	}{p, crumbs(p, "tree", dirPath), prefix, entries, readmeName, readmeHTML})
 }
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request) {

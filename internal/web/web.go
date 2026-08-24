@@ -34,7 +34,16 @@ var version = sync.OnceValue(func() string {
 	return ""
 })
 
-var funcs = template.FuncMap{"gitbayVersion": func() string { return version() }}
+var funcs = template.FuncMap{
+	"gitbayVersion": func() string { return version() },
+	// short abbreviates a commit SHA for display.
+	"short": func(s string) string {
+		if len(s) > 10 {
+			return s[:10]
+		}
+		return s
+	},
+}
 
 // Render executes the named page template with the shared layout.
 func Render(w io.Writer, page string, data any) error {
