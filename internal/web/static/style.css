@@ -1,65 +1,258 @@
+/* gitbay stylesheet. One file, light and dark via prefers-color-scheme.
+   Tokens first; components use tokens only. No external requests. */
+
 :root {
-  --bg: #ffffff; --fg: #1a1a1a; --muted: #666; --line: #ddd;
-  --link: #0550ae; --code-bg: #f6f8fa;
-  --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --neutral: #666;
+  /* palette */
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #667079;
+  --faint: #eceff1;          /* hairlines, row separators */
+  --line: #d7dde2;           /* control borders, card edges */
+  --surface: #f6f8fa;        /* cards, code, table hover */
+  --accent: #0b6c80;         /* sea blue: links, active tab, primary */
+  --accent-fg: #ffffff;      /* text on accent */
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --bad: #cf222e;
+  --done: #8250df;           /* merged */
+  --neutral: #667079;
+  --code-bg: #f6f8fa;
+
+  /* type */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+          "Liberation Mono", monospace;
+  --fs-0: 0.8rem;    /* 12.8px: chips, fine print */
+  --fs-1: 0.866rem;  /* ~13px: metadata, mono in tables */
+  --fs-2: 0.933rem;  /* 14px: dense table text */
+  --fs-3: 1rem;      /* 15px: body */
+  --fs-4: 1.135rem;  /* ~17px: h2 */
+  --fs-5: 1.335rem;  /* ~20px: h1 */
+
+  /* spacing */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2.5rem;
+
+  /* radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-pill: 999px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d;
-    --link: #58a6ff; --code-bg: #161b22;
-    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --neutral: #8b949e;
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8d96a0;
+    --faint: #1d242c;
+    --line: #30363d;
+    --surface: #161b22;
+    --accent: #58b7c9;
+    --accent-fg: #06272e;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --done: #a371f7;
+    --neutral: #8d96a0;
+    --code-bg: #161b22;
   }
 }
+
 * { box-sizing: border-box; }
+html { font-size: 15px; }
 body {
-  margin: 0; background: var(--bg); color: var(--fg);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: var(--fs-3)/1.6 var(--sans);
 }
-header { border-bottom: 1px solid var(--line); padding: 0.6rem 1rem; }
-a.site { font-weight: 700; }
-main { max-width: 60rem; margin: 0 auto; padding: 1rem; }
-a { color: var(--link); text-decoration: none; }
+
+a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
-h1 { font-size: 1.3rem; }
-h2 { font-size: 1.1rem; }
-code, pre, .code, td.mode, td.size { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+
+h1 { font-size: var(--fs-5); font-weight: 600; line-height: 1.3;
+     margin: var(--sp-5) 0 var(--sp-3); letter-spacing: -0.01em; }
+h2 { font-size: var(--fs-4); font-weight: 600; line-height: 1.35;
+     margin: var(--sp-5) 0 var(--sp-3); }
+h3 { font-size: var(--fs-3); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2); }
+
+code, pre, .code, td.mode, td.size {
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+}
+
+/* layout */
+header {
+  border-bottom: 1px solid var(--faint);
+  padding: var(--sp-3) var(--sp-5);
+}
+a.site { font-weight: 650; color: var(--fg); letter-spacing: -0.01em; }
+a.site:hover { text-decoration: none; color: var(--accent); }
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: var(--sp-3) var(--sp-5) var(--sp-6);
+}
+
+/* tables */
 table { border-collapse: collapse; width: 100%; }
-td { padding: 0.25rem 0.6rem 0.25rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td {
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) 0;
+  border-bottom: 1px solid var(--faint);
+  vertical-align: top;
+  font-size: var(--fs-2);
+}
+td:last-child { padding-right: 0; }
 td.size, td.mode { color: var(--muted); white-space: nowrap; }
-nav.tabs a { margin-right: 1rem; }
-p.clone code { background: var(--code-bg); padding: 0.15rem 0.4rem; border-radius: 4px; }
-.crumbs { color: var(--muted); }
-.readme, .code { border: 1px solid var(--line); border-radius: 6px; padding: 1rem; margin-top: 1rem; overflow-x: auto; }
-/* chroma emits inline styles for a light background; pin the block to light
-   colors in both schemes so unstyled tokens stay legible. */
-.code { background: #f8f8f8; color: #1a1a1a; }
+
+/* repo tabs */
+nav.tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+nav.tabs a {
+  color: var(--muted);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-md);
+}
+nav.tabs a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
+
+p.clone code {
+  background: var(--surface);
+  border: 1px solid var(--faint);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-sm);
+}
+.crumbs { color: var(--muted); font-size: var(--fs-2); }
+.desc, td.desc { color: var(--muted); }
+.error { color: var(--bad); }
+
+/* cards: README, comments */
+.readme, .code {
+  border: 1px solid var(--faint);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  margin-top: var(--sp-4);
+  overflow-x: auto;
+}
+/* chroma emits inline styles for a light background; pin code blocks to
+   light colors in both schemes so unstyled tokens stay legible. */
+.code { background: #f8f8f8; color: #1a1a1a; padding: var(--sp-3) var(--sp-4); }
 .code pre { margin: 0; background: transparent !important; }
-pre.message { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) {
+  .code { border-color: var(--line); }
+}
+
+/* rendered markdown / org / html */
 .rendered { max-width: 100%; overflow-wrap: anywhere; }
-.rendered pre { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; overflow-x: auto; }
-.rendered code { background: var(--code-bg); padding: 0.1rem 0.3rem; border-radius: 3px; }
-.rendered blockquote { border-left: 3px solid var(--line); margin-left: 0; padding-left: 1rem; color: var(--muted); }
-pre.diff { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; overflow-x: auto; }
+.rendered pre {
+  background: var(--code-bg);
+  border: 1px solid var(--faint);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+.rendered code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: var(--r-sm); }
+.rendered pre code { background: transparent; padding: 0; }
+.rendered blockquote {
+  border-left: 3px solid var(--line);
+  margin-left: 0;
+  padding-left: var(--sp-4);
+  color: var(--muted);
+}
+.rendered img { max-width: 100%; }
+.rendered h1, .rendered h2 { border-bottom: 1px solid var(--faint); padding-bottom: var(--sp-1); }
+
+pre.message {
+  background: var(--code-bg);
+  border: 1px solid var(--faint);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* diffs */
+pre.diff {
+  background: var(--code-bg);
+  border: 1px solid var(--faint);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  line-height: 1.5;
+}
 pre.diff .add { color: var(--ok); }
 pre.diff .del { color: var(--bad); }
-pre.diff .hunk { color: var(--link); }
+pre.diff .hunk { color: var(--accent); }
 pre.diff .meta { color: var(--muted); }
-.error { color: var(--bad); }
-.desc, td.desc { color: var(--muted); }
+
+/* badges: signature and check states. Semantic colors stay distinct:
+   green verified/success, amber pending/stale, red bad/failure, muted
+   unsigned. */
 .badge {
-  display: inline-block; padding: 0.05rem 0.5rem; border-radius: 10px;
-  font-size: 12px; border: 1px solid;
+  --chip: var(--neutral);
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-0);
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--chip);
+  border: 1px solid color-mix(in srgb, var(--chip) 35%, transparent);
+  background: color-mix(in srgb, var(--chip) 7%, transparent);
+  white-space: nowrap;
 }
-.badge-verified { color: var(--ok); border-color: var(--ok); }
-.badge-unsigned { color: var(--neutral); border-color: var(--line); }
-.badge-signed_unknown_key { color: var(--warn); border-color: var(--warn); }
-.badge-signed_email_mismatch { color: var(--bad); border-color: var(--bad); }
-.badge-signed_key_expired { color: var(--warn); border-color: var(--warn); }
-.badge-signed_key_revoked { color: var(--bad); border-color: var(--bad); }
-.badge-bad_signature { color: var(--bad); border-color: var(--bad); }
-.check-success { color: var(--ok); border-color: var(--ok); }
-.check-pending { color: var(--warn); border-color: var(--warn); }
-.check-failure, .check-error { color: var(--bad); border-color: var(--bad); }
-.thread { border: 1px solid var(--line); border-left: 3px solid var(--link); border-radius: 6px; padding: 0.5rem 0.8rem; margin: 0.3rem 0 0.3rem 2rem; }
+.badge-verified { --chip: var(--ok); }
+.badge-unsigned { --chip: var(--neutral); }
+.badge-signed_unknown_key { --chip: var(--warn); }
+.badge-signed_email_mismatch { --chip: var(--bad); }
+.badge-signed_key_expired { --chip: var(--warn); }
+.badge-signed_key_revoked { --chip: var(--bad); }
+.badge-bad_signature { --chip: var(--bad); }
+.badge.check-success { --chip: var(--ok); }
+.badge.check-pending { --chip: var(--warn); }
+.badge.check-failure, .badge.check-error { --chip: var(--bad); }
+span.check-success { color: var(--ok); }
+span.check-pending { color: var(--warn); }
+span.check-failure, span.check-error { color: var(--bad); }
+
+/* review threads under diff lines */
+.thread {
+  border: 1px solid var(--faint);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  margin: var(--sp-2) 0 var(--sp-2) var(--sp-6);
+}
 .thread.resolved { border-left-color: var(--ok); opacity: 0.75; }
 .thread.stale { border-left-color: var(--warn); }
+
+/* forms */
+input, textarea, button, select { font: inherit; color: inherit; }
+input[type="text"], input:not([type]), textarea {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+}
+textarea { width: 100%; resize: vertical; }
+input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
+button {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--r-md);
+  padding: var(--sp-1) var(--sp-3);
+  font-weight: 500;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+
+/* mobile */
+@media (max-width: 40rem) {
+  header { padding: var(--sp-3) var(--sp-4); }
+  main { padding: var(--sp-2) var(--sp-4) var(--sp-6); }
+  .thread { margin-left: var(--sp-3); }
+}
