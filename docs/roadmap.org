@@ -56,6 +56,8 @@ step.
 - [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates — done 2026-08-24
 - [[https://gitbay.org/krz/gitbay/issues/30][#30]] activity graph on owner pages (platform-recorded activity
   signal; events table already covers issues/MRs, extend to commits)
+- [[https://gitbay.org/krz/gitbay/issues/31][#31]] issue actions from commit messages — done 2026-08-24
+  (closes/fixes/resolves #N closes on landing; bare #N leaves a comment)
 
 * Phase 3 — other people's forges
 
