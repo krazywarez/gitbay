@@ -33,6 +33,7 @@ func (s *Server) Routes() []Route {
 	routes = append(routes,
 		Route{Method: "GET", Pattern: "/{$}", Handler: s.index},
 		Route{Method: "GET", Pattern: "/explore", Handler: s.explore},
+		Route{Method: "GET", Pattern: "/privacy", Handler: s.privacy},
 		Route{Method: "GET", Pattern: "/static/style.css", Handler: s.stylesheet},
 		Route{Method: "GET", Pattern: "/favicon.svg", Handler: s.favicon},
 		Route{Method: "GET", Pattern: "/{owner}", Handler: s.ownerPage},

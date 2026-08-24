@@ -63,7 +63,10 @@ func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
 // the stock plain-text response if the template fails.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	if err := web.Render(&buf, "404.html", struct{ Site string }{s.siteName()}); err != nil {
+	if err := web.Render(&buf, "404.html", struct {
+		Site   string
+		Viewer string
+	}{s.siteName(), s.viewerName(r)}); err != nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -99,10 +102,11 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		s.cfg.Server.SiteURL, "https://"), "http://"), "/")
 	s.render(w, "landing.html", struct {
 		Site     string
+		Viewer   string
 		Host     string
 		Accounts bool
 		Signup   bool
-	}{s.siteName(), host, s.cfg.Web.Mode == "accounts",
+	}{s.siteName(), "", host, s.cfg.Web.Mode == "accounts",
 		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed"})
 }
 
@@ -143,6 +147,25 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 		Query  string
 		Repos  []describedRepo
 	}{s.siteName(), viewer.Username, q, s.filterRepos(q, s.describeAll(repos))})
+}
+
+// viewerName returns the logged-in username for header rendering, or "".
+func (s *Server) viewerName(r *http.Request) string {
+	if s.cfg.Web.Mode != "accounts" {
+		return ""
+	}
+	return s.viewer(r).Username
+}
+
+// privacy renders the privacy page: what the gitbay software does with
+// data, plus this instance's operator-provided notes.
+func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
+	s.render(w, "privacy.html", struct {
+		Site   string
+		Viewer string
+		Host   string
+		Notice string
+	}{s.siteName(), s.viewerName(r), s.cfg.SiteHost(), s.cfg.Web.PrivacyNotice})
 }
 
 // filterRepos keeps repos whose path, description, or topics contain the

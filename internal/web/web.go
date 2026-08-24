@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,8 +36,34 @@ var version = sync.OnceValue(func() string {
 	return ""
 })
 
+// fullVersion is the complete VCS revision, for linking the footer hash
+// to the upstream commit page.
+var fullVersion = sync.OnceValue(func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" {
+			return s.Value
+		}
+	}
+	return ""
+})
+
 var funcs = template.FuncMap{
 	"gitbayVersion": func() string { return version() },
+	"gitbayCommit":  func() string { return fullVersion() },
+	// paragraphs splits plain text on blank lines for safe rich display.
+	"paragraphs": func(s string) []string {
+		var out []string
+		for _, p := range strings.Split(s, "\n\n") {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	},
 	// short abbreviates a commit SHA for display.
 	"short": func(s string) string {
 		if len(s) > 10 {

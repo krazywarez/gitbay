@@ -9,13 +9,20 @@
 </head>
 <body>
 <header>
-  <nav class="container"><a class="site" href="/"><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M5 9.5c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M5 15c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>{{.Site}}</a></nav>
+  <nav class="container topnav">
+    <a class="site" href="/"><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M5 9.5c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M5 15c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>{{.Site}}</a>
+    <span class="spacer"></span>
+    <a href="/explore">explore</a>
+    {{if .Viewer}}<a href="/new">new repository</a>
+    <a class="navuser" href="/{{.Viewer}}">{{.Viewer}}</a>
+    <form method="post" action="/logout" class="inline"><button type="submit" class="linklike">logout</button></form>{{end}}
+  </nav>
 </header>
 <main class="container">
 {{template "content" .}}
 </main>
 <footer>
-  <div class="container"><p>powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code>{{.}}</code>{{end}}</p></div>
+  <div class="container"><p>powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="/privacy">privacy</a></p></div>
 </footer>
 </body>
 </html>{{end}}

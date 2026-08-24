@@ -87,7 +87,7 @@ func TestWebAccounts(t *testing.T) {
 
 	browser := newBrowser(t)
 	status, body := browserGet(t, browser, inst.base()+loginPath)
-	if status != 200 || !strings.Contains(body, "logged in as alice") {
+	if status != 200 || !strings.Contains(body, `logged in as <a href="/alice">alice</a>`) {
 		t.Fatalf("login redirect landed wrong: %d\n%s", status, body)
 	}
 

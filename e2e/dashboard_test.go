@@ -89,7 +89,7 @@ func TestDashboard(t *testing.T) {
 		t.Fatalf("login: %d", status)
 	}
 	status, body = browserGet(t, browser, inst.base()+"/")
-	if status != 200 || !strings.Contains(body, "logged in as alice") {
+	if status != 200 || !strings.Contains(body, `logged in as <a href="/alice">alice</a>`) {
 		t.Fatalf("dashboard: %d", status)
 	}
 	for _, want := range []string{

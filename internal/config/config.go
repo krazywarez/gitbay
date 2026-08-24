@@ -62,6 +62,9 @@ type GitDaemon struct {
 type Web struct {
 	Mode         string `toml:"mode"` // view_only | accounts
 	PasswordAuth bool   `toml:"password_auth"`
+	// PrivacyNotice is operator-provided text shown on /privacy under the
+	// fixed project-level statement. Plain text; blank paragraphs split.
+	PrivacyNotice string `toml:"privacy_notice"`
 }
 
 type Registration struct {

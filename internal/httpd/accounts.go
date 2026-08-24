@@ -63,17 +63,19 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
 		s.render(w, "login.html", struct {
-			Site  string
-			Error string
-		}{s.siteName(), ""})
+			Site   string
+			Viewer string
+			Error  string
+		}{s.siteName(), "", ""})
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
 		s.render(w, "login.html", struct {
-			Site  string
-			Error string
-		}{s.siteName(), "that login link is invalid, expired, or already used — mint a new one"})
+			Site   string
+			Viewer string
+			Error  string
+		}{s.siteName(), "", "that login link is invalid, expired, or already used — mint a new one"})
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()

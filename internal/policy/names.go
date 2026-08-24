@@ -20,6 +20,7 @@ var reservedNames = map[string]bool{
 	"login":       true,
 	"logout":      true,
 	"new":         true,
+	"privacy":     true,
 	"raw":         true,
 	"register":    true,
 	"settings":    true,
