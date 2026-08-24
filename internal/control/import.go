@@ -58,11 +58,27 @@ func runRepoImport(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url> [--private] [--token-stdin]")
 	}
 	owner, name, ok := strings.Cut(path, "/")
-	if !ok || owner != c.User.Username {
-		return c.fail(protocol.ExitDenied, "imports land under your own account: %s/<name>", c.User.Username)
+	if !ok {
+		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url>")
 	}
 	if err := policy.ValidateName(name); err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	// Same ownership rule as repo create: yourself, or an org you admin.
+	ownerKind, ownerID := "user", c.User.ID
+	if owner != c.User.Username {
+		org, err := c.Store.OrgByName(owner)
+		if err != nil {
+			return c.fail(protocol.ExitDenied, "cannot import under %q: not you and not an organization you can see", owner)
+		}
+		role, err := c.Store.OrgRole(org.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if role != "admin" {
+			return c.fail(protocol.ExitDenied, "only admins of %s can import repositories there", owner)
+		}
+		ownerKind, ownerID = "org", org.ID
 	}
 
 	// Scheme allowlist. file:// (and anything else local) would read the
@@ -107,7 +123,7 @@ func runRepoImport(c *Ctx, args []string) int {
 	if private {
 		visibility = "private"
 	}
-	id, err := c.Store.CreateRepo("user", c.User.ID, name, visibility)
+	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

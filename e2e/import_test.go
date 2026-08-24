@@ -89,6 +89,17 @@ func TestRepoImport(t *testing.T) {
 		t.Fatalf("git:// import: %s", errOut)
 	}
 
+	// Org-owned imports: allowed for org admins, refused for non-members.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "org", "create", "imports"); code != 0 {
+		t.Fatalf("org create: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "import", "imports/mirror", "--from", httpURL); code != 0 {
+		t.Fatalf("org import: %s", errOut)
+	}
+	if out, _, code := inst.ssh(t, aliceKey, "", "repo", "log", "imports/mirror"); code != 0 || !strings.Contains(out, "first") {
+		t.Fatalf("org import log: %d\n%s", code, out)
+	}
+
 	// Refusals: bad scheme, credentials in URL, existing name, foreign owner.
 	cases := []struct {
 		args []string
@@ -97,7 +108,7 @@ func TestRepoImport(t *testing.T) {
 		{[]string{"repo", "import", "alice/x", "--from", "file:///etc"}, "https://, http://, and git://"},
 		{[]string{"repo", "import", "alice/x", "--from", "https://token@github.com/a/b"}, "--token-stdin"},
 		{[]string{"repo", "import", "alice/mirror", "--from", httpURL}, "already exists"},
-		{[]string{"repo", "import", "bob/x", "--from", httpURL}, "your own account"},
+		{[]string{"repo", "import", "bob/x", "--from", httpURL}, "not you and not an organization"},
 	}
 	for _, tc := range cases {
 		_, errOut, code := inst.ssh(t, aliceKey, "", tc.args...)
