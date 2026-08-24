@@ -90,13 +90,25 @@ func runRepoCreate(c *Ctx, args []string) int {
 	if !ok {
 		return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private]")
 	}
-	if owner != c.User.Username {
-		return c.fail(protocol.ExitDenied, "cannot create repositories under %q (orgs not yet supported)", owner)
-	}
 	if err := policyValidateRepoName(name); err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	id, err := c.Store.CreateRepo("user", c.User.ID, name, visibility)
+	ownerKind, ownerID := "user", c.User.ID
+	if owner != c.User.Username {
+		org, err := c.Store.OrgByName(owner)
+		if err != nil {
+			return c.fail(protocol.ExitDenied, "cannot create repositories under %q: not you and not an organization you can see", owner)
+		}
+		role, err := c.Store.OrgRole(org.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if role != "admin" {
+			return c.fail(protocol.ExitDenied, "only admins of %s can create repositories there", owner)
+		}
+		ownerKind, ownerID = "org", org.ID
+	}
+	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

@@ -30,6 +30,11 @@ var ErrDuplicateKey = errors.New("that key is already registered to another acco
 var ErrNotFound = errors.New("not found")
 
 func (s *Store) CreateUser(username string, isAdmin bool) (int64, error) {
+	if taken, err := ownerNameTaken(s.DB, username); err != nil {
+		return 0, err
+	} else if taken {
+		return 0, fmt.Errorf("username %q is taken", username)
+	}
 	res, err := s.DB.Exec("INSERT INTO users (username, is_admin) VALUES (?, ?)", username, boolInt(isAdmin))
 	if err != nil {
 		if isUniqueErr(err) {

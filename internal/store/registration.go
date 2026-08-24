@@ -56,6 +56,11 @@ func (s *Store) ConsumeEmailToken(userID int64, tokenHash string) (string, error
 // CreateRegisteredUser makes a self-registered account, pending until its
 // email is verified.
 func (s *Store) CreateRegisteredUser(username string, pending bool) (int64, error) {
+	if taken, err := ownerNameTaken(s.DB, username); err != nil {
+		return 0, err
+	} else if taken {
+		return 0, errors.New("that username is taken")
+	}
 	res, err := s.DB.Exec("INSERT INTO users (username, pending) VALUES (?, ?)", username, boolInt(pending))
 	if err != nil {
 		if isUniqueErr(err) {

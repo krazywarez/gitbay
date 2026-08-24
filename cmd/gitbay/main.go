@@ -30,6 +30,7 @@ func main() {
 		issueCmd(),
 		mrCmd(),
 		webCmd(),
+		orgCmd(),
 		remoteCmd(),
 		initCmd(),
 		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
@@ -284,6 +285,20 @@ func usesTokenStdin(args []string) bool {
 func webCmd() *cobra.Command {
 	return group("web", "browser session",
 		pass("login", "mint a one-time browser login URL over ssh", passOpts{server: []string{"web", "login"}}),
+	)
+}
+
+func orgCmd() *cobra.Command {
+	return group("org", "organizations",
+		pass("create", "create an organization", passOpts{server: []string{"org", "create"}}),
+		pass("list", "list organizations you belong to", passOpts{server: []string{"org", "list"}}),
+		pass("show", "show an organization and its members", passOpts{server: []string{"org", "show"}}),
+		pass("delete", "delete an empty organization (--yes)", passOpts{server: []string{"org", "delete"}}),
+		group("members", "manage members",
+			pass("add", "add or update a member: <org> <user> [--role member|admin]", passOpts{server: []string{"org", "members", "add"}}),
+			pass("remove", "remove a member: <org> <user>", passOpts{server: []string{"org", "members", "remove"}}),
+			pass("list", "list members: <org>", passOpts{server: []string{"org", "members", "list"}}),
+		),
 	)
 }
 

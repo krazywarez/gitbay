@@ -115,6 +115,17 @@ func (i *instance) admin(t *testing.T, args ...string) string {
 	return string(out)
 }
 
+// forgedAdminErr runs an admin command expected to fail, returning output.
+func (i *instance) forgedAdminErr(t *testing.T, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(i.gitbayd, append([]string{"--config", i.config}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("gitbayd %v unexpectedly succeeded:\n%s", args, out)
+	}
+	return string(out)
+}
+
 // newKey generates a client keypair and returns the private key path.
 func (i *instance) newKey(t *testing.T, name string) string {
 	t.Helper()
