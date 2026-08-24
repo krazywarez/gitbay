@@ -83,35 +83,61 @@ func (s *Server) describeAll(repos []store.Repo) []describedRepo {
 	return out
 }
 
+// index is the homepage: a dashboard for logged-in users, a landing page
+// for everyone else. The full public listing lives at /explore.
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Web.Mode == "accounts" {
+		if viewer := s.viewer(r); viewer.ID != 0 {
+			s.dashboard(w, r, viewer)
+			return
+		}
+	}
+	host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(
+		s.cfg.Server.SiteURL, "https://"), "http://"), "/")
+	s.render(w, "landing.html", struct {
+		Site     string
+		Host     string
+		Accounts bool
+	}{s.siteName(), host, s.cfg.Web.Mode == "accounts"})
+}
+
+func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {
+	pinned, _ := s.st.PinnedRepos(viewer.ID)
+	var visible []store.Repo
+	for _, rp := range pinned {
+		grant, _ := s.st.AccessRole(rp.ID, viewer.ID)
+		if policy.CanRead(viewer, rp, grant) {
+			visible = append(visible, rp)
+		}
+	}
+	mrs, _ := s.st.DashboardMRs(viewer.ID)
+	issues, _ := s.st.DashboardIssues(viewer.ID)
+	s.render(w, "dashboard.html", struct {
+		Site   string
+		Viewer string
+		Pinned []describedRepo
+		MRs    []store.DashboardItem
+		Issues []store.DashboardItem
+	}{s.siteName(), viewer.Username, s.describeAll(visible), mrs, issues})
+}
+
+func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 	repos, err := s.st.ListPublicRepos()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	var viewer store.User
-	var mine []store.Repo
 	if s.cfg.Web.Mode == "accounts" {
-		if viewer = s.viewer(r); viewer.ID != 0 {
-			all, err := s.st.ListReposForUser(viewer.ID)
-			if err == nil {
-				for _, rp := range all {
-					if rp.Visibility == "private" {
-						mine = append(mine, rp)
-					}
-				}
-			}
-		}
+		viewer = s.viewer(r)
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	s.render(w, "index.html", struct {
+	s.render(w, "explore.html", struct {
 		Site   string
 		Viewer string
 		Query  string
 		Repos  []describedRepo
-		Mine   []describedRepo
-	}{s.siteName(), viewer.Username, q,
-		s.filterRepos(q, s.describeAll(repos)), s.filterRepos(q, s.describeAll(mine))})
+	}{s.siteName(), viewer.Username, q, s.filterRepos(q, s.describeAll(repos))})
 }
 
 // filterRepos keeps repos whose path, description, or topics contain the
@@ -1041,6 +1067,21 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	md := s.ugcFor(r, p.Repo)
 	var detachedThreads []diffThread
 	lines, detachedThreads = attachThreads(lines, diffComments, m.HeadSHA, md)
+	type diffStat struct{ Files, Adds, Dels int }
+	var stat diffStat
+	seenFiles := map[string]bool{}
+	for _, l := range lines {
+		switch l.Class {
+		case "add":
+			stat.Adds++
+		case "del":
+			stat.Dels++
+		}
+		if l.Path != "" && !seenFiles[l.Path] {
+			seenFiles[l.Path] = true
+			stat.Files++
+		}
+	}
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -1050,8 +1091,9 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Comments        []renderedComment
 		Reviews         []store.MRReview
 		DiffLines       []diffLine
+		Stat            diffStat
 		DetachedThreads []diffThread
-	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md), reviews, lines, detachedThreads})
+	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md), reviews, lines, stat, detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

@@ -337,6 +337,20 @@ a.memberchip {
 a.memberchip:hover { text-decoration: none; border-color: var(--accent); color: var(--accent); }
 a.memberchip .role { color: var(--muted); }
 
+/* landing page */
+.landing { max-width: 44rem; padding: var(--sp-6) 0; }
+.landing h1 { font-size: 1.8rem; margin-bottom: var(--sp-3); }
+.landing .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.7; margin: 0 0 var(--sp-4); }
+pre.quickstart {
+  background: var(--code-bg);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  overflow-x: auto;
+  margin: 0 0 var(--sp-4);
+}
+.landing .explorelink { font-weight: 550; }
+
 /* index toolbar */
 p.toolbar { color: var(--muted); font-size: var(--fs-2); margin-top: var(--sp-4); }
 form.inline { display: inline; }
@@ -397,6 +411,16 @@ pre.message {
 }
 
 /* diffs */
+details.difffold summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+details.difffold summary h3 { display: inline; margin: 0; }
+details.difffold summary .add { color: var(--ok); }
+details.difffold summary .del { color: var(--bad); }
 pre.diff {
   background: var(--code-bg);
   border: 1px solid var(--faint);
