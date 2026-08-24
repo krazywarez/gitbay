@@ -310,6 +310,7 @@ func orgCmd() *cobra.Command {
 		pass("create", "create an organization", passOpts{server: []string{"org", "create"}}),
 		pass("list", "list organizations you belong to", passOpts{server: []string{"org", "list"}}),
 		pass("show", "show an organization and its members", passOpts{server: []string{"org", "show"}}),
+		pass("rename", "rename an organization: <old> <new>", passOpts{server: []string{"org", "rename"}}),
 		pass("delete", "delete an empty organization (--yes)", passOpts{server: []string{"org", "delete"}}),
 		group("members", "manage members",
 			pass("add", "add or update a member: <org> <user> [--role member|admin]", passOpts{server: []string{"org", "members", "add"}}),

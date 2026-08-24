@@ -113,6 +113,30 @@ func TestOrganizations(t *testing.T) {
 		t.Fatalf("org delete: %s", errOut)
 	}
 
+	// Rename: clone works at the new path, old path is gone, collisions
+	// with users and existing orgs are refused.
+	if _, _, code = inst.ssh(t, aliceKey, "", "org", "create", "oldname"); code != 0 {
+		t.Fatal("org create oldname failed")
+	}
+	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "create", "oldname/thing"); code != 0 {
+		t.Fatal("repo under oldname failed")
+	}
+	rnWork := t.TempDir()
+	mustGit(t, rnWork, inst.gitEnv(aliceKey), "clone", inst.sshURL("oldname/thing"), "w1")
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "rename", "oldname", "bob"); code != 2 || !strings.Contains(errOut, "taken") {
+		t.Fatalf("rename onto user name: %d %s", code, errOut)
+	}
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "rename", "oldname", "newname"); code != 0 {
+		t.Fatalf("rename: %s", errOut)
+	}
+	mustGit(t, rnWork, inst.gitEnv(aliceKey), "clone", inst.sshURL("newname/thing"), "w2")
+	if out, code := gitRun(t, t.TempDir(), inst.gitEnv(aliceKey), "clone", inst.sshURL("oldname/thing")); code == 0 {
+		t.Fatalf("old org path still clones:\n%s", out)
+	}
+	if out, _, _ := inst.ssh(t, aliceKey, "", "repo", "list"); !strings.Contains(out, "newname/thing") {
+		t.Fatalf("renamed org missing from repo list:\n%s", out)
+	}
+
 	// Public org repos appear on the anonymous web index.
 	if _, _, code = inst.ssh(t, aliceKey, "", "org", "create", "puborg"); code != 0 {
 		t.Fatal("org create failed")

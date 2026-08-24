@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -17,6 +19,8 @@ func init() {
 		Summary: "list organizations you belong to", ReadOnly: true, Run: runOrgList})
 	register(Command{Path: []string{"org", "show"},
 		Summary: "show an organization and its members: org show <name>", ReadOnly: true, Run: runOrgShow})
+	register(Command{Path: []string{"org", "rename"},
+		Summary: "rename an organization: org rename <old> <new> (clone URLs change)", Run: runOrgRename})
 	register(Command{Path: []string{"org", "delete"},
 		Summary: "delete an empty organization: org delete <name> --yes", Run: runOrgDelete})
 	register(Command{Path: []string{"org", "members", "add"},
@@ -113,6 +117,39 @@ func runOrgShow(c *Ctx, args []string) int {
 		for _, m := range ms {
 			fmt.Fprintf(w, "  %s\t%s\n", m.User, m.Role)
 		}
+	})
+}
+
+func runOrgRename(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: org rename <old> <new>")
+	}
+	org, code := orgAdmin(c, args[0])
+	if code >= 0 {
+		return code
+	}
+	newName := args[1]
+	if err := policy.ValidateOwnerName(newName); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	oldDir := filepath.Join(c.Cfg.Server.Root, "repos", org.Name)
+	newDir := filepath.Join(c.Cfg.Server.Root, "repos", newName)
+	if _, err := os.Stat(newDir); err == nil {
+		return c.fail(protocol.ExitFailure, "repository directory %s already exists", newName)
+	}
+	if err := c.Store.RenameOrg(org.ID, newName); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	// Repo paths on disk derive from the owner name; move the tree. If the
+	// move fails, revert the database so name and disk stay consistent.
+	if _, err := os.Stat(oldDir); err == nil {
+		if err := os.Rename(oldDir, newDir); err != nil {
+			c.Store.RenameOrg(org.ID, org.Name)
+			return c.fail(protocol.ExitFailure, "moving repositories: %v", err)
+		}
+	}
+	return c.emit(map[string]string{"org": newName, "was": org.Name}, func(w io.Writer) {
+		fmt.Fprintf(w, "renamed %s to %s — clone URLs now use %s/<repo>\n", org.Name, newName, newName)
 	})
 }
 

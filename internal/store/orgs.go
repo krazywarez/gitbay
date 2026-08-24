@@ -190,3 +190,28 @@ func (s *Store) DeleteOrg(orgID int64) error {
 	_, err := s.DB.Exec("DELETE FROM orgs WHERE id = ?", orgID)
 	return err
 }
+
+// RenameOrg changes an org's name, holding the shared owner-namespace
+// invariant. The caller moves the on-disk repos directory afterward.
+func (s *Store) RenameOrg(orgID int64, newName string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	taken, err := ownerNameTaken(tx, newName)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return fmt.Errorf("the name %q is taken", newName)
+	}
+	res, err := tx.Exec("UPDATE orgs SET name = ? WHERE id = ?", newName, orgID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return tx.Commit()
+}
