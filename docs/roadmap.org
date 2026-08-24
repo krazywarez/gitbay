@@ -74,7 +74,7 @@ work to it.
 - [[https://gitbay.org/krz/gitbay/issues/18][#18]] push/pull mirroring — done 2026-08-24 (worker sync, read-only pull mirrors)
 - [[https://gitbay.org/krz/gitbay/issues/29][#29]] account migration between gitbay instances — no lock-in,
   ever; the export bundle doubles as a user-level backup
-- [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging and multi-user hardening
+- [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging and multi-user hardening — done 2026-08-24 (quotas and key-expiry warnings ride with #28)
 - [[https://gitbay.org/krz/gitbay/issues/9][#9]] web signup for open/invite instances — done 2026-08-24
 
 * Phase 4 — reach
