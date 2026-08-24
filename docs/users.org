@@ -9,6 +9,8 @@ convenience (instance profiles, repo inference, =$EDITOR=), nothing more.
 
 #+begin_src sh
 go install gitbay.org/gitbay/cmd/gitbay@latest   # any platform with Go
+
+brew tap krz/tap https://gitbay.org/krz/homebrew-tap.git
 brew install krz/tap/gitbay                      # Homebrew (macOS/Linux)
 #+end_src
 

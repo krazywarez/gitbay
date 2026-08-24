@@ -64,7 +64,9 @@ step.
 Goal: someone who is not the author runs an instance and moves their
 work to it.
 
-- [[https://gitbay.org/krz/gitbay/issues/26][#26]] release engineering: versioned builds, go-install vanity
+- [[https://gitbay.org/krz/gitbay/issues/26][#26]] release engineering — done 2026-08-24 except artifact
+  hosting, which waits on #8 (go-install vanity live, release.sh,
+  CHANGELOG, Homebrew formula in krz/homebrew-tap)
   imports, Homebrew/deb — the adoption gate for everything below
 - [[https://gitbay.org/krz/gitbay/issues/27][#27]] repository maintenance (admin gc/stats, scheduled repack)
 - [[https://gitbay.org/krz/gitbay/issues/8][#8]] releases (notes + assets; also hosts gitbay's own binaries)
