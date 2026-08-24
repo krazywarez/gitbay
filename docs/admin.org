@@ -103,6 +103,11 @@ contradiction; =--no-host-checks= skips port/path probes.
   Serves only public repositories that additionally ran
   =repo settings git-daemon <repo> on=.
 
+** [mirrors]
+- =pull_interval_minutes= (15) — how often pull mirrors fetch their
+  upstream. Push mirrors sync shortly after each local ref update.
+  Mirror URLs pass the same SSRF rules as webhook targets.
+
 ** [go_import]
 Vanity Go module paths, one per line: ="host/module" = "owner/repo"=.
 Requests with =?go-get=1= at or under the module path answer with the

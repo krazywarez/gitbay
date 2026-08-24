@@ -332,5 +332,6 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request, u store.User
 		fail(err.Error())
 		return
 	}
+	s.st.MarkMirrorsDirty(repo.ID, "push")
 	http.Redirect(w, r, fmt.Sprintf("/%s/blob/%s/%s", repo.Path(), ref, filePath), http.StatusSeeOther)
 }

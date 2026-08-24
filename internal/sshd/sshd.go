@@ -302,6 +302,12 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		fmt.Fprintf(stderr, "%s is archived and read-only\n", repo.Path())
 		return protocol.ExitDenied
 	}
+	if write {
+		if mirrored, err := st.PullMirrored(repo.ID); err == nil && mirrored {
+			fmt.Fprintf(stderr, "%s is a pull mirror: its refs come from the upstream; push there instead\n", repo.Path())
+			return protocol.ExitDenied
+		}
+	}
 
 	dir := control.RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name)
 	env := []string{

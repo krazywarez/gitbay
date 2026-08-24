@@ -822,6 +822,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	if mr.TargetRef == repo.DefaultBranch {
 		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
 	}
+	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
 			notifyBody(c, fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))

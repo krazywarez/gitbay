@@ -23,6 +23,7 @@ type Config struct {
 	Webhooks     Webhooks     `toml:"webhooks"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
+	Mirrors      Mirrors      `toml:"mirrors"`
 	// GoImport maps vanity Go module paths to repositories, e.g.
 	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
 	// under a mapped path get a go-import meta tag.
@@ -80,6 +81,10 @@ type Webhooks struct {
 	AllowLocal bool `toml:"allow_local"`
 }
 
+type Mirrors struct {
+	PullIntervalMinutes int `toml:"pull_interval_minutes"`
+}
+
 type Limits struct {
 	MaxPackBytes    int64 `toml:"max_pack_bytes"`
 	MaxBlobBytes    int64 `toml:"max_blob_bytes"`
@@ -106,6 +111,7 @@ func Default() Config {
 			Mode: "closed",
 		},
 		GitDaemon: GitDaemon{Port: 9418},
+		Mirrors:   Mirrors{PullIntervalMinutes: 15},
 		Limits: Limits{
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,

@@ -127,6 +127,19 @@ gitbay repo import you/mirror --from https://github.com/you/repo.git \
 gitbay repo import-issues you/mirror --from you/repo --token-stdin
 #+end_src
 
+Mirroring keeps a foreign remote in sync during a gradual migration
+(repo admin; https remotes; the token is stored server-side for the
+recurring sync and never echoed back):
+
+#+begin_src sh
+gitbay repo mirror add you/project https://github.com/you/project.git \
+    --direction push --token-stdin    # propagate after every local push
+gitbay repo mirror add you/copy https://github.com/them/theirs.git \
+    --direction pull                  # follow upstream; local pushes refused
+gitbay repo mirror list               # sync status and last error, per mirror
+gitbay repo mirror sync / remove <id>
+#+end_src
+
 * Organizations
 
 Orgs share the owner namespace with users and own repositories at

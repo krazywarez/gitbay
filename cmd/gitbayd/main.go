@@ -21,6 +21,7 @@ import (
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/mail"
+	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
@@ -137,6 +138,7 @@ func serveCmd() *cobra.Command {
 			if cfg.Mail.SMTPHost != "" {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
 			}
+			go mirror.New(st, cfg).Run(whCtx)
 
 			errCh := make(chan error, 3)
 			if cfg.SSH.Mode == "embedded" {

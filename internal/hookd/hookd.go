@@ -183,6 +183,8 @@ func (s *Server) postReceive(req Request) {
 			dir := control.RepoDir(s.cfg.Server.Root, pushedRepo.OwnerName, pushedRepo.Name)
 			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, u.Old, u.New)
 		}
+		// Any branch/tag update schedules the push mirrors.
+		s.st.MarkMirrorsDirty(req.RepoID, "push")
 		mrs, err := s.st.OpenMRsBySource(req.RepoID, branch)
 		if err != nil {
 			slog.Error("post-receive: listing MRs", "err", err)
