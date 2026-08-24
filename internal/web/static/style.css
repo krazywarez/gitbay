@@ -360,6 +360,8 @@ pre.diff .meta { color: var(--muted); }
 .chip-neutral, .chip-source_gone { --chip: var(--neutral); }
 .chip-stale { --chip: var(--warn); }
 .chip.label { font-weight: 500; }
+.chip.topic { --chip: var(--accent); }
+.repohead .topics { margin: 0 0 var(--sp-2); }
 .badge-verified { --chip: var(--ok); }
 .badge-unsigned { --chip: var(--neutral); }
 .badge-signed_unknown_key { --chip: var(--warn); }

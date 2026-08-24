@@ -22,8 +22,9 @@
 
 {{define "repoheader"}}
 <div class="repohead">
-<h1 class="repotitle"><a class="owner" href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a><span class="sep">/</span><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>{{if eq .Repo.Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</h1>
+<h1 class="repotitle"><a class="owner" href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a><span class="sep">/</span><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>{{if eq .Repo.Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Repo.Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</h1>
 {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
+{{if .Topics}}<p class="topics">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
 <nav class="tabs">
   <a {{if eq .Tab "files"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
   <a {{if eq .Tab "log"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>

@@ -5,7 +5,7 @@
 <h1>repositories</h1>
 <ul class="repolist">
 {{range .Repos}}<li>
-  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a>/<a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></p>
+  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a>/<a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
 </li>

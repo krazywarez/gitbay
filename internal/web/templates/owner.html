@@ -7,7 +7,7 @@
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Username}}">{{.Username}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 <ul class="repolist">
 {{range .Repos}}<li>
-  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</p>
+  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
 </li>

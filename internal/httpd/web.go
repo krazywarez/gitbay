@@ -120,6 +120,7 @@ type repoPage struct {
 	CloneURL string
 	Dir      string
 	Tab      string // active tab in the repo header
+	Topics   []string
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
@@ -148,6 +149,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	if ref == "" {
 		ref = repo.DefaultBranch
 	}
+	topics, _ := s.st.ListTopics(repo.ID)
 	return repoPage{
 		Site:     s.siteName(),
 		Viewer:   viewer.Username,
@@ -156,6 +158,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		Ref:      ref,
 		CloneURL: s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
 		Dir:      control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name),
+		Topics:   topics,
 	}, true
 }
 
