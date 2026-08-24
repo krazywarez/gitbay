@@ -6,6 +6,7 @@
 <table>
 {{range .Repos}}<tr>
   <td><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></td>
+  <td class="desc">{{.Desc}}</td>
   <td>{{.Visibility}}</td>
   <td>{{.DefaultBranch}}</td>
 </tr>

@@ -146,3 +146,30 @@ func SetHead(dir, branch string) error {
 	}
 	return nil
 }
+
+// gitDefaultDescription is the placeholder git init writes; treated as no
+// description at all.
+const gitDefaultDescription = "Unnamed repository; edit this file 'description' to name the repository."
+
+// ReadDescription returns the repo's description from the classic
+// <repo>.git/description file, empty for the git-init placeholder.
+func ReadDescription(dir string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, "description"))
+	if err != nil {
+		return ""
+	}
+	desc := strings.TrimSpace(string(raw))
+	if desc == gitDefaultDescription {
+		return ""
+	}
+	return desc
+}
+
+// WriteDescription sets the description file: first line only, capped.
+func WriteDescription(dir, desc string) error {
+	desc, _, _ = strings.Cut(strings.TrimSpace(desc), "\n")
+	if len(desc) > 256 {
+		desc = desc[:256]
+	}
+	return os.WriteFile(filepath.Join(dir, "description"), []byte(desc+"\n"), 0o644)
+}

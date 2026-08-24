@@ -220,6 +220,7 @@ func repoCmd() *cobra.Command {
 			pass("protect", "protect a branch", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
 			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
 			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
+			pass("description", "set the repository description: <text>", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
 			pass("git-daemon", "expose over git://: ... on|off", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),
 		),
 	)

@@ -18,6 +18,7 @@
 
 {{define "repoheader"}}
 <h1><a href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a>/<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a></h1>
+{{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
 <nav class="tabs">
   <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
   <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>

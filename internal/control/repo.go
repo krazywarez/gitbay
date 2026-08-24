@@ -46,6 +46,8 @@ func init() {
 		Summary: "protect a branch: repo settings protect <owner/name> <branch>", Run: runProtect})
 	register(Command{Path: []string{"repo", "settings", "unprotect"},
 		Summary: "unprotect a branch: repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
+	register(Command{Path: []string{"repo", "settings", "description"},
+		Summary: "set the repository description: repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
 		Summary: "expose over git://: repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
 }
@@ -76,16 +78,22 @@ func resolveRepo(c *Ctx, path string, check func(store.User, store.Repo, string)
 
 func runRepoCreate(c *Ctx, args []string) int {
 	visibility := "public"
-	var path string
-	for _, a := range args {
-		switch a {
+	var path, description string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--private":
 			visibility = "private"
+		case "--description":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--description requires a value")
+			}
+			description = args[i+1]
+			i++
 		default:
 			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private]")
+				return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private] [--description <text>]")
 			}
-			path = a
+			path = args[i]
 		}
 	}
 	owner, name, ok := strings.Cut(path, "/")
@@ -119,6 +127,11 @@ func runRepoCreate(c *Ctx, args []string) int {
 		c.Store.DeleteRepo(id)
 		return c.fail(protocol.ExitFailure, "initializing repository: %v", err)
 	}
+	if description != "" {
+		if err := gitutil.WriteDescription(dir, description); err != nil {
+			return c.fail(protocol.ExitFailure, "writing description: %v", err)
+		}
+	}
 	type out struct {
 		Path       string `json:"path"`
 		Visibility string `json:"visibility"`
@@ -143,16 +156,18 @@ func runRepoList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	type out struct {
-		Path       string `json:"path"`
-		Visibility string `json:"visibility"`
+		Path        string `json:"path"`
+		Visibility  string `json:"visibility"`
+		Description string `json:"description,omitempty"`
 	}
 	var ds []out
 	for _, r := range repos {
-		ds = append(ds, out{r.Path(), r.Visibility})
+		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
+		ds = append(ds, out{r.Path(), r.Visibility, desc})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\n", d.Path, d.Visibility)
+			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Path, d.Visibility, d.Description)
 		}
 	})
 }
@@ -167,13 +182,18 @@ func runRepoShow(c *Ctx, args []string) int {
 	}
 	type out struct {
 		Path              string   `json:"path"`
+		Description       string   `json:"description,omitempty"`
 		Visibility        string   `json:"visibility"`
 		DefaultBranch     string   `json:"default_branch"`
 		ProtectedBranches []string `json:"protected_branches,omitempty"`
 	}
-	d := out{repo.Path(), repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches}
+	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
+	d := out{repo.Path(), desc, repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "%s\t%s\tdefault: %s\n", d.Path, d.Visibility, d.DefaultBranch)
+		if d.Description != "" {
+			fmt.Fprintf(w, "%s\n", d.Description)
+		}
 		if len(d.ProtectedBranches) > 0 {
 			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
 		}
@@ -350,6 +370,23 @@ func runSettingsShow(c *Ctx, args []string) int {
 	return c.emit(repo.Settings, func(w io.Writer) {
 		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\ngit_daemon: %v\n",
 			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon)
+	})
+}
+
+func runSetDescription(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo settings description <owner/name> <text>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if err := gitutil.WriteDescription(dir, args[1]); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"description": gitutil.ReadDescription(dir)}, func(w io.Writer) {
+		fmt.Fprintf(w, "description set on %s\n", repo.Path())
 	})
 }
 

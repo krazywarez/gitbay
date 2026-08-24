@@ -48,6 +48,20 @@ func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
 	w.Write(web.StyleCSS)
 }
 
+// describedRepo pairs a repo with its description for listings.
+type describedRepo struct {
+	store.Repo
+	Desc string
+}
+
+func (s *Server) describeAll(repos []store.Repo) []describedRepo {
+	var out []describedRepo
+	for _, r := range repos {
+		out = append(out, describedRepo{r, gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, r.OwnerName, r.Name))})
+	}
+	return out
+}
+
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	repos, err := s.st.ListPublicRepos()
 	if err != nil {
@@ -71,15 +85,16 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "index.html", struct {
 		Site   string
 		Viewer string
-		Repos  []store.Repo
-		Mine   []store.Repo
-	}{s.siteName(), viewer.Username, repos, mine})
+		Repos  []describedRepo
+		Mine   []describedRepo
+	}{s.siteName(), viewer.Username, s.describeAll(repos), s.describeAll(mine)})
 }
 
 // repoPage is the shared context for repo-scoped pages.
 type repoPage struct {
 	Site     string
 	Viewer   string
+	Desc     string
 	Repo     store.Repo
 	Ref      string
 	CloneURL string
@@ -115,6 +130,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	return repoPage{
 		Site:     s.siteName(),
 		Viewer:   viewer.Username,
+		Desc:     gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
 		Repo:     repo,
 		Ref:      ref,
 		CloneURL: s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
@@ -186,10 +202,10 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Viewer  string
 		Owner   string
 		Kind    string
-		Repos   []store.Repo
+		Repos   []describedRepo
 		Members []store.OrgMember
 		Orgs    []store.OrgMember
-	}{s.siteName(), viewer.Username, name, kind, visible, members, orgs})
+	}{s.siteName(), viewer.Username, name, kind, s.describeAll(visible), members, orgs})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {

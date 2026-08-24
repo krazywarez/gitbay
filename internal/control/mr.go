@@ -81,6 +81,9 @@ func runRepoFork(c *Ctx, args []string) int {
 		c.Store.DeleteRepo(id)
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	if desc := gitutil.ReadDescription(srcDir); desc != "" {
+		gitutil.WriteDescription(dstDir, desc)
+	}
 	if err := gitutil.FetchInto(dstDir, srcDir, "refs/heads/*", "refs/heads/*"); err != nil {
 		// Empty source repos have nothing to fetch; that is fine.
 		if _, rerr := gitutil.ResolveRef(srcDir, src.DefaultBranch); rerr == nil {
