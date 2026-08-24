@@ -1,17 +1,24 @@
 {{define "title"}}#{{.Issue.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
-<h2>#{{.Issue.Number}} {{.Issue.Title}} <span class="badge badge-unsigned">{{.Issue.State}}</span></h2>
-<p class="crumbs">by {{.Issue.Author}} at {{.Issue.CreatedAt}}
-{{if .Issue.Labels}} · labels: {{range .Issue.Labels}}{{.}} {{end}}{{end}}
-{{if .Issue.Assignees}} · assigned: {{range .Issue.Assignees}}{{.}} {{end}}{{end}}</p>
-{{if .BodyHTML}}<div class="rendered">{{.BodyHTML}}</div>{{end}}
+<h2 class="issuetitle">{{.Issue.Title}} <span class="issuenumber">#{{.Issue.Number}}</span></h2>
+<p class="issuemeta"><span class="chip {{if eq .Issue.State "open"}}chip-open{{else}}chip-done{{end}}">{{.Issue.State}}</span>
+{{.Issue.Author}} opened this on {{when .Issue.CreatedAt}}
+{{if .Issue.Labels}} · {{range .Issue.Labels}}<span class="chip label" style="{{index $.LabelColors .}}">{{.}}</span> {{end}}{{end}}
+{{if .Issue.Assignees}} · assigned to {{range .Issue.Assignees}}{{.}} {{end}}{{end}}</p>
+{{if .BodyHTML}}<article class="comment">
+  <header class="commenthead"><strong>{{.Issue.Author}}</strong> <span class="when">{{when .Issue.CreatedAt}}</span></header>
+  <div class="rendered">{{.BodyHTML}}</div>
+</article>{{end}}
 {{range .Comments}}
-<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div></div>
+<article class="comment">
+  <header class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></header>
+  <div class="rendered">{{.BodyHTML}}</div>
+</article>
 {{end}}
 {{if .Viewer}}
-<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment">
-<p><textarea name="body" rows="4" style="width:100%" placeholder="comment as {{.Viewer}}"></textarea></p>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">
+<p><textarea name="body" rows="4" placeholder="comment as {{.Viewer}}"></textarea></p>
 <p><button type="submit">comment</button></p>
 </form>
 {{end}}

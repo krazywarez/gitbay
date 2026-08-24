@@ -1,25 +1,34 @@
 {{define "title"}}!{{.MR.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
-<h2>!{{.MR.Number}} {{.MR.Title}} <span class="badge badge-unsigned">{{.MR.State}}</span></h2>
-<p class="crumbs">by {{.MR.Author}} · {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} → {{.MR.TargetRef}}
- @ <code>{{.MR.HeadSHA}}</code></p>
-{{if .BodyHTML}}<div class="rendered">{{.BodyHTML}}</div>{{end}}
-{{if .Checks}}<p>checks: <span class="badge check-{{.Combined}}">{{.Combined}}</span>
-{{range .Checks}} · {{if .TargetURL}}<a href="{{.TargetURL}}" rel="nofollow">{{.Context}}</a>{{else}}{{.Context}}{{end}} <span class="check-{{.State}}">{{.State}}</span>{{end}}</p>{{end}}
-{{range .Reviews}}<p>review: {{.Reviewer}} — {{.Verdict}}{{if .Stale}} <span class="badge badge-signed_key_expired">stale</span>{{end}}</p>{{end}}
+<h2 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h2>
+<p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
+{{.MR.Author}} wants to merge {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} into {{.MR.TargetRef}}
+ at <code>{{short .MR.HeadSHA}}</code></p>
+{{if .BodyHTML}}<article class="comment">
+  <header class="commenthead"><strong>{{.MR.Author}}</strong></header>
+  <div class="rendered">{{.BodyHTML}}</div>
+</article>{{end}}
+{{if .Checks}}<div class="checks">
+<p>checks: <span class="badge check-{{.Combined}}">{{.Combined}}</span>
+{{range .Checks}} · {{if .TargetURL}}<a href="{{.TargetURL}}" rel="nofollow">{{.Context}}</a>{{else}}{{.Context}}{{end}} <span class="check-{{.State}}">{{.State}}</span>{{end}}</p>
+</div>{{end}}
+{{range .Reviews}}<p class="review">review: <strong>{{.Reviewer}}</strong> — {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}</p>{{end}}
 {{range .Comments}}
-<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div></div>
+<article class="comment">
+  <header class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></header>
+  <div class="rendered">{{.BodyHTML}}</div>
+</article>
 {{end}}
 {{if .Viewer}}
-<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}/comment">
-<p><textarea name="body" rows="4" style="width:100%" placeholder="comment as {{.Viewer}}"></textarea></p>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}/comment" class="commentform">
+<p><textarea name="body" rows="4" placeholder="comment as {{.Viewer}}"></textarea></p>
 <p><button type="submit">comment</button></p>
 </form>
 {{end}}
 <h3>diff</h3>
 <pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
-{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="crumbs">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div><pre class="diff">{{end}}{{end}}</pre>
+{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="threadstate">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div><pre class="diff">{{end}}{{end}}</pre>
 {{if .DetachedThreads}}<h3>threads on earlier revisions</h3>
-{{range .DetachedThreads}}<div class="thread stale"><p class="crumbs">{{if .Stale}}stale · {{end}}{{if .Resolved}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div>{{end}}{{end}}
+{{range .DetachedThreads}}<div class="thread stale"><p class="threadstate">{{if .Stale}}stale{{end}}{{if .Resolved}}{{if .Stale}} · {{end}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div>{{end}}{{end}}
 {{end}}

@@ -1,16 +1,23 @@
 {{define "title"}}issues · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
-<h2>issues ({{.State}})</h2>
-<p class="crumbs"><a href="?state=open">open</a> · <a href="?state=closed">closed</a> · <a href="?state=all">all</a></p>
-<table>
-{{range .Issues}}<tr>
-  <td>#{{.Number}}</td>
-  <td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues/{{.Number}}">{{.Title}}</a></td>
-  <td>{{.State}}</td>
-  <td>{{.Author}}</td>
-  <td>{{range .Labels}}<span class="badge badge-unsigned">{{.}}</span> {{end}}</td>
-</tr>
-{{else}}<tr><td>no issues</td></tr>{{end}}
-</table>
+<div class="listhead">
+  <h2>issues</h2>
+  <nav class="filters">
+    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+  </nav>
+</div>
+<ul class="issuelist">
+{{range .Issues}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues/{{.Number}}">{{.Title}}</a>
+    {{range .Labels}}<span class="chip label" style="{{index $.LabelColors .}}">{{.}}</span> {{end}}</p>
+    <p class="meta">#{{.Number}} opened by {{.Author}}</p>
+  </div>
+  <span class="chip {{if eq .State "open"}}chip-open{{else}}chip-done{{end}}">{{.State}}</span>
+</li>
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues — open one with <code>gitbay issue create {{.Repo.OwnerName}}/{{.Repo.Name}} --title "..."</code></li>{{end}}
+</ul>
 {{end}}

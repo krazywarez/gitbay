@@ -167,6 +167,49 @@ func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	return out, rows.Err()
 }
 
+// ListIssueLabels returns the label names attached to each issue of a
+// repo, keyed by issue id. Used by the web issue listing; ListIssues
+// itself stays label-free for the CLI's lean list output.
+func (s *Store) ListIssueLabels(repoID int64) (map[int64][]string, error) {
+	rows, err := s.DB.Query(`
+		SELECT il.issue_id, l.name FROM issue_labels il
+		JOIN labels l ON l.id = il.label_id
+		WHERE l.repo_id = ? ORDER BY l.name`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], name)
+	}
+	return out, rows.Err()
+}
+
+// LabelColors returns the repo's label colors keyed by label name. Labels
+// with no stored color map to "".
+func (s *Store) LabelColors(repoID int64) (map[string]string, error) {
+	rows, err := s.DB.Query("SELECT name, color FROM labels WHERE repo_id = ?", repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var name, color string
+		if err := rows.Scan(&name, &color); err != nil {
+			return nil, err
+		}
+		out[name] = color
+	}
+	return out, rows.Err()
+}
+
 // SetIssueLabel attaches (add) or detaches a label, creating the repo label
 // on first use.
 func (s *Store) SetIssueLabel(repoID, issueID int64, name string, add bool) error {

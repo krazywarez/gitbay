@@ -8,6 +8,7 @@ import (
 	"io"
 	"runtime/debug"
 	"sync"
+	"time"
 )
 
 //go:embed templates/*.html
@@ -42,6 +43,15 @@ var funcs = template.FuncMap{
 			return s[:10]
 		}
 		return s
+	},
+	// when formats a stored RFC3339 timestamp for display; unparseable
+	// values pass through unchanged.
+	"when": func(s string) string {
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return s
+		}
+		return t.UTC().Format("2006-01-02 15:04")
 	},
 }
 

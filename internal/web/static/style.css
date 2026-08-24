@@ -352,8 +352,10 @@ pre.diff .meta { color: var(--muted); }
 }
 .chip-open { --chip: var(--ok); }
 .chip-closed { --chip: var(--bad); }
-.chip-merged { --chip: var(--done); }
-.chip-neutral { --chip: var(--neutral); }
+.chip-merged, .chip-done { --chip: var(--done); }
+.chip-neutral, .chip-source_gone { --chip: var(--neutral); }
+.chip-stale { --chip: var(--warn); }
+.chip.label { font-weight: 500; }
 .badge-verified { --chip: var(--ok); }
 .badge-unsigned { --chip: var(--neutral); }
 .badge-signed_unknown_key { --chip: var(--warn); }
@@ -368,6 +370,63 @@ span.check-success { color: var(--ok); }
 span.check-pending { color: var(--warn); }
 span.check-failure, span.check-error { color: var(--bad); }
 
+/* issue and MR listings */
+.listhead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.listhead h2 { margin-bottom: var(--sp-2); }
+nav.filters { display: flex; gap: var(--sp-1); }
+nav.filters a {
+  color: var(--muted);
+  font-size: var(--fs-2);
+  padding: 0.05rem var(--sp-2);
+  border-radius: var(--r-pill);
+}
+nav.filters a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
+nav.filters a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+ul.issuelist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
+ul.issuelist li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--faint);
+}
+ul.issuelist li.empty { display: block; color: var(--muted); }
+ul.issuelist .issuemain { flex: 1; min-width: 0; }
+ul.issuelist p { margin: 0; }
+ul.issuelist .title a { color: var(--fg); font-weight: 550; }
+ul.issuelist .title a:hover { color: var(--accent); }
+
+/* issue / MR detail */
+h2.issuetitle { margin-bottom: var(--sp-1); font-size: var(--fs-5); }
+.issuenumber { color: var(--muted); font-weight: 400; }
+.issuemeta { color: var(--muted); font-size: var(--fs-2); margin-top: 0; }
+.review { font-size: var(--fs-2); }
+
+/* comment cards */
+article.comment {
+  border: 1px solid var(--faint);
+  border-radius: var(--r-lg);
+  margin: var(--sp-4) 0;
+}
+article.comment .commenthead {
+  background: var(--surface);
+  border-bottom: 1px solid var(--faint);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-2);
+}
+article.comment .commenthead .when { color: var(--muted); }
+article.comment .rendered { padding: 0 var(--sp-4); }
+article.comment .rendered > :first-child { margin-top: var(--sp-3); }
+article.comment .rendered > :last-child { margin-bottom: var(--sp-3); }
+form.commentform { margin: var(--sp-4) 0; }
+
 /* review threads under diff lines */
 .thread {
   border: 1px solid var(--faint);
@@ -378,6 +437,10 @@ span.check-failure, span.check-error { color: var(--bad); }
 }
 .thread.resolved { border-left-color: var(--ok); opacity: 0.75; }
 .thread.stale { border-left-color: var(--warn); }
+.thread p.commenthead { font-size: var(--fs-2); margin: var(--sp-2) 0 0; }
+.thread .when { color: var(--muted); }
+.thread .rendered p { margin: var(--sp-1) 0; }
+.thread .threadstate { color: var(--muted); font-size: var(--fs-1); margin: var(--sp-1) 0 0; }
 
 /* forms */
 input, textarea, button, select { font: inherit; color: inherit; }

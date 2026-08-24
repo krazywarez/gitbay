@@ -3,6 +3,7 @@ package httpd
 import (
 	"bytes"
 	"fmt"
+	"hash/fnv"
 
 	"gitbay.org/gitbay/internal/policy"
 	"html/template"
@@ -645,6 +646,32 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg, v, checks, lines})
 }
 
+// labelPalette provides default label chip colors: mid-tone hues that stay
+// legible on light and dark backgrounds.
+var labelPalette = []string{
+	"#0969da", "#1a7f37", "#9a6700", "#cf222e",
+	"#8250df", "#b93a86", "#0b6c80", "#bf5b16",
+}
+
+var hexColorPat = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// labelColors returns a complete label-name -> chip color map for a repo:
+// the stored labels.color when it is a valid hex color, otherwise a
+// stable default picked from the palette by name hash.
+func (s *Server) labelColors(repoID int64) map[string]template.CSS {
+	stored, _ := s.st.LabelColors(repoID)
+	out := make(map[string]template.CSS, len(stored))
+	for name, color := range stored {
+		if !hexColorPat.MatchString(color) {
+			h := fnv.New32a()
+			h.Write([]byte(name))
+			color = labelPalette[h.Sum32()%uint32(len(labelPalette))]
+		}
+		out[name] = template.CSS("--chip:" + color)
+	}
+	return out
+}
+
 func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
@@ -660,11 +687,17 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if labels, err := s.st.ListIssueLabels(p.Repo.ID); err == nil {
+		for i := range issues {
+			issues[i].Labels = labels[issues[i].ID]
+		}
+	}
 	s.render(w, "issues.html", struct {
 		repoPage
-		State  string
-		Issues []store.Issue
-	}{p, state, issues})
+		State       string
+		Issues      []store.Issue
+		LabelColors map[string]template.CSS
+	}{p, state, issues, s.labelColors(p.Repo.ID)})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
@@ -690,10 +723,11 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "issue.html", struct {
 		repoPage
-		Issue    store.Issue
-		BodyHTML template.HTML
-		Comments []renderedComment
-	}{p, iss, mdHTML(iss.Body), renderComments(comments)})
+		Issue       store.Issue
+		BodyHTML    template.HTML
+		Comments    []renderedComment
+		LabelColors map[string]template.CSS
+	}{p, iss, mdHTML(iss.Body), renderComments(comments), s.labelColors(p.Repo.ID)})
 }
 
 func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {

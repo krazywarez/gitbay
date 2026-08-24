@@ -1,16 +1,23 @@
 {{define "title"}}merge requests · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
-<h2>merge requests ({{.State}})</h2>
-<p class="crumbs"><a href="?state=open">open</a> · <a href="?state=merged">merged</a> · <a href="?state=closed">closed</a> · <a href="?state=all">all</a></p>
-<table>
-{{range .MRs}}<tr>
-  <td>!{{.Number}}</td>
-  <td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></td>
-  <td>{{.State}}</td>
-  <td>{{.Author}}</td>
-  <td>{{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</td>
-</tr>
-{{else}}<tr><td>no merge requests</td></tr>{{end}}
-</table>
+<div class="listhead">
+  <h2>merge requests</h2>
+  <nav class="filters">
+    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "merged"}}class="active" {{end}}href="?state=merged">merged</a>
+    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+  </nav>
+</div>
+<ul class="issuelist">
+{{range .MRs}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></p>
+    <p class="meta">!{{.Number}} by {{.Author}} · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
+  </div>
+  <span class="chip chip-{{.State}}">{{.State}}</span>
+</li>
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}
+</ul>
 {{end}}
