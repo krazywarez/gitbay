@@ -1,0 +1,118 @@
+#+title: gitbay
+#+author: Christian Cleberg
+
+A CLI-first git forge. One binary, SQLite, and the system =git= — designed
+so the command line is the product and the web UI is a rendering of state
+the CLI already manages. Runs at [[https://gitbay.org]].
+
+* Design
+
+SSH is the API. The server authenticates by public key, then dispatches the
+requested command: =git-upload-pack= / =git-receive-pack= stream the git
+transport, anything else is a control command. The control plane is fully
+usable from stock OpenSSH with no client installed:
+
+#+begin_src sh
+ssh git@gitbay.org repo create you/project --private
+ssh git@gitbay.org issue create you/project --title "bug" --file - < body.md
+ssh git@gitbay.org repo log you/project --json
+#+end_src
+
+The =gitbay= CLI is ergonomics on top — instance profiles, repo inference
+from the origin remote, =$EDITOR= for long text — never a requirement. A
+registry test enforces that every command stays reachable over bare ssh.
+
+Properties that follow from the design:
+
+- pushing is SSH-only. HTTPS and =git://= serve anonymous reads of public
+  repositories; a push over HTTPS is answered with a pkt-line ERR that
+  every git version prints as =remote error:= — no credential prompt,
+  ever. Private repositories answer 404/not-found identically to
+  nonexistent ones on every surface.
+- commit signatures (OpenPGP and SSHSIG) are verified against registered
+  keys and verified emails, with six distinct states — =verified=,
+  =signed_unknown_key=, =signed_email_mismatch=, =signed_key_expired=,
+  =signed_key_revoked=, =bad_signature=, =unsigned= — cached and
+  invalidated by a global key epoch, so registering a key retroactively
+  verifies old commits.
+- there is no server signing key. Server-created commits (web edits,
+  merge/squash/rebase commits) display honestly as unsigned, and branches
+  with =require_signed_commits= accept only fast-forward merges of
+  verified commits — enforced at push time and merge time.
+- the web UI is server-rendered with no JavaScript required. In
+  =view_only= mode the mutating routes are never registered on the mux;
+  browser sessions, where enabled, are minted over SSH (=web login=) —
+  there are no passwords.
+
+* Features
+
+- repositories with per-branch protection, forks, and organizations
+  (shared owner namespace, membership-derived access)
+- issues and merge requests (fast-forward, merge-commit, squash, rebase)
+  entirely over ssh, with reviews that go stale on force-push
+- merge request heads are fetched /into/ the target repository, so an MR
+  survives deletion of its source fork
+- =repo import= mirrors from any http(s)/git URL, tokens via stdin only
+- registration modes: =closed= (admin creates users), =invite=, =open=
+  with SMTP email verification
+- signed outbound webhooks with retries, dead-lettering, and SSRF
+  guarding; a JSON API (=POST /api/v1/cmd=) fronting the same command
+  registry, with bearer tokens mintable only over SSH
+- built-in ACME (Let's Encrypt) TLS; =admin backup= produces one
+  restore-tested archive (database snapshot first, then repositories)
+
+* Server quickstart
+
+#+begin_src sh
+# /etc/gitbay/config.toml
+[server]
+root = "/var/lib/gitbay"
+site_url = "https://forge.example.org"
+
+[http]
+acme_email = "you@example.org"
+#+end_src
+
+#+begin_src sh
+gitbayd --config /etc/gitbay/config.toml check-config
+gitbayd --config /etc/gitbay/config.toml admin user create you \
+    --key ~/.ssh/id_ed25519.pub --email you@example.org --verified --admin
+gitbayd --config /etc/gitbay/config.toml serve
+#+end_src
+
+The embedded SSH listener takes port 22 (move the host sshd, or set
+=ssh.mode = "system"= to run under it via =AuthorizedKeysCommand=). See
+=deploy/= for a cloud-init file, hardened systemd unit, and nightly
+backup timer.
+
+* Client quickstart
+
+#+begin_src sh
+gitbay remote add myforge forge.example.org --default
+gitbay auth whoami
+gitbay repo create you/project
+gitbay repo clone you/project && cd project
+gitbay issue create --title "first issue"   # repo inferred from origin
+gitbay mr checkout 4                        # fetches refs/merge-requests/4/head
+#+end_src
+
+Every read command takes =--json=; stdout is data, stderr is messages;
+exit codes are stable (0 ok, 2 usage, 3 not found, 4 denied). Man pages
+via =gitbay man=, completions via =gitbay completion <shell>=.
+
+* Development
+
+#+begin_src sh
+go build ./...
+go test ./...        # e2e drives real git, ssh, sshd, and gpg binaries
+#+end_src
+
+Layout: =cmd/gitbay= (CLI), =cmd/gitbayd= (daemon, hooks, admin),
+=internal/control= (command registry — the single source of truth fronted
+by ssh and the JSON API), =internal/sshd= / =httpd= / =gitd= (transports),
+=internal/sig= (signature verification), =internal/policy= (access rules),
+=internal/store= (SQLite, migrations), =e2e/= (integration tests).
+
+* License
+
+0BSD.
