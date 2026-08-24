@@ -94,10 +94,15 @@ code, pre, .code, td.mode, td.size {
   font-size: var(--fs-1);
 }
 
-/* layout */
+/* layout: one shared container aligns header, content, and footer */
+.container {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+}
 header {
   border-bottom: 1px solid var(--faint);
-  padding: var(--sp-3) var(--sp-5);
+  padding: var(--sp-3) 0;
 }
 a.site {
   font-weight: 650;
@@ -109,10 +114,10 @@ a.site {
 }
 a.site:hover { text-decoration: none; color: var(--accent); }
 a.site svg.mark { display: block; }
-main {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: var(--sp-3) var(--sp-5) var(--sp-6);
+main.container {
+  width: 100%;
+  padding-top: var(--sp-3);
+  padding-bottom: var(--sp-6);
 }
 
 /* tables */
@@ -186,7 +191,21 @@ nav.tabs a.active { color: var(--fg); border-bottom-color: var(--accent); font-w
 }
 .pathbar .crumbs strong { color: var(--fg); }
 
-/* file table */
+/* file and refs tables: bordered cards, rows inside */
+table.tree, table.refs {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  margin-bottom: var(--sp-4);
+}
+table.tree td, table.refs td {
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--faint);
+}
+table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: none; }
+table.tree tr:hover td, table.refs tr:hover td { background: var(--surface); }
 table.tree td.name { width: 100%; }
 table.tree td.name a { color: var(--fg); }
 table.tree td.name a:hover { color: var(--accent); }
@@ -210,14 +229,23 @@ table.refs td.sha { color: var(--muted); }
 }
 
 /* log */
-ul.loglist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
+ul.loglist {
+  list-style: none;
+  margin: var(--sp-3) 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
 ul.loglist li {
   display: flex;
   align-items: baseline;
   gap: var(--sp-3);
-  padding: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-4);
   border-bottom: 1px solid var(--faint);
 }
+ul.loglist li:last-child { border-bottom: none; }
+ul.loglist li:hover { background: var(--surface); }
 ul.loglist .commitmain { flex: 1; min-width: 0; }
 ul.loglist p { margin: 0; }
 ul.loglist .subject a { color: var(--fg); font-weight: 550; }
@@ -242,14 +270,59 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
 svg.icon { vertical-align: -0.125em; }
 .lede { font-size: var(--fs-3); margin: var(--sp-2) 0; }
 
-/* repo listings (index, owner pages) */
-ul.repolist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
-ul.repolist li { padding: var(--sp-3) 0; border-bottom: 1px solid var(--faint); }
-ul.repolist li.empty { color: var(--muted); }
-ul.repolist p { margin: 0; }
-ul.repolist .reponame { font-size: var(--fs-3); font-weight: 550; }
-ul.repolist .desc { margin-top: 0.1rem; }
-ul.repolist .meta { margin-top: 0.1rem; }
+/* repo listings (index, owner pages): responsive card grid */
+.repogrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0 var(--sp-5);
+}
+.repogrid .empty { color: var(--muted); grid-column: 1 / -1; }
+.repocard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  min-width: 0;
+}
+.repocard p { margin: 0; }
+.repocard .reponame {
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repocard .desc {
+  font-size: var(--fs-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.repocard .meta { margin-top: auto; padding-top: var(--sp-1); }
+.repocard .reponame .sep { color: var(--muted); margin: 0 0.1em; }
+
+/* owner profile header */
+.profilehead {
+  border-bottom: 1px solid var(--faint);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.profilehead h1 { margin: var(--sp-4) 0 var(--sp-1); }
+.profilehead .lede { margin: 0 0 var(--sp-1); }
+.profilehead .meta { margin: var(--sp-1) 0 0; }
+h2 .count { color: var(--muted); font-weight: 400; font-size: var(--fs-2); }
+
+/* heading row with actions on the right */
+.headrow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.headrow .spacer { flex: 1; }
 
 /* member and org chips on owner pages */
 a.memberchip {
@@ -394,14 +467,23 @@ nav.filters a {
 nav.filters a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
 nav.filters a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
-ul.issuelist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
+ul.issuelist {
+  list-style: none;
+  margin: var(--sp-2) 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
 ul.issuelist li {
   display: flex;
   align-items: baseline;
   gap: var(--sp-3);
-  padding: var(--sp-3) 0;
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--faint);
 }
+ul.issuelist li:last-child { border-bottom: none; }
+ul.issuelist li:hover { background: var(--surface); }
 ul.issuelist li.empty { display: block; color: var(--muted); }
 ul.issuelist .issuemain { flex: 1; min-width: 0; }
 ul.issuelist p { margin: 0; }
@@ -414,7 +496,10 @@ h2.issuetitle { margin-bottom: var(--sp-1); font-size: var(--fs-5); }
 .issuemeta { color: var(--muted); font-size: var(--fs-2); margin-top: 0; }
 .review { font-size: var(--fs-2); }
 
-/* comment cards */
+/* comment cards; discussion stays at a readable measure */
+article.comment, form.commentform {
+  max-width: 48rem;
+}
 article.comment {
   border: 1px solid var(--faint);
   border-radius: var(--r-lg);
@@ -484,10 +569,8 @@ button:hover { filter: brightness(1.08); }
 
 /* footer */
 footer {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: var(--sp-4) var(--sp-5);
   border-top: 1px solid var(--faint);
+  padding: var(--sp-4) 0;
   color: var(--muted);
   font-size: var(--fs-1);
 }
@@ -541,8 +624,9 @@ footer a:hover { color: var(--accent); }
 
 /* mobile */
 @media (max-width: 40rem) {
-  header { padding: var(--sp-3) var(--sp-4); }
-  main { padding: var(--sp-2) var(--sp-4) var(--sp-6); }
+  .container { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  main.container { padding-top: var(--sp-2); }
+  .repogrid { grid-template-columns: 1fr; }
   .thread { margin-left: var(--sp-3); }
   table.tree td.mode { display: none; }
   .readme, .code { padding: var(--sp-3); }

@@ -1,23 +1,26 @@
 {{define "title"}}{{.Site}}{{end}}
 {{define "content"}}
+<div class="headrow">
+<h1>repositories</h1>
+<span class="spacer"></span>
 {{if .Viewer}}<p class="toolbar">logged in as {{.Viewer}} · <a href="/new">new repository</a> ·
 <form method="post" action="/logout" class="inline"><button type="submit" class="linklike">logout</button></form></p>{{end}}
-<h1>repositories</h1>
-<ul class="repolist">
-{{range .Repos}}<li>
-  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a>/<a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
+</div>
+<div class="repogrid">
+{{range .Repos}}<div class="repocard">
+  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
-</li>
-{{else}}<li class="empty">no public repositories yet</li>{{end}}
-</ul>
+</div>
+{{else}}<p class="empty">no public repositories yet</p>{{end}}
+</div>
 {{if .Mine}}<h2>your private repositories</h2>
-<ul class="repolist">
-{{range .Mine}}<li>
+<div class="repogrid">
+{{range .Mine}}<div class="repocard">
   <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}/{{.Name}}</a> <span class="chip chip-neutral">{{.Visibility}}</span></p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
-</li>
+</div>
 {{end}}
-</ul>{{end}}
+</div>{{end}}
 {{end}}
