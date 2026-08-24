@@ -42,6 +42,14 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") {
 		t.Fatalf("issue 1 not closed by commit: %s", out)
 	}
+	// The entry is a system message with a linked sha, not a user comment.
+	if !strings.Contains(out, `"author":"system"`) || !strings.Contains(out, "](/alice/app/commit/") {
+		t.Fatalf("close entry not a linked system message: %s", out)
+	}
+	if status, body := inst.get(t, "/alice/app/issues/1"); status != 200 ||
+		!strings.Contains(body, `class="syscomment"`) || !strings.Contains(body, `/alice/app/commit/`) {
+		t.Fatalf("web system message: %d", status)
+	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "2", "--json")
 	if !strings.Contains(out, `"state":"open"`) || !strings.Contains(out, "referenced in commit") ||
 		!strings.Contains(out, "repair the widget") {

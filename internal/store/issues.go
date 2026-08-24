@@ -25,6 +25,7 @@ type IssueComment struct {
 	Author    string
 	Body      string
 	CreatedAt string
+	Kind      string // comment | system
 }
 
 // CreateIssue allocates the per-repo number from the repo counter inside the
@@ -155,7 +156,8 @@ func (s *Store) AddIssueComment(issueID, authorID int64, body string) error {
 
 func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
-		SELECT u.username, c.body, c.created_at
+		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
+		       c.body, c.created_at, c.kind
 		FROM issue_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.issue_id = ? ORDER BY c.id`, issueID)
 	if err != nil {
@@ -165,12 +167,22 @@ func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// AddIssueSystemComment records an informational entry (commit references,
+// automated closes). The actor is kept for provenance but the entry
+// displays as coming from the system, not the user.
+func (s *Store) AddIssueSystemComment(issueID, actorID int64, body string) error {
+	_, err := s.DB.Exec(
+		"INSERT INTO issue_comments (issue_id, author_id, body, kind) VALUES (?, ?, ?, 'system')",
+		issueID, actorID, body)
+	return err
 }
 
 // ListIssueLabels returns the label names attached to each issue of a

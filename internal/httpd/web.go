@@ -815,13 +815,14 @@ func (s *Server) ugcFor(r *http.Request, repo store.Repo) func(string) template.
 type renderedComment struct {
 	Author    string
 	CreatedAt string
+	Kind      string
 	BodyHTML  template.HTML
 }
 
 func renderComments(cs []store.IssueComment, md func(string) template.HTML) []renderedComment {
 	var out []renderedComment
 	for _, c := range cs {
-		out = append(out, renderedComment{c.Author, c.CreatedAt, md(c.Body)})
+		out = append(out, renderedComment{c.Author, c.CreatedAt, c.Kind, md(c.Body)})
 	}
 	return out
 }
@@ -930,11 +931,11 @@ func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA strin
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
-				Comments: []renderedComment{{cm.Author, cm.CreatedAt, md(cm.Body)}}}
+				Comments: []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body)}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
 			order = append(order, cm.ID)
 		} else if th, ok := threads[cm.ReplyTo]; ok {
-			th.Comments = append(th.Comments, renderedComment{cm.Author, cm.CreatedAt, md(cm.Body)})
+			th.Comments = append(th.Comments, renderedComment{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body)})
 		}
 	}
 	placed := map[int64]bool{}

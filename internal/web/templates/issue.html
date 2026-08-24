@@ -12,10 +12,11 @@
   <div class="rendered">{{.BodyHTML}}</div>
 </article>{{end}}
 {{range .Comments}}
-<article class="comment">
-  <header class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></header>
+{{if eq .Kind "system"}}<div class="syscomment">{{.BodyHTML}} <span class="when">{{when .CreatedAt}}</span></div>
+{{else}}<article class="comment">
+  <header class="commenthead"><strong><a href="/{{.Author}}">{{.Author}}</a></strong> <span class="when">{{when .CreatedAt}}</span></header>
   <div class="rendered">{{.BodyHTML}}</div>
-</article>
+</article>{{end}}
 {{end}}
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">

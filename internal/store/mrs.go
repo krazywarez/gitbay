@@ -185,9 +185,18 @@ func (s *Store) AddMRComment(mrID, authorID int64, body string) error {
 	return err
 }
 
+// AddMRSystemComment is the informational counterpart of AddMRComment.
+func (s *Store) AddMRSystemComment(mrID, actorID int64, body string) error {
+	_, err := s.DB.Exec(
+		"INSERT INTO mr_comments (mr_id, author_id, body, kind) VALUES (?, ?, ?, 'system')",
+		mrID, actorID, body)
+	return err
+}
+
 func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
-		SELECT u.username, c.body, c.created_at
+		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
+		       c.body, c.created_at, c.kind
 		FROM mr_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.mr_id = ? ORDER BY c.id`, mrID)
 	if err != nil {
@@ -197,7 +206,7 @@ func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

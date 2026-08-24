@@ -69,14 +69,17 @@ func actOnIssue(st *store.Store, repo store.Repo, actorID int64, sha string, num
 	if len(short) > 10 {
 		short = short[:10]
 	}
+	// Informational system entries, not comments from the pusher; the
+	// linked sha renders clickable on the web.
+	link := fmt.Sprintf("[%s](/%s/commit/%s)", short, repo.Path(), sha)
 	if close && issue.State == "open" {
 		if err := st.SetIssueState(issue.ID, "closed"); err != nil {
 			slog.Error("commit refs: closing issue", "issue", number, "err", err)
 			return
 		}
-		st.AddIssueComment(issue.ID, actorID, fmt.Sprintf("closed by commit %s: %s", short, subject))
+		st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("closed by commit %s: %s", link, subject))
 		st.RecordEvent(repo.ID, actorID, "issue.closed", fmt.Sprintf(`{"number":%d,"sha":%q}`, number, sha))
 		return
 	}
-	st.AddIssueComment(issue.ID, actorID, fmt.Sprintf("referenced in commit %s: %s", short, subject))
+	st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("referenced in commit %s: %s", link, subject))
 }

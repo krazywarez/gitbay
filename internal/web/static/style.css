@@ -616,6 +616,15 @@ article.comment .rendered { padding: 0 var(--sp-4); }
 article.comment .rendered > :first-child { margin-top: var(--sp-3); }
 article.comment .rendered > :last-child { margin-bottom: var(--sp-3); }
 form.commentform { margin: var(--sp-4) 0; }
+.syscomment {
+  max-width: 48rem;
+  color: var(--muted);
+  font-size: var(--fs-2);
+  margin: var(--sp-3) 0;
+  padding-left: var(--sp-4);
+  border-left: 3px solid var(--faint);
+}
+.syscomment p { display: inline; margin: 0; }
 
 /* review threads under diff lines */
 .thread {
