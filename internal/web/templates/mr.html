@@ -4,10 +4,10 @@
 <h2>!{{.MR.Number}} {{.MR.Title}} <span class="badge badge-unsigned">{{.MR.State}}</span></h2>
 <p class="crumbs">by {{.MR.Author}} · {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} → {{.MR.TargetRef}}
  @ <code>{{.MR.HeadSHA}}</code></p>
-{{if .MR.Body}}<pre class="message">{{.MR.Body}}</pre>{{end}}
+{{if .BodyHTML}}<div class="rendered">{{.BodyHTML}}</div>{{end}}
 {{range .Reviews}}<p>review: {{.Reviewer}} — {{.Verdict}}{{if .Stale}} <span class="badge badge-signed_key_expired">stale</span>{{end}}</p>{{end}}
 {{range .Comments}}
-<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><pre class="message">{{.Body}}</pre></div>
+<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div></div>
 {{end}}
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}/comment">

@@ -342,6 +342,34 @@ func pickReadme(entries []gitutil.TreeEntry) string {
 	return best
 }
 
+// mdHTML renders user-authored markdown (issue and MR bodies, comments).
+// goldmark's default renderer drops raw HTML, so this is safe as-is.
+func mdHTML(raw string) template.HTML {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	var buf bytes.Buffer
+	if goldmark.Convert([]byte(raw), &buf) != nil {
+		return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
+	}
+	return template.HTML(buf.String())
+}
+
+// renderedComment pairs a comment with its rendered body for templates.
+type renderedComment struct {
+	Author    string
+	CreatedAt string
+	BodyHTML  template.HTML
+}
+
+func renderComments(cs []store.IssueComment) []renderedComment {
+	var out []renderedComment
+	for _, c := range cs {
+		out = append(out, renderedComment{c.Author, c.CreatedAt, mdHTML(c.Body)})
+	}
+	return out
+}
+
 // ugcPolicy sanitizes rendered repo content before it enters the forge's
 // origin: markdown is already safe (goldmark drops raw HTML), but org-mode
 // output and repo-authored HTML are not.
@@ -548,8 +576,9 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue    store.Issue
-		Comments []store.IssueComment
-	}{p, iss, comments})
+		BodyHTML template.HTML
+		Comments []renderedComment
+	}{p, iss, mdHTML(iss.Body), renderComments(comments)})
 }
 
 func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
@@ -605,10 +634,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR        store.MR
-		Comments  []store.IssueComment
+		BodyHTML  template.HTML
+		Comments  []renderedComment
 		Reviews   []store.MRReview
 		DiffLines []diffLine
-	}{p, m, comments, reviews, lines})
+	}{p, m, mdHTML(m.Body), renderComments(comments), reviews, lines})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

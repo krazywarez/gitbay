@@ -132,7 +132,8 @@ func TestIssueLifecycleOverBareSSH(t *testing.T) {
 		t.Fatalf("missing repo: exit %d, want 3", code)
 	}
 
-	// Web read views: list shows the issue, detail shows the comment.
+	// Web read views: list shows the issue, detail shows the comment, and
+	// bodies render as markdown (goldmark drops raw HTML).
 	status, body := inst.get(t, "/alice/proj/issues")
 	if status != 200 || !strings.Contains(body, "first bug") {
 		t.Fatalf("issues page: %d", status)
@@ -140,6 +141,17 @@ func TestIssueLifecycleOverBareSSH(t *testing.T) {
 	status, body = inst.get(t, "/alice/proj/issues/1")
 	if status != 200 || !strings.Contains(body, "me too") || !strings.Contains(body, "bug") {
 		t.Fatalf("issue detail: %d\n%s", status, body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/proj",
+		"--title", "'md body'", "--body", "'has **bold** and <script>x</script>'"); code != 0 {
+		t.Fatal("md issue create failed")
+	}
+	status, body = inst.get(t, "/alice/proj/issues/3")
+	if status != 200 || !strings.Contains(body, "<strong>bold</strong>") {
+		t.Fatalf("markdown body not rendered: %d\n%s", status, body)
+	}
+	if strings.Contains(body, "<script>x</script>") {
+		t.Fatal("raw HTML survived in issue body")
 	}
 
 	// Private repos hide their issues from non-readers, as not-found.

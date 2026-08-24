@@ -5,9 +5,9 @@
 <p class="crumbs">by {{.Issue.Author}} at {{.Issue.CreatedAt}}
 {{if .Issue.Labels}} · labels: {{range .Issue.Labels}}{{.}} {{end}}{{end}}
 {{if .Issue.Assignees}} · assigned: {{range .Issue.Assignees}}{{.}} {{end}}{{end}}</p>
-{{if .Issue.Body}}<pre class="message">{{.Issue.Body}}</pre>{{end}}
+{{if .BodyHTML}}<div class="rendered">{{.BodyHTML}}</div>{{end}}
 {{range .Comments}}
-<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><pre class="message">{{.Body}}</pre></div>
+<div class="readme"><p class="crumbs">{{.Author}} at {{.CreatedAt}}</p><div class="rendered">{{.BodyHTML}}</div></div>
 {{end}}
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment">

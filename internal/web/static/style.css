@@ -34,7 +34,11 @@ p.clone code { background: var(--code-bg); padding: 0.15rem 0.4rem; border-radiu
    colors in both schemes so unstyled tokens stay legible. */
 .code { background: #f8f8f8; color: #1a1a1a; }
 .code pre { margin: 0; background: transparent !important; }
-pre.message { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; }
+pre.message { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rendered { max-width: 100%; overflow-wrap: anywhere; }
+.rendered pre { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; overflow-x: auto; }
+.rendered code { background: var(--code-bg); padding: 0.1rem 0.3rem; border-radius: 3px; }
+.rendered blockquote { border-left: 3px solid var(--line); margin-left: 0; padding-left: 1rem; color: var(--muted); }
 pre.diff { background: var(--code-bg); padding: 0.8rem; border-radius: 6px; overflow-x: auto; }
 pre.diff .add { color: var(--ok); }
 pre.diff .del { color: var(--bad); }
