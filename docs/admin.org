@@ -121,6 +121,19 @@ gitbayd admin invite --email b@example.org       # mails a code; prints it if no
 records which. Verified emails are what make commit signatures
 meaningful — an unverified address never produces a =verified= badge.
 
+* Maintenance
+
+#+begin_src sh
+gitbayd admin stats [--json]         # counts, database size, per-repo disk
+gitbayd admin gc [--repo owner/name] # git gc: repack and prune; per-repo sizes
+gitbayd admin gc --aggressive        # thorough repack; slow, rarely needed
+#+end_src
+
+=deploy/cloud-init.yaml= ships a =gitbay-gc.timer= that runs =admin gc=
+weekly (Sunday 07:00 UTC). Imported repositories keep whatever pack
+layout the source sent, so a first manual =admin gc= after a bulk
+import is worthwhile.
+
 * Backup and restore
 
 #+begin_src sh

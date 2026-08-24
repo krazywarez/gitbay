@@ -242,15 +242,6 @@ func adminCmd() *cobra.Command {
 		Use:   "admin",
 		Short: "host-local administration",
 	}
-	notImplemented := func(use, short string) *cobra.Command {
-		return &cobra.Command{
-			Use:   use,
-			Short: short,
-			RunE: func(cmd *cobra.Command, args []string) error {
-				return fmt.Errorf("not implemented")
-			},
-		}
-	}
 	userCmd := &cobra.Command{Use: "user", Short: "manage users"}
 	userCmd.AddCommand(adminUserCreateCmd())
 	emailCmd := &cobra.Command{Use: "email", Short: "manage user emails"}
@@ -260,8 +251,8 @@ func adminCmd() *cobra.Command {
 		emailCmd,
 		adminInviteCmd(),
 		backupCmd(),
-		notImplemented("gc", "run git gc across repositories"),
-		notImplemented("stats", "instance statistics"),
+		gcCmd(),
+		statsCmd(),
 	)
 	return admin
 }

@@ -115,6 +115,26 @@ write_files:
       [Install]
       WantedBy=timers.target
 
+  - path: /etc/systemd/system/gitbay-gc.service
+    content: |
+      [Unit]
+      Description=gitbay weekly repository maintenance
+      [Service]
+      Type=oneshot
+      User=gitbay
+      ExecStart=/usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin gc
+
+  - path: /etc/systemd/system/gitbay-gc.timer
+    content: |
+      [Unit]
+      Description=gitbay weekly repository maintenance
+      [Timer]
+      OnCalendar=Sun *-*-* 07:00:00 UTC
+      RandomizedDelaySec=30m
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
 runcmd:
   - adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
   - install -d -o gitbay -g gitbay -m 750 /var/lib/gitbay /var/backups/gitbay
@@ -126,5 +146,5 @@ runcmd:
   - ufw --force enable
   - systemctl daemon-reload
   - systemctl restart ssh.socket || systemctl restart ssh
-  - systemctl enable gitbayd gitbay-backup.timer
-  - systemctl start gitbay-backup.timer
+  - systemctl enable gitbayd gitbay-backup.timer gitbay-gc.timer
+  - systemctl start gitbay-backup.timer gitbay-gc.timer
