@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	gossh "golang.org/x/crypto/ssh"
+
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
@@ -162,6 +164,47 @@ func (s *Server) repoForUser(w http.ResponseWriter, r *http.Request, u store.Use
 		return store.Repo{}, false
 	}
 	return repo, true
+}
+
+// signupForm and signupSubmit front the SSH registration path for open
+// and invite instances: same store transactions, same rules, a pasted
+// public key instead of the connecting one.
+func (s *Server) signupForm(w http.ResponseWriter, r *http.Request) {
+	s.renderSignup(w, "", "")
+}
+
+func (s *Server) renderSignup(w http.ResponseWriter, errMsg, username string) {
+	s.render(w, "register.html", struct {
+		Site     string
+		Viewer   string
+		Host     string
+		Mode     string // open | invite
+		Error    string
+		Username string
+	}{s.siteName(), "", s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
+}
+
+func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	keyText := strings.TrimSpace(r.FormValue("key"))
+	pub, _, _, _, err := gossh.ParseAuthorizedKey([]byte(keyText))
+	if err != nil {
+		s.renderSignup(w, "that does not parse as an SSH public key (expected e.g. \"ssh-ed25519 AAAA... comment\")", username)
+		return
+	}
+	msg, errMsg, code := control.RegisterAccount(s.cfg, s.st, pub, username,
+		strings.TrimSpace(r.FormValue("email")), strings.TrimSpace(r.FormValue("invite")))
+	if code != 0 {
+		s.renderSignup(w, errMsg, username)
+		return
+	}
+	s.render(w, "registered.html", struct {
+		Site     string
+		Viewer   string
+		Username string
+		Message  string
+		Host     string
+	}{s.siteName(), "", username, msg, s.cfg.SiteHost()})
 }
 
 // issueCreateForm renders the new-issue form, prefilled from the repo's

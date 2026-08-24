@@ -1,0 +1,11 @@
+{{define "title"}}welcome · {{.Site}}{{end}}
+{{define "content"}}
+<div class="landing">
+<h1>welcome, {{.Username}}</h1>
+<pre class="quickstart">{{.Message}}</pre>
+<p>Everything runs over SSH with the key you registered:</p>
+<pre class="quickstart">ssh git@{{.Host}} whoami
+ssh git@{{.Host}} repo create {{.Username}}/hello
+gitbay web login        # mints a browser session from your terminal</pre>
+</div>
+{{end}}

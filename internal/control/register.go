@@ -130,42 +130,56 @@ func RunRegister(cfg config.Config, st *store.Store, pub ssh.PublicKey, argv []s
 		return fail(protocol.ExitUsage, "%v", err)
 	}
 
+	msg, errMsg, code := RegisterAccount(cfg, st, pub, username, email, invite)
+	if code != protocol.ExitOK {
+		return fail(code, "%s", errMsg)
+	}
+	fmt.Fprint(stdout, msg)
+	return protocol.ExitOK
+}
+
+// RegisterAccount creates an account for pub under the instance's
+// registration mode. On success it returns the human message and ExitOK;
+// otherwise an error message and the classifying exit code. Shared by the
+// SSH register command and the web signup form.
+func RegisterAccount(cfg config.Config, st *store.Store, pub ssh.PublicKey, username, email, invite string) (string, string, int) {
+	if err := policy.ValidateOwnerName(username); err != nil {
+		return "", err.Error(), protocol.ExitUsage
+	}
 	fp := ssh.FingerprintSHA256(pub)
 	switch cfg.Registration.Mode {
 	case "invite":
 		if invite == "" {
-			return fail(protocol.ExitDenied, "this instance is invite-only: register --username <name> --invite <code>")
+			return "", "this instance is invite-only: an invite code is required", protocol.ExitDenied
 		}
 		// One transaction: a failure at any step leaves the invite
 		// redeemable and no partial account behind.
 		_, err := st.RedeemInvite(store.HashToken(invite), username, fp, pub.Type(), pub.Marshal())
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				return fail(protocol.ExitDenied, "that invite is invalid or already used")
+				return "", "that invite is invalid or already used", protocol.ExitDenied
 			}
-			return fail(protocol.ExitUsage, "%v", err)
+			return "", err.Error(), protocol.ExitUsage
 		}
-		fmt.Fprintf(stdout, "welcome, %s — your account is active\n", username)
-		return protocol.ExitOK
+		return fmt.Sprintf("welcome, %s — your account is active\n", username), "", protocol.ExitOK
 
 	case "open":
 		if email == "" || !strings.Contains(email, "@") {
-			return fail(protocol.ExitUsage, "usage: register --username <name> --email <address>")
+			return "", "a valid email address is required", protocol.ExitUsage
 		}
 		uid, err := st.RegisterOpen(username, email, fp, pub.Type(), pub.Marshal())
 		if err != nil {
-			return fail(protocol.ExitUsage, "%v", err)
+			return "", err.Error(), protocol.ExitUsage
 		}
 		if err := sendVerification(cfg, st, uid, email); err != nil {
-			return fail(protocol.ExitFailure, "sending verification mail: %v", err)
+			return "", "sending verification mail: " + err.Error(), protocol.ExitFailure
 		}
-		fmt.Fprintf(stdout,
+		return fmt.Sprintf(
 			"account %s created. A verification code was sent to %s.\nActivate with:\n\n    ssh git@%s email verify <code>\n",
-			username, email, siteHost(cfg))
-		return protocol.ExitOK
+			username, email, siteHost(cfg)), "", protocol.ExitOK
 
 	default:
-		return fail(protocol.ExitDenied, "registration is closed on this instance")
+		return "", "registration is closed on this instance", protocol.ExitDenied
 	}
 }
 

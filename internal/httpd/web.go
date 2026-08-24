@@ -101,7 +101,9 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		Site     string
 		Host     string
 		Accounts bool
-	}{s.siteName(), host, s.cfg.Web.Mode == "accounts"})
+		Signup   bool
+	}{s.siteName(), host, s.cfg.Web.Mode == "accounts",
+		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed"})
 }
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {

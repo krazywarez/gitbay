@@ -19,7 +19,10 @@ Or build from source: =go build ./cmd/gitbay= in a clone of
 
 * Getting an account
 
-How you join depends on the instance's registration mode:
+How you join depends on the instance's registration mode. On instances
+with web accounts enabled, =/register= offers the same signup as a
+browser form (paste your SSH public key); everything below works from
+the terminal alone:
 
 - closed :: an admin creates your account on the host and registers your
   first SSH key. Nothing for you to do but hand over your public key.

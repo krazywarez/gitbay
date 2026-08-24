@@ -71,6 +71,17 @@ func (s *Server) Routes() []Route {
 			Route{Method: "POST", Pattern: "/logout", Mutating: true,
 				Handler: s.checkOrigin(s.logout)},
 			Route{Method: "GET", Pattern: "/new", Handler: s.requireUser(s.newRepoForm)},
+		)
+		// Web signup fronts the same registration path as SSH register,
+		// so it exists only when registration is open or invite.
+		if s.cfg.Registration.Mode != "closed" {
+			routes = append(routes,
+				Route{Method: "GET", Pattern: "/register", Handler: s.signupForm},
+				Route{Method: "POST", Pattern: "/register", Mutating: true,
+					Handler: s.checkOrigin(s.signupSubmit)},
+			)
+		}
+		routes = append(routes,
 			Route{Method: "POST", Pattern: "/new", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.newRepoSubmit))},
 			Route{Method: "GET", Pattern: "/{owner}/{repo}/issues/new",
