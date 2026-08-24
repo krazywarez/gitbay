@@ -1,0 +1,54 @@
+#+title: gitbay changelog
+
+Versioning follows semver from v0.1.0. Database migrations run
+automatically on daemon start; upgrade notes appear per release when
+anything beyond "replace the binary and restart" is needed.
+
+* Unreleased
+
+- Deploy keys: repo-bound CI keys (=repo deploy-key=), ro/rw, rename- and
+  transfer-proof.
+- Commit statuses (=status set/list=), combined state on MR pages, and a
+  =require-checks= merge gate.
+- Email notifications for issue and MR activity (participants with
+  verified addresses; never the actor).
+- Inline review threads on MR diffs (=mr diff-comment/threads/resolve=),
+  stale on force-push, =require-resolved= merge gate.
+- Required approvals with CODEOWNERS (=require-approvals=; latest review
+  wins, author excluded) and a =require-resolved= gate; merge gate order
+  is checks → approvals → CODEOWNERS → resolved threads → signatures.
+- Web design revamp: token-based stylesheet (light+dark), wordmark and
+  favicon, aligned layout grid, card-based listings, designed 404,
+  mobile pass.
+- Cross-references and mentions: =#N=, =!N=, =owner/name#N=, =@user=
+  autolink in issue/MR text, viewer-aware for private repos.
+- Archived repositories (read-only with badge) and repo topics.
+- Blame view with signature-aware attribution and 1000-line pages.
+- Repository search (name/description/topic) and per-repo code search
+  (=repo grep=, web search tab); blob line anchors.
+- Homepage: dashboard for logged-in users (pinned repos via =repo pin=,
+  open MRs and issues involving you), landing page for visitors, full
+  public listing at =/explore=; MR diffs collapsed by default.
+- Milestones (=milestone create/list/close=, =issue/mr milestone=) with
+  web progress; issue templates from =.gitbay/issue-template*.md=
+  (CLI =$EDITOR= prefill and web form).
+- Issue actions from commit messages landing on the default branch:
+  =closes/fixes/resolves #N= closes, bare =#N= leaves a reference
+  comment; once per issue+commit.
+- Vanity Go imports: =[go_import]= config serves go-import meta tags, so
+  =go install gitbay.org/gitbay/cmd/...@latest= works.
+- Release script: =deploy/release.sh <tag>= builds reproducible
+  linux/amd64, linux/arm64, and darwin/arm64 binaries with SHA256SUMS.
+
+Upgrade notes: migrations 0006–0014 apply on start. No config changes
+required; =[go_import]= and =web.mode = "accounts"= are opt-in.
+
+* v0.1.0 — 2026-08-24
+
+First tagged release: the complete CLI-first forge. SSH control plane
+(bare-OpenSSH usable), git over SSH/HTTPS/git-daemon, repos, issues,
+merge requests (ff/merge/squash/rebase with signature policy), OpenPGP
+and SSHSIG verification with retroactive re-verification, orgs, repo
+import, web UI (view-only or accounts mode), registration with invites
+and SMTP, HTTPS/JSON API with SSH-minted tokens, webhooks, backups,
+ACME TLS, systemd deployment.

@@ -6,6 +6,13 @@ startup and on every admin command.
 
 * Install
 
+Build from source (=go build ./cmd/gitbayd=), install via the vanity
+module path (=go install gitbay.org/gitbay/cmd/gitbayd@latest=), or use
+a release build: =deploy/release.sh <tag>= cross-compiles reproducible
+linux/amd64, linux/arm64, and darwin/arm64 binaries with a SHA256SUMS
+manifest (CGO off, trimpath, stripped — byte-identical per commit and
+toolchain).
+
 #+begin_src sh
 install -m 755 gitbayd /usr/local/bin/
 adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
@@ -94,6 +101,13 @@ contradiction; =--no-host-checks= skips port/path probes.
 - =enabled= (false), =port= (9418) — the anonymous =git://= listener.
   Serves only public repositories that additionally ran
   =repo settings git-daemon <repo> on=.
+
+** [go_import]
+Vanity Go module paths, one per line: ="host/module" = "owner/repo"=.
+Requests with =?go-get=1= at or under the module path answer with the
+go-import meta tag pointing at the repository's HTTPS clone URL, so
+=go install host/module/cmd/...@latest= resolves. The repository should
+be public (the module path itself confirms it exists).
 
 * Users, email, invites
 

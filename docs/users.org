@@ -5,6 +5,16 @@ Everything here works from stock OpenSSH — replace =gitbay= with
 convenience (instance profiles, repo inference, =$EDITOR=), nothing more.
 =ssh git@<host> help= lists every command the server knows.
 
+* Installing the CLI
+
+#+begin_src sh
+go install gitbay.org/gitbay/cmd/gitbay@latest   # any platform with Go
+brew install krz/tap/gitbay                      # Homebrew (macOS/Linux)
+#+end_src
+
+Or build from source: =go build ./cmd/gitbay= in a clone of
+=https://gitbay.org/krz/gitbay.git=.
+
 * Getting an account
 
 How you join depends on the instance's registration mode:

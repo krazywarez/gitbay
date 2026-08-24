@@ -23,6 +23,10 @@ type Config struct {
 	Webhooks     Webhooks     `toml:"webhooks"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
+	// GoImport maps vanity Go module paths to repositories, e.g.
+	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
+	// under a mapped path get a go-import meta tag.
+	GoImport map[string]string `toml:"go_import"`
 }
 
 type Server struct {
@@ -169,6 +173,16 @@ func (c Config) Validate() error {
 	}
 	if err := oneOf("registration.mode", c.Registration.Mode, "closed", "invite", "open"); err != nil {
 		errs = append(errs, err)
+	}
+
+	for module, repo := range c.GoImport {
+		host, _, ok := strings.Cut(module, "/")
+		if !ok || host == "" || !strings.Contains(host, ".") {
+			errs = append(errs, fmt.Errorf("go_import key %q must be host/path (e.g. gitbay.org/gitbay)", module))
+		}
+		if parts := strings.Split(repo, "/"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			errs = append(errs, fmt.Errorf("go_import value %q must be owner/name", repo))
+		}
 	}
 
 	// Contradictions.

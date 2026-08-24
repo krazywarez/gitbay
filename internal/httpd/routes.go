@@ -1,6 +1,11 @@
 package httpd
 
-import "net/http"
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"strings"
+)
 
 // Route is one entry in the explicit route table. The view-only guarantee is
 // structural: Handler() consults web.mode when building the table, and the
@@ -88,5 +93,27 @@ func (s *Server) Handler() http.Handler {
 	for _, r := range s.Routes() {
 		mux.HandleFunc(r.Method+" "+r.Pattern, r.Handler)
 	}
-	return mux
+	if len(s.cfg.GoImport) == 0 {
+		return mux
+	}
+	// Vanity Go modules: ?go-get=1 requests under a configured module
+	// path answer with the go-import meta tag before normal routing.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("go-get") == "1" {
+			host := r.Host
+			if h, _, err := net.SplitHostPort(host); err == nil {
+				host = h
+			}
+			requested := host + strings.TrimSuffix(r.URL.Path, "/")
+			for module, repo := range s.cfg.GoImport {
+				if requested == module || strings.HasPrefix(requested, module+"/") {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta name="go-import" content="%s git %s/%s.git"></head><body>%s</body></html>`,
+						module, s.cfg.Server.SiteURL, repo, module)
+					return
+				}
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
