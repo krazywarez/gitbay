@@ -105,6 +105,7 @@ type repoPage struct {
 	Ref      string
 	CloneURL string
 	Dir      string
+	Tab      string // active tab in the repo header
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
@@ -221,6 +222,7 @@ func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "files"
 	s.renderTree(w, r, p, "")
 }
 
@@ -229,6 +231,7 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "files"
 	s.renderTree(w, r, p, strings.Trim(r.PathValue("path"), "/"))
 }
 
@@ -275,6 +278,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "files"
 	filePath := strings.Trim(r.PathValue("path"), "/")
 	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, maxRenderBytes+1)
 	if err != nil {
@@ -565,6 +569,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "log"
 	const pageSize = 50
 	shas, err := gitutil.RevList(p.Dir, p.Ref, pageSize+1)
 	if err != nil {
@@ -604,6 +609,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "log"
 	sha := r.PathValue("sha")
 	full, err := gitutil.ResolveRef(p.Dir, sha)
 	if err != nil {
@@ -641,6 +647,7 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "issues"
 	state := r.URL.Query().Get("state")
 	if state != "closed" && state != "all" {
 		state = "open"
@@ -662,6 +669,7 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "issues"
 	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
 	if err != nil {
 		http.NotFound(w, r)
@@ -690,6 +698,7 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "merge requests"
 	state := r.URL.Query().Get("state")
 	if state == "" {
 		state = "open"
@@ -715,6 +724,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "merge requests"
 	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
 	if err != nil {
 		http.NotFound(w, r)
@@ -763,6 +773,7 @@ func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	p.Tab = "refs"
 	branches, _ := gitutil.Refs(p.Dir, "heads")
 	tags, _ := gitutil.Refs(p.Dir, "tags")
 	s.render(w, "refs.html", struct {

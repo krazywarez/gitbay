@@ -122,14 +122,33 @@ td {
 td:last-child { padding-right: 0; }
 td.size, td.mode { color: var(--muted); white-space: nowrap; }
 
+/* repo header */
+.repohead { margin-bottom: var(--sp-4); }
+h1.repotitle { margin: var(--sp-4) 0 var(--sp-1); font-weight: 400; }
+h1.repotitle a { color: var(--fg); }
+h1.repotitle a:last-of-type { font-weight: 650; }
+h1.repotitle a:hover { color: var(--accent); text-decoration: none; }
+h1.repotitle .sep { color: var(--muted); margin: 0 0.15em; }
+.repohead .desc { margin: 0 0 var(--sp-2); }
+
 /* repo tabs */
-nav.tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+nav.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  border-bottom: 1px solid var(--faint);
+  margin-top: var(--sp-3);
+}
 nav.tabs a {
   color: var(--muted);
   padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-md);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: var(--fs-2);
 }
 nav.tabs a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
+nav.tabs a.active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 550; }
 
 p.clone code {
   background: var(--surface);
@@ -203,7 +222,7 @@ pre.diff .meta { color: var(--muted); }
 /* badges: signature and check states. Semantic colors stay distinct:
    green verified/success, amber pending/stale, red bad/failure, muted
    unsigned. */
-.badge {
+.badge, .chip {
   --chip: var(--neutral);
   display: inline-block;
   padding: 0.05rem 0.55rem;
@@ -215,7 +234,12 @@ pre.diff .meta { color: var(--muted); }
   border: 1px solid color-mix(in srgb, var(--chip) 35%, transparent);
   background: color-mix(in srgb, var(--chip) 7%, transparent);
   white-space: nowrap;
+  vertical-align: middle;
 }
+.chip-open { --chip: var(--ok); }
+.chip-closed { --chip: var(--bad); }
+.chip-merged { --chip: var(--done); }
+.chip-neutral { --chip: var(--neutral); }
 .badge-verified { --chip: var(--ok); }
 .badge-unsigned { --chip: var(--neutral); }
 .badge-signed_unknown_key { --chip: var(--warn); }

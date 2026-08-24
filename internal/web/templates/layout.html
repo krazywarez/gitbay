@@ -21,17 +21,18 @@
 </html>{{end}}
 
 {{define "repoheader"}}
-<h1><a href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a>/<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a></h1>
+<div class="repohead">
+<h1 class="repotitle"><a class="owner" href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a><span class="sep">/</span><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>{{if eq .Repo.Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</h1>
 {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
 <nav class="tabs">
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
+  <a {{if eq .Tab "files"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
+  <a {{if eq .Tab "log"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
+  <a {{if eq .Tab "refs"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
+  <a {{if eq .Tab "issues"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
+  <a {{if eq .Tab "merge requests"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
   <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">archive</a>
 </nav>
-<p class="clone">clone: <code>git clone {{.CloneURL}}</code></p>
+</div>
 {{end}}
 
 {{define "sigbadge"}}<span class="badge badge-{{.State}}" title="{{.Fingerprint}}">{{.State}}{{if .Signer}} · {{.Signer}}{{end}}</span>{{end}}

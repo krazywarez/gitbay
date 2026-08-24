@@ -2,6 +2,7 @@
 {{define "content"}}
 {{template "repoheader" .}}
 <p class="crumbs">{{.Ref}}: {{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</p>
+<p class="clone">clone: <code>git clone {{.CloneURL}}</code></p>
 <table class="tree">
 {{range .Entries}}<tr>
   <td class="mode">{{.Mode}}</td>
