@@ -817,6 +817,11 @@ func runMRMerge(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
+	// Merges bypass receive-pack, so the commit-message issue actions
+	// (closes #N, references) run here for the newly landed commits.
+	if mr.TargetRef == repo.DefaultBranch {
+		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
+	}
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
 			notifyBody(c, fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))

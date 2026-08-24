@@ -166,6 +166,7 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 // the target owns the objects, so the MR outlives the fork. This is the only
 // place a hook writes outside its own repository.
 func (s *Server) postReceive(req Request) {
+	pushedRepo, pushedRepoErr := s.st.RepoByID(req.RepoID)
 	for _, u := range req.Updates {
 		// Every ref update is an event webhooks can subscribe to.
 		s.st.RecordEvent(req.RepoID, req.UserID, "push", fmt.Sprintf(
@@ -175,6 +176,12 @@ func (s *Server) postReceive(req Request) {
 		branch, ok := cutHeads(u.Ref)
 		if !ok {
 			continue
+		}
+		// Commits landing on the default branch act on issue references
+		// in their messages (closes #N, plain #N).
+		if pushedRepoErr == nil && branch == pushedRepo.DefaultBranch && !u.IsDelete {
+			dir := control.RepoDir(s.cfg.Server.Root, pushedRepo.OwnerName, pushedRepo.Name)
+			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, u.Old, u.New)
 		}
 		mrs, err := s.st.OpenMRsBySource(req.RepoID, branch)
 		if err != nil {

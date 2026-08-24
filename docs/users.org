@@ -146,6 +146,11 @@ that is why no =owner/name= appears above. Anywhere else, pass it as the
 first argument. Long text: =--body= inline, =--file -= from stdin, or
 neither on a terminal and =$EDITOR= opens.
 
+Commit messages act on issues when the commits land on the default
+branch (direct push or MR merge): =closes/fixes/resolves #4= closes the
+issue with a linking comment, and a bare =#4= leaves a reference
+comment. Each issue/commit pair acts once, ever. Same repository only.
+
 Milestones group issues and MRs toward a release (write access to
 manage, attach with =issue milestone= / =mr milestone=; progress shows
 on the web at =/owner/name/milestones=):
