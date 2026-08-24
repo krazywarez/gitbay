@@ -104,12 +104,30 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.User) {
+// adminOrgs lists organizations the user administers, for owner pickers.
+func (s *Server) adminOrgs(u store.User) []string {
+	var out []string
+	if orgs, err := s.st.ListOrgsForUser(u.ID); err == nil {
+		for _, o := range orgs {
+			if o.Role == "admin" {
+				out = append(out, o.Username)
+			}
+		}
+	}
+	return out
+}
+
+func (s *Server) renderNewRepo(w http.ResponseWriter, u store.User, errMsg string) {
 	s.render(w, "new.html", struct {
 		Site   string
 		Viewer string
+		Orgs   []string
 		Error  string
-	}{s.siteName(), u.Username, ""})
+	}{s.siteName(), u.Username, s.adminOrgs(u), errMsg})
+}
+
+func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.renderNewRepo(w, u, "")
 }
 
 func (s *Server) newRepoSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -118,29 +136,56 @@ func (s *Server) newRepoSubmit(w http.ResponseWriter, r *http.Request, u store.U
 	if r.FormValue("visibility") == "private" {
 		visibility = "private"
 	}
-	fail := func(msg string) {
-		s.render(w, "new.html", struct {
-			Site   string
-			Viewer string
-			Error  string
-		}{s.siteName(), u.Username, msg})
-	}
+	fail := func(msg string) { s.renderNewRepo(w, u, msg) }
 	if err := policy.ValidateName(name); err != nil {
 		fail(err.Error())
 		return
 	}
-	id, err := s.st.CreateRepo("user", u.ID, name, visibility)
+	// Owner: yourself, or an org you admin — same rule as repo create.
+	owner := r.FormValue("owner")
+	ownerKind, ownerID := "user", u.ID
+	if owner == "" {
+		owner = u.Username
+	}
+	if owner != u.Username {
+		org, err := s.st.OrgByName(owner)
+		if err != nil {
+			fail("no such organization")
+			return
+		}
+		role, _ := s.st.OrgRole(org.ID, u.ID)
+		if role != "admin" {
+			fail("only admins of " + owner + " can create repositories there")
+			return
+		}
+		ownerKind, ownerID = "org", org.ID
+	}
+	id, err := s.st.CreateRepo(ownerKind, ownerID, name, visibility)
 	if err != nil {
 		fail(err.Error())
 		return
 	}
-	dir := control.RepoDir(s.cfg.Server.Root, u.Username, name)
+	dir := control.RepoDir(s.cfg.Server.Root, owner, name)
 	if err := gitutil.InitBare(dir, "main", control.HooksDir(s.cfg.Server.Root)); err != nil {
 		s.st.DeleteRepo(id)
 		fail("initializing repository failed")
 		return
 	}
-	http.Redirect(w, r, "/"+u.Username+"/"+name, http.StatusSeeOther)
+	http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)
+}
+
+// pinToggle pins or unpins the repo for the logged-in viewer.
+func (s *Server) pinToggle(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	if s.st.IsPinned(u.ID, repo.ID) {
+		s.st.UnpinRepo(u.ID, repo.ID)
+	} else {
+		s.st.PinRepo(u.ID, repo.ID)
+	}
+	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }
 
 // repoForUser is repoFor with a write/read permission requirement for a
@@ -257,6 +302,17 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	// Labels need write access, matching the SSH rule; ignored otherwise.
+	if labels := strings.Fields(r.FormValue("labels")); len(labels) > 0 {
+		grant, _ := s.st.AccessRole(repo.ID, u.ID)
+		if policy.CanWrite(u, repo, grant) {
+			if iss, err := s.st.IssueByNumber(repo.ID, n); err == nil {
+				for _, l := range labels {
+					s.st.SetIssueLabel(repo.ID, iss.ID, l, true)
+				}
+			}
+		}
 	}
 	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
 }

@@ -8,6 +8,15 @@ import (
 
 const zeroSHA = "0000000000000000000000000000000000000000"
 
+// Parents returns a commit's parent shas.
+func Parents(dir, sha string) []string {
+	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%P", sha).Output()
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(out))
+}
+
 // LastCommitDate returns the committer date (YYYY-MM-DD) of the ref tip,
 // or "" for empty repos.
 func LastCommitDate(dir, ref string) string {

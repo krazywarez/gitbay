@@ -8,6 +8,7 @@
     <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
     <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
   </nav>
+  {{if .Label}}<p class="meta">label: <span class="chip label" style="{{index .LabelColors .Label}}">{{.Label}}</span> <a href="?state={{.State}}">clear</a></p>{{end}}
   <span class="spacer"></span>
   <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
 </div>
@@ -15,8 +16,8 @@
 {{range .Issues}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues/{{.Number}}">{{.Title}}</a>
-    {{range .Labels}}<span class="chip label" style="{{index $.LabelColors .}}">{{.}}</span> {{end}}</p>
-    <p class="meta">#{{.Number}} opened by {{.Author}}{{if .Milestone}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/milestones">{{.Milestone}}</a>{{end}}</p>
+    {{range .Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="?label={{.}}">{{.}}</a> {{end}}</p>
+    <p class="meta">#{{.Number}} opened by <a href="/{{.Author}}">{{.Author}}</a>{{if .Milestone}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/milestones">{{.Milestone}}</a>{{end}}</p>
   </div>
   <span class="chip {{if eq .State "open"}}chip-open{{else}}chip-done{{end}}">{{.State}}</span>
 </li>

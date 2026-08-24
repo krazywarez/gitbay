@@ -3,7 +3,11 @@
 <h1>new repository</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 <form method="post" action="/new">
-<p><label>name <input name="name" required pattern="[a-z0-9][a-z0-9._-]*"></label> (under {{.Viewer}}/)</p>
+<p><label>owner <select name="owner">
+  <option value="{{.Viewer}}">{{.Viewer}}</option>
+  {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
+</select></label>
+<label>/ name <input name="name" required pattern="[a-z0-9][a-z0-9._-]*"></label></p>
 <p><label><input type="radio" name="visibility" value="public" checked> public</label>
    <label><input type="radio" name="visibility" value="private"> private</label></p>
 <p><button type="submit">create</button></p>

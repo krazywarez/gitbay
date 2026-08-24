@@ -215,6 +215,7 @@ type repoPage struct {
 	Dir      string
 	Tab      string // active tab in the repo header
 	Topics   []string
+	Pinned   bool // by the viewer
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
@@ -244,9 +245,14 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		ref = repo.DefaultBranch
 	}
 	topics, _ := s.st.ListTopics(repo.ID)
+	pinned := false
+	if viewer.ID != 0 {
+		pinned = s.st.IsPinned(viewer.ID, repo.ID)
+	}
 	return repoPage{
 		Site:     s.siteName(),
 		Viewer:   viewer.Username,
+		Pinned:   pinned,
 		Desc:     gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
 		Repo:     repo,
 		Ref:      ref,
@@ -1064,11 +1070,13 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "commit.html", struct {
 		repoPage
 		SHA, ShortSHA, AuthorName, AuthorEmail, CommitterEmail, Date, Message string
+		Parents                                                               []string
 		Sig                                                                   sigView
 		Checks                                                                []store.CommitStatus
 		DiffLines                                                             []diffLine
 	}{p, full, full[:10], parsed.AuthorName, parsed.AuthorEmail, committerEmail,
-		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg, v, checks, lines})
+		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
+		gitutil.Parents(p.Dir, full), v, checks, lines})
 }
 
 // labelPalette provides default label chip colors: mid-tone hues that stay
@@ -1117,12 +1125,27 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 			issues[i].Labels = labels[issues[i].ID]
 		}
 	}
+	// ?label=x narrows to issues carrying that label (chips link here).
+	labelFilter := r.URL.Query().Get("label")
+	if labelFilter != "" {
+		var kept []store.Issue
+		for _, iss := range issues {
+			for _, l := range iss.Labels {
+				if l == labelFilter {
+					kept = append(kept, iss)
+					break
+				}
+			}
+		}
+		issues = kept
+	}
 	s.render(w, "issues.html", struct {
 		repoPage
 		State       string
+		Label       string
 		Issues      []store.Issue
 		LabelColors map[string]template.CSS
-	}{p, state, issues, s.labelColors(p.Repo.ID)})
+	}{p, state, labelFilter, issues, s.labelColors(p.Repo.ID)})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {

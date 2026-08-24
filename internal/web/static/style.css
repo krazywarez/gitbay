@@ -149,6 +149,19 @@ h1.repotitle a { color: var(--fg); }
 h1.repotitle a:last-of-type { font-weight: 650; }
 h1.repotitle a:hover { color: var(--accent); text-decoration: none; }
 h1.repotitle .sep { color: var(--muted); margin: 0 0.15em; }
+form.pinform { display: inline; margin-left: var(--sp-2); vertical-align: middle; }
+button.pinbtn {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-0);
+  padding: 0.05rem 0.55rem;
+  cursor: pointer;
+}
+button.pinbtn:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+button.pinbtn.pinned { color: var(--accent); border-color: var(--accent); }
+a.chip.label:hover, a.chip.topic:hover { text-decoration: none; filter: brightness(1.15); }
 .repohead .desc { margin: 0 0 var(--sp-2); }
 
 /* repo tabs */

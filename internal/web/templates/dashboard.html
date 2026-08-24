@@ -15,7 +15,7 @@
 {{range .MRs}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{.RepoPath}}/mrs/{{.Number}}">{{.RepoPath}}!{{.Number}} {{.Title}}</a></p>
-    <p class="meta">{{.Author}} · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
+    <p class="meta"><a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
   </div>
 </li>
 {{else}}<li class="empty">no open merge requests</li>{{end}}
@@ -25,7 +25,7 @@
 {{range .Issues}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{.RepoPath}}/issues/{{.Number}}">{{.RepoPath}}#{{.Number}} {{.Title}}</a></p>
-    <p class="meta">{{.Author}} · {{when .UpdatedAt}}</p>
+    <p class="meta"><a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}</p>
   </div>
 </li>
 {{else}}<li class="empty">no open issues</li>{{end}}

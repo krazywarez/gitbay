@@ -74,6 +74,13 @@ func (s *Store) PinRepo(userID, repoID int64) error {
 	return err
 }
 
+func (s *Store) IsPinned(userID, repoID int64) bool {
+	var n int
+	s.DB.QueryRow("SELECT COUNT(*) FROM repo_pins WHERE user_id = ? AND repo_id = ?",
+		userID, repoID).Scan(&n)
+	return n > 0
+}
+
 func (s *Store) UnpinRepo(userID, repoID int64) error {
 	res, err := s.DB.Exec(
 		"DELETE FROM repo_pins WHERE user_id = ? AND repo_id = ?", userID, repoID)

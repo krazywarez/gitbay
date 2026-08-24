@@ -85,6 +85,8 @@ func (s *Server) Routes() []Route {
 		routes = append(routes,
 			Route{Method: "POST", Pattern: "/new", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.newRepoSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/pin", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.pinToggle))},
 			Route{Method: "GET", Pattern: "/{owner}/{repo}/issues/new",
 				Handler: s.requireUser(s.issueCreateForm)},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/new", Mutating: true,

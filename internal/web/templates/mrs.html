@@ -14,7 +14,7 @@
 {{range .MRs}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></p>
-    <p class="meta">!{{.Number}} by {{.Author}} · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
+    <p class="meta">!{{.Number}} by <a href="/{{.Author}}">{{.Author}}</a> · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
   </div>
   <span class="chip chip-{{.State}}">{{.State}}</span>
 </li>
