@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/acme/autocert"
@@ -25,6 +27,7 @@ import (
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/webhook"
 )
 
 func openStore(cfg config.Config) (*store.Store, error) {
@@ -118,6 +121,18 @@ func serveCmd() *cobra.Command {
 				return err
 			}
 			defer stopHookd()
+
+			// Outbound webhook deliveries. The retry base is overridable
+			// for tests via GITBAY_WEBHOOK_RETRY_BASE.
+			retryBase := 30 * time.Second
+			if v := os.Getenv("GITBAY_WEBHOOK_RETRY_BASE"); v != "" {
+				if d, err := time.ParseDuration(v); err == nil {
+					retryBase = d
+				}
+			}
+			whCtx, whCancel := context.WithCancel(context.Background())
+			defer whCancel()
+			go webhook.New(st, cfg.Webhooks.AllowLocal, retryBase).Run(whCtx)
 
 			errCh := make(chan error, 3)
 			if cfg.SSH.Mode == "embedded" {

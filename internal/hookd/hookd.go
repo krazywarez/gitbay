@@ -167,6 +167,11 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 // place a hook writes outside its own repository.
 func (s *Server) postReceive(req Request) {
 	for _, u := range req.Updates {
+		// Every ref update is an event webhooks can subscribe to.
+		s.st.RecordEvent(req.RepoID, req.UserID, "push", fmt.Sprintf(
+			`{"ref":%q,"old":%q,"new":%q,"forced":%v,"deleted":%v}`,
+			u.Ref, u.Old, u.New, u.IsForce, u.IsDelete))
+
 		branch, ok := cutHeads(u.Ref)
 		if !ok {
 			continue

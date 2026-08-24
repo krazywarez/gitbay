@@ -20,6 +20,7 @@ type Config struct {
 	Web          Web          `toml:"web"`
 	Registration Registration `toml:"registration"`
 	API          API          `toml:"api"`
+	Webhooks     Webhooks     `toml:"webhooks"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
 }
@@ -67,6 +68,12 @@ type Registration struct {
 // credential-bearing HTTP surface at all.
 type API struct {
 	Enabled bool `toml:"enabled"`
+}
+
+// Webhooks controls outbound delivery. AllowLocal permits endpoints on
+// loopback/private addresses (off by default: SSRF).
+type Webhooks struct {
+	AllowLocal bool `toml:"allow_local"`
 }
 
 type Limits struct {

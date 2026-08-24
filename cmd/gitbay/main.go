@@ -31,6 +31,7 @@ func main() {
 		mrCmd(),
 		webCmd(),
 		orgCmd(),
+		webhookCmd(),
 		remoteCmd(),
 		initCmd(),
 		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
@@ -291,6 +292,16 @@ func usesTokenStdin(args []string) bool {
 func webCmd() *cobra.Command {
 	return group("web", "browser session",
 		pass("login", "mint a one-time browser login URL over ssh", passOpts{server: []string{"web", "login"}}),
+	)
+}
+
+func webhookCmd() *cobra.Command {
+	return group("webhook", "outbound event delivery",
+		pass("add", "add a webhook: <url> [--secret s] [--events k1,k2|*]", passOpts{server: []string{"webhook", "add"}, needsRepo: true}),
+		pass("list", "list webhooks", passOpts{server: []string{"webhook", "list"}, needsRepo: true}),
+		pass("remove", "remove a webhook: <id>", passOpts{server: []string{"webhook", "remove"}, needsRepo: true}),
+		pass("deliveries", "recent deliveries [--limit n]", passOpts{server: []string{"webhook", "deliveries"}, needsRepo: true}),
+		pass("redeliver", "requeue a delivery: <delivery-id>", passOpts{server: []string{"webhook", "redeliver"}, needsRepo: true}),
 	)
 }
 

@@ -220,13 +220,34 @@ func (s *Store) SetIssueAssignee(issueID, userID int64, add bool) error {
 	return nil
 }
 
-// RecordEvent appends to the event log (the forward hook CI will consume).
+// RecordEvent appends to the event log and enqueues a delivery for every
+// active webhook on the repo whose event filter matches.
 func (s *Store) RecordEvent(repoID, actorID int64, kind, dataJSON string) error {
 	if dataJSON == "" {
 		dataJSON = "{}"
 	}
-	_, err := s.DB.Exec(
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(
 		"INSERT INTO events (repo_id, actor_id, kind, data_json) VALUES (?, ?, ?, ?)",
 		repoID, actorID, kind, dataJSON)
-	return err
+	if err != nil {
+		return err
+	}
+	eventID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO webhook_deliveries (webhook_id, event_id)
+		SELECT id, ? FROM webhooks
+		WHERE repo_id = ? AND active = 1
+		  AND (events = '*' OR ',' || events || ',' LIKE '%,' || ? || ',%')`,
+		eventID, repoID, kind); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
