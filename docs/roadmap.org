@@ -45,8 +45,11 @@ Mostly web-layer; descriptions and profiles already landed as the first
 step.
 
 - [[https://gitbay.org/krz/gitbay/issues/10][#10]] design revamp (umbrella: tokens, typography, identity, mobile)
-- [[https://gitbay.org/krz/gitbay/issues/6][#6]] cross-references (#N) and @mentions
-- [[https://gitbay.org/krz/gitbay/issues/23][#23]] archived repos and topics
+  — shipped 2026-08-24, open pending visual review
+- [[https://gitbay.org/krz/gitbay/issues/6][#6]] cross-references (#N) and @mentions — done 2026-08-24
+  (rendering-side; backlinks and mention notifications later)
+- [[https://gitbay.org/krz/gitbay/issues/23][#23]] archived repos and topics — done 2026-08-24 (topic
+  filtering rides along with search, #7)
 - [[https://gitbay.org/krz/gitbay/issues/24][#24]] blame view
 - [[https://gitbay.org/krz/gitbay/issues/7][#7]] search (repo-name filter first; code search later)
 - [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates
