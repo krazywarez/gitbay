@@ -1,17 +1,16 @@
 {{define "title"}}{{.Owner}} · {{.Site}}{{end}}
 {{define "content"}}
-<h1>{{.Owner}} <span class="badge badge-unsigned">{{.Kind}}</span></h1>
-{{if .Profile.Description}}<p class="desc">{{.Profile.Description}}</p>{{end}}
-{{if .Profile.Website}}<p class="crumbs"><a href="{{.Profile.Website}}" rel="nofollow me">{{.Profile.Website}}</a></p>{{end}}
-{{if .Orgs}}<p class="crumbs">member of: {{range .Orgs}}<a href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
-{{if .Members}}<p class="crumbs">members: {{range .Members}}<a href="/{{.Username}}">{{.Username}}</a> ({{.Role}}) {{end}}</p>{{end}}
-<table>
-{{range .Repos}}<tr>
-  <td><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></td>
-  <td class="desc">{{.Desc}}</td>
-  <td>{{.Visibility}}</td>
-  <td>{{.DefaultBranch}}</td>
-</tr>
-{{else}}<tr><td>no visible repositories</td></tr>{{end}}
-</table>
+<h1>{{.Owner}} <span class="chip chip-neutral">{{.Kind}}</span></h1>
+{{if .Profile.Description}}<p class="desc lede">{{.Profile.Description}}</p>{{end}}
+{{if .Profile.Website}}<p class="meta"><a href="{{.Profile.Website}}" rel="nofollow me">{{.Profile.Website}}</a></p>{{end}}
+{{if .Orgs}}<p class="meta">member of {{range .Orgs}}<a class="memberchip" href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
+{{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Username}}">{{.Username}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
+<ul class="repolist">
+{{range .Repos}}<li>
+  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</p>
+  {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
+  <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
+</li>
+{{else}}<li class="empty">no visible repositories</li>{{end}}
+</ul>
 {{end}}

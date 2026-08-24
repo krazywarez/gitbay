@@ -159,6 +159,45 @@ p.clone code {
 .crumbs { color: var(--muted); font-size: var(--fs-2); }
 .desc, td.desc { color: var(--muted); }
 .error { color: var(--bad); }
+.meta { color: var(--muted); font-size: var(--fs-1); }
+svg.icon { vertical-align: -0.125em; }
+.lede { font-size: var(--fs-3); margin: var(--sp-2) 0; }
+
+/* repo listings (index, owner pages) */
+ul.repolist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
+ul.repolist li { padding: var(--sp-3) 0; border-bottom: 1px solid var(--faint); }
+ul.repolist li.empty { color: var(--muted); }
+ul.repolist p { margin: 0; }
+ul.repolist .reponame { font-size: var(--fs-3); font-weight: 550; }
+ul.repolist .desc { margin-top: 0.1rem; }
+ul.repolist .meta { margin-top: 0.1rem; }
+
+/* member and org chips on owner pages */
+a.memberchip {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 0.05rem 0.6rem;
+  color: var(--fg);
+  font-size: var(--fs-1);
+  margin: 0 0.15rem 0.15rem 0;
+}
+a.memberchip:hover { text-decoration: none; border-color: var(--accent); color: var(--accent); }
+a.memberchip .role { color: var(--muted); }
+
+/* index toolbar */
+p.toolbar { color: var(--muted); font-size: var(--fs-2); margin-top: var(--sp-4); }
+form.inline { display: inline; }
+button.linklike {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-2);
+  cursor: pointer;
+}
+button.linklike:hover { text-decoration: underline; filter: none; }
 
 /* cards: README, comments */
 .readme, .code {
