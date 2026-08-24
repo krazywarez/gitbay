@@ -107,6 +107,10 @@ via =gitbay man=, completions via =gitbay completion <shell>=.
 - [[file:docs/api.org][API and webhooks]] — the JSON API contract, tokens, webhook payloads and HMAC
 - [[file:docs/roadmap.org][roadmap]] — status, phased plan, and what is deliberately not planned
 
+* Contributing
+
+See [[file:CONTRIBUTING.org][CONTRIBUTING]]. Development happens on gitbay.org itself.
+
 * Development
 
 #+begin_src sh
