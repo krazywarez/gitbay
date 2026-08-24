@@ -113,6 +113,33 @@ func TestOrganizations(t *testing.T) {
 		t.Fatalf("org delete: %s", errOut)
 	}
 
+	// Transfer: org repo moves to a user; old path gone, new path clones,
+	// target collisions and non-admin transfers are refused.
+	if _, _, code = inst.ssh(t, aliceKey, "", "org", "create", "movers"); code != 0 {
+		t.Fatal("org movers failed")
+	}
+	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "create", "movers/box"); code != 0 {
+		t.Fatal("movers/box failed")
+	}
+	tw := t.TempDir()
+	mustGit(t, tw, inst.gitEnv(aliceKey), "clone", inst.sshURL("movers/box"), "b1")
+	if _, errOut, code = inst.ssh(t, bobKey, "", "repo", "transfer", "movers/box", "bob"); code != 4 {
+		t.Fatalf("non-admin transfer: %d %s", code, errOut)
+	}
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "transfer", "movers/box", "alice"); code != 0 {
+		t.Fatalf("transfer: %s", errOut)
+	}
+	mustGit(t, tw, inst.gitEnv(aliceKey), "clone", inst.sshURL("alice/box"), "b2")
+	if out, code := gitRun(t, t.TempDir(), inst.gitEnv(aliceKey), "clone", inst.sshURL("movers/box")); code == 0 {
+		t.Fatalf("old transfer path still clones:\n%s", out)
+	}
+	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "create", "movers/box"); code != 0 {
+		t.Fatal("recreate movers/box failed")
+	}
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "transfer", "movers/box", "alice"); code == 0 || !strings.Contains(errOut, "already") {
+		t.Fatalf("collision transfer: %d %s", code, errOut)
+	}
+
 	// Rename: clone works at the new path, old path is gone, collisions
 	// with users and existing orgs are refused.
 	if _, _, code = inst.ssh(t, aliceKey, "", "org", "create", "oldname"); code != 0 {

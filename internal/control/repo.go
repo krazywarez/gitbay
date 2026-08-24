@@ -30,6 +30,8 @@ func init() {
 		Summary: "list repositories you own or can access", ReadOnly: true, Run: runRepoList})
 	register(Command{Path: []string{"repo", "show"},
 		Summary: "show repository details: repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
+	register(Command{Path: []string{"repo", "transfer"},
+		Summary: "move a repository to another owner: repo transfer <owner/name> <new-owner> (clone URLs change)", Run: runRepoTransfer})
 	register(Command{Path: []string{"repo", "delete"},
 		Summary: "delete a repository: repo delete <owner/name> --yes", Run: runRepoDelete})
 	register(Command{Path: []string{"repo", "access", "grant"},
@@ -175,6 +177,59 @@ func runRepoShow(c *Ctx, args []string) int {
 		if len(d.ProtectedBranches) > 0 {
 			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
 		}
+	})
+}
+
+func runRepoTransfer(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo transfer <owner/name> <new-owner>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	newOwner := args[1]
+	if newOwner == repo.OwnerName {
+		return c.fail(protocol.ExitUsage, "%s already owns this repository", newOwner)
+	}
+
+	// Target: yourself, or an org you admin — same rule as repo create.
+	newKind, newID := "", int64(0)
+	if newOwner == c.User.Username {
+		newKind, newID = "user", c.User.ID
+	} else if org, err := c.Store.OrgByName(newOwner); err == nil {
+		role, err := c.Store.OrgRole(org.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if role != "admin" {
+			return c.fail(protocol.ExitDenied, "only admins of %s can receive repositories there", newOwner)
+		}
+		newKind, newID = "org", org.ID
+	} else {
+		return c.fail(protocol.ExitDenied, "cannot transfer to %q: not you and not an organization you can see", newOwner)
+	}
+
+	oldDir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	newDir := RepoDir(c.Cfg.Server.Root, newOwner, repo.Name)
+	if _, err := os.Stat(newDir); err == nil {
+		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", newOwner, repo.Name)
+	}
+	if err := c.Store.TransferRepo(repo.ID, newKind, newID); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(newDir), 0o750); err != nil {
+		c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID)
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if err := os.Rename(oldDir, newDir); err != nil {
+		// Keep name and disk consistent: revert the database change.
+		c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID)
+		return c.fail(protocol.ExitFailure, "moving repository: %v", err)
+	}
+	newPath := newOwner + "/" + repo.Name
+	return c.emit(map[string]string{"repo": newPath, "was": repo.Path()}, func(w io.Writer) {
+		fmt.Fprintf(w, "transferred %s to %s — clone URLs now use %s\n", repo.Path(), newPath, newPath)
 	})
 }
 

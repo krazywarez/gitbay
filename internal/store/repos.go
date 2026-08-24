@@ -255,3 +255,14 @@ func (s *Store) ListReposForOwner(ownerKind string, ownerID int64) ([]Repo, erro
 	}
 	return out, rows.Err()
 }
+
+// TransferRepo moves a repository to a new owner. The unique index on
+// (owner_kind, owner_id, name) refuses collisions in the target namespace.
+func (s *Store) TransferRepo(repoID int64, newKind string, newOwnerID int64) error {
+	_, err := s.DB.Exec("UPDATE repos SET owner_kind = ?, owner_id = ? WHERE id = ?",
+		newKind, newOwnerID, repoID)
+	if isUniqueErr(err) {
+		return fmt.Errorf("the target owner already has a repository by that name")
+	}
+	return err
+}
