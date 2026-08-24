@@ -1,0 +1,18 @@
+{{define "title"}}explore · {{.Site}}{{end}}
+{{define "content"}}
+<div class="headrow">
+<h1>explore</h1>
+<form method="get" action="/explore" class="searchform compact">
+  <input type="search" name="q" value="{{.Query}}" placeholder="filter by name, description, topic">
+</form>
+<span class="spacer"></span>
+</div>
+<div class="repogrid">
+{{range .Repos}}<div class="repocard">
+  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
+  {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
+  <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
+</div>
+{{else}}<p class="empty">no public repositories yet</p>{{end}}
+</div>
+{{end}}

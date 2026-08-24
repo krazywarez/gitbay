@@ -66,13 +66,18 @@ func TestWebUI(t *testing.T) {
 		t.Fatal("create private failed")
 	}
 
-	// Index lists the public repo, not the private one.
+	// Explore lists the public repo, not the private one; the anonymous
+	// homepage is a landing page pointing there.
 	status, body := inst.get(t, "/")
+	if status != 200 || !strings.Contains(body, `href="/explore"`) {
+		t.Fatalf("landing: %d\n%s", status, body)
+	}
+	status, body = inst.get(t, "/explore")
 	if status != 200 || !strings.Contains(body, "alice/site") {
-		t.Fatalf("index: %d\n%s", status, body)
+		t.Fatalf("explore: %d\n%s", status, body)
 	}
 	if strings.Contains(body, "secret") {
-		t.Fatal("index leaks private repo")
+		t.Fatal("explore leaks private repo")
 	}
 
 	// Repo home: tree entries plus rendered README.

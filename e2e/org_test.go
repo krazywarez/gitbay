@@ -171,9 +171,9 @@ func TestOrganizations(t *testing.T) {
 	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "create", "puborg/site"); code != 0 {
 		t.Fatal("org public repo failed")
 	}
-	status, body := inst.get(t, "/")
+	status, body := inst.get(t, "/explore")
 	if status != 200 || !strings.Contains(body, "puborg/site") {
-		t.Fatalf("org repo missing from index: %d", status)
+		t.Fatalf("org repo missing from explore: %d", status)
 	}
 	if status, _ := inst.get(t, "/puborg/site"); status != 200 {
 		t.Fatalf("org repo page: %d", status)

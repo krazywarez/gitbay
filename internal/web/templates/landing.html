@@ -1,0 +1,13 @@
+{{define "title"}}{{.Site}}{{end}}
+{{define "content"}}
+<div class="landing">
+<h1>{{.Site}}</h1>
+<p class="lede">A CLI-first git forge. SSH is the API: repositories, issues, and
+merge requests are managed from your terminal with nothing but OpenSSH —
+the web is a fast, readable rendering of that state.</p>
+<pre class="quickstart">ssh git@{{.Host}} help                # every command, no client needed
+git clone ssh://git@{{.Host}}/owner/repo.git</pre>
+<p><a class="explorelink" href="/explore">explore public repositories →</a></p>
+{{if .Accounts}}<p class="meta">have an account? mint a browser session from your terminal: <code>gitbay web login</code></p>{{end}}
+</div>
+{{end}}

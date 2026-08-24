@@ -69,18 +69,18 @@ func TestSearch(t *testing.T) {
 		t.Fatalf("private grep parity: exit %d, %s", code, errOut)
 	}
 
-	// Web: index filter respects the query and visibility.
-	status, body := inst.get(t, "/?q=webapp")
+	// Web: explore filter respects the query and visibility.
+	status, body := inst.get(t, "/explore?q=webapp")
 	if status != 200 || !strings.Contains(body, "alice/webapp") {
-		t.Fatalf("index filter: %d", status)
+		t.Fatalf("explore filter: %d", status)
 	}
-	_, body = inst.get(t, "/?q=nomatchhere")
+	_, body = inst.get(t, "/explore?q=nomatchhere")
 	if strings.Contains(body, "alice/webapp") {
-		t.Fatal("index filter did not filter")
+		t.Fatal("explore filter did not filter")
 	}
-	_, body = inst.get(t, "/?q=hidden")
+	_, body = inst.get(t, "/explore?q=hidden")
 	if strings.Contains(body, "secret") {
-		t.Fatal("private repo leaked on index search")
+		t.Fatal("private repo leaked on explore search")
 	}
 
 	// Web: repo code search with mark and blob line anchor.

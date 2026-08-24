@@ -1,0 +1,38 @@
+{{define "title"}}dashboard · {{.Site}}{{end}}
+{{define "content"}}
+<div class="headrow">
+<h1>dashboard</h1>
+<span class="spacer"></span>
+<p class="toolbar">logged in as {{.Viewer}} · <a href="/{{.Viewer}}">your repositories</a> · <a href="/new">new repository</a> · <a href="/explore">explore</a> ·
+<form method="post" action="/logout" class="inline"><button type="submit" class="linklike">logout</button></form></p>
+</div>
+{{if .Pinned}}<h2>pinned</h2>
+<div class="repogrid">
+{{range .Pinned}}<div class="repocard">
+  <p class="reponame"><a href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
+  {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
+  <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}</p>
+</div>
+{{end}}
+</div>{{end}}
+<h2>open merge requests <span class="count">{{len .MRs}}</span></h2>
+<ul class="issuelist">
+{{range .MRs}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{.RepoPath}}/mrs/{{.Number}}">{{.RepoPath}}!{{.Number}} {{.Title}}</a></p>
+    <p class="meta">{{.Author}} · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
+  </div>
+</li>
+{{else}}<li class="empty">no open merge requests</li>{{end}}
+</ul>
+<h2>open issues <span class="count">{{len .Issues}}</span></h2>
+<ul class="issuelist">
+{{range .Issues}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{.RepoPath}}/issues/{{.Number}}">{{.RepoPath}}#{{.Number}} {{.Title}}</a></p>
+    <p class="meta">{{.Author}} · {{when .UpdatedAt}}</p>
+  </div>
+</li>
+{{else}}<li class="empty">no open issues</li>{{end}}
+</ul>
+{{end}}

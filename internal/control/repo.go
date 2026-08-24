@@ -64,6 +64,10 @@ func init() {
 		Summary: "find repositories by name, description, or topic: repo search <query>", ReadOnly: true, Run: runRepoSearch})
 	register(Command{Path: []string{"repo", "grep"},
 		Summary: "search file contents: repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
+	register(Command{Path: []string{"repo", "pin"},
+		Summary: "pin a repository to your dashboard: repo pin <owner/name>", Run: runRepoPin})
+	register(Command{Path: []string{"repo", "unpin"},
+		Summary: "unpin a repository: repo unpin <owner/name>", Run: runRepoUnpin})
 }
 
 const (
@@ -687,6 +691,36 @@ func runRepoGrep(c *Ctx, args []string) int {
 		for _, d := range ds {
 			fmt.Fprintf(w, "%s:%d:%s\n", d.Path, d.Line, d.Text)
 		}
+	})
+}
+
+func runRepoPin(c *Ctx, args []string) int   { return setPinned(c, args, true) }
+func runRepoUnpin(c *Ctx, args []string) int { return setPinned(c, args, false) }
+
+func setPinned(c *Ctx, args []string, pin bool) int {
+	verb := "pin"
+	if !pin {
+		verb = "unpin"
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if pin {
+		if err := c.Store.PinRepo(c.User.ID, repo.ID); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	} else if err := c.Store.UnpinRepo(c.User.ID, repo.ID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "%s is not pinned", repo.Path())
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{verb + "ned": repo.Path()}, func(w io.Writer) {
+		fmt.Fprintf(w, "%sned %s\n", verb, repo.Path())
 	})
 }
 

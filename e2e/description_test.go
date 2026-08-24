@@ -47,8 +47,8 @@ func TestRepoDescriptions(t *testing.T) {
 		t.Fatalf("non-admin set: exit %d, want 4", code)
 	}
 
-	// Web: index, owner page, and repo header all show it.
-	for _, path := range []string{"/", "/alice", "/alice/tool"} {
+	// Web: explore, owner page, and repo header all show it.
+	for _, path := range []string{"/explore", "/alice", "/alice/tool"} {
 		status, body := inst.get(t, path)
 		if status != 200 || !strings.Contains(body, "better now") {
 			t.Fatalf("description missing at %s (%d)", path, status)

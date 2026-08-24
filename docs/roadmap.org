@@ -54,6 +54,8 @@ step.
 - [[https://gitbay.org/krz/gitbay/issues/7][#7]] search — done 2026-08-24 (repo search by name/desc/topic,
   per-repo git grep on web+SSH; cross-repo indexer only if ever needed)
 - [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates
+- [[https://gitbay.org/krz/gitbay/issues/30][#30]] activity graph on owner pages (platform-recorded activity
+  signal; events table already covers issues/MRs, extend to commits)
 
 * Phase 3 — other people's forges
 
