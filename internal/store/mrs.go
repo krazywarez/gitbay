@@ -55,13 +55,14 @@ func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, target
 const mrSelect = `
 	SELECT m.id, m.repo_id, m.number, u.username,
 	       COALESCE(m.source_repo_id, 0),
-	       COALESCE(su.username || '/' || sr.name, ''),
+	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
 	       m.source_ref, m.target_ref, m.title, m.body, m.state, m.head_sha,
 	       m.created_at, m.updated_at
 	FROM merge_requests m
 	JOIN users u ON u.id = m.author_id
 	LEFT JOIN repos sr ON sr.id = m.source_repo_id
-	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id`
+	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id
+	LEFT JOIN orgs so  ON sr.owner_kind = 'org'  AND so.id = sr.owner_id`
 
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
