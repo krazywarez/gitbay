@@ -38,13 +38,13 @@ required approvals with CODEOWNERS and require-resolved.
 - [[https://gitbay.org/krz/gitbay/issues/2][#2]] inline review comments on MR diffs
 - [[https://gitbay.org/krz/gitbay/issues/19][#19]] required approvals and CODEOWNERS (builds on #1 and #2)
 
-* Phase 2 — a product, not a debug view
+* Phase 2 — a product, not a debug view [COMPLETE 2026-08-24; #30 activity graph follows on]
 
 Goal: the site looks and reads like something you would recommend.
 Mostly web-layer; descriptions and profiles already landed as the first
 step.
 
-- [[https://gitbay.org/krz/gitbay/issues/10][#10]] design revamp (umbrella: tokens, typography, identity, mobile)
+- [[https://gitbay.org/krz/gitbay/issues/10][#10]] design revamp — closed 2026-08-24 after review (further design work is iteration under new issues)
   — shipped 2026-08-24, open pending visual review
 - [[https://gitbay.org/krz/gitbay/issues/6][#6]] cross-references (#N) and @mentions — done 2026-08-24
   (rendering-side; backlinks and mention notifications later)
