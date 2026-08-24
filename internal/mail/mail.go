@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/smtp"
@@ -35,7 +36,7 @@ func Send(cfg config.Config, to, subject, body string) error {
 	}
 	defer c.Close()
 	if ok, _ := c.Extension("STARTTLS"); ok {
-		if err := c.StartTLS(nil); err != nil {
+		if err := c.StartTLS(&tls.Config{ServerName: hostname}); err != nil {
 			return fmt.Errorf("starttls: %w", err)
 		}
 	}
