@@ -5,14 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{template "title" .}}</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
 <body>
 <header>
-  <nav><a class="site" href="/">{{.Site}}</a></nav>
+  <nav><a class="site" href="/"><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M5 9.5c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M5 15c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>{{.Site}}</a></nav>
 </header>
 <main>
 {{template "content" .}}
 </main>
+<footer>
+  <p>powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code>{{.}}</code>{{end}}</p>
+</footer>
 </body>
 </html>{{end}}
 

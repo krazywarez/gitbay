@@ -11,17 +11,18 @@ import (
 // the httpd mux's top-level routes must be reflected here; the httpd package
 // asserts this in its tests.
 var reservedNames = map[string]bool{
-	"admin":    true,
-	"api":      true,
-	"archive":  true,
-	"explore":  true,
-	"login":    true,
-	"logout":   true,
-	"new":      true,
-	"raw":      true,
-	"register": true,
-	"settings": true,
-	"static":   true,
+	"admin":       true,
+	"api":         true,
+	"archive":     true,
+	"explore":     true,
+	"favicon.svg": true,
+	"login":       true,
+	"logout":      true,
+	"new":         true,
+	"raw":         true,
+	"register":    true,
+	"settings":    true,
+	"static":      true,
 }
 
 // namePat matches valid user, org, and repo names: lowercase alphanumerics,

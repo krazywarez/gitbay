@@ -6,6 +6,8 @@ import (
 	"embed"
 	"html/template"
 	"io"
+	"runtime/debug"
+	"sync"
 )
 
 //go:embed templates/*.html
@@ -14,10 +16,30 @@ var templateFS embed.FS
 //go:embed static/style.css
 var StyleCSS []byte
 
+//go:embed static/favicon.svg
+var FaviconSVG []byte
+
+// version returns the short VCS revision baked into the binary, or "" when
+// built outside a checkout. Used by the layout footer.
+var version = sync.OnceValue(func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" && len(s.Value) >= 10 {
+			return s.Value[:10]
+		}
+	}
+	return ""
+})
+
+var funcs = template.FuncMap{"gitbayVersion": func() string { return version() }}
+
 // Render executes the named page template with the shared layout.
 func Render(w io.Writer, page string, data any) error {
 	t, err := template.Must(
-		template.ParseFS(templateFS, "templates/layout.html"),
+		template.New("layout.html").Funcs(funcs).ParseFS(templateFS, "templates/layout.html"),
 	).ParseFS(templateFS, "templates/"+page)
 	if err != nil {
 		return err

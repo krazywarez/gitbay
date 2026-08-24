@@ -49,6 +49,11 @@ func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
 	w.Write(web.StyleCSS)
 }
 
+func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Write(web.FaviconSVG)
+}
+
 // describedRepo pairs a repo with its description for listings.
 type describedRepo struct {
 	store.Repo
