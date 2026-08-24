@@ -24,11 +24,12 @@ What it is today: an excellent forge for its author and for CLI-native
 individuals. What it is not yet: a forge a GitHub-habituated *team*
 would stay on, or a project outsiders can easily run themselves.
 
-* Phase 1 — collaboration credibility
+* Phase 1 — collaboration credibility [COMPLETE 2026-08-24]
 
 Goal: a second contributor works here for a week and misses nothing they
-would act on. These compound: statuses gate merges, notifications close
-the feedback loop, inline comments make review real.
+would act on. All five shipped: deploy keys, commit statuses with
+require-checks gating, email notifications, inline review threads, and
+required approvals with CODEOWNERS and require-resolved.
 
 - [[https://gitbay.org/krz/gitbay/issues/22][#22]] deploy keys — smallest item, unblocks CI checkout; the scope
   already exists in the policy layer
