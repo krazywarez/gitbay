@@ -2,6 +2,10 @@
    Tokens first; components use tokens only. No external requests. */
 
 :root {
+  /* declare native light+dark support: correct form controls and
+     scrollbars per scheme, and opt out of browser auto-darkening */
+  color-scheme: light dark;
+
   /* palette */
   --bg: #ffffff;
   --fg: #1f2328;
@@ -284,7 +288,7 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 }
 /* chroma emits inline styles for a light background; pin code blocks to
    light colors in both schemes so unstyled tokens stay legible. */
-.code { background: #f8f8f8; color: #1a1a1a; padding: var(--sp-3) var(--sp-4); }
+.code { background: #f8f8f8; color: #1a1a1a; padding: var(--sp-3) var(--sp-4); color-scheme: light; }
 .code pre { margin: 0; background: transparent !important; }
 @media (prefers-color-scheme: dark) {
   .code { border-color: var(--line); }
