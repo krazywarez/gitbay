@@ -1,3 +1,4 @@
 /gitbay
 /gitbayd
 *.db
+/dist/

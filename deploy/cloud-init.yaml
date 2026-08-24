@@ -1,0 +1,130 @@
+#cloud-config
+# gitbay VPS bootstrap (Ubuntu 24.04).
+#
+# What this does on first boot:
+#   - moves the host's admin sshd to port 2222 (gitbay's embedded SSH
+#     listener owns port 22) — CONNECT ON 2222 AFTER FIRST BOOT
+#   - creates the unprivileged gitbay user and directory layout
+#   - installs /etc/gitbay/config.toml, the systemd unit (with
+#     CAP_NET_BIND_SERVICE so ports 22/80/443 work without root), and a
+#     nightly backup timer
+#   - opens ufw for 22, 80, 443, 2222
+#
+# It does NOT install the gitbayd binary (it is not hosted anywhere yet);
+# scp it to /usr/local/bin/gitbayd afterward and `systemctl start gitbayd`.
+
+package_update: true
+packages:
+  - git
+  - ufw
+
+write_files:
+  # Admin sshd on 2222. Ubuntu 24.04 socket-activates sshd, so the port
+  # must change in BOTH sshd_config and the socket unit.
+  - path: /etc/ssh/sshd_config.d/60-gitbay-port.conf
+    content: |
+      Port 2222
+      PasswordAuthentication no
+  - path: /etc/systemd/system/ssh.socket.d/override.conf
+    content: |
+      [Socket]
+      ListenStream=
+      ListenStream=2222
+
+  - path: /etc/gitbay/config.toml
+    permissions: "0640"
+    content: |
+      [server]
+      root = "/var/lib/gitbay"
+      site_url = "https://gitbay.org"
+
+      [ssh]
+      mode = "embedded"
+      port = 22
+
+      [http]
+      addr = ":443"
+      tls = "acme"
+      acme_email = "hello@gitbay.org"
+      acme_http_addr = ":80"
+
+      [web]
+      mode = "view_only"
+
+      [registration]
+      mode = "closed"
+
+  - path: /etc/systemd/system/gitbayd.service
+    content: |
+      [Unit]
+      Description=gitbay forge daemon
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=gitbay
+      Group=gitbay
+      ExecStart=/usr/local/bin/gitbayd --config /etc/gitbay/config.toml serve
+      Restart=on-failure
+      RestartSec=3
+
+      # Bind 22/80/443 without root; no privilege escalation afterward.
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+      NoNewPrivileges=yes
+      ProtectSystem=strict
+      ProtectHome=yes
+      ReadWritePaths=/var/lib/gitbay /var/backups/gitbay
+      PrivateTmp=yes
+      ProtectKernelTunables=yes
+      ProtectControlGroups=yes
+      RestrictSUIDSGID=yes
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /usr/local/bin/gitbay-backup.sh
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      # Nightly consistent backup; keeps the last 7 locally.
+      # To ship offsite, add an rclone/s3 upload of $out here.
+      set -eu
+      dir=/var/backups/gitbay
+      out="$dir/gitbay-$(date -u +%Y%m%d-%H%M%S).tar.gz"
+      /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --out "$out"
+      ls -1t "$dir"/gitbay-*.tar.gz | tail -n +8 | xargs -r rm --
+
+  - path: /etc/systemd/system/gitbay-backup.service
+    content: |
+      [Unit]
+      Description=gitbay nightly backup
+      [Service]
+      Type=oneshot
+      User=gitbay
+      ExecStart=/usr/local/bin/gitbay-backup.sh
+
+  - path: /etc/systemd/system/gitbay-backup.timer
+    content: |
+      [Unit]
+      Description=gitbay nightly backup
+      [Timer]
+      OnCalendar=*-*-* 09:00:00 UTC
+      RandomizedDelaySec=15m
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
+  - install -d -o gitbay -g gitbay -m 750 /var/lib/gitbay /var/backups/gitbay
+  - chgrp gitbay /etc/gitbay/config.toml /etc/gitbay
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 2222/tcp
+  - ufw --force enable
+  - systemctl daemon-reload
+  - systemctl restart ssh.socket || systemctl restart ssh
+  - systemctl enable gitbayd gitbay-backup.timer
+  - systemctl start gitbay-backup.timer
