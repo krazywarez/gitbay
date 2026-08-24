@@ -24,6 +24,8 @@ type RepoSettings struct {
 	ProtectedBranches    []string `json:"protected_branches,omitempty"`
 	RequireSignedCommits bool     `json:"require_signed_commits,omitempty"`
 	RequireChecks        bool     `json:"require_checks,omitempty"`
+	RequireApprovals     int      `json:"require_approvals,omitempty"`
+	RequireResolved      bool     `json:"require_resolved,omitempty"`
 	GitDaemon            bool     `json:"git_daemon,omitempty"`
 }
 
