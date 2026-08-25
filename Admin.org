@@ -212,6 +212,16 @@ deploy, an archive publish, an automated MR branch — needs an explicit
 grant on that repo: =repo access grant <owner/name> ci write=. Private
 repos likewise need at least read for the clone.
 
+* LFS storage
+
+Objects live content-addressed under =[lfs] root= (default
+=<server.root>/lfs=); =[lfs] max_object_bytes= caps a single object
+(512MB default). Storage sits behind a small interface — an
+S3-compatible backend is a drop-in with the server proxying, and
+presigned URLs a later optimization. LFS objects do not travel with
+push mirrors (mirrors move git refs only), and gc does not yet collect
+orphaned objects.
+
 * Pages
 
 =[pages] domain = "example.site"= serves public repos' =pages= branches

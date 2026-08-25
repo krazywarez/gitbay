@@ -333,6 +333,15 @@ matching tag is pushed — and only then; =schedule= and =tags= are
 mutually exclusive. =build trigger <owner/name> <job>= queues any job
 immediately.
 
+* Large files (LFS)
+
+Standard Git LFS works over both transports with no setup beyond the
+usual =git lfs track=. SSH remotes authenticate through
+=git-lfs-authenticate= (deploy keys included: ro keys can download, rw
+keys upload); anonymous HTTPS clones of public repositories can fetch
+LFS objects with no credentials. Objects are verified against their
+sha256 on upload and capped at 512MB by default.
+
 * Pages
 
 On instances with =[pages] domain= set, a =pages= branch in any public
