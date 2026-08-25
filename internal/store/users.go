@@ -46,6 +46,15 @@ func (s *Store) CreateUser(username string, isAdmin bool) (int64, error) {
 	return res.LastInsertId()
 }
 
+// OwnerExists reports whether a user or org owns the name — the ACME host
+// policy check for pages subdomains.
+func (s *Store) OwnerExists(name string) bool {
+	var n int
+	s.DB.QueryRow(`SELECT (SELECT COUNT(*) FROM users WHERE username = ?1)
+		+ (SELECT COUNT(*) FROM orgs WHERE name = ?1)`, name).Scan(&n)
+	return n > 0
+}
+
 func (s *Store) UserByUsername(name string) (User, error) {
 	var u User
 	var admin, pending, disabled int

@@ -21,6 +21,7 @@ type Config struct {
 	Registration Registration `toml:"registration"`
 	API          API          `toml:"api"`
 	Webhooks     Webhooks     `toml:"webhooks"`
+	Pages        Pages        `toml:"pages"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
 	Mirrors      Mirrors      `toml:"mirrors"`
@@ -69,6 +70,13 @@ type Web struct {
 
 type Registration struct {
 	Mode string `toml:"mode"` // closed | invite | open
+}
+
+// Pages serves each public repo's `pages` branch as a static site on
+// <owner>.<domain> — a separate origin, so page-authored scripts never run
+// on the forge's own host. Empty domain disables the feature.
+type Pages struct {
+	Domain string `toml:"domain"`
 }
 
 // API controls the HTTPS/JSON control-plane API (bearer tokens minted over
@@ -154,6 +162,14 @@ func (c Config) Validate() error {
 
 	if c.Server.Root == "" {
 		errs = append(errs, errors.New("server.root is required"))
+	}
+	if d := c.Pages.Domain; d != "" {
+		if d == c.SiteHost() {
+			errs = append(errs, errors.New("pages.domain must differ from the site host: pages serve repo-authored scripts, which must not run on the forge's origin"))
+		}
+		if strings.HasSuffix(c.SiteHost(), "."+d) {
+			errs = append(errs, errors.New("pages.domain must not be a parent of the site host"))
+		}
 	}
 	if c.Server.SiteURL == "" {
 		errs = append(errs, errors.New("server.site_url is required"))

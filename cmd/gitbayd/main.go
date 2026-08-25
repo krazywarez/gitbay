@@ -170,10 +170,31 @@ func serveCmd() *cobra.Command {
 					errCh <- hs.ListenAndServeTLS(cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
 				case "acme":
 					host := cfg.SiteHost()
+					stripPort := func(hp string) string {
+						if h, _, err := net.SplitHostPort(hp); err == nil {
+							return h
+						}
+						return hp
+					}
+					// Beyond the site host, allow <owner>.<pages domain>
+					// for owners that exist — certs come on demand per
+					// subdomain, no wildcard needed.
+					hostPolicy := func(ctx context.Context, h string) error {
+						if h == host {
+							return nil
+						}
+						if pd := cfg.Pages.Domain; pd != "" {
+							if owner, ok := strings.CutSuffix(h, "."+pd); ok &&
+								!strings.Contains(owner, ".") && st.OwnerExists(owner) {
+								return nil
+							}
+						}
+						return fmt.Errorf("host %q not served here", h)
+					}
 					m := &autocert.Manager{
 						Prompt:     autocert.AcceptTOS,
 						Cache:      autocert.DirCache(filepath.Join(cfg.Server.Root, "acme")),
-						HostPolicy: autocert.HostWhitelist(host),
+						HostPolicy: hostPolicy,
 						Email:      cfg.HTTP.ACMEEmail,
 					}
 					// TLS-ALPN-01 rides the HTTPS port itself. The optional
@@ -181,7 +202,13 @@ func serveCmd() *cobra.Command {
 					// it (port 80 taken, no privileges) is not fatal.
 					if addr := cfg.HTTP.ACMEHTTPAddr; addr != "" && addr != "off" {
 						redirect := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-							http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusMovedPermanently)
+							// Pages hosts redirect to themselves, not the
+							// forge host.
+							target := host
+							if hostPolicy(r.Context(), stripPort(r.Host)) == nil {
+								target = stripPort(r.Host)
+							}
+							http.Redirect(w, r, "https://"+target+r.URL.RequestURI(), http.StatusMovedPermanently)
 						})
 						go func() {
 							slog.Info("acme http listening", "addr", addr)

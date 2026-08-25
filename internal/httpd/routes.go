@@ -122,7 +122,11 @@ func (s *Server) Handler() http.Handler {
 	if len(s.cfg.GoImport) > 0 {
 		h = s.goImportHandler(mux)
 	}
-	return s.securityHeaders(h)
+	h = s.securityHeaders(h)
+	if s.cfg.Pages.Domain != "" {
+		h = s.pagesRouter(h)
+	}
+	return h
 }
 
 // securityHeaders sets defensive response headers on every reply. The CSP
