@@ -329,12 +329,14 @@ build and push the branch for automatic deploys. Sites run on a
 separate origin — your scripts work, and the forge's cookies are out of
 reach.
 
-A repo can also serve its pages branch on a domain you own:
-=gitbay repo domain add <owner/name> <domain>=, then point the domain's
-A/AAAA records at the instance (DNS-only if the domain sits behind a
-proxying provider — the instance issues its own certificates). Claims
-are exclusive per instance; =repo domain list= and =repo show= report
-them.
+A repo can also serve its pages branch on a domain you own.
+=repo domain add <owner/name> <domain>= claims it and prints a DNS TXT
+challenge (=_gitbay-challenge.<domain>=); create the record, run
+=repo domain verify=, then point the domain's A/AAAA records at the
+instance (DNS-only if the domain sits behind a proxying provider — the
+instance issues its own certificates). Claims are exclusive per
+instance; unverified claims serve nothing and expire after 7 days.
+=repo domain list= reports pending/verified/expired.
 
 * Notifications
 

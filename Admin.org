@@ -210,10 +210,12 @@ owners that exist). The domain must not be the site host or a parent of
 it — pages content runs its own scripts and must stay off the forge's
 origin.
 
-Users with repo admin claim custom domains with =repo domain add=; ACME
-issues certificates only for claimed hosts, so stray DNS pointed at the
-server gets nothing. Claims are unverified in v1 — fine while
-registration is closed; add DNS TXT verification before opening it.
+Users with repo admin claim custom domains with =repo domain add=.
+Claims activate only after a DNS TXT challenge proves control of the
+domain (=repo domain verify=, audit-logged); pending claims serve
+nothing, get no certificates, and expire after 7 days. ACME issues
+certificates only for verified hosts, so stray DNS pointed at the
+server gets nothing.
 
 * Security
 
