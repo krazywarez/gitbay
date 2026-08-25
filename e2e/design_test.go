@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,7 +26,9 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "img"), 0o755)
 	os.WriteFile(filepath.Join(dir, "README.md"), []byte(
 		"# site\n\n[guide](docs/guide.md) and [export](docs/paper.html) and "+
-			"[abs](https://example.org/x) here\n\n![logo](img/logo.png)\n"), 0o644)
+			"[abs](https://example.org/x) here\n\n![logo](img/logo.png)\n"+
+			"![ext](https://example.org/pic.png)\n\n"+
+			"| flag | effect |\n|------|--------|\n| `-v` | verbose |\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "docs", "guide.md"), []byte("# guide\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "docs", "paper.org"), []byte("* paper\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "img", "logo.png"), []byte{0x89, 0x50}, 0o644)
@@ -41,7 +45,9 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		`href="/alice/site/blob/main/docs/guide.md"`,   // relative link
 		`href="/alice/site/blob/main/docs/paper.org"`,  // .html mapped to .org source
 		`src="/alice/site/raw/main/img/logo.png"`,      // relative image via raw
+		`src="https://example.org/pic.png"`,            // remote image untouched
 		`href="https://example.org/x"`,                 // absolute untouched
+		"<table>", "<td>verbose</td>",                  // GFM table renders
 		`href="/alice/site/blob/main/README.md">README.md</a>`, // clickable card header
 		`<th>name</th>`, // file table column headers
 	} {
@@ -52,6 +58,28 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	// Branch dropdown lists branches.
 	if !strings.Contains(body, `class="refmenu"`) || !strings.Contains(body, ">all refs") {
 		t.Error("branch dropdown missing")
+	}
+	// Raw serves images with their real type (nosniff otherwise blocks
+	// <img>); everything else stays inert text/plain.
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/alice/site/raw/main/img/logo.png", inst.httpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Errorf("raw png content-type = %q", ct)
+	}
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%d/alice/site/raw/main/README.md", inst.httpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+		t.Errorf("raw md content-type = %q", ct)
+	}
+	// Blob pages preview images inline.
+	if _, body := inst.get(t, "/alice/site/blob/main/img/logo.png"); !strings.Contains(body, `<img src="/alice/site/raw/main/img/logo.png"`) {
+		t.Errorf("blob image preview missing:\n%s", body)
 	}
 	// Explore rows carry topics, license, and updated date.
 	inst.ssh(t, aliceKey, "", "repo", "topics", "add", "alice/site", "web")

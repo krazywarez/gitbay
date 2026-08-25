@@ -23,6 +23,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/niklasfasching/go-org/org"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 
 	"gitbay.org/gitbay/internal/autolink"
 	"gitbay.org/gitbay/internal/control"
@@ -462,9 +463,10 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	binary := gitutil.IsBinary(data) || len(data) > maxRenderBytes
+	_, image := imageTypes[strings.ToLower(path.Ext(filePath))]
 
 	var codeHTML template.HTML
-	if !binary {
+	if !binary && !image {
 		codeHTML = highlight(filePath, data)
 	}
 	cs := crumbs(p, "blob", filePath)
@@ -482,10 +484,11 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		DirPath  string
 		RefKind  string
 		Binary   bool
+		Image    bool
 		Size     int
 		Branches []gitutil.Ref
 		CodeHTML template.HTML
-	}{p, cs, base, filePath, filePath, "blob", binary, len(data), branches, codeHTML})
+	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), branches, codeHTML})
 }
 
 // releases lists tag-anchored releases with notes and assets.
@@ -762,9 +765,23 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Serve inert: never let repo content execute in the forge's origin.
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	// Images get their real type so <img> works under nosniff; SVG script
+	// is dead on arrival because the instance CSP is script-src 'none'.
+	ct := "text/plain; charset=utf-8"
+	if t, ok := imageTypes[strings.ToLower(path.Ext(filePath))]; ok {
+		ct = t
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(data)
+}
+
+// imageTypes are the formats raw serves with a real content type and blob
+// pages preview inline.
+var imageTypes = map[string]string{
+	".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+	".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif",
+	".svg": "image/svg+xml", ".ico": "image/x-icon",
 }
 
 // readmeRank orders competing README files: richer renderers win.
@@ -794,6 +811,10 @@ func pickReadme(entries []gitutil.TreeEntry) string {
 	return best
 }
 
+// markdown is the shared renderer: GFM (tables, strikethrough, autolinks,
+// task lists) on top of CommonMark. Raw HTML is still dropped.
+var markdown = goldmark.New(goldmark.WithExtensions(extension.GFM))
+
 // mdHTML renders user-authored markdown (issue and MR bodies, comments).
 // goldmark's default renderer drops raw HTML, so this is safe as-is.
 func mdHTML(raw string) template.HTML {
@@ -801,7 +822,7 @@ func mdHTML(raw string) template.HTML {
 		return ""
 	}
 	var buf bytes.Buffer
-	if goldmark.Convert([]byte(raw), &buf) != nil {
+	if markdown.Convert([]byte(raw), &buf) != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
 	}
 	return template.HTML(buf.String())
@@ -899,7 +920,7 @@ func renderReadme(name string, raw []byte) template.HTML {
 	switch path.Ext(strings.ToLower(name)) {
 	case ".md", ".markdown":
 		var buf bytes.Buffer
-		if goldmark.Convert(raw, &buf) != nil {
+		if markdown.Convert(raw, &buf) != nil {
 			return plain()
 		}
 		return template.HTML(buf.String())

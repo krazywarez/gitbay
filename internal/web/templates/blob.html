@@ -7,6 +7,7 @@
   <span class="spacer"></span>
   <span class="actions">{{if not .Binary}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blame/{{.Ref}}/{{.Path}}">blame</a> · {{end}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">edit</a>{{end}}</span>
 </div>
-{{if .Binary}}<p class="empty-note">binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
+{{if .Image}}<div class="blobimage"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}"><img src="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}" alt="{{.Base}}"></a><p class="meta">{{.Size}} bytes</p></div>
+{{else if .Binary}}<p class="empty-note">binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
 {{else}}<div class="code">{{.CodeHTML}}</div>{{end}}
 {{end}}

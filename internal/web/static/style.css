@@ -484,6 +484,26 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 }
 .rendered img { max-width: 100%; }
 .rendered h1, .rendered h2 { border-bottom: 1px solid var(--faint); padding-bottom: var(--sp-1); }
+.rendered table {
+  border-collapse: collapse;
+  margin: var(--sp-3) 0;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.rendered th, .rendered td {
+  border: 1px solid var(--line);
+  padding: var(--sp-1) var(--sp-3);
+  text-align: left;
+}
+.rendered th { background: var(--surface); font-weight: 600; }
+.blobimage { text-align: center; }
+.blobimage img {
+  max-width: 100%;
+  border: 1px solid var(--faint);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
 
 pre.message {
   background: var(--code-bg);
