@@ -495,6 +495,7 @@ button.linklike:hover { text-decoration: underline; filter: none; }
   border: 1px solid var(--line);
   padding: var(--sp-1) var(--sp-3);
   text-align: left;
+  overflow-wrap: normal; /* scroll the table, don't shatter words */
 }
 .rendered th { background: var(--surface); font-weight: 600; }
 .blobimage { text-align: center; }
