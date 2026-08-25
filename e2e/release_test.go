@@ -40,6 +40,28 @@ func TestReleases(t *testing.T) {
 		t.Fatal("duplicate release accepted")
 	}
 
+	// Edit: notes replace from stdin, absent flags keep their field.
+	if _, _, code := inst.ssh(t, aliceKey, "", "release", "edit", "alice/app", "v1.0"); code != 2 {
+		t.Fatal("edit with nothing to change accepted")
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "the **rebuilt** notes\n", "release", "edit", "alice/app", "v1.0", "--file", "-"); code != 0 {
+		t.Fatalf("release edit: %s", errOut)
+	}
+	out, _, _ := inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0")
+	if !strings.Contains(out, "the **rebuilt** notes") || !strings.Contains(out, "First light") {
+		t.Fatalf("edit lost a field:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "release", "edit", "alice/app", "v1.0", "--title", "'Second light'"); code != 0 {
+		t.Fatal("title edit failed")
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0")
+	if !strings.Contains(out, "Second light") || !strings.Contains(out, "the **rebuilt** notes") {
+		t.Fatalf("title edit lost notes:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "release", "edit", "alice/app", "v9.9", "--title", "x"); code != 3 {
+		t.Fatal("edit of missing release accepted")
+	}
+
 	// Assets: upload from stdin, validation, dedup, round-trip.
 	payload := "BINARY\x01\x02payload for the release asset\n"
 	if _, errOut, code := inst.ssh(t, aliceKey, payload, "release", "asset", "add", "alice/app", "v1.0", "tool-linux-amd64"); code != 0 {
@@ -58,17 +80,17 @@ func TestReleases(t *testing.T) {
 	if code != 0 || got != payload {
 		t.Fatalf("asset round-trip: exit %d, %q", code, got)
 	}
-	out, _, _ := inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0", "--json")
+	out, _, _ = inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0", "--json")
 	if !strings.Contains(out, `"name":"tool-linux-amd64"`) ||
 		!strings.Contains(out, fmt.Sprintf(`"size":%d`, len(payload))) ||
-		!strings.Contains(out, `"sha256":"`) || !strings.Contains(out, "First light") {
+		!strings.Contains(out, `"sha256":"`) || !strings.Contains(out, "Second light") {
 		t.Fatalf("release show: %s", out)
 	}
 
 	// Web: page renders notes and assets; download streams exact bytes.
 	status, body := inst.get(t, "/alice/app/releases")
-	if status != 200 || !strings.Contains(body, "First light") ||
-		!strings.Contains(body, "<strong>first</strong>") ||
+	if status != 200 || !strings.Contains(body, "Second light") ||
+		!strings.Contains(body, "<strong>rebuilt</strong>") ||
 		!strings.Contains(body, "tool-linux-amd64") {
 		t.Fatalf("releases page: %d\n%s", status, body)
 	}

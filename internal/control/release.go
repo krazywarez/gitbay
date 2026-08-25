@@ -21,6 +21,9 @@ func init() {
 	register(Command{Path: []string{"release", "create"},
 		Summary: "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
 		ReadsStdin: true, Run: runReleaseCreate})
+	register(Command{Path: []string{"release", "edit"},
+		Summary: "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
+		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
 		Summary: "list releases: release list <owner/name>", ReadOnly: true, Run: runReleaseList})
 	register(Command{Path: []string{"release", "show"},
@@ -145,6 +148,69 @@ func releaseToOut(r store.Release, withNotes bool) releaseOut {
 		o.Assets = append(o.Assets, assetOut{a.Name, a.Size, a.SHA256})
 	}
 	return o
+}
+
+func runReleaseEdit(c *Ctx, args []string) int {
+	const usage = "usage: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]"
+	var path, tag, title, notes, file string
+	var setTitle, setNotes bool
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--title", "--notes", "--file":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
+			}
+			switch args[i] {
+			case "--title":
+				title, setTitle = args[i+1], true
+			case "--notes":
+				notes, setNotes = args[i+1], true
+			case "--file":
+				file, setNotes = args[i+1], true
+			}
+			i++
+		default:
+			if path == "" {
+				path = args[i]
+			} else if tag == "" {
+				tag = args[i]
+			} else {
+				return c.fail(protocol.ExitUsage, usage)
+			}
+		}
+	}
+	if path == "" || tag == "" || (!setTitle && !setNotes) {
+		return c.fail(protocol.ExitUsage, usage)
+	}
+	repo, code := resolveRepo(c, path, policy.CanWrite)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	rel, err := c.Store.ReleaseByTag(repo.ID, tag)
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no release %q in %s", tag, repo.Path())
+	}
+	// Absent flags keep what the release already says.
+	if !setTitle {
+		title = rel.Title
+	} else if title == "" {
+		title = tag
+	}
+	body := rel.Notes
+	if setNotes {
+		if body, err = bodyFrom(c, notes, file); err != nil {
+			return c.fail(protocol.ExitUsage, "%v", err)
+		}
+	}
+	if err := c.Store.UpdateRelease(repo.ID, tag, title, body); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"tag": tag, "title": title}, func(w io.Writer) {
+		fmt.Fprintf(w, "updated release %s\n", tag)
+	})
 }
 
 func runReleaseList(c *Ctx, args []string) int {

@@ -60,6 +60,20 @@ func (s *Store) releaseAssets(rel *Release) error {
 	return rows.Err()
 }
 
+// UpdateRelease replaces a release's title and notes.
+func (s *Store) UpdateRelease(repoID int64, tag, title, notes string) error {
+	res, err := s.DB.Exec(
+		"UPDATE releases SET title = ?, notes = ? WHERE repo_id = ? AND tag = ?",
+		title, notes, repoID, tag)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) ReleaseByTag(repoID int64, tag string) (Release, error) {
 	var r Release
 	err := s.DB.QueryRow(releaseSelect+" WHERE r.repo_id = ? AND r.tag = ?", repoID, tag).
