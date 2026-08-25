@@ -33,6 +33,20 @@
 <p><button type="submit">comment</button></p>
 </form>
 {{end}}
+{{if .Commits}}<h3>commits <span class="count">{{len .Commits}}</span></h3>
+<ul class="loglist">
+{{range .Commits}}<li>
+  <div class="commitmain">
+    <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a></p>
+    <p class="meta">{{.AuthorName}} · {{.Date}}</p>
+  </div>
+  <div class="commitside">
+    {{template "sigbadge" .Sig}}
+    <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code>
+  </div>
+</li>
+{{end}}
+</ul>{{end}}
 <details class="difffold">
 <summary><h3>diff</h3><span class="meta">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span></span></summary>
 <pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>

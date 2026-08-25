@@ -1345,6 +1345,29 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			stat.Files++
 		}
 	}
+	// The commits this MR carries: base..head, the same range as the diff.
+	type commitRow struct {
+		SHA, ShortSHA, Subject, AuthorName, Date string
+		Sig                                      sigView
+	}
+	var commits []commitRow
+	if base != "" {
+		const maxMRCommits = 100
+		shas, _ := gitutil.RevListRange(p.Dir, base, headRef)
+		if len(shas) > maxMRCommits {
+			shas = shas[:maxMRCommits]
+		}
+		for _, sha := range shas {
+			v, parsed := s.sigFor(p.Repo, p.Dir, sha)
+			cr := commitRow{SHA: sha, ShortSHA: sha[:10], Sig: v}
+			if parsed != nil {
+				cr.Subject = parsed.Subject
+				cr.AuthorName = parsed.AuthorName
+				cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
+			}
+			commits = append(commits, cr)
+		}
+	}
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -1355,10 +1378,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Reviews         []store.MRReview
 		DiffLines       []diffLine
 		Stat            diffStat
+		Commits         []commitRow
 		CanEdit         bool
 		DetachedThreads []diffThread
 	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
-		reviews, lines, stat, s.canEditItem(r, p.Repo, m.Author), detachedThreads})
+		reviews, lines, stat, commits, s.canEditItem(r, p.Repo, m.Author), detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

@@ -11,6 +11,7 @@ import (
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/sig"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -414,18 +415,48 @@ func runMRShow(c *Ctx, args []string) int {
 	for _, r := range reviews {
 		rs = append(rs, reviewOut{r.Reviewer, r.Verdict, r.Stale})
 	}
+	// The commits this MR carries: base..head, the diff's range.
+	type commitOut struct {
+		SHA     string `json:"sha"`
+		Subject string `json:"subject"`
+	}
+	var commits []commitOut
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	base := mr.MergedBase
+	if base == "" {
+		if b, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, mrHeadRef(mr.Number)); err == nil {
+			base = b
+		}
+	}
+	if base != "" {
+		if shas, err := gitutil.RevListRange(dir, base, mrHeadRef(mr.Number)); err == nil {
+			for _, sha := range shas {
+				subject := ""
+				if raw, err := gitutil.ReadCommit(dir, sha); err == nil {
+					if parsed, err := sig.ParseCommit(raw); err == nil {
+						subject = parsed.Subject
+					}
+				}
+				commits = append(commits, commitOut{sha, subject})
+			}
+		}
+	}
 	d := struct {
 		mrOut
 		Checks            []checkOut   `json:"checks,omitempty"`
 		Combined          string       `json:"checks_combined,omitempty"`
 		UnresolvedThreads int          `json:"unresolved_threads,omitempty"`
+		Commits           []commitOut  `json:"commits,omitempty"`
 		Comments          []commentOut `json:"comments,omitempty"`
 		Reviews           []reviewOut  `json:"reviews,omitempty"`
-	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), unresolved, cs, rs}
+	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), unresolved, commits, cs, rs}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
 		if d.Body != "" {
 			fmt.Fprintf(w, "\n%s\n", d.Body)
+		}
+		for _, cm := range commits {
+			fmt.Fprintf(w, "commit: %.10s %s\n", cm.SHA, cm.Subject)
 		}
 		for _, x := range checks {
 			fmt.Fprintf(w, "check: %s %s\n", x.Context, x.State)

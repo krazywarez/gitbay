@@ -267,4 +267,17 @@ func TestMergeRequests(t *testing.T) {
 	if !strings.Contains(body, "feature.txt") {
 		t.Fatalf("merged MR web diff empty:\n%s", body)
 	}
+	// The MR page lists the commits it carries, linked to commit pages.
+	if !strings.Contains(body, ">commits <") || !strings.Contains(body, "/alice/lib/commit/") {
+		t.Fatalf("mr commits section missing:\n%s", body)
+	}
+	// So does mr show, human and JSON.
+	showOut, _, code := inst.ssh(t, aliceKey, "", "mr", "show", "alice/lib", "1")
+	if code != 0 || !strings.Contains(showOut, "commit: ") {
+		t.Fatalf("mr show missing commits: %d\n%s", code, showOut)
+	}
+	showJSON, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/lib", "1", "--json")
+	if !strings.Contains(showJSON, `"commits":[`) || !strings.Contains(showJSON, `"subject"`) {
+		t.Fatalf("mr show json missing commits: %s", showJSON)
+	}
 }
