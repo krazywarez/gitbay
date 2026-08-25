@@ -27,6 +27,11 @@ func (s *Server) Routes() []Route {
 		{Method: "GET", Pattern: "/{owner}/{repo}/info/refs", Handler: s.infoRefs},
 		{Method: "POST", Pattern: "/{owner}/{repo}/git-upload-pack", Handler: s.uploadPack},
 		{Method: "POST", Pattern: "/{owner}/{repo}/git-receive-pack", Handler: s.receivePackRefusal},
+		// Git LFS: token-authenticated transport (minted over SSH), not
+		// web-session routes — anonymous download for public repos only.
+		{Method: "POST", Pattern: "/{owner}/{repo}/info/lfs/objects/batch", Handler: s.lfsBatch},
+		{Method: "GET", Pattern: "/{owner}/{repo}/info/lfs/objects/{oid}", Handler: s.lfsDownload},
+		{Method: "PUT", Pattern: "/{owner}/{repo}/info/lfs/objects/{oid}", Handler: s.lfsUpload},
 	}
 
 	// Web UI, read-only. These exist in every mode.

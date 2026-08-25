@@ -260,6 +260,14 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cm
 				return protocol.ExitDenied
 			}
 			return runGit(cfg, st, user, scope, argv, stdin, stdout, stderr)
+		case "git-lfs-authenticate":
+			// Part of the git transport, not the control plane: usable by
+			// git-scoped and deploy keys, with the transports' access rules.
+			if user.Pending {
+				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
+				return protocol.ExitDenied
+			}
+			return runLFSAuthenticate(cfg, st, user, scope, argv, stdout, stderr)
 		}
 	}
 	ctx := &control.Ctx{

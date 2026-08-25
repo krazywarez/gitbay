@@ -22,6 +22,7 @@ type Config struct {
 	API          API          `toml:"api"`
 	Webhooks     Webhooks     `toml:"webhooks"`
 	Pages        Pages        `toml:"pages"`
+	LFS          LFS          `toml:"lfs"`
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
 	Mirrors      Mirrors      `toml:"mirrors"`
@@ -70,6 +71,14 @@ type Web struct {
 
 type Registration struct {
 	Mode string `toml:"mode"` // closed | invite | open
+}
+
+// LFS stores large-file objects content-addressed under Root (default
+// <server.root>/lfs). MaxObjectBytes caps a single object; 0 means the
+// 512MB default.
+type LFS struct {
+	Root           string `toml:"root"`
+	MaxObjectBytes int64  `toml:"max_object_bytes"`
 }
 
 // Pages serves each public repo's `pages` branch as a static site on

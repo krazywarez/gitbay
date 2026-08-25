@@ -20,9 +20,11 @@ func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
 		if r.Mutating {
 			t.Errorf("view_only route table contains mutating route %s %s", r.Method, r.Pattern)
 		}
-		// The only POSTs allowed are the git transport endpoints: a pure
-		// read (upload-pack) and a static refusal (receive-pack).
-		if r.Method != "GET" && !strings.Contains(r.Pattern, "git-upload-pack") && !strings.Contains(r.Pattern, "git-receive-pack") {
+		// The only non-GETs allowed are transport endpoints, which never
+		// authenticate by web session: git upload-pack (a pure read), the
+		// receive-pack static refusal, and LFS (SSH-minted tokens).
+		if r.Method != "GET" && !strings.Contains(r.Pattern, "git-upload-pack") &&
+			!strings.Contains(r.Pattern, "git-receive-pack") && !strings.Contains(r.Pattern, "/info/lfs/") {
 			t.Errorf("view_only route table contains non-GET route %s %s", r.Method, r.Pattern)
 		}
 		for _, word := range []string{"login", "logout", "register", "edit", "new", "settings"} {
