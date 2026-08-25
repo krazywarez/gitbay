@@ -192,6 +192,19 @@ that is why no =owner/name= appears above. Anywhere else, pass it as the
 first argument. Long text: =--body= inline, =--file -= from stdin, or
 neither on a terminal and =$EDITOR= opens.
 
+Wikis are companion repositories edited by push — no separate storage,
+no web editor, the same rendering pipeline as READMEs (markdown and
+org). Access mirrors the parent repo (read to view, write to push);
+the companion is created on your first push and follows the repo
+through transfer and delete:
+
+#+begin_src sh
+git clone ssh://git@<host>/you/project.wiki.git
+# add Home.md (or .org), more pages, images; relative links between
+# pages just work on the web at /you/project/wiki
+git push
+#+end_src
+
 Releases anchor notes and binary assets to a pushed tag (write access;
 assets stream over SSH, capped by the instance's =max_asset_bytes=):
 

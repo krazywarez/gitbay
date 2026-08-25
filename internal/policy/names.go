@@ -55,6 +55,9 @@ func ValidateName(name string) error {
 	if len(name) > 4 && name[len(name)-4:] == ".git" {
 		return fmt.Errorf("invalid name %q: must not end in .git", name)
 	}
+	if len(name) > 5 && name[len(name)-5:] == ".wiki" {
+		return fmt.Errorf("invalid name %q: .wiki names are reserved for wiki companion repositories", name)
+	}
 	return nil
 }
 

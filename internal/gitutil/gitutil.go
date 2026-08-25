@@ -22,9 +22,13 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git init: %v\n%s", err, out)
 	}
-	cmd = exec.Command("git", "-C", path, "config", "core.hooksPath", hooksPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git config core.hooksPath: %v\n%s", err, out)
+	// An empty hooksPath leaves the bare repo with no hooks — used for
+	// companion repos (wikis) that carry no ref policy.
+	if hooksPath != "" {
+		cmd = exec.Command("git", "-C", path, "config", "core.hooksPath", hooksPath)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git config core.hooksPath: %v\n%s", err, out)
+		}
 	}
 	return nil
 }

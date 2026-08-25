@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -284,6 +285,12 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 	}
 	write := service == "git-receive-pack"
 
+	// Wiki companion repos: ssh://.../owner/name.wiki.git. Access derives
+	// from the parent repo; the bare repo is created on first push.
+	if base, ok := strings.CutSuffix(strings.TrimSuffix(argv[1], ".git"), ".wiki"); ok {
+		return runWikiGit(cfg, st, user, scope, service, base, write, stdin, stdout, stderr)
+	}
+
 	repo, err := st.RepoByPath(argv[1])
 	if err != nil {
 		fmt.Fprintln(stderr, "repository not found")
@@ -335,6 +342,59 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
 	}
 	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, cfg.Limits.MaxPackBytes); err != nil {
+		return protocol.ExitFailure
+	}
+	return protocol.ExitOK
+}
+
+// runWikiGit serves a repo's wiki companion. The wiki carries no ref
+// policy (no hooks, no merge requests); access is exactly the parent
+// repo's, and the bare repo is created on the first push. Deploy keys —
+// bound to the repo's own git data for CI — cannot touch the wiki.
+func runWikiGit(cfg config.Config, st *store.Store, user store.User, scope, service, basePath string,
+	write bool, stdin io.Reader, stdout, stderr io.Writer) int {
+	repo, err := st.RepoByPath(basePath)
+	if err != nil {
+		fmt.Fprintln(stderr, "repository not found")
+		return protocol.ExitNotFound
+	}
+	if policy.IsDeployScope(scope) {
+		fmt.Fprintln(stderr, "repository not found")
+		return protocol.ExitNotFound
+	}
+	grant, err := st.AccessRole(repo.ID, user.ID)
+	if err != nil {
+		fmt.Fprintln(stderr, "internal error")
+		return protocol.ExitFailure
+	}
+	if !policy.CanRead(user, repo, grant) {
+		fmt.Fprintln(stderr, "repository not found")
+		return protocol.ExitNotFound
+	}
+	if !policy.ScopeAllowsGit(scope, repo.Path(), write) {
+		fmt.Fprintf(stderr, "this key's scope (%s) does not allow %s on the wiki\n", scope, service)
+		return protocol.ExitDenied
+	}
+	if write && !policy.CanWrite(user, repo, grant) {
+		fmt.Fprintf(stderr, "write access to %s wiki denied\n", repo.Path())
+		return protocol.ExitDenied
+	}
+	if write && repo.Settings.Archived {
+		fmt.Fprintf(stderr, "%s is archived and read-only\n", repo.Path())
+		return protocol.ExitDenied
+	}
+	dir := control.RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name+".wiki")
+	if _, err := os.Stat(dir); err != nil {
+		if !write {
+			fmt.Fprintln(stderr, "this repository has no wiki yet")
+			return protocol.ExitNotFound
+		}
+		if err := gitutil.InitBare(dir, "main", ""); err != nil {
+			fmt.Fprintln(stderr, "initializing wiki failed")
+			return protocol.ExitFailure
+		}
+	}
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, nil, cfg.Limits.MaxPackBytes); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK

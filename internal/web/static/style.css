@@ -738,6 +738,19 @@ pre.matchline mark {
   border-radius: 2px;
 }
 
+/* wiki */
+.wikilayout { display: flex; gap: var(--sp-5); align-items: flex-start; }
+.wikipage { flex: 1; min-width: 0; }
+.wikinav { flex: none; width: 13rem; padding-top: var(--sp-4); }
+.wikinav ul { list-style: none; margin: var(--sp-1) 0 var(--sp-4); padding: 0; }
+.wikinav li a { display: block; padding: 0.15rem 0; color: var(--fg); }
+.wikinav li a:hover { color: var(--accent); text-decoration: none; }
+.wikinav li a.active { color: var(--accent); font-weight: 550; }
+@media (max-width: 40rem) {
+  .wikilayout { flex-direction: column; }
+  .wikinav { width: auto; padding-top: 0; }
+}
+
 /* blame */
 .blame {
   border: 1px solid var(--line);

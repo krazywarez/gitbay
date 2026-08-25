@@ -216,6 +216,8 @@ type repoPage struct {
 	Tab      string // active tab in the repo header
 	Topics   []string
 	Pinned   bool // by the viewer
+	HasWiki  bool
+	Host     string
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
@@ -253,6 +255,8 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		Site:     s.siteName(),
 		Viewer:   viewer.Username,
 		Pinned:   pinned,
+		HasWiki:  s.wikiDir(repo.OwnerName, repo.Name) != "",
+		Host:     s.cfg.SiteHost(),
 		Desc:     gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
 		Repo:     repo,
 		Ref:      ref,
