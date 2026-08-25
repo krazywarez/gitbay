@@ -170,6 +170,50 @@ func TestCI(t *testing.T) {
 		t.Fatal("secret remove failed")
 	}
 
+	// --- tag-triggered jobs ---
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  test:\n    steps:\n      - echo branch build\n  publish:\n    tags: \"v*\"\n    steps:\n      - echo publishing $GITBAY_REF\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "tag job")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	// The branch push queued only the branch job.
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if strings.Contains(out, "publish") {
+		t.Fatalf("tag job queued on branch push:\n%s", out)
+	}
+	// An annotated tag queues the tag job, with the peeled commit as sha.
+	mustGit(t, dir, env, "tag", "-a", "-m", "rel", "v1.0.0")
+	mustGit(t, dir, env, "push", "-q", "origin", "v1.0.0")
+	headSHA := strings.TrimSpace(mustGit(t, dir, env, "rev-parse", "HEAD"))
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if !strings.Contains(out, "publish\tpending\t"+headSHA[:10]) || !strings.Contains(out, "v1.0.0") {
+		t.Fatalf("tag build missing or unpeeled:\n%s", out)
+	}
+	// A non-matching tag queues nothing.
+	mustGit(t, dir, env, "tag", "nightly-1")
+	mustGit(t, dir, env, "push", "-q", "origin", "nightly-1")
+	out2, _, _ := inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if strings.Count(out2, "publish") != strings.Count(out, "publish") {
+		t.Fatalf("non-matching tag queued a build:\n%s", out2)
+	}
+	inst.runnerOnce(t, runnerKey) // branch "test" job
+	inst.runnerOnce(t, runnerKey) // tag "publish" job
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if !strings.Contains(out, "publish\tsuccess") {
+		t.Fatalf("tag build did not run:\n%s", out)
+	}
+	// schedule and tags together are refused.
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  both:\n    schedule: \"0 6 * * *\"\n    tags: \"v*\"\n    steps: [echo x]\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "both triggers")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	shaBoth := strings.TrimSpace(mustGit(t, dir, env, "rev-parse", "HEAD"))
+	out, _, _ = inst.ssh(t, aliceKey, "", "status", "list", "alice/app", shaBoth)
+	if !strings.Contains(out, "ci/config") || !strings.Contains(out, "failure") {
+		t.Fatalf("mutually exclusive triggers not refused:\n%s", out)
+	}
+
 	// A broken ci.yml surfaces as a failed ci/config status.
 	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs: {bad name: {steps: [x]}}\n"), 0o644)
 	mustGit(t, dir, env, "add", ".")

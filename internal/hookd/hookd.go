@@ -15,7 +15,9 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/ci"
@@ -175,6 +177,14 @@ func (s *Server) postReceive(req Request) {
 			`{"ref":%q,"old":%q,"new":%q,"forced":%v,"deleted":%v}`,
 			u.Ref, u.Old, u.New, u.IsForce, u.IsDelete))
 
+		// Any ref update — branch or tag — schedules the push mirrors.
+		s.st.MarkMirrorsDirty(req.RepoID, "push")
+
+		// Tag pushes run the tag-triggered CI jobs.
+		if tag, ok := strings.CutPrefix(u.Ref, "refs/tags/"); ok && !u.IsDelete && pushedRepoErr == nil {
+			s.queueTagBuilds(pushedRepo, req.UserID, tag, u.New)
+		}
+
 		branch, ok := cutHeads(u.Ref)
 		if !ok {
 			continue
@@ -190,8 +200,6 @@ func (s *Server) postReceive(req Request) {
 		if pushedRepoErr == nil && !u.IsDelete {
 			s.queueBuilds(pushedRepo, req.UserID, branch, u.New)
 		}
-		// Any branch/tag update schedules the push mirrors.
-		s.st.MarkMirrorsDirty(req.RepoID, "push")
 		if u.IsForce {
 			s.st.Audit(req.UserID, "push.forced", map[string]any{
 				"repo": req.RepoID, "ref": u.Ref, "old": u.Old, "new": u.New})
@@ -250,6 +258,10 @@ func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) 
 	now := time.Now()
 	var schedules []store.Schedule
 	for _, j := range jobs {
+		// Tag jobs run on matching tag pushes only.
+		if j.Tags != "" {
+			continue
+		}
 		// Scheduled jobs run on their cron, not on push; a default-branch
 		// push (re)registers them.
 		if j.Schedule != "" {
@@ -274,6 +286,41 @@ func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) 
 		if err := s.st.SyncSchedules(repo.ID, schedules); err != nil {
 			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
 		}
+	}
+}
+
+// queueTagBuilds runs the jobs whose tag pattern matches a pushed tag.
+// The build records the tag as its ref and the peeled commit as its sha,
+// so statuses land on the commit, not an annotated tag object.
+func (s *Server) queueTagBuilds(repo store.Repo, userID int64, tag, pushed string) {
+	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	sha, err := gitutil.PeelToCommit(dir, pushed)
+	if err != nil {
+		return
+	}
+	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		return // the branch push already reported ci/config
+	}
+	for _, j := range jobs {
+		if j.Tags == "" {
+			continue
+		}
+		if ok, _ := path.Match(j.Tags, tag); !ok {
+			continue
+		}
+		steps, _ := json.Marshal(j.Steps)
+		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, tag, string(steps))
+		if err != nil {
+			slog.Error("queueing tag build", "repo", repo.Path(), "job", j.Name, "err", err)
+			continue
+		}
+		url := fmt.Sprintf("%s/%s/builds/%d", s.cfg.Server.SiteURL, repo.Path(), n)
+		s.st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "tag "+tag, url, userID)
 	}
 }
 

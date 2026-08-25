@@ -100,6 +100,16 @@ func RevList(dir, ref string, limit int) ([]string, error) {
 	return shas, nil
 }
 
+// PeelToCommit resolves a ref or object to its commit — annotated tags
+// peel to the commit they point at.
+func PeelToCommit(dir, ref string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", ref+"^{commit}").Output()
+	if err != nil {
+		return "", fmt.Errorf("rev-parse %s^{commit}: %w", ref, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // ReadCommit returns the raw commit object bytes.
 func ReadCommit(dir, sha string) ([]byte, error) {
 	cmd := exec.Command("git", "-C", dir, "cat-file", "commit", sha)
