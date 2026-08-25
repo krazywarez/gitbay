@@ -97,6 +97,71 @@ Done for the wiki half (2026-08-25): the docs now live in this wiki,
 dogfooding #25. When #15 (pages) lands they can graduate to a published
 site.
 
+* Phase 5 — the web grows up (v0.5.0, [[https://gitbay.org/krz/gitbay/issues/35][#35]])
+
+Two goals, one structure. The design needs sustained iteration, and the
+web needs enough capability that nobody calls it useless — without
+diluting CLI-first.
+
+** Identity, settled
+
+The CLI is the complete interface: every capability exists over SSH,
+and web writes call the same control handlers. The web is the reading,
+reviewing, and responding surface — its bar is that a maintainer can
+complete the triage/review/merge loop from a browser. Deliberately
+CLI-only forever: secrets, mirror tokens, domain claims, and anything
+else whose input is a credential (stdin discipline). No-JS pages remain
+the baseline.
+
+** Current web write surface (audit 2026-08-25)
+
+repo create, file edit, issue create/comment/edit, MR comment/edit,
+pin. Everything else is read-only.
+
+** Foundations (before page work)
+
+- Navigation IA: ten flat repo tabs wrap on mobile. Regroup — code
+  (files/log/refs), work (issues/MRs/builds), publish
+  (releases/wiki) — search and archive demoted to compact affordances.
+- Type scale and spacing rhythm pass; consistent card/list grammar.
+- Accessibility baseline: landmarks, focus states, contrast audit,
+  skip link; keyboard-only walk of every page.
+- Diff renderer: syntax-highlighted diffs, per-file sections with
+  stats and collapse — shared by commit and MR pages.
+- Empty states everywhere a list can be empty.
+
+** Page workstreams (design + parity land together)
+
+Each ends with a screenshot checkpoint (both schemes, three widths)
+before merge.
+
+1. MR page: timeline/diff layout, review actions (approve/request
+   changes), thread resolve, merge button with gate status, retarget;
+   MR create from the web (branch picker).
+2. Issues: close/reopen, labels, assignees, milestone from the web;
+   list filtering that matches the CLI's.
+3. Repo home: header with latest-commit line and clone box that
+   doesn't fight the tree; file table polish.
+4. Dashboard: review requests, assigned work, recent activity feed —
+   a reason to set it as a browser home page.
+5. Commit + log: statuses inline, signature chips tightened, log
+   filtering UI for the ?path= history.
+6. Owner/org: team visibility, member management for org admins.
+7. Settings surface (repo admins): description, website, topics,
+   branch protection and merge gates, visibility, archive — the
+   safe subset of repo settings; plus SSH key management for accounts
+   (add/remove keys from an authenticated session).
+8. Releases/builds: create and edit releases, retrigger builds.
+
+** Guardrails
+
+- PARITY page in this wiki: a maintained matrix of capability x
+  surface (SSH/CLI/web/API), updated in the MR that changes it.
+- Rule for new features: lands over SSH first; if it belongs to the
+  triage/review/respond loop it lands on the web in the same MR.
+- The view-only mode guarantee stays structural: accounts-mode routes
+  never registered there.
+
 * Phase S — security (cross-cutting)
 
 Not a sequential phase: items land alongside whatever phase is active,
