@@ -37,7 +37,7 @@ ssh git@gitbay.org register --username you --invite <code>
 
 * What holds the design together
 
-Read =docs/roadmap.org= for direction. The invariants that reviews will
+Read the [[https://gitbay.org/krz/gitbay/wiki/Roadmap][roadmap]] (in the wiki) for direction. The invariants that reviews will
 hold you to:
 
 - every control command must work from bare OpenSSH; the registry test
@@ -59,7 +59,7 @@ surrounding code; keep diffs surgical.
 * Issues
 
 File at [[https://gitbay.org/krz/gitbay/issues][the tracker]] (=gitbay issue create= from a clone). Check
-=docs/roadmap.org= first — it maps the filed issues to phases.
+the [[https://gitbay.org/krz/gitbay/wiki/Roadmap][roadmap]] (in the wiki) first — it maps the filed issues to phases.
 
 * License
 
