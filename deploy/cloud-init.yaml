@@ -17,6 +17,8 @@ package_update: true
 packages:
   - git
   - ufw
+  - unattended-upgrades
+  - fail2ban
 
 write_files:
   # Admin sshd on 2222. Ubuntu 24.04 socket-activates sshd, so the port
@@ -25,6 +27,74 @@ write_files:
     content: |
       Port 2222
       PasswordAuthentication no
+      # Throttle unauthenticated connection floods on the admin sshd
+      # (gitbayd's own port 22 is throttled by limits.ssh_auth_rate).
+      MaxStartups 10:30:60
+      MaxAuthTries 3
+      LoginGraceTime 20
+
+  # OS security patches applied automatically; reboot at 04:30 if needed.
+  - path: /etc/apt/apt.conf.d/51gitbay-unattended
+    content: |
+      Unattended-Upgrade::Allowed-Origins { "${distro_id}:${distro_codename}-security"; };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:30";
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  # fail2ban watches the admin sshd for auth failures.
+  - path: /etc/fail2ban/jail.d/gitbay.conf
+    content: |
+      [sshd]
+      enabled = true
+      port    = 2222
+      backend = systemd
+      maxretry = 5
+      bantime  = 1h
+
+  # Heartbeat: post disk/service/cert status to a webhook if one is set in
+  # /etc/gitbay/monitor.url. Silent when the file is absent.
+  - path: /usr/local/bin/gitbay-monitor.sh
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      url_file=/etc/gitbay/monitor.url
+      [ -f "$url_file" ] || exit 0
+      url=$(cat "$url_file")
+      disk=$(df -P /var/lib/gitbay | awk 'NR==2{print $5}')
+      svc=$(systemctl is-active gitbayd || true)
+      # Days until the ACME cert expires, if autocert cached one.
+      cert=/var/lib/gitbay/autocert
+      exp="n/a"
+      if [ -d "$cert" ]; then
+        f=$(ls -1 "$cert" 2>/dev/null | grep -v acme_account | head -1 || true)
+        [ -n "$f" ] && exp=$(openssl x509 -enddate -noout -in "$cert/$f" 2>/dev/null | cut -d= -f2 || echo n/a)
+      fi
+      alert=""
+      [ "$svc" != "active" ] && alert="gitbayd is $svc; "
+      pct=$(echo "$disk" | tr -d '%')
+      [ "$pct" -ge 85 ] && alert="${alert}disk ${disk}; "
+      body=$(printf '{"disk":"%s","service":"%s","cert_expires":"%s","alert":"%s"}' "$disk" "$svc" "$exp" "$alert")
+      curl -fsS -m 10 -H 'Content-Type: application/json' -d "$body" "$url" >/dev/null 2>&1 || true
+
+  - path: /etc/systemd/system/gitbay-monitor.service
+    content: |
+      [Unit]
+      Description=gitbay host heartbeat
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/gitbay-monitor.sh
+
+  - path: /etc/systemd/system/gitbay-monitor.timer
+    content: |
+      [Unit]
+      Description=gitbay host heartbeat
+      [Timer]
+      OnCalendar=*-*-* *:00:00 UTC
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
   - path: /etc/systemd/system/ssh.socket.d/override.conf
     content: |
       [Socket]
@@ -77,8 +147,24 @@ write_files:
       ReadWritePaths=/var/lib/gitbay /var/backups/gitbay
       PrivateTmp=yes
       ProtectKernelTunables=yes
+      ProtectKernelModules=yes
       ProtectControlGroups=yes
+      ProtectHostname=yes
+      ProtectClock=yes
+      ProtectKernelLogs=yes
       RestrictSUIDSGID=yes
+      RestrictNamespaces=yes
+      RestrictRealtime=yes
+      LockPersonality=yes
+      MemoryDenyWriteExecute=yes
+      PrivateDevices=yes
+      # IPv4/IPv6 for listeners and outbound git/ssh; UNIX for the hook socket.
+      RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+      # Allow only ordinary service syscalls; the daemon spawns git and ssh,
+      # so keep @process/@exec available (both are within @system-service).
+      SystemCallFilter=@system-service
+      SystemCallErrorNumber=EPERM
+      SystemCallArchitectures=native
 
       [Install]
       WantedBy=multi-user.target
@@ -146,5 +232,6 @@ runcmd:
   - ufw --force enable
   - systemctl daemon-reload
   - systemctl restart ssh.socket || systemctl restart ssh
-  - systemctl enable gitbayd gitbay-backup.timer gitbay-gc.timer
-  - systemctl start gitbay-backup.timer gitbay-gc.timer
+  - systemctl enable gitbayd gitbay-backup.timer gitbay-gc.timer gitbay-monitor.timer
+  - systemctl start gitbay-backup.timer gitbay-gc.timer gitbay-monitor.timer
+  - systemctl enable --now unattended-upgrades fail2ban

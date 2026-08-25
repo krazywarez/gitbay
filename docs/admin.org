@@ -182,6 +182,38 @@ Replace the binary, restart the unit. Migrations apply automatically and
 are transactional; hook scripts under =<root>/hooks= are rewritten at
 startup to point at the current binary path.
 
+* Security
+
+The =docs/threat-model.org= file is the reference for what the forge
+trusts and refuses to do. Operational checklist:
+
+- *Software checks.* =deploy/audit.sh= runs =go vet=, =govulncheck=
+  (the module list is deliberately short — review it on each release),
+  and a short fuzz pass over every attacker-facing parser (pkt-line,
+  commit, SSHSIG armor, OpenPGP key, SSH tokenizer). Run it before
+  tagging a release.
+- *Web responses* carry a scripts-forbidden CSP, =X-Frame-Options:
+  DENY=, =nosniff=, =no-referrer=, and HSTS when TLS is on — no
+  configuration needed.
+- *Host sandboxing.* The systemd unit in =deploy/cloud-init.yaml= runs
+  gitbayd unprivileged with =ProtectSystem=strict=, =PrivateDevices=,
+  =LockPersonality=, =MemoryDenyWriteExecute=,
+  =SystemCallFilter=@system-service=, and =RestrictAddressFamilies= to
+  INET/INET6/UNIX. It keeps =CAP_NET_BIND_SERVICE= only, to bind 22/80/443.
+- *OS patches* apply via =unattended-upgrades= (security origins,
+  auto-reboot 04:30 if required).
+- *Admin sshd (2222)* is throttled by =MaxStartups=/=MaxAuthTries= and
+  watched by =fail2ban=; gitbayd's own port 22 is throttled by
+  =limits.ssh_auth_rate= (auth failures per IP per minute).
+- *Monitoring.* =gitbay-monitor.timer= posts disk/service/cert status
+  hourly to the webhook URL in =/etc/gitbay/monitor.url= (create the
+  file to enable; absent = silent). Alerts fire on a stopped service or
+  disk ≥ 85%.
+- *Database.* =gitbay.db= and its WAL live under =/var/lib/gitbay= (mode
+  0750, owned by =gitbay=). The nightly archive plus provider snapshots
+  are the recovery path; for tighter RPO, add continuous replication
+  (litestream) against the same file — it coexists with the WAL.
+
 * Odds and ends
 
 - deleting a fork marks MRs sourced from it =source_gone=; their diffs

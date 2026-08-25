@@ -35,4 +35,11 @@ else
     shasum -a 256 -- * > SHA256SUMS
 fi
 echo "wrote $out/SHA256SUMS"
+
+# Optional detached signature over the manifest. Set MINISIGN_KEY to a
+# minisign secret key path to sign; downloaders verify with the public key.
+if [ -n "${MINISIGN_KEY:-}" ] && command -v minisign >/dev/null 2>&1; then
+    minisign -S -s "$MINISIGN_KEY" -m SHA256SUMS
+    echo "signed SHA256SUMS -> SHA256SUMS.minisig"
+fi
 cat SHA256SUMS

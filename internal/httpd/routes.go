@@ -113,9 +113,38 @@ func (s *Server) Handler() http.Handler {
 	for _, r := range s.Routes() {
 		mux.HandleFunc(r.Method+" "+r.Pattern, r.Handler)
 	}
-	if len(s.cfg.GoImport) == 0 {
-		return mux
+	var h http.Handler = mux
+	if len(s.cfg.GoImport) > 0 {
+		h = s.goImportHandler(mux)
 	}
+	return s.securityHeaders(h)
+}
+
+// securityHeaders sets defensive response headers on every reply. The CSP
+// is strict where it can be: no scripts at all (the UI needs none), no
+// plugins, no embedding. Inline styles are allowed because chroma emits
+// inline style attributes on highlighted code and label chips carry their
+// color inline. Images may load from anywhere so external README images
+// still render; they are the one thing a reader-facing forge can't police
+// without a proxy.
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; " +
+		"img-src * data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hd := w.Header()
+		hd.Set("Content-Security-Policy", csp)
+		hd.Set("X-Frame-Options", "DENY")
+		hd.Set("X-Content-Type-Options", "nosniff")
+		hd.Set("Referrer-Policy", "no-referrer")
+		hd.Set("Cross-Origin-Opener-Policy", "same-origin")
+		if s.cfg.HTTP.TLS != "off" {
+			hd.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) goImportHandler(mux http.Handler) http.Handler {
 	// Vanity Go modules: ?go-get=1 requests under a configured module
 	// path answer with the go-import meta tag before normal routing.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,92 @@
+#+title: gitbay threat model
+
+What the forge trusts, what it refuses to do, and where the boundaries
+are. This is the reference for security review; it complements the audit
+log and hardening notes in =admin.org=.
+
+* What gitbay never does
+
+- *Execute repository content.* Git object contents are never run. Hooks
+  are gitbay's own binary, invoked by git; they compute facts and ask the
+  daemon over a unix socket. Repo files are only ever read.
+- *Hold a signing key.* There is no server-side signing key. "Verified"
+  means a signature made by a key the *user* registered — the server
+  never vouches for a commit it did not receive already signed. Merge
+  commits the server creates are honestly =unsigned=.
+- *Serve repository HTML on its own origin as active content.* Raw file
+  serving is =text/plain= with =nosniff=. Rendered markdown/org is
+  sanitized (bluemonday) and served under a CSP that forbids scripts.
+- *Put secrets in argv, URLs, or logs.* Import and mirror credentials,
+  registration invites, and API tokens travel on stdin or in request
+  bodies, never as command arguments (visible in =/proc=) or query
+  strings. Tokens are stored only as SHA-256 hashes.
+- *Confirm the existence of private repositories.* Every surface answers
+  "not found" identically for a private repo and a nonexistent one — web
+  pages, git transport, control commands, release asset downloads.
+
+* Trust boundaries
+
+- *SSH public key = identity.* The SSH username is ignored; the presented
+  key's fingerprint resolves to an account. Key uniqueness is global.
+- *Per-instance trust.* Email verification and key registration are local
+  to an instance and never transfer. Account migration re-registers keys
+  and re-verifies emails on the target by design.
+- *The control plane is one authenticated channel* (SSH), fully usable
+  from stock OpenSSH. The JSON API fronts the same command registry with
+  bearer tokens minted only over SSH; git transport never runs over it.
+- *Anonymous surfaces* — HTTPS clone of public repos, =git://= where
+  enabled, the read-only web UI — carry no credentials and expose only
+  public data. HTTP push is refused via a pkt-line =ERR=, never a 401.
+
+* Attacker-controlled parsers
+
+Every parser that eats bytes from a pusher, a key registrant, or an
+anonymous client has a fuzz target and must never panic:
+
+- =internal/protocol= — the SSH command tokenizer (fuzzed against argv
+  round-tripping).
+- =internal/gitd= — the =git://= pkt-line reader.
+- =internal/sig= — the commit parser, the SSHSIG armor decoder and blob
+  parser, and the OpenPGP armored-key reader.
+
+Run =deploy/audit.sh= to exercise them plus =go vet= and =govulncheck=.
+
+* Secret handling
+
+Tokens (web sessions, login links, email verification, API bearer tokens,
+deploy/CI) are random 256-bit values. Only their SHA-256 hash is stored,
+and verification is a database index lookup on that hash — the secret
+itself is never compared in Go, so there is no timing oracle to exploit.
+Webhook payloads are signed outbound with HMAC-SHA256; the forge verifies
+no inbound HMAC.
+
+* Network-facing request forgery
+
+Anything that makes the *server* open an outbound connection to a
+user-supplied address — webhook delivery, GitHub-history import
+=--api-base=, mirror remotes — passes the same SSRF guard: the scheme
+must be http/https and, unless =webhooks.allow_local= is set, the
+resolved address must not be loopback, private, or link-local. The
+webhook dialer re-checks at connect time so a DNS answer that changes
+after validation still cannot reach private space. Redirects are never
+followed.
+
+* Web responses
+
+Every response carries =Content-Security-Policy= (no scripts, no plugins,
+no embedding; inline styles allowed for chroma and label chips; images
+from any origin so external README images render), =X-Frame-Options:
+DENY=, =X-Content-Type-Options: nosniff=, =Referrer-Policy: no-referrer=,
+and =Strict-Transport-Security= when TLS is on. The UI needs no
+JavaScript, so =script-src 'none'= costs nothing.
+
+* Residual risks, accepted
+
+- External images in rendered READMEs load from their origin (no image
+  proxy), which a repo author can use as a tracking pixel against a
+  viewer. Documented; proxying is future work.
+- Backups are consistent per the DB-snapshot-first ordering but are not a
+  single atomic snapshot; a few orphaned git objects are possible and
+  harmless (see =admin.org=).
+- A global signature-verification epoch over-invalidates the cache on any
+  trust-input change. Correct, not a leak; a performance tradeoff.

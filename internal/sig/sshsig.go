@@ -164,12 +164,20 @@ func decodeArmor(armored []byte, label string) ([]byte, error) {
 	end := "-----END " + label + "-----"
 	s := string(armored)
 	i := strings.Index(s, begin)
-	j := strings.Index(s, end)
-	if i < 0 || j < i {
+	if i < 0 {
 		return nil, fmt.Errorf("no %s armor", label)
 	}
+	bodyStart := i + len(begin)
+	// Search for the end marker only after the begin block, so an end
+	// marker overlapping the begin line's trailing dashes cannot yield a
+	// negative-length body.
+	rel := strings.Index(s[bodyStart:], end)
+	if rel < 0 {
+		return nil, fmt.Errorf("no %s armor", label)
+	}
+	j := bodyStart + rel
 	var b64 strings.Builder
-	for _, line := range strings.Split(s[i+len(begin):j], "\n") {
+	for _, line := range strings.Split(s[bodyStart:j], "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "=") || strings.Contains(line, ":") {
 			continue // armor checksum or header line
