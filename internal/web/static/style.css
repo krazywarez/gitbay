@@ -95,7 +95,7 @@
     --bad: #fa4d56;
     --done: #a56eff;
     --neutral: #a8a8a8;
-    --code-bg: #1e1e1e;
+    --code-bg: #131313;
     --shell-line: #393939;
   }
 }
@@ -133,11 +133,15 @@ code, pre, .code, td.mode, td.size {
   margin: 0 auto;
   padding: 0 var(--sp-5);
 }
-/* the shell: an ink bar in both schemes, Carbon UI-shell style */
-header {
+/* the shell: an ink bar in both schemes, Carbon UI-shell style. Scoped
+   to the page header so cards with their own <header> stay untouched. */
+body > header {
   background: var(--shell-bg);
   border-bottom: 1px solid var(--shell-line);
   padding: 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 a.site {
   font-weight: 600;
@@ -146,6 +150,7 @@ a.site {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
+  padding: 0 var(--sp-4);
 }
 a.site:hover { text-decoration: none; color: #ffffff; }
 a.site svg.mark { display: block; }
@@ -155,45 +160,134 @@ nav.topnav {
   display: flex;
   align-items: center;
   gap: 0;
-  min-height: 3rem;
+  height: 3rem;
 }
 nav.topnav .spacer { flex: 1; }
-nav.topnav > a:not(.site) {
-  color: var(--shell-muted);
-  font-size: var(--fs-2);
-  padding: 0.85rem var(--sp-3);
-  line-height: 1;
-}
-nav.topnav > a:not(.site):hover { color: #ffffff; background: #353535; text-decoration: none; }
-nav.topnav a.navuser {
-  font-weight: 600;
+/* the avatar square is the only nav item in the shell; everything else
+   lives in the rail */
+a.avatar {
+  width: 2rem;
+  height: 2rem;
+  margin-right: var(--sp-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
   color: #ffffff;
-  box-shadow: inset 0 -3px 0 #0f62fe;
+  font-size: var(--fs-2);
+  font-weight: 600;
+  flex: none;
 }
-nav.topnav button.linklike { color: var(--shell-muted); padding: 0.85rem var(--sp-3); }
-nav.topnav button.linklike:hover { color: #ffffff; background: #353535; text-decoration: none; }
+a.avatar:hover { text-decoration: none; filter: brightness(1.12); }
+a.avatar.guest { background: #393939; color: #f4f4f4; }
+
+/* the rail: persistent navigation, global links first, repo sections
+   below them, the signed-in user pinned to the bottom */
+.shell { display: flex; flex: 1; align-items: stretch; }
+.siderail {
+  flex: none;
+  width: 13.5rem;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  position: sticky;
+  top: 3rem;
+  height: calc(100vh - 3rem);
+  display: flex;
+  flex-direction: column;
+}
+.railmain { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
+.railfoot {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: var(--sp-2) 0;
+  background: var(--surface);
+}
+.siderail a, .siderail button.linklike {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+  color: var(--fg);
+  font-size: var(--fs-2);
+  padding: 0.4rem var(--sp-4);
+  border-left: 3px solid transparent;
+  line-height: 1.35;
+}
+.siderail a:hover, .siderail button.linklike:hover {
+  background: var(--hover);
+  text-decoration: none;
+  color: var(--fg);
+}
+.siderail a.active {
+  border-left-color: var(--accent);
+  background: var(--hover);
+  font-weight: 600;
+}
+.siderail .glabel {
+  display: block;
+  font-size: var(--fs-0);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  padding: 0 var(--sp-4);
+  margin: var(--sp-4) 0 var(--sp-1);
+}
+.siderail .glabel:not(.sub) {
+  color: var(--fg);
+  font-weight: 600;
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-3);
+  overflow-wrap: anywhere;
+}
+.siderail .glabel.sub { margin-top: var(--sp-2); }
+.siderail .railuser { font-weight: 600; }
+.siderail .avatar.sm {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  font-size: var(--fs-0);
+  background: var(--accent);
+  color: #ffffff;
+}
 main.container {
   width: 100%;
-  padding-top: var(--sp-3);
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  max-width: 66rem;
+  padding-top: var(--sp-4);
   padding-bottom: var(--sp-6);
 }
-/* repo pages carry a left rail: the repohead spans the top, the sidenav
-   takes column one, everything after flows in column two. Browsers
-   without :has() fall back to single-column flow, which still works. */
-main.container:has(> nav.tabs) {
-  display: grid;
-  grid-template-columns: 11.5rem minmax(0, 1fr);
-  column-gap: var(--sp-6);
-  max-width: 80rem;
-}
-main.container:has(> nav.tabs) > * { grid-column: 2; }
-main.container:has(> nav.tabs) > .repohead { grid-column: 1 / -1; }
-main.container:has(> nav.tabs) > nav.tabs {
-  grid-column: 1;
-  grid-row: 2 / span 99;
-  align-self: start;
-  position: sticky;
-  top: var(--sp-4);
+@media (max-width: 52rem) {
+  /* the rail folds into a wrapping strip above the content */
+  .shell { display: block; }
+  .siderail {
+    width: auto;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .railmain, .railfoot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    overflow: visible;
+    padding: var(--sp-1) var(--sp-2);
+    border-top: none;
+  }
+  .railmain { flex: 1 1 auto; }
+  .siderail a, .siderail button.linklike {
+    width: auto;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: var(--sp-1) var(--sp-2);
+  }
+  .siderail a.active { border-left: none; border-bottom-color: var(--accent); background: none; }
+  .siderail .glabel { display: none; }
 }
 
 /* tables */
@@ -261,8 +355,8 @@ nav.tabs a.active {
 
 .clone { color: var(--muted); font-size: var(--fs-2); }
 .clone code {
-  background: var(--surface);
-  border: 1px solid var(--faint);
+  background: var(--code-bg);
+  border: 1px solid var(--line);
   padding: 0.15rem 0.5rem;
   border-radius: var(--r-sm);
 }
@@ -507,7 +601,7 @@ a.memberchip .role { color: var(--muted); }
 .landing .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.7; margin: 0 0 var(--sp-4); }
 pre.quickstart {
   background: var(--code-bg);
-  border: 1px solid var(--faint);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-4);
   overflow-x: auto;
@@ -540,7 +634,7 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 }
 /* Highlighting is class-based with a palette per scheme, so code blocks
    follow the site's own colors. */
-.code { background: var(--code-bg); color: var(--fg); padding: var(--sp-3) var(--sp-4); }
+.code { background: var(--code-bg); color: var(--fg); padding: var(--sp-3) var(--sp-4); border-color: var(--line); }
 .code pre { margin: 0; background: transparent !important; }
 @media (prefers-color-scheme: dark) {
   .code { border-color: var(--line); }
@@ -550,13 +644,18 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 .rendered { max-width: 100%; overflow-wrap: anywhere; }
 .rendered pre {
   background: var(--code-bg);
-  border: 1px solid var(--faint);
+  border: 1px solid var(--line);
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
   overflow-x: auto;
 }
-.rendered code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: var(--r-sm); }
-.rendered pre code { background: transparent; padding: 0; }
+.rendered code {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--r-sm);
+}
+.rendered pre code { background: transparent; border: none; padding: 0; }
 .rendered blockquote {
   border-left: 3px solid var(--line);
   margin-left: 0;
@@ -589,7 +688,7 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 
 pre.message {
   background: var(--code-bg);
-  border: 1px solid var(--faint);
+  border: 1px solid var(--line);
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
   white-space: pre-wrap;
@@ -614,7 +713,7 @@ details.difffold summary .add { color: var(--ok); }
 details.difffold summary .del { color: var(--bad); }
 pre.diff {
   background: var(--code-bg);
-  border: 1px solid var(--faint);
+  border: 1px solid var(--line);
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
   overflow-x: auto;
@@ -721,6 +820,7 @@ article.release {
   padding: var(--sp-3) var(--sp-4);
   margin: var(--sp-4) 0;
 }
+.releasehead { background: none; border: 0; padding: 0; }
 .releasehead h3 { margin: 0 0 var(--sp-1); }
 .releasehead .meta { margin: 0 0 var(--sp-2); }
 table.assets { margin-top: var(--sp-2); }

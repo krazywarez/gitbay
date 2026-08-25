@@ -6,6 +6,7 @@ import (
 	"embed"
 	"html/template"
 	"io"
+	"reflect"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -76,6 +77,46 @@ var funcs = template.FuncMap{
 	},
 	"add": func(a, b int) int { return a + b },
 	"sub": func(a, b int) int { return a - b },
+	// initial is the avatar letter for a username.
+	"initial": func(s string) string {
+		for _, r := range s {
+			return strings.ToUpper(string(r))
+		}
+		return "?"
+	},
+	// str is field, narrowed to strings: missing or non-string fields
+	// yield "", which comparisons handle without erroring.
+	"str": func(v any, name string) string {
+		rv := reflect.ValueOf(v)
+		for rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
+			rv = rv.Elem()
+		}
+		if rv.Kind() != reflect.Struct {
+			return ""
+		}
+		f := rv.FieldByName(name)
+		if !f.IsValid() || f.Kind() != reflect.String {
+			return ""
+		}
+		return f.String()
+	},
+	// field reads a field the page struct may not have, so the layout can
+	// render repo navigation without every page carrying repo context.
+	// Missing fields yield nil, which templates treat as absent.
+	"field": func(v any, name string) any {
+		rv := reflect.ValueOf(v)
+		for rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
+			rv = rv.Elem()
+		}
+		if rv.Kind() != reflect.Struct {
+			return nil
+		}
+		f := rv.FieldByName(name)
+		if !f.IsValid() || !f.CanInterface() {
+			return nil
+		}
+		return f.Interface()
+	},
 	// when formats a stored RFC3339 timestamp for display; unparseable
 	// values pass through unchanged.
 	"when": func(s string) string {

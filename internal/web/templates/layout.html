@@ -9,18 +9,46 @@
 </head>
 <body>
 <header>
-  <nav class="container topnav">
+  <nav class="topnav">
     <a class="site" href="/"><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M5 9.5c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M5 15c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>{{.Site}}</a>
     <span class="spacer"></span>
-    <a href="/explore">explore</a>
-    {{if .Viewer}}<a href="/new">new repository</a>
-    <a class="navuser" href="/{{.Viewer}}">{{.Viewer}}</a>
-    <form method="post" action="/logout" class="inline"><button type="submit" class="linklike">logout</button></form>{{end}}
+    {{if .Viewer}}<a class="avatar" href="/{{.Viewer}}" title="{{.Viewer}}" aria-label="{{.Viewer}}">{{initial .Viewer}}</a>
+    {{else}}<a class="avatar guest" href="/login" title="sign in" aria-label="sign in">→</a>{{end}}
   </nav>
 </header>
+<div class="shell">
+<nav class="siderail" aria-label="site">
+  <div class="railmain">
+    <a {{if eq (str . "Tab") "explore"}}class="active" {{end}}href="/explore">explore</a>
+    {{if .Viewer}}<a href="/new">new repository</a>{{end}}
+    {{with field . "Repo"}}
+    <span class="glabel">{{.OwnerName}}/{{.Name}}</span>
+    <span class="glabel sub">code</span>
+    <a {{if eq (str $ "Tab") "files"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}">files</a>
+    <a {{if eq (str $ "Tab") "log"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/log">log</a>
+    <a {{if eq (str $ "Tab") "refs"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/refs">refs</a>
+    <span class="glabel sub">work</span>
+    <a {{if eq (str $ "Tab") "issues"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">issues</a>
+    <a {{if eq (str $ "Tab") "merge requests"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/mrs">merge requests</a>
+    <a {{if eq (str $ "Tab") "builds"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/builds">builds</a>
+    <span class="glabel sub">publish</span>
+    <a {{if eq (str $ "Tab") "releases"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/releases">releases</a>
+    {{if field $ "HasWiki"}}<a {{if eq (str $ "Tab") "wiki"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/wiki">wiki</a>{{end}}
+    <span class="glabel sub">tools</span>
+    <a {{if eq (str $ "Tab") "search"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/search">search</a>
+    <a href="/{{.OwnerName}}/{{.Name}}/archive/{{str $ "Ref"}}.tar.gz">archive</a>
+    {{end}}
+  </div>
+  <div class="railfoot">
+    {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar sm">{{initial .Viewer}}</span>{{.Viewer}}</a>
+    <form method="post" action="/logout"><button type="submit" class="linklike">log out</button></form>
+    {{else}}<a href="/login">sign in</a>{{end}}
+  </div>
+</nav>
 <main class="container">
 {{template "content" .}}
 </main>
+</div>
 <footer>
   <div class="container"><p>powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="/privacy">privacy</a></p></div>
 </footer>
@@ -35,22 +63,6 @@
 {{if .Topics}}<p class="topics">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
 {{range .Mirrors}}<p class="meta mirrorline">{{if eq .Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="mirrorerr">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
 {{end}}</div>
-<nav class="tabs">
-  <span class="glabel">code</span>
-  <a {{if eq .Tab "files"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
-  <a {{if eq .Tab "log"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
-  <a {{if eq .Tab "refs"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
-  <span class="glabel">work</span>
-  <a {{if eq .Tab "issues"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
-  <a {{if eq .Tab "merge requests"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
-  <a {{if eq .Tab "builds"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds">builds</a>
-  <span class="glabel">publish</span>
-  <a {{if eq .Tab "releases"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases">releases</a>
-  {{if .HasWiki}}<a {{if eq .Tab "wiki"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/wiki">wiki</a>
-  {{end}}<span class="glabel">tools</span>
-  <a {{if eq .Tab "search"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search">search</a>
-  <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">archive</a>
-</nav>
 {{end}}
 
 {{define "reporow"}}<li>
