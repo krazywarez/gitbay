@@ -140,6 +140,11 @@ gitbayd admin audit [--limit n]      # host-local
 ssh git@<host> audit [--limit n]     # instance admins, SSH only
 gitbayd admin user disable <name>    # suspend: SSH, web, API all refused;
 gitbayd admin user enable <name>     #   sessions dropped, nothing deleted
+gitbayd admin user delete <name> --yes  # only for accounts anchoring nothing:
+                                     #   refused (with each blocker named) while
+                                     #   the account owns repos, authored
+                                     #   issues/MRs/comments/reviews, or is an
+                                     #   org's only admin
 #+end_src
 
 =limits.ssh_auth_rate= (10) throttles per-IP authentication *failures*
