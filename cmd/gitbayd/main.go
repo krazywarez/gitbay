@@ -184,6 +184,9 @@ func serveCmd() *cobra.Command {
 							return nil
 						}
 						if pd := cfg.Pages.Domain; pd != "" {
+							if h == pd {
+								return nil // apex: serves a redirect to the forge
+							}
 							if owner, ok := strings.CutSuffix(h, "."+pd); ok &&
 								!strings.Contains(owner, ".") && st.OwnerExists(owner) {
 								return nil

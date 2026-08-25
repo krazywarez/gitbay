@@ -107,11 +107,14 @@ func TestPages(t *testing.T) {
 	for _, tc := range []struct{ host, path string }{
 		{"alice.p.test", "/secret/"},
 		{"bob.p.test", "/"},
-		{"p.test", "/"},
 	} {
 		if resp, _ = inst.pagesGet(t, tc.host, tc.path); resp.StatusCode != 404 {
 			t.Fatalf("%s%s: %d, want 404", tc.host, tc.path, resp.StatusCode)
 		}
+	}
+	// The apex redirects to the forge.
+	if resp, _ = inst.pagesGet(t, "p.test", "/"); resp.StatusCode != 302 || !strings.Contains(resp.Header.Get("Location"), "gitbay.test") {
+		t.Fatalf("apex: %d -> %s", resp.StatusCode, resp.Header.Get("Location"))
 	}
 
 	// The forge itself still answers on its own host.

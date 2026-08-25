@@ -46,6 +46,11 @@ func (s *Server) servePage(w http.ResponseWriter, r *http.Request, host string) 
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// The apex has no site of its own; send visitors to the forge.
+	if host == s.cfg.Pages.Domain {
+		http.Redirect(w, r, s.cfg.Server.SiteURL, http.StatusFound)
+		return
+	}
 	owner, ok := strings.CutSuffix(host, "."+s.cfg.Pages.Domain)
 	if !ok || owner == "" || strings.Contains(owner, ".") {
 		http.NotFound(w, r)
