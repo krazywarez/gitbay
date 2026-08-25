@@ -47,6 +47,24 @@ func adminUserDisableCmd() *cobra.Command {
 		})
 }
 
+func adminUserDeleteCmd() *cobra.Command {
+	var yes bool
+	cmd := withUser("delete", "delete an account that anchors nothing (keys, emails, and sessions go with it)",
+		func(st *store.Store, u store.User) error {
+			if !yes {
+				return fmt.Errorf("deletion is permanent; pass --yes")
+			}
+			if err := st.DeleteUser(u.ID); err != nil {
+				return err
+			}
+			st.Audit(0, "admin user.deleted", map[string]any{"user": u.Username})
+			fmt.Printf("deleted %s\n", u.Username)
+			return nil
+		})
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm permanent deletion")
+	return cmd
+}
+
 func adminUserEnableCmd() *cobra.Command {
 	return withUser("enable", "restore a suspended account",
 		func(st *store.Store, u store.User) error {

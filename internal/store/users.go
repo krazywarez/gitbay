@@ -46,6 +46,55 @@ func (s *Store) CreateUser(username string, isAdmin bool) (int64, error) {
 	return res.LastInsertId()
 }
 
+// DeleteUser removes an account whose removal orphans nothing: no owned
+// repositories, no authored issues, MRs, comments, or reviews, and not the
+// only admin of an org. Everything else (keys, emails, sessions, tokens,
+// pins, memberships, activity) cascades. Blockers come back as an error
+// naming what stands in the way, so the operator can transfer, delete, or
+// disable instead.
+func (s *Store) DeleteUser(id int64) error {
+	var blockers []string
+	var checkErr error
+	count := func(q string, what string) {
+		var n int
+		if err := s.DB.QueryRow(q, id).Scan(&n); err != nil {
+			if checkErr == nil {
+				checkErr = fmt.Errorf("checking %s: %w", what, err)
+			}
+			return
+		}
+		if n > 0 {
+			blockers = append(blockers, fmt.Sprintf("%d %s", n, what))
+		}
+	}
+	count("SELECT COUNT(*) FROM repos WHERE owner_kind = 'user' AND owner_id = ?", "owned repositories")
+	count("SELECT COUNT(*) FROM issues WHERE author_id = ?", "authored issues")
+	count("SELECT COUNT(*) FROM merge_requests WHERE author_id = ?", "authored merge requests")
+	count("SELECT COUNT(*) FROM issue_comments WHERE author_id = ?", "issue comments")
+	count("SELECT COUNT(*) FROM mr_comments WHERE author_id = ?", "MR comments")
+	count("SELECT COUNT(*) FROM mr_diff_comments WHERE author_id = ?", "diff comments")
+	count("SELECT COUNT(*) FROM mr_reviews WHERE reviewer_id = ?", "reviews")
+	count(`SELECT COUNT(*) FROM org_members m WHERE m.user_id = ? AND m.role = 'admin'
+		AND NOT EXISTS (SELECT 1 FROM org_members o
+			WHERE o.org_id = m.org_id AND o.role = 'admin' AND o.user_id != m.user_id)`,
+		"organizations with no other admin")
+	if checkErr != nil {
+		return checkErr
+	}
+	if len(blockers) > 0 {
+		return fmt.Errorf("account still anchors: %s — transfer or delete those first, or disable the account instead",
+			strings.Join(blockers, ", "))
+	}
+	res, err := s.DB.Exec("DELETE FROM users WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // OwnerExists reports whether a user or org owns the name — the ACME host
 // policy check for pages subdomains.
 func (s *Store) OwnerExists(name string) bool {
