@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/config"
@@ -246,7 +247,20 @@ func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) 
 		s.st.SetCommitStatus(repo.ID, sha, "ci/config", "failure", err.Error(), "", userID)
 		return
 	}
+	now := time.Now()
+	var schedules []store.Schedule
 	for _, j := range jobs {
+		// Scheduled jobs run on their cron, not on push; a default-branch
+		// push (re)registers them.
+		if j.Schedule != "" {
+			if branch == repo.DefaultBranch {
+				schedules = append(schedules, store.Schedule{
+					RepoID: repo.ID, Job: j.Name, Cron: j.Schedule,
+					NextRun: ci.NextRun(j.Schedule, now),
+				})
+			}
+			continue
+		}
 		steps, _ := json.Marshal(j.Steps)
 		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, branch, string(steps))
 		if err != nil {
@@ -255,6 +269,11 @@ func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) 
 		}
 		url := fmt.Sprintf("%s/%s/builds/%d", s.cfg.Server.SiteURL, repo.Path(), n)
 		s.st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "queued", url, userID)
+	}
+	if branch == repo.DefaultBranch {
+		if err := s.st.SyncSchedules(repo.ID, schedules); err != nil {
+			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
+		}
 	}
 }
 

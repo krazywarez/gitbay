@@ -23,13 +23,14 @@ import (
 )
 
 type job struct {
-	ID     int64    `json:"id"`
-	Repo   string   `json:"repo"`
-	Number int64    `json:"number"`
-	Job    string   `json:"job"`
-	SHA    string   `json:"sha"`
-	Ref    string   `json:"ref"`
-	Steps  []string `json:"steps"`
+	ID      int64             `json:"id"`
+	Repo    string            `json:"repo"`
+	Number  int64             `json:"number"`
+	Job     string            `json:"job"`
+	SHA     string            `json:"sha"`
+	Ref     string            `json:"ref"`
+	Steps   []string          `json:"steps"`
+	Secrets map[string]string `json:"secrets"`
 }
 
 type runner struct {
@@ -155,6 +156,9 @@ func (r *runner) run(j job) bool {
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(),
 			"GITBAY_REPO="+j.Repo, "GITBAY_SHA="+j.SHA, "GITBAY_REF="+j.Ref, "GITBAY_JOB="+j.Job, "CI=true")
+		for name, value := range j.Secrets {
+			cmd.Env = append(cmd.Env, name+"="+value)
+		}
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if err := cmd.Start(); err != nil {
 			fmt.Fprintf(sink, "start: %v\n", err)

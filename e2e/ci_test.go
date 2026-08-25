@@ -122,6 +122,54 @@ func TestCI(t *testing.T) {
 		t.Fatalf("build log page:\n%s", body)
 	}
 
+	// --- secrets: stdin in, names-only out, injected into the build env ---
+	if _, errOut, code := inst.ssh(t, aliceKey, "hunter2\n", "repo", "secret", "set", "alice/app", "MY_TOKEN"); code != 0 {
+		t.Fatalf("secret set: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "x\n", "repo", "secret", "set", "alice/app", "bad-name"); code != 2 {
+		t.Fatal("bad secret name accepted")
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "secret", "list", "alice/app")
+	if !strings.Contains(out, "MY_TOKEN") || strings.Contains(out, "hunter2") {
+		t.Fatalf("secret list leaked or missed: %s", out)
+	}
+
+	// --- schedules and manual trigger ---
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  usesecret:\n    steps:\n      - echo token=$MY_TOKEN\n  nightly:\n    schedule: \"0 6 * * 1\"\n    steps:\n      - echo scheduled ran\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "secrets and schedule")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	// The push queued only the unscheduled job.
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if !strings.Contains(out, "usesecret\tpending") || strings.Contains(out, "nightly") {
+		t.Fatalf("scheduled job queued on push:\n%s", out)
+	}
+	inst.runnerOnce(t, runnerKey)
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	usecretN := strings.Split(out, "\t")[0]
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "log", "alice/app", usecretN)
+	if !strings.Contains(out, "token=hunter2") {
+		t.Fatalf("secret not injected:\n%s", out)
+	}
+	// The scheduled job runs on demand via trigger.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "build", "trigger", "alice/app", "nightly"); code != 0 {
+		t.Fatalf("trigger: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "build", "trigger", "alice/app", "nosuch"); code != 3 {
+		t.Fatal("triggered a job that does not exist")
+	}
+	inst.runnerOnce(t, runnerKey)
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
+	if !strings.Contains(out, "nightly\tsuccess") {
+		t.Fatalf("triggered build did not run:\n%s", out)
+	}
+	// Removing the secret stops injection.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "secret", "remove", "alice/app", "MY_TOKEN"); code != 0 {
+		t.Fatal("secret remove failed")
+	}
+
 	// A broken ci.yml surfaces as a failed ci/config status.
 	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs: {bad name: {steps: [x]}}\n"), 0o644)
 	mustGit(t, dir, env, "add", ".")

@@ -2,10 +2,15 @@ package control
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
+	"strings"
 
+	"gitbay.org/gitbay/internal/ci"
+	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -18,6 +23,19 @@ func init() {
 		Summary: "show one build: build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
 	register(Command{Path: []string{"build", "log"},
 		Summary: "print a build's log: build log <owner/name> <n>", ReadOnly: true, Run: runBuildLog})
+
+	register(Command{Path: []string{"build", "trigger"},
+		Summary: "queue a job now (scheduled or not): build trigger <owner/name> <job>", Run: runBuildTrigger})
+	// Secrets: set over stdin, listed by name only, injected into the
+	// repo's builds as environment variables. Same discipline as mirror
+	// tokens — the value never appears in argv, logs, or output.
+	register(Command{Path: []string{"repo", "secret", "set"},
+		Summary:    "set a build secret: repo secret set <owner/name> <NAME> (value on stdin)",
+		ReadsStdin: true, SSHOnly: true, Run: runSecretSet})
+	register(Command{Path: []string{"repo", "secret", "remove"},
+		Summary: "remove a build secret: repo secret remove <owner/name> <NAME>", Run: runSecretRemove})
+	register(Command{Path: []string{"repo", "secret", "list"},
+		Summary: "list build secret names: repo secret list <owner/name>", ReadOnly: true, Run: runSecretList})
 
 	// Runner commands: the claim/report loop for gitbay-runner. Admin-only —
 	// a runner executes arbitrary repo code, so handing out jobs is the
@@ -114,6 +132,113 @@ func runBuildLog(c *Ctx, args []string) int {
 	return protocol.ExitOK
 }
 
+func runBuildTrigger(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: build trigger <owner/name> <job>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanWrite)
+	if code >= 0 {
+		return code
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	sha, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "resolving %s: %v", repo.DefaultBranch, err)
+	}
+	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "%s has no %s on %s", repo.Path(), ci.ConfigPath, repo.DefaultBranch)
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	for _, j := range jobs {
+		if j.Name != args[1] {
+			continue
+		}
+		steps, _ := json.Marshal(j.Steps)
+		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps))
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), n)
+		c.Store.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "triggered", url, c.User.ID)
+		return c.emit(map[string]any{"build": n, "job": j.Name, "sha": sha}, func(w io.Writer) {
+			fmt.Fprintf(w, "queued build %d (%s @ %.10s)\n", n, j.Name, sha)
+		})
+	}
+	return c.fail(protocol.ExitNotFound, "no job %q in %s", args[1], ci.ConfigPath)
+}
+
+// secretName is env-var shaped: the value lands in the build environment.
+var secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
+
+func runSecretSet(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo secret set <owner/name> <NAME> (value on stdin)")
+	}
+	if !secretName.MatchString(args[1]) {
+		return c.fail(protocol.ExitUsage, "secret names are env-var shaped: uppercase letters, digits, _")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	raw, err := io.ReadAll(io.LimitReader(c.Stdin, 64<<10))
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "reading secret: %v", err)
+	}
+	value := strings.TrimRight(string(raw), "\n")
+	if value == "" {
+		return c.fail(protocol.ExitUsage, "no value on stdin (pipe it: printf %%s TOKEN | ...)")
+	}
+	if err := c.Store.SetBuildSecret(repo.ID, args[1], value); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"secret": args[1]}, func(w io.Writer) {
+		fmt.Fprintf(w, "secret %s set on %s\n", args[1], repo.Path())
+	})
+}
+
+func runSecretRemove(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo secret remove <owner/name> <NAME>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	if err := c.Store.RemoveBuildSecret(repo.ID, args[1]); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "no secret %s on %s", args[1], repo.Path())
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"removed": args[1]}, func(w io.Writer) {
+		fmt.Fprintf(w, "removed %s\n", args[1])
+	})
+}
+
+func runSecretList(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo secret list <owner/name>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	names, err := c.Store.ListBuildSecretNames(repo.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(names, func(w io.Writer) {
+		for _, n := range names {
+			fmt.Fprintln(w, n)
+		}
+	})
+}
+
 func requireRunner(c *Ctx) int {
 	if !c.User.IsAdmin {
 		return c.fail(protocol.ExitDenied, "runner commands are for instance-admin runner accounts")
@@ -138,15 +263,22 @@ func runRunnerNext(c *Ctx, args []string) int {
 	}
 	var steps []string
 	json.Unmarshal([]byte(b.Steps), &steps)
+	// Secrets ride the claim: this channel is admin-only and the values
+	// land in the build's environment, nowhere else.
+	secrets, err := c.Store.BuildSecrets(b.RepoID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	d := struct {
-		ID     int64    `json:"id"`
-		Repo   string   `json:"repo"`
-		Number int64    `json:"number"`
-		Job    string   `json:"job"`
-		SHA    string   `json:"sha"`
-		Ref    string   `json:"ref"`
-		Steps  []string `json:"steps"`
-	}{b.ID, repo.Path(), b.Number, b.Job, b.SHA, b.Ref, steps}
+		ID      int64             `json:"id"`
+		Repo    string            `json:"repo"`
+		Number  int64             `json:"number"`
+		Job     string            `json:"job"`
+		SHA     string            `json:"sha"`
+		Ref     string            `json:"ref"`
+		Steps   []string          `json:"steps"`
+		Secrets map[string]string `json:"secrets,omitempty"`
+	}{b.ID, repo.Path(), b.Number, b.Job, b.SHA, b.Ref, steps, secrets}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d: %s %s @ %.10s\n", d.ID, d.Repo, d.Job, d.SHA)
 	})

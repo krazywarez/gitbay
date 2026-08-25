@@ -10,7 +10,12 @@ type CommitStatus struct {
 }
 
 // SetCommitStatus upserts the latest state for one context on one commit.
+// A zero creatorID records no creator (system actions like the scheduler).
 func (s *Store) SetCommitStatus(repoID int64, sha, context, state, description, targetURL string, creatorID int64) error {
+	var creator any
+	if creatorID != 0 {
+		creator = creatorID
+	}
 	_, err := s.DB.Exec(`
 		INSERT INTO commit_statuses (repo_id, commit_sha, context, state, description, target_url, creator_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -18,7 +23,7 @@ func (s *Store) SetCommitStatus(repoID int64, sha, context, state, description, 
 			state = excluded.state, description = excluded.description,
 			target_url = excluded.target_url, creator_id = excluded.creator_id,
 			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
-		repoID, sha, context, state, description, targetURL, creatorID)
+		repoID, sha, context, state, description, targetURL, creator)
 	return err
 }
 

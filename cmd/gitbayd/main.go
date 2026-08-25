@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/mail"
 	"gitbay.org/gitbay/internal/mirror"
@@ -139,6 +140,10 @@ func serveCmd() *cobra.Command {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
 			}
 			go mirror.New(st, cfg).Run(whCtx)
+			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL,
+				RepoDir: func(owner, name string) string {
+					return control.RepoDir(cfg.Server.Root, owner, name)
+				}}).Run(whCtx)
 
 			errCh := make(chan error, 3)
 			if cfg.SSH.Mode == "embedded" {
