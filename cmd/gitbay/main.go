@@ -406,6 +406,19 @@ func orgCmd() *cobra.Command {
 			pass("remove", "remove a member: <org> <user>", passOpts{server: []string{"org", "members", "remove"}}),
 			pass("list", "list members: <org>", passOpts{server: []string{"org", "members", "list"}}),
 		),
+		group("team", "scope repository access with teams",
+			pass("create", "create a team: <org> <team>", passOpts{server: []string{"org", "team", "create"}}),
+			pass("delete", "delete a team: <org> <team>", passOpts{server: []string{"org", "team", "delete"}}),
+			pass("list", "list teams: <org>", passOpts{server: []string{"org", "team", "list"}}),
+			pass("show", "show members and grants: <org> <team>", passOpts{server: []string{"org", "team", "show"}}),
+			pass("add", "add org members: <org> <team> <user>...", passOpts{server: []string{"org", "team", "add"}}),
+			pass("remove", "remove members: <org> <team> <user>...", passOpts{server: []string{"org", "team", "remove"}}),
+			pass("grant", "grant a repo role: <org> <team> <owner/name> read|write|admin", passOpts{server: []string{"org", "team", "grant"}}),
+			pass("revoke", "revoke a repo grant: <org> <team> <owner/name>", passOpts{server: []string{"org", "team", "revoke"}}),
+		),
+		group("settings", "organization settings",
+			pass("members-role", "role plain membership implies: <org> write|read|none", passOpts{server: []string{"org", "settings", "members-role"}}),
+		),
 	)
 }
 

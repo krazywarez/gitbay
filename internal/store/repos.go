@@ -106,15 +106,22 @@ func (s *Store) DeleteRepo(repoID int64) error {
 	return nil
 }
 
-// ListReposForUser returns repos the user owns, belongs to through an org,
-// or has an explicit grant on.
+// ListReposForUser returns repos the user owns, reaches through an org
+// (unless the org scopes members to 'none'), has an explicit grant on, or
+// reaches through a team.
 func (s *Store) ListReposForUser(userID int64) ([]Repo, error) {
 	rows, err := s.DB.Query(repoSelect+`
 		LEFT JOIN repo_access a ON a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?
 		LEFT JOIN org_members m ON r.owner_kind = 'org' AND m.org_id = r.owner_id AND m.user_id = ?
-		WHERE (r.owner_kind = 'user' AND r.owner_id = ?) OR a.subject_id IS NOT NULL OR m.user_id IS NOT NULL
+		LEFT JOIN orgs og ON r.owner_kind = 'org' AND og.id = r.owner_id
+		WHERE (r.owner_kind = 'user' AND r.owner_id = ?)
+		   OR a.subject_id IS NOT NULL
+		   OR (m.user_id IS NOT NULL AND (m.role = 'admin' OR og.members_role <> 'none'))
+		   OR EXISTS (SELECT 1 FROM team_repos tr
+		              JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?
+		              WHERE tr.repo_id = r.id)
 		GROUP BY r.id
-		ORDER BY 4, r.name`, userID, userID, userID)
+		ORDER BY 4, r.name`, userID, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,11 +138,18 @@ func (s *Store) ListReposForUser(userID int64) ([]Repo, error) {
 }
 
 // AccessRole returns the user's effective role on the repo ("" if none):
-// the strongest of any explicit grant and, for org-owned repos, the role
-// derived from org membership (org admin -> admin, org member -> write).
+// the strongest of any explicit grant, the role derived from org
+// membership (org admin -> admin; plain member -> the org's members_role,
+// 'write' by default so the pre-teams model is the degenerate case), and
+// any team grants on the repo.
 func (s *Store) AccessRole(repoID, userID int64) (string, error) {
-	rank := map[string]int{"": 0, "read": 1, "write": 2, "admin": 3}
+	rank := map[string]int{"": 0, "none": 0, "read": 1, "write": 2, "admin": 3}
 	best := ""
+	better := func(role string) {
+		if rank[role] > rank[best] {
+			best = role
+		}
+	}
 
 	var explicit string
 	err := s.DB.QueryRow(
@@ -144,22 +158,34 @@ func (s *Store) AccessRole(repoID, userID int64) (string, error) {
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	if rank[explicit] > rank[best] {
-		best = explicit
-	}
+	better(explicit)
 
-	var orgRole string
+	var orgRole, membersRole string
 	err = s.DB.QueryRow(`
-		SELECT m.role FROM repos r
+		SELECT m.role, o.members_role FROM repos r
 		JOIN org_members m ON r.owner_kind = 'org' AND m.org_id = r.owner_id AND m.user_id = ?
-		WHERE r.id = ?`, userID, repoID).Scan(&orgRole)
+		JOIN orgs o ON o.id = r.owner_id
+		WHERE r.id = ?`, userID, repoID).Scan(&orgRole, &membersRole)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	derived := map[string]string{"admin": "admin", "member": "write"}[orgRole]
-	if rank[derived] > rank[best] {
-		best = derived
+	if orgRole == "admin" {
+		better("admin")
+	} else if orgRole == "member" {
+		better(membersRole) // write | read | none
 	}
+
+	var teamRole string
+	err = s.DB.QueryRow(`
+		SELECT tr.role FROM team_repos tr
+		JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?
+		WHERE tr.repo_id = ?
+		ORDER BY CASE tr.role WHEN 'admin' THEN 3 WHEN 'write' THEN 2 ELSE 1 END DESC
+		LIMIT 1`, userID, repoID).Scan(&teamRole)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	better(teamRole)
 	return best, nil
 }
 

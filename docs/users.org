@@ -159,8 +159,8 @@ gitbay repo mirror sync / remove <id>
 * Organizations
 
 Orgs share the owner namespace with users and own repositories at
-=org/repo=. Members get write on all org repos; org admins get repo
-admin, create repos under the org, and manage membership.
+=org/repo=. By default members get write on all org repos; org admins
+get repo admin, create repos under the org, and manage membership.
 
 #+begin_src sh
 gitbay org create krz
@@ -168,6 +168,19 @@ gitbay org members add krz alice [--role admin]
 gitbay org show krz
 gitbay org rename krz newname     # clone URLs change
 gitbay org delete krz --yes       # only when it owns no repositories
+#+end_src
+
+Large orgs scope access with teams: set what plain membership implies,
+then grant per-repo roles through named teams (org admins always keep
+admin; the default =write= keeps the simple model):
+
+#+begin_src sh
+gitbay org settings members-role krz none   # write | read | none
+gitbay org team create krz core-devs
+gitbay org team add krz core-devs alice bob # org members only
+gitbay org team grant krz core-devs krz/gitbay write
+gitbay org team show krz core-devs          # members + grants
+gitbay org team revoke / remove / delete ...
 #+end_src
 
 * Issues

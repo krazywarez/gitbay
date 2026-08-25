@@ -18,7 +18,12 @@ const involvedCond = `(
 	OR EXISTS (SELECT 1 FROM repo_access a
 	           WHERE a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?1)
 	OR EXISTS (SELECT 1 FROM org_members mm
-	           WHERE r.owner_kind = 'org' AND mm.org_id = r.owner_id AND mm.user_id = ?1)
+	           JOIN orgs oo ON oo.id = mm.org_id
+	           WHERE r.owner_kind = 'org' AND mm.org_id = r.owner_id AND mm.user_id = ?1
+	             AND (mm.role = 'admin' OR oo.members_role <> 'none'))
+	OR EXISTS (SELECT 1 FROM team_repos tr
+	           JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?1
+	           WHERE tr.repo_id = r.id)
 )`
 
 func (s *Store) dashboardQuery(q string, userID int64) ([]DashboardItem, error) {
