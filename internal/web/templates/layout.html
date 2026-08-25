@@ -34,19 +34,23 @@
 {{if .Repo.Settings.Website}}<p class="meta repowebsite"><a href="{{.Repo.Settings.Website}}" rel="nofollow">{{.Repo.Settings.Website}}</a></p>{{end}}
 {{if .Topics}}<p class="topics">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
 {{range .Mirrors}}<p class="meta mirrorline">{{if eq .Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="mirrorerr">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
-{{end}}<nav class="tabs">
+{{end}}</div>
+<nav class="tabs">
+  <span class="glabel">code</span>
   <a {{if eq .Tab "files"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">files</a>
   <a {{if eq .Tab "log"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
   <a {{if eq .Tab "refs"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
-  <a {{if eq .Tab "releases"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases">releases</a>
-  <a {{if eq .Tab "builds"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds">builds</a>
+  <span class="glabel">work</span>
   <a {{if eq .Tab "issues"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
   <a {{if eq .Tab "merge requests"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
+  <a {{if eq .Tab "builds"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds">builds</a>
+  <span class="glabel">publish</span>
+  <a {{if eq .Tab "releases"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases">releases</a>
   {{if .HasWiki}}<a {{if eq .Tab "wiki"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/wiki">wiki</a>
-  {{end}}<a {{if eq .Tab "search"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search">search</a>
+  {{end}}<span class="glabel">tools</span>
+  <a {{if eq .Tab "search"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search">search</a>
   <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">archive</a>
 </nav>
-</div>
 {{end}}
 
 {{define "reporow"}}<li>

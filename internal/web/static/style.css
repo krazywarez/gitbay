@@ -1,32 +1,62 @@
-/* gitbay stylesheet. One file, light and dark via prefers-color-scheme.
-   Tokens first; components use tokens only. No external requests. */
+/* gitbay stylesheet, Carbon-school: black shell, sharp lines, one blue.
+   One file, light and dark via prefers-color-scheme. Tokens first;
+   components use tokens only. No external requests: IBM Plex is served
+   from this origin. */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/static/fonts/plex-sans.woff2) format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/static/fonts/plex-mono-400.woff2) format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/static/fonts/plex-mono-500.woff2) format("woff2");
+}
 
 :root {
   /* declare native light+dark support: correct form controls and
      scrollbars per scheme, and opt out of browser auto-darkening */
   color-scheme: light dark;
 
-  /* palette */
-  --bg: #ffffff;
-  --fg: #1f2328;
-  --muted: #667079;
-  --faint: #eceff1;          /* hairlines, row separators */
-  --line: #d7dde2;           /* control borders, card edges */
-  --surface: #f6f8fa;        /* cards, code, table hover */
-  --accent: #0000f0;         /* blue: links, active tab, primary */
+  /* palette (Carbon g10) */
+  --bg: #f4f4f4;
+  --fg: #161616;
+  --muted: #525252;
+  --faint: #ececec;          /* hairlines, row separators */
+  --line: #e0e0e0;           /* control borders, tile edges */
+  --surface: #ffffff;        /* tiles, cards */
+  --hover: #f0f2f8;          /* row hover on tiles */
+  --accent: #0f62fe;         /* blue-60: links, active nav, primary */
   --accent-fg: #ffffff;      /* text on accent */
-  --ok: #1a7f37;
-  --warn: #9a6700;
-  --bad: #cf222e;
-  --done: #8250df;           /* merged */
-  --neutral: #667079;
-  --code-bg: #f6f8fa;
+  --ok: #198038;
+  --warn: #8e6a00;
+  --bad: #da1e28;
+  --done: #8a3ffc;           /* merged */
+  --neutral: #525252;
+  --code-bg: #f4f4f4;
+  /* the shell is ink in both schemes */
+  --shell-bg: #161616;
+  --shell-fg: #f4f4f4;
+  --shell-muted: #c6c6c6;
+  --shell-line: #161616;
 
   /* type */
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
-          "Liberation Mono", monospace;
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo,
+          Consolas, "Liberation Mono", monospace;
   --fs-0: 0.8rem;    /* 12.8px: chips, fine print */
   --fs-1: 0.866rem;  /* ~13px: metadata, mono in tables */
   --fs-2: 0.933rem;  /* 14px: dense table text */
@@ -42,28 +72,31 @@
   --sp-5: 1.5rem;
   --sp-6: 2.5rem;
 
-  /* radii */
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 8px;
+  /* radii: sharp everywhere; only tags stay pills */
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
   --r-pill: 999px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1117;
-    --fg: #e6edf3;
-    --muted: #8d96a0;
-    --faint: #1d242c;
-    --line: #30363d;
-    --surface: #161b22;
-    --accent: #8899ff;
-    --accent-fg: #0a1030;
-    --ok: #3fb950;
-    --warn: #d29922;
-    --bad: #f85149;
-    --done: #a371f7;
-    --neutral: #8d96a0;
-    --code-bg: #161b22;
+    /* Carbon g100 */
+    --bg: #161616;
+    --fg: #f4f4f4;
+    --muted: #a8a8a8;
+    --faint: #2a2a2a;
+    --line: #393939;
+    --surface: #262626;
+    --hover: #2e3440;
+    --accent: #78a9ff;       /* blue-40 reads on dark grounds */
+    --accent-fg: #161616;
+    --ok: #42be65;
+    --warn: #d2a106;
+    --bad: #fa4d56;
+    --done: #a56eff;
+    --neutral: #a8a8a8;
+    --code-bg: #1e1e1e;
+    --shell-line: #393939;
   }
 }
 
@@ -100,35 +133,67 @@ code, pre, .code, td.mode, td.size {
   margin: 0 auto;
   padding: 0 var(--sp-5);
 }
+/* the shell: an ink bar in both schemes, Carbon UI-shell style */
 header {
-  border-bottom: 1px solid var(--faint);
-  padding: var(--sp-3) 0;
+  background: var(--shell-bg);
+  border-bottom: 1px solid var(--shell-line);
+  padding: 0;
 }
 a.site {
-  font-weight: 650;
-  color: var(--fg);
+  font-weight: 600;
+  color: var(--shell-fg);
   letter-spacing: -0.01em;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
 }
-a.site:hover { text-decoration: none; color: var(--accent); }
+a.site:hover { text-decoration: none; color: #ffffff; }
 a.site svg.mark { display: block; }
+a.site svg.mark rect { fill: #0f62fe; }
+a.site svg.mark path { stroke: #ffffff; }
 nav.topnav {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
+  gap: 0;
+  min-height: 3rem;
 }
 nav.topnav .spacer { flex: 1; }
-nav.topnav > a:not(.site) { color: var(--fg); font-size: var(--fs-2); }
-nav.topnav > a:not(.site):hover { color: var(--accent); text-decoration: none; }
-nav.topnav a.navuser { font-weight: 600; }
-nav.topnav button.linklike { color: var(--muted); }
-nav.topnav button.linklike:hover { color: var(--accent); text-decoration: none; }
+nav.topnav > a:not(.site) {
+  color: var(--shell-muted);
+  font-size: var(--fs-2);
+  padding: 0.85rem var(--sp-3);
+  line-height: 1;
+}
+nav.topnav > a:not(.site):hover { color: #ffffff; background: #353535; text-decoration: none; }
+nav.topnav a.navuser {
+  font-weight: 600;
+  color: #ffffff;
+  box-shadow: inset 0 -3px 0 #0f62fe;
+}
+nav.topnav button.linklike { color: var(--shell-muted); padding: 0.85rem var(--sp-3); }
+nav.topnav button.linklike:hover { color: #ffffff; background: #353535; text-decoration: none; }
 main.container {
   width: 100%;
   padding-top: var(--sp-3);
   padding-bottom: var(--sp-6);
+}
+/* repo pages carry a left rail: the repohead spans the top, the sidenav
+   takes column one, everything after flows in column two. Browsers
+   without :has() fall back to single-column flow, which still works. */
+main.container:has(> nav.tabs) {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr);
+  column-gap: var(--sp-6);
+  max-width: 80rem;
+}
+main.container:has(> nav.tabs) > * { grid-column: 2; }
+main.container:has(> nav.tabs) > .repohead { grid-column: 1 / -1; }
+main.container:has(> nav.tabs) > nav.tabs {
+  grid-column: 1;
+  grid-row: 2 / span 99;
+  align-self: start;
+  position: sticky;
+  top: var(--sp-4);
 }
 
 /* tables */
@@ -164,24 +229,35 @@ button.pinbtn.pinned { color: var(--accent); border-color: var(--accent); }
 a.chip.label:hover, a.chip.topic:hover { text-decoration: none; filter: brightness(1.15); }
 .repohead .desc { margin: 0 0 var(--sp-2); }
 
-/* repo tabs */
-nav.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  border-bottom: 1px solid var(--faint);
-  margin-top: var(--sp-3);
-}
-nav.tabs a {
+/* repo rail: grouped vertical navigation on the left */
+nav.tabs { display: flex; flex-direction: column; margin-top: var(--sp-1); }
+nav.tabs .glabel {
+  font-size: var(--fs-0);
   color: var(--muted);
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-md) var(--r-md) 0 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  font-size: var(--fs-2);
+  letter-spacing: 0.04em;
+  margin: var(--sp-4) 0 var(--sp-1);
 }
-nav.tabs a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
-nav.tabs a.active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 550; }
+nav.tabs .glabel:first-child { margin-top: 0; }
+nav.tabs a {
+  color: var(--fg);
+  padding: 0.32rem var(--sp-3);
+  font-size: var(--fs-2);
+  border-left: 3px solid transparent;
+}
+nav.tabs a:hover { background: var(--hover); text-decoration: none; }
+nav.tabs a.active {
+  border-left-color: var(--accent);
+  background: var(--surface);
+  font-weight: 600;
+}
+@media (max-width: 52rem) {
+  /* the rail folds back into a wrapping strip on narrow screens */
+  main.container:has(> nav.tabs) { display: block; }
+  nav.tabs { flex-direction: row; flex-wrap: wrap; gap: 0 var(--sp-1); border-bottom: 1px solid var(--line); padding-bottom: var(--sp-2); position: static; }
+  nav.tabs .glabel { display: none; }
+  nav.tabs a { border-left: none; border-bottom: 3px solid transparent; padding: var(--sp-1) var(--sp-2); }
+  nav.tabs a.active { border-bottom-color: var(--accent); background: none; }
+}
 
 .clone { color: var(--muted); font-size: var(--fs-2); }
 .clone code {
@@ -239,11 +315,12 @@ details.refmenu .refdrop a {
   font-family: var(--mono);
   font-size: var(--fs-1);
 }
-details.refmenu .refdrop a:hover { background: var(--surface); text-decoration: none; }
+details.refmenu .refdrop a:hover { background: var(--hover); text-decoration: none; }
 details.refmenu .refdrop a.allrefs { color: var(--accent); font-family: var(--sans); border-top: 1px solid var(--faint); margin-top: var(--sp-1); }
 
 /* file and refs tables: bordered cards, rows inside */
 table.tree, table.refs {
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   border-collapse: separate;
@@ -256,7 +333,7 @@ table.tree td, table.refs td {
   border-bottom: 1px solid var(--faint);
 }
 table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: none; }
-table.tree tr:hover td, table.refs tr:hover td { background: var(--surface); }
+table.tree tr:hover td, table.refs tr:hover td { background: var(--hover); }
 table.tree tr.cols th {
   text-align: left;
   font-weight: 500;
@@ -264,9 +341,9 @@ table.tree tr.cols th {
   color: var(--muted);
   padding: var(--sp-1) var(--sp-4);
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--bg);
 }
-table.tree tr.cols:hover th { background: var(--surface); }
+table.tree tr.cols:hover th { background: var(--bg); }
 table.tree th.size { text-align: right; }
 table.tree td.name { width: 100%; }
 table.tree td.name a { color: var(--fg); }
@@ -286,7 +363,7 @@ table.refs td.sha { color: var(--muted); }
   border-bottom: 1px solid var(--faint);
   margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-5)) var(--sp-4);
   padding: var(--sp-2) var(--sp-5);
-  background: var(--surface);
+  background: var(--bg);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 
@@ -295,6 +372,7 @@ ul.loglist {
   list-style: none;
   margin: var(--sp-3) 0;
   padding: 0;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -307,7 +385,7 @@ ul.loglist li {
   border-bottom: 1px solid var(--faint);
 }
 ul.loglist li:last-child { border-bottom: none; }
-ul.loglist li:hover { background: var(--surface); }
+ul.loglist li:hover { background: var(--hover); }
 ul.loglist .commitmain { flex: 1; min-width: 0; }
 ul.loglist p { margin: 0; }
 ul.loglist .subject a { color: var(--fg); font-weight: 550; }
@@ -337,6 +415,7 @@ ul.repolist {
   list-style: none;
   margin: var(--sp-3) 0 var(--sp-5);
   padding: 0;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -352,16 +431,17 @@ ul.pinlist {
   gap: var(--sp-2);
 }
 ul.pinlist li {
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--sp-1) var(--sp-3);
 }
-ul.pinlist li:hover { background: var(--surface); }
+ul.pinlist li:hover { background: var(--hover); }
 ul.pinlist li a { color: var(--fg); }
 ul.pinlist li a:hover { color: var(--accent); text-decoration: none; }
 ul.pinlist .sep { color: var(--muted); margin: 0 0.15em; }
 ul.repolist li:last-child { border-bottom: none; }
-ul.repolist li:hover { background: var(--surface); }
+ul.repolist li:hover { background: var(--hover); }
 ul.repolist li.empty { color: var(--muted); }
 ul.repolist p { margin: 0; }
 ul.repolist .reponame { font-size: var(--fs-3); }
@@ -451,7 +531,8 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 
 /* cards: README, comments */
 .readme, .code {
-  border: 1px solid var(--faint);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-5);
   margin-top: var(--sp-4);
@@ -605,13 +686,14 @@ nav.filters a {
   padding: 0.05rem var(--sp-2);
   border-radius: var(--r-pill);
 }
-nav.filters a:hover { color: var(--fg); background: var(--surface); text-decoration: none; }
+nav.filters a:hover { color: var(--fg); background: var(--hover); text-decoration: none; }
 nav.filters a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
 ul.issuelist {
   list-style: none;
   margin: var(--sp-2) 0;
   padding: 0;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -624,7 +706,7 @@ ul.issuelist li {
   border-bottom: 1px solid var(--faint);
 }
 ul.issuelist li:last-child { border-bottom: none; }
-ul.issuelist li:hover { background: var(--surface); }
+ul.issuelist li:hover { background: var(--hover); }
 ul.issuelist li.empty { display: block; color: var(--muted); }
 ul.issuelist .issuemain { flex: 1; min-width: 0; }
 ul.issuelist p { margin: 0; }
@@ -633,6 +715,7 @@ ul.issuelist .title a:hover { color: var(--accent); }
 
 /* releases */
 article.release {
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: var(--sp-3) var(--sp-4);

@@ -40,6 +40,11 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/explore", Handler: s.explore},
 		Route{Method: "GET", Pattern: "/privacy", Handler: s.privacy},
 		Route{Method: "GET", Pattern: "/static/style.css", Handler: s.stylesheet},
+		// Literal per-file routes: a {name} wildcard is ambiguous against
+		// /{owner}/{repo}/... patterns in ServeMux precedence.
+		Route{Method: "GET", Pattern: "/static/fonts/plex-sans.woff2", Handler: s.font},
+		Route{Method: "GET", Pattern: "/static/fonts/plex-mono-400.woff2", Handler: s.font},
+		Route{Method: "GET", Pattern: "/static/fonts/plex-mono-500.woff2", Handler: s.font},
 		Route{Method: "GET", Pattern: "/favicon.svg", Handler: s.favicon},
 		Route{Method: "GET", Pattern: "/{owner}", Handler: s.ownerPage},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}", Handler: s.repoHome},

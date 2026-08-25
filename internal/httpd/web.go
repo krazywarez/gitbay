@@ -62,6 +62,19 @@ func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
 	w.Write(web.FaviconSVG)
 }
 
+// font serves the embedded IBM Plex subsets. Same-origin, so the CSP's
+// default-src 'self' covers it — no font CDN.
+func (s *Server) font(w http.ResponseWriter, r *http.Request) {
+	data, err := web.FontFS.ReadFile("static" + r.URL.Path[len("/static"):])
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "font/woff2")
+	w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
+	w.Write(data)
+}
+
 // notFound renders the designed 404 page with a 404 status. Falls back to
 // the stock plain-text response if the template fails.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
