@@ -530,6 +530,8 @@ pre.diff .meta { color: var(--muted); }
 .chip.label { font-weight: 500; }
 .chip.topic { --chip: var(--accent); }
 .repohead .topics { margin: 0 0 var(--sp-2); }
+.repohead .mirrorline { margin: 0 0 var(--sp-2); }
+.mirrorerr { color: var(--bad); }
 .badge-verified { --chip: var(--ok); }
 .badge-unsigned { --chip: var(--neutral); }
 .badge-signed_unknown_key { --chip: var(--warn); }

@@ -218,6 +218,25 @@ type repoPage struct {
 	Pinned   bool // by the viewer
 	HasWiki  bool
 	Host     string
+	Mirrors  []mirrorLine // repo admins only
+}
+
+// mirrorLine is the admin-only mirror status shown in the repo header.
+// It carries no credentials: URL host/path only, sync time, and error.
+type mirrorLine struct {
+	Direction string
+	Target    string // URL without the scheme
+	Synced    string
+	Error     string
+}
+
+// syncedAt trims a stored sync timestamp (2026-08-25T03:39:19.994Z) to a
+// readable "2026-08-25 03:39 UTC".
+func syncedAt(ts string) string {
+	if len(ts) < 16 {
+		return ts
+	}
+	return ts[:10] + " " + ts[11:16] + " UTC"
 }
 
 // repoFor resolves the repo for a web request; false means 404 was sent.
@@ -232,8 +251,8 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	}
 	repo, err := s.st.RepoByPath(r.PathValue("owner") + "/" + r.PathValue("repo"))
 	ok := err == nil
+	grant := ""
 	if ok {
-		grant := ""
 		if viewer.ID != 0 {
 			grant, _ = s.st.AccessRole(repo.ID, viewer.ID)
 		}
@@ -251,7 +270,20 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	if viewer.ID != 0 {
 		pinned = s.st.IsPinned(viewer.ID, repo.ID)
 	}
+	var mirrors []mirrorLine
+	if viewer.ID != 0 && policy.CanAdmin(viewer, repo, grant) {
+		ms, _ := s.st.ListMirrors(repo.ID)
+		for _, m := range ms {
+			mirrors = append(mirrors, mirrorLine{
+				Direction: m.Direction,
+				Target:    strings.TrimPrefix(strings.TrimPrefix(m.URL, "https://"), "http://"),
+				Synced:    syncedAt(m.LastSync),
+				Error:     m.LastError,
+			})
+		}
+	}
 	return repoPage{
+		Mirrors:  mirrors,
 		Site:     s.siteName(),
 		Viewer:   viewer.Username,
 		Pinned:   pinned,

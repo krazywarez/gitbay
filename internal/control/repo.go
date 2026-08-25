@@ -226,14 +226,22 @@ func runRepoShow(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	type mirrorOut struct {
+		Direction string `json:"direction"`
+		URL       string `json:"url"`
+		Pending   bool   `json:"pending"`
+		LastSync  string `json:"last_sync,omitempty"`
+		LastError string `json:"last_error,omitempty"`
+	}
 	type out struct {
-		Path              string   `json:"path"`
-		Description       string   `json:"description,omitempty"`
-		Visibility        string   `json:"visibility"`
-		DefaultBranch     string   `json:"default_branch"`
-		ProtectedBranches []string `json:"protected_branches,omitempty"`
-		Archived          bool     `json:"archived,omitempty"`
-		Topics            []string `json:"topics,omitempty"`
+		Path              string      `json:"path"`
+		Description       string      `json:"description,omitempty"`
+		Visibility        string      `json:"visibility"`
+		DefaultBranch     string      `json:"default_branch"`
+		ProtectedBranches []string    `json:"protected_branches,omitempty"`
+		Archived          bool        `json:"archived,omitempty"`
+		Topics            []string    `json:"topics,omitempty"`
+		Mirrors           []mirrorOut `json:"mirrors,omitempty"`
 	}
 	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
 	topics, err := c.Store.ListTopics(repo.ID)
@@ -241,7 +249,18 @@ func runRepoShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	d := out{repo.Path(), desc, repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches,
-		repo.Settings.Archived, topics}
+		repo.Settings.Archived, topics, nil}
+	// Mirror status is admin-only, like repo mirror list. The token never
+	// leaves the server.
+	if grant, err := c.Store.AccessRole(repo.ID, c.User.ID); err == nil && policy.CanAdmin(c.User, repo, grant) {
+		ms, err := c.Store.ListMirrors(repo.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		for _, m := range ms {
+			d.Mirrors = append(d.Mirrors, mirrorOut{m.Direction, m.URL, m.Dirty, m.LastSync, m.LastError})
+		}
+	}
 	return c.emit(d, func(w io.Writer) {
 		line := fmt.Sprintf("%s\t%s\tdefault: %s", d.Path, d.Visibility, d.DefaultBranch)
 		if d.Archived {
@@ -256,6 +275,16 @@ func runRepoShow(c *Ctx, args []string) int {
 		}
 		if len(d.ProtectedBranches) > 0 {
 			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
+		}
+		for _, m := range d.Mirrors {
+			status := "ok"
+			if m.Pending {
+				status = "pending"
+			}
+			if m.LastError != "" {
+				status = "error: " + m.LastError
+			}
+			fmt.Fprintf(w, "mirror: %s %s\tlast %s\t%s\n", m.Direction, m.URL, orDash(m.LastSync), status)
 		}
 	})
 }

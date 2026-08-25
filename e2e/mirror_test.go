@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"net/http/cgi"
 	"net/http/httptest"
 	"os"
@@ -52,7 +53,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func TestMirrors(t *testing.T) {
 	t.Setenv("GITBAY_MIRROR_TICK", "200ms")
-	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n")
+	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -89,6 +90,40 @@ func TestMirrors(t *testing.T) {
 	if !strings.Contains(out, `"last_sync":"`) || strings.Contains(out, "token") ||
 		strings.Contains(out, `"last_error":"`) {
 		t.Fatalf("mirror list after sync: %s", out)
+	}
+
+	// ---- status surfacing: repo show carries mirrors for admins only.
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "show", "alice/app", "--json")
+	if !strings.Contains(out, `"mirrors":[`) || !strings.Contains(out, `"last_sync":"`) ||
+		strings.Contains(out, "token") {
+		t.Fatalf("repo show missing mirror status: %s", out)
+	}
+	out, _, _ = inst.ssh(t, bobKey, "", "repo", "show", "alice/app", "--json")
+	if strings.Contains(out, `"mirrors"`) {
+		t.Fatalf("repo show leaked mirrors to non-admin: %s", out)
+	}
+
+	// The web repo page shows the mirror line to the admin, not to visitors.
+	out, errOut, code := inst.ssh(t, aliceKey, "", "web", "login", "--json")
+	if code != 0 {
+		t.Fatalf("web login: %s", errOut)
+	}
+	var loginEnv struct {
+		Data struct {
+			URL string `json:"url"`
+		} `json:"data"`
+	}
+	json.Unmarshal([]byte(out), &loginEnv)
+	loginPath := loginEnv.Data.URL[strings.Index(loginEnv.Data.URL, "/login"):]
+	browser := newBrowser(t)
+	if status, _ := browserGet(t, browser, inst.base()+loginPath); status != 200 {
+		t.Fatalf("login: %d", status)
+	}
+	if _, body := browserGet(t, browser, inst.base()+"/alice/app"); !strings.Contains(body, "mirrors to") {
+		t.Fatalf("admin repo page missing mirror line:\n%s", body)
+	}
+	if _, body := browserGet(t, newBrowser(t), inst.base()+"/alice/app"); strings.Contains(body, "mirrors to") {
+		t.Fatalf("anonymous repo page shows mirror line:\n%s", body)
 	}
 
 	// ---- pull mirror: local repo follows the remote and refuses pushes.
@@ -144,6 +179,10 @@ func TestMirrors(t *testing.T) {
 		out, _, _ := inst.ssh(t, aliceKey, "", "repo", "mirror", "list", "alice/follow", "--json")
 		return strings.Contains(out, `"last_error":"git push`)
 	})
+	// The failure is visible on the admin's web repo page.
+	if _, body := browserGet(t, browser, inst.base()+"/alice/follow"); !strings.Contains(body, "sync error:") {
+		t.Fatalf("admin repo page missing sync error:\n%s", body)
+	}
 }
 
 func TestMirrorSSRFGuard(t *testing.T) {
