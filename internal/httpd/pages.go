@@ -21,11 +21,23 @@ const PagesBranch = "refs/heads/pages"
 // a separate origin where the forge has no cookies to protect.
 func (s *Server) pagesRouter(forge http.Handler) http.Handler {
 	domain := s.cfg.Pages.Domain
+	siteHost := s.cfg.SiteHost()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := hostOnly(r.Host)
-		if host == domain || strings.HasSuffix(host, "."+domain) {
+		if domain != "" && (host == domain || strings.HasSuffix(host, "."+domain)) {
 			s.servePage(w, r, host)
 			return
+		}
+		// Any other foreign host may be a custom pages domain.
+		if host != siteHost && host != "" {
+			if repo, err := s.st.PageDomainRepo(host); err == nil && repo.Visibility == "public" {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				s.servePageFile(w, r, repo, strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/"))
+				return
+			}
 		}
 		forge.ServeHTTP(w, r)
 	})

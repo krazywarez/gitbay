@@ -121,4 +121,56 @@ func TestPages(t *testing.T) {
 	if status, _ := inst.get(t, "/explore"); status != 200 {
 		t.Fatalf("forge routes broken: %d", status)
 	}
+
+	// --- custom domains ---
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "domain", "add", "alice/site", "docs.example.org"); code != 4 {
+		t.Fatal("non-admin claimed a domain")
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "docs.example.org"); code != 0 {
+		t.Fatalf("domain add: %s", errOut)
+	}
+	// The whole path maps into the repo's pages branch, no /<repo>/ prefix.
+	resp, body = inst.pagesGet(t, "docs.example.org", "/")
+	if resp.StatusCode != 200 || !strings.Contains(body, "project site") {
+		t.Fatalf("custom domain root: %d\n%s", resp.StatusCode, body)
+	}
+	if resp, _ = inst.pagesGet(t, "docs.example.org", "/style.css"); !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/css") {
+		t.Fatalf("custom domain css: %s", resp.Header.Get("Content-Type"))
+	}
+	if resp.Header.Get("Content-Security-Policy") != "" {
+		t.Fatal("forge CSP on a custom-domain response")
+	}
+	// Claims are exclusive, without naming the holder.
+	if _, errOut, code := inst.ssh(t, bobKey, "", "repo", "create", "bob/other"); code != 0 {
+		t.Fatalf("bob repo: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/other", "docs.example.org"); code != 2 || strings.Contains(errOut, "alice") {
+		t.Fatalf("duplicate claim: exit %d, %s", code, errOut)
+	}
+	// The forge host and bad domains are refused; private repos refused.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "gitbay.test"); code != 2 {
+		t.Fatal("claimed the forge host")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "sub.p.test"); code != 2 {
+		t.Fatal("claimed the built-in pages domain")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/secret", "priv.example.org"); code != 2 {
+		t.Fatal("private repo got a domain")
+	}
+	// repo show lists it; removal stops serving.
+	out, _, _ := inst.ssh(t, aliceKey, "", "repo", "show", "alice/site")
+	if !strings.Contains(out, "pages domains: docs.example.org") {
+		t.Fatalf("repo show missing domains:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "domain", "remove", "alice/site", "docs.example.org"); code != 0 {
+		t.Fatal("domain remove failed")
+	}
+	// An unmapped host falls through to the forge (default-vhost), so the
+	// site content specifically must be gone.
+	if _, body = inst.pagesGet(t, "docs.example.org", "/"); strings.Contains(body, "project site") {
+		t.Fatal("removed domain still serves")
+	}
 }

@@ -192,6 +192,10 @@ func serveCmd() *cobra.Command {
 								return nil
 							}
 						}
+						// Custom pages domains: certs only for claimed hosts.
+						if _, err := st.PageDomainRepo(h); err == nil {
+							return nil
+						}
 						return fmt.Errorf("host %q not served here", h)
 					}
 					m := &autocert.Manager{

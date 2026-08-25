@@ -122,11 +122,9 @@ func (s *Server) Handler() http.Handler {
 	if len(s.cfg.GoImport) > 0 {
 		h = s.goImportHandler(mux)
 	}
-	h = s.securityHeaders(h)
-	if s.cfg.Pages.Domain != "" {
-		h = s.pagesRouter(h)
-	}
-	return h
+	// Always wrapped: custom pages domains work with or without the
+	// built-in [pages] domain.
+	return s.pagesRouter(s.securityHeaders(h))
 }
 
 // securityHeaders sets defensive response headers on every reply. The CSP

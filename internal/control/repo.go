@@ -244,6 +244,7 @@ func runRepoShow(c *Ctx, args []string) int {
 		ProtectedBranches []string    `json:"protected_branches,omitempty"`
 		Archived          bool        `json:"archived,omitempty"`
 		Topics            []string    `json:"topics,omitempty"`
+		Domains           []string    `json:"domains,omitempty"`
 		Mirrors           []mirrorOut `json:"mirrors,omitempty"`
 	}
 	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
@@ -251,8 +252,9 @@ func runRepoShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	domains, _ := c.Store.ListPageDomains(repo.ID)
 	d := out{repo.Path(), desc, repo.Settings.Website, repo.Visibility, repo.DefaultBranch,
-		repo.Settings.ProtectedBranches, repo.Settings.Archived, topics, nil}
+		repo.Settings.ProtectedBranches, repo.Settings.Archived, topics, domains, nil}
 	// Mirror status is admin-only, like repo mirror list. The token never
 	// leaves the server.
 	if grant, err := c.Store.AccessRole(repo.ID, c.User.ID); err == nil && policy.CanAdmin(c.User, repo, grant) {
@@ -281,6 +283,9 @@ func runRepoShow(c *Ctx, args []string) int {
 		}
 		if len(d.ProtectedBranches) > 0 {
 			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
+		}
+		if len(d.Domains) > 0 {
+			fmt.Fprintf(w, "pages domains: %s\n", strings.Join(d.Domains, ", "))
 		}
 		for _, m := range d.Mirrors {
 			status := "ok"
