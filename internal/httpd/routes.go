@@ -129,9 +129,9 @@ func (s *Server) Handler() http.Handler {
 
 // securityHeaders sets defensive response headers on every reply. The CSP
 // is strict where it can be: no scripts at all (the UI needs none), no
-// plugins, no embedding. Inline styles are allowed because chroma emits
-// inline style attributes on highlighted code and label chips carry their
-// color inline. Images may load from anywhere so external README images
+// plugins, no embedding. Inline styles are allowed because label chips
+// carry their color inline (chroma is class-based so the syntax palette
+// can follow the color scheme). Images may load from anywhere so external README images
 // still render; they are the one thing a reader-facing forge can't police
 // without a proxy.
 func (s *Server) securityHeaders(next http.Handler) http.Handler {

@@ -53,6 +53,7 @@ func (s *Server) siteName() string {
 func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Write(web.StyleCSS)
+	w.Write(chromaCSS)
 }
 
 func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
@@ -734,24 +735,39 @@ type numberedLine struct {
 	Text string
 }
 
+// chromaFormatter emits class-based markup (no inline colors), so the
+// stylesheet can swap palettes with the color scheme.
+var chromaFormatter = html.New(html.WithClasses(true),
+	html.WithLineNumbers(true), html.LineNumbersInTable(false),
+	html.WithLinkableLineNumbers(true, "L"))
+
 func highlight(filePath string, data []byte) template.HTML {
 	lexer := lexers.Match(filePath)
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}
-	style := styles.Get("friendly")
-	formatter := html.New(html.WithLineNumbers(true), html.LineNumbersInTable(false),
-		html.WithLinkableLineNumbers(true, "L"))
 	iterator, err := lexer.Tokenise(nil, string(data))
 	if err != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	var buf bytes.Buffer
-	if err := formatter.Format(&buf, style, iterator); err != nil {
+	if err := chromaFormatter.Format(&buf, styles.Get("friendly"), iterator); err != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	return template.HTML(buf.String())
 }
+
+// chromaCSS is both syntax palettes: light by default, dark under the same
+// media query the rest of the stylesheet uses. The site's --code-bg stays
+// the background either way.
+var chromaCSS = func() []byte {
+	var buf bytes.Buffer
+	chromaFormatter.WriteCSS(&buf, styles.Get("friendly"))
+	buf.WriteString("\n@media (prefers-color-scheme: dark) {\n")
+	chromaFormatter.WriteCSS(&buf, styles.Get("github-dark"))
+	buf.WriteString("}\n.chroma, .bg { background: var(--code-bg) !important; }\n")
+	return buf.Bytes()
+}()
 
 func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, r.PathValue("ref"))

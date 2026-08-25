@@ -101,6 +101,16 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	if _, body := inst.get(t, "/alice/site/blob/main/img/logo.png"); !strings.Contains(body, `<img src="/alice/site/raw/main/img/logo.png"`) {
 		t.Errorf("blob image preview missing:\n%s", body)
 	}
+	// Highlighting is class-based so the palette follows the color scheme:
+	// no inline colors on code, and the stylesheet carries both palettes.
+	if _, body := inst.get(t, "/alice/site/blob/main/README.md"); !strings.Contains(body, `class="chroma"`) ||
+		strings.Contains(body, "style=\"color") {
+		t.Errorf("highlighting not class-based:\n%.2000s", body)
+	}
+	if _, css := inst.get(t, "/static/style.css"); strings.Count(css, "/* Background */") < 2 ||
+		!strings.Contains(css, ".chroma, .bg { background: var(--code-bg)") {
+		t.Error("stylesheet missing dual syntax palettes")
+	}
 	// Explore rows carry topics, license, and updated date.
 	inst.ssh(t, aliceKey, "", "repo", "topics", "add", "alice/site", "web")
 	// Bare 0BSD grant (no notice-retention clause), wrapped mid-sentence.
