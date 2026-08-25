@@ -256,6 +256,7 @@ func adminCmd() *cobra.Command {
 		gcCmd(),
 		statsCmd(),
 		adminAuditCmd(),
+		adminMigrateCommitRefsCmd(),
 	)
 	return admin
 }

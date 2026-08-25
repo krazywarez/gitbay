@@ -57,6 +57,33 @@ func adminUserEnableCmd() *cobra.Command {
 		})
 }
 
+// adminMigrateCommitRefsCmd is a one-shot backfill: legacy commit-reference
+// comments (author-attributed, bare sha) become system messages with a
+// linked sha. Idempotent.
+func adminMigrateCommitRefsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "migrate-commit-refs",
+		Short: "convert legacy commit-reference comments into linked system messages",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+			st, err := openStore(cfg)
+			if err != nil {
+				return err
+			}
+			defer st.Close()
+			n, err := st.MigrateCommitRefComments()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("converted %d commit-reference comment(s) to system messages\n", n)
+			return nil
+		},
+	}
+}
+
 func adminAuditCmd() *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{
