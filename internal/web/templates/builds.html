@@ -1,0 +1,17 @@
+{{define "title"}}builds · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{template "repoheader" .}}
+<ul class="loglist">
+{{range .Builds}}<li>
+  <div class="commitmain">
+    <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/builds/{{.Number}}">#{{.Number}} {{.Job}}</a></p>
+    <p class="meta">{{.Ref}} · {{when .CreatedAt}}</p>
+  </div>
+  <div class="commitside">
+    <span class="badge check-{{.Status}}">{{.Status}}</span>
+    <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{printf "%.10s" .SHA}}</a></code>
+  </div>
+</li>
+{{else}}<li class="empty">no builds — push a commit with a <code>.gitbay/ci.yml</code></li>{{end}}
+</ul>
+{{end}}

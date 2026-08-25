@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
@@ -184,6 +185,10 @@ func (s *Server) postReceive(req Request) {
 			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, u.Old, u.New)
 			control.RecordLandedCommits(s.st, dir, pushedRepo, u.Old, u.New)
 		}
+		// A branch push with a .gitbay/ci.yml queues one build per job.
+		if pushedRepoErr == nil && !u.IsDelete {
+			s.queueBuilds(pushedRepo, req.UserID, branch, u.New)
+		}
 		// Any branch/tag update schedules the push mirrors.
 		s.st.MarkMirrorsDirty(req.RepoID, "push")
 		if u.IsForce {
@@ -224,6 +229,32 @@ func (s *Server) postReceive(req Request) {
 				s.st.SetMRState(mr.ID, "open") // branch came back
 			}
 		}
+	}
+}
+
+// queueBuilds reads .gitbay/ci.yml at the pushed commit and creates one
+// pending build per job, with a pending commit status the runner resolves.
+// A broken config surfaces as a failed "ci/config" status, not silence.
+func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) {
+	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return // no CI config at this commit
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		s.st.SetCommitStatus(repo.ID, sha, "ci/config", "failure", err.Error(), "", userID)
+		return
+	}
+	for _, j := range jobs {
+		steps, _ := json.Marshal(j.Steps)
+		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, branch, string(steps))
+		if err != nil {
+			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
+			continue
+		}
+		url := fmt.Sprintf("%s/%s/builds/%d", s.cfg.Server.SiteURL, repo.Path(), n)
+		s.st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "queued", url, userID)
 	}
 }
 

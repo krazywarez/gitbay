@@ -39,6 +39,7 @@
   <a {{if eq .Tab "log"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">log</a>
   <a {{if eq .Tab "refs"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">refs</a>
   <a {{if eq .Tab "releases"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases">releases</a>
+  <a {{if eq .Tab "builds"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds">builds</a>
   <a {{if eq .Tab "issues"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues">issues</a>
   <a {{if eq .Tab "merge requests"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs">merge requests</a>
   {{if .HasWiki}}<a {{if eq .Tab "wiki"}}class="active" {{end}}href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/wiki">wiki</a>

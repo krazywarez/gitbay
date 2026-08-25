@@ -1,0 +1,192 @@
+// gitbay-runner executes CI builds queued by a gitbay server. It polls over
+// SSH — the same authenticated channel everything else uses — claims one
+// build at a time, clones the repo, runs each step with `sh -c`, streams the
+// combined output back, and reports success or failure.
+//
+// The account behind the runner's key must be an instance admin: a runner
+// executes arbitrary repo code, so handing out jobs is the operator's call.
+// v1 runs steps directly on the host under this process's user; run it as a
+// dedicated unprivileged user.
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type job struct {
+	ID     int64    `json:"id"`
+	Repo   string   `json:"repo"`
+	Number int64    `json:"number"`
+	Job    string   `json:"job"`
+	SHA    string   `json:"sha"`
+	Ref    string   `json:"ref"`
+	Steps  []string `json:"steps"`
+}
+
+type runner struct {
+	remote    string // ssh destination, e.g. git@gitbay.org
+	sshOpts   []string
+	cloneBase string // e.g. ssh://git@gitbay.org
+	workdir   string
+	timeout   time.Duration
+}
+
+func main() {
+	var (
+		remote    = flag.String("remote", "git@gitbay.org", "ssh destination of the gitbay server")
+		sshOpts   = flag.String("ssh-opts", "", "extra ssh options, space-separated (also used for git clone)")
+		cloneBase = flag.String("clone-base", "", "clone URL prefix (default ssh://<remote>)")
+		workdir   = flag.String("workdir", filepath.Join(os.TempDir(), "gitbay-runner"), "build workspace root")
+		poll      = flag.Duration("poll", 5*time.Second, "idle poll interval")
+		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
+		once      = flag.Bool("once", false, "process at most one build, then exit")
+	)
+	flag.Parse()
+	r := &runner{
+		remote:    *remote,
+		cloneBase: *cloneBase,
+		workdir:   *workdir,
+		timeout:   *timeout,
+	}
+	if *sshOpts != "" {
+		r.sshOpts = strings.Fields(*sshOpts)
+	}
+	if r.cloneBase == "" {
+		r.cloneBase = "ssh://" + *remote
+	}
+	if err := os.MkdirAll(r.workdir, 0o755); err != nil {
+		log.Fatal(err)
+	}
+	for {
+		ran, err := r.step()
+		if err != nil {
+			log.Printf("runner: %v", err)
+		}
+		if *once {
+			return
+		}
+		if !ran {
+			time.Sleep(*poll)
+		}
+	}
+}
+
+// step claims and executes at most one build. ran reports whether there was
+// one, so the caller knows when to idle.
+func (r *runner) step() (bool, error) {
+	out, err := r.ssh(nil, "runner", "next", "--json")
+	if err != nil {
+		return false, fmt.Errorf("claiming build: %w (%s)", err, out)
+	}
+	var env struct {
+		Data job `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		return false, fmt.Errorf("parsing job: %w", err)
+	}
+	if env.Data.ID == 0 {
+		return false, nil
+	}
+	j := env.Data
+	log.Printf("build %d: %s %s @ %.10s", j.ID, j.Repo, j.Job, j.SHA)
+	status := "failure"
+	if r.run(j) {
+		status = "success"
+	}
+	if out, err := r.ssh(nil, "runner", "done", fmt.Sprint(j.ID), status); err != nil {
+		return true, fmt.Errorf("reporting build %d: %w (%s)", j.ID, err, out)
+	}
+	log.Printf("build %d: %s", j.ID, status)
+	return true, nil
+}
+
+// run clones, checks out, and executes the steps, streaming output to the
+// server. Returns whether every step succeeded.
+func (r *runner) run(j job) bool {
+	dir := filepath.Join(r.workdir, fmt.Sprintf("build-%d", j.ID))
+	defer os.RemoveAll(dir)
+
+	// One long-lived `runner log` session receives the whole stream.
+	logCmd := exec.Command("ssh", append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
+	sink, err := logCmd.StdinPipe()
+	if err != nil {
+		log.Printf("build %d: log pipe: %v", j.ID, err)
+		return false
+	}
+	logCmd.Stdout, logCmd.Stderr = io.Discard, io.Discard
+	if err := logCmd.Start(); err != nil {
+		log.Printf("build %d: log stream: %v", j.ID, err)
+		return false
+	}
+	defer func() {
+		sink.Close()
+		logCmd.Wait()
+	}()
+
+	gitSSH := strings.TrimSpace("ssh " + strings.Join(r.sshOpts, " "))
+	cloneURL := r.cloneBase + "/" + j.Repo + ".git"
+	fmt.Fprintf(sink, "$ git clone %s (%.10s)\n", cloneURL, j.SHA)
+	for _, args := range [][]string{
+		{"clone", "-q", cloneURL, dir},
+		{"-C", dir, "checkout", "-q", j.SHA},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND="+gitSSH, "GIT_TERMINAL_PROMPT=0")
+		cmd.Stdout, cmd.Stderr = sink, sink
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(sink, "git %s: %v\n", args[0], err)
+			return false
+		}
+	}
+
+	deadline := time.Now().Add(r.timeout)
+	for _, step := range j.Steps {
+		fmt.Fprintf(sink, "$ %s\n", step)
+		cmd := exec.Command("sh", "-c", step)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GITBAY_REPO="+j.Repo, "GITBAY_SHA="+j.SHA, "GITBAY_REF="+j.Ref, "GITBAY_JOB="+j.Job, "CI=true")
+		cmd.Stdout, cmd.Stderr = sink, sink
+		if err := cmd.Start(); err != nil {
+			fmt.Fprintf(sink, "start: %v\n", err)
+			return false
+		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case err := <-done:
+			if err != nil {
+				fmt.Fprintf(sink, "step failed: %v\n", err)
+				return false
+			}
+		case <-time.After(time.Until(deadline)):
+			cmd.Process.Kill()
+			fmt.Fprintf(sink, "build timed out after %s\n", r.timeout)
+			return false
+		}
+	}
+	return true
+}
+
+// ssh runs one control command against the server and returns stdout.
+func (r *runner) ssh(stdin io.Reader, args ...string) (string, error) {
+	cmd := exec.Command("ssh", append(append(r.sshOpts, r.remote), args...)...)
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
+	var out, errOut strings.Builder
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	if err := cmd.Run(); err != nil {
+		return out.String() + errOut.String(), err
+	}
+	return out.String(), nil
+}

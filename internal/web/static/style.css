@@ -581,6 +581,11 @@ pre.diff .meta { color: var(--muted); }
 .badge.check-success { --chip: var(--ok); }
 .badge.check-pending { --chip: var(--warn); }
 .badge.check-failure, .badge.check-error { --chip: var(--bad); }
+.badge.check-running, .chip.check-running { --chip: var(--warn); }
+.chip.check-success { --chip: var(--ok); }
+.chip.check-pending { --chip: var(--warn); }
+.chip.check-failure { --chip: var(--bad); }
+pre.buildlog { max-height: 40rem; overflow: auto; }
 span.check-success { color: var(--ok); }
 span.check-pending { color: var(--warn); }
 span.check-failure, span.check-error { color: var(--bad); }

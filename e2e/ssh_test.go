@@ -14,7 +14,8 @@ import (
 )
 
 type instance struct {
-	gitbayd   string // path to built binary
+	gitbayd  string // path to built binary
+	runner   string // path to built gitbay-runner (CI tests)
 	root     string
 	config   string
 	port     int
