@@ -301,6 +301,34 @@ Threads render inline on the MR page. A force-push marks them stale
 anchors; =mr show= reports the unresolved count. Resolving is for the
 thread author, the MR author, or anyone with write.
 
+* CI builds
+
+A =.gitbay/ci.yml= in the repo runs jobs on every branch push:
+
+#+begin_src yaml
+jobs:
+  test:
+    steps:
+      - go test ./...
+#+end_src
+
+Each job becomes a build (=build list=, =build log=, the builds tab on
+the web) and a =ci/<job>= commit status, which =repo settings
+require-checks= can gate merges on. Steps run with =sh -c= on the
+instance's runner, stopping at the first failure; a broken config
+surfaces as a failed =ci/config= status. Environment: =GITBAY_REPO=,
+=GITBAY_SHA=, =GITBAY_REF=, =GITBAY_JOB=, =CI=true=.
+
+* Pages
+
+On instances with =[pages] domain= set, a =pages= branch in any public
+repo is served as a static site: the repo named =pages= at
+=https://<you>.<domain>/=, every other repo at
+=https://<you>.<domain>/<repo>/=. Push HTML to publish; a CI job can
+build and push the branch for automatic deploys. Sites run on a
+separate origin — your scripts work, and the forge's cookies are out of
+reach.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you: someone

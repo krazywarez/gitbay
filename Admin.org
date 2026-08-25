@@ -182,6 +182,34 @@ Replace the binary, restart the unit. Migrations apply automatically and
 are transactional; hook scripts under =<root>/hooks= are rewritten at
 startup to point at the current binary path.
 
+* CI runner
+
+=gitbay-runner= executes builds queued by pushes. It polls over SSH as
+an admin account (runner commands are admin-only: a runner executes
+arbitrary repo code), clones, runs the steps, streams the log back, and
+resolves the commit status. Run it as a dedicated unprivileged user:
+
+#+begin_src sh
+useradd --system --create-home --home-dir /var/lib/gitbay-runner ci-runner
+sudo -u ci-runner ssh-keygen -t ed25519 -N "" -f /var/lib/gitbay-runner/.ssh/id_ed25519
+gitbayd --config /etc/gitbay/config.toml admin user create ci --admin \
+  --key /var/lib/gitbay-runner/.ssh/id_ed25519.pub
+gitbay-runner -remote git@127.0.0.1 -workdir /var/lib/gitbay-runner/work
+#+end_src
+
+v1 runs steps directly on the host — no containers — so treat the
+runner machine as executing whatever your users push. Install the
+toolchains your builds need on it.
+
+* Pages
+
+=[pages] domain = "example.site"= serves public repos' =pages= branches
+on =<owner>.<domain>=. DNS needs a wildcard record =*.<domain>= to the
+server; ACME issues per-subdomain certificates on demand (only for
+owners that exist). The domain must not be the site host or a parent of
+it — pages content runs its own scripts and must stay off the forge's
+origin.
+
 * Security
 
 The [[Threat-Model]] file is the reference for what the forge

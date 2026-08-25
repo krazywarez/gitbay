@@ -82,10 +82,13 @@ work to it.
 
 Bigger bets, each valuable independently; order by appetite.
 
-- [[https://gitbay.org/krz/gitbay/issues/13][#13]] CI/CD via external runners (after #1; the forge never executes
-  repository content)
+- [[https://gitbay.org/krz/gitbay/issues/13][#13]] CI/CD — done 2026-08-25 (.gitbay/ci.yml jobs, gitbay-runner over
+  SSH on bay1, statuses feed require-checks; the forge never executes
+  repository content itself)
 - [[https://gitbay.org/krz/gitbay/issues/16][#16]] Git LFS
-- [[https://gitbay.org/krz/gitbay/issues/15][#15]] static page hosting (needs the separate-origin decision)
+- [[https://gitbay.org/krz/gitbay/issues/15][#15]] static pages — done 2026-08-25 (public repos' =pages= branches on
+  <owner>.<pages domain>, separate origin; gitbay.org deployment awaits
+  the domain)
 - [[https://gitbay.org/krz/gitbay/issues/11][#11]] iOS app (hutch-based) and [[https://gitbay.org/krz/gitbay/issues/12][#12]] Android
 - [[https://gitbay.org/krz/gitbay/issues/21][#21]] teams within orgs — done 2026-08-25 (members-role scoping + per-repo team grants)
 - [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis — done 2026-08-25 (push-edited .wiki companions; krz/gitbay has one)
