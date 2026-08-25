@@ -136,10 +136,10 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	s.render(w, "dashboard.html", struct {
 		Site   string
 		Viewer string
-		Pinned []describedRepo
+		Pinned []store.Repo
 		MRs    []store.DashboardItem
 		Issues []store.DashboardItem
-	}{s.siteName(), viewer.Username, s.describeAll(visible), mrs, issues})
+	}{s.siteName(), viewer.Username, visible, mrs, issues})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {

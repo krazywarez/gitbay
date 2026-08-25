@@ -6,8 +6,8 @@
 <p class="toolbar">logged in as <a href="/{{.Viewer}}">{{.Viewer}}</a></p>
 </div>
 {{if .Pinned}}<h2>pinned</h2>
-<ul class="repolist">
-{{range .Pinned}}{{template "reporow" .}}
+<ul class="pinlist">
+{{range .Pinned}}<li><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</li>
 {{end}}
 </ul>{{end}}
 <h2>open merge requests <span class="count">{{len .MRs}}</span></h2>

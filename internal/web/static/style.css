@@ -342,6 +342,24 @@ ul.repolist {
   overflow: hidden;
 }
 ul.repolist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
+/* pinned repos: a compact wrap of name pills, no description or meta */
+ul.pinlist {
+  list-style: none;
+  margin: var(--sp-3) 0 var(--sp-5);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+ul.pinlist li {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-1) var(--sp-3);
+}
+ul.pinlist li:hover { background: var(--surface); }
+ul.pinlist li a { color: var(--fg); }
+ul.pinlist li a:hover { color: var(--accent); text-decoration: none; }
+ul.pinlist .sep { color: var(--muted); margin: 0 0.15em; }
 ul.repolist li:last-child { border-bottom: none; }
 ul.repolist li:hover { background: var(--surface); }
 ul.repolist li.empty { color: var(--muted); }
