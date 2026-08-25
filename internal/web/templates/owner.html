@@ -7,6 +7,14 @@
 {{if .Orgs}}<p class="meta">member of {{range .Orgs}}<a class="memberchip" href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Username}}">{{.Username}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 </section>
+<section class="activity">
+<h2>activity <span class="count">{{.ActivityTotal}} in the last year</span></h2>
+<div class="actgraph-scroll">
+<div class="actgraph">
+{{range .Activity}}<div class="actweek">{{range .}}<span class="actday{{if .Pad}} pad{{else}} l{{.Level}}{{end}}"{{if not .Pad}} title="{{.Count}} on {{.Date}}"{{end}}></span>{{end}}</div>{{end}}
+</div>
+</div>
+</section>
 <h2>repositories <span class="count">{{len .Repos}}</span></h2>
 <ul class="repolist">
 {{range .Repos}}{{template "reporow" .}}

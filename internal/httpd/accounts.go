@@ -304,6 +304,7 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.st.RecordEvent(repo.ID, u.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, n))
 	// Labels need write access, matching the SSH rule; ignored otherwise.
 	if labels := strings.Fields(r.FormValue("labels")); len(labels) > 0 {
 		grant, _ := s.st.AccessRole(repo.ID, u.ID)
@@ -411,6 +412,7 @@ func (s *Server) issueCommentSubmit(w http.ResponseWriter, r *http.Request, u st
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.st.RecordEvent(repo.ID, u.ID, "issue.commented", fmt.Sprintf(`{"number":%d}`, n))
 	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
 }
 
@@ -434,6 +436,7 @@ func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.st.RecordEvent(repo.ID, u.ID, "mr.commented", fmt.Sprintf(`{"number":%d}`, n))
 	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", repo.Path(), n), http.StatusSeeOther)
 }
 

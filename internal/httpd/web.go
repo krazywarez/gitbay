@@ -326,16 +326,27 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 			visible = append(visible, repo)
 		}
 	}
+	var counts map[string]int
+	if kind == "user" {
+		counts, _ = s.st.ActivityByDay(ownerID, activitySince())
+	} else {
+		counts, _ = s.st.OrgActivityByDay(ownerID, activitySince())
+	}
+	weeks, activityTotal := activityGrid(counts)
+
 	s.render(w, "owner.html", struct {
-		Site    string
-		Viewer  string
-		Owner   string
-		Kind    string
-		Profile store.Profile
-		Repos   []describedRepo
-		Members []store.OrgMember
-		Orgs    []store.OrgMember
-	}{s.siteName(), viewer.Username, name, kind, profile, s.describeAll(visible), members, orgs})
+		Site          string
+		Viewer        string
+		Owner         string
+		Kind          string
+		Profile       store.Profile
+		Repos         []describedRepo
+		Members       []store.OrgMember
+		Orgs          []store.OrgMember
+		Activity      []activityWeek
+		ActivityTotal int
+	}{s.siteName(), viewer.Username, name, kind, profile, s.describeAll(visible), members, orgs,
+		weeks, activityTotal})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {

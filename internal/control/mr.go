@@ -534,6 +534,7 @@ func runMRComment(c *Ctx, args []string) int {
 	if err := c.Store.AddMRComment(mr.ID, c.User.ID, body); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.commented", fmt.Sprintf(`{"number":%d}`, mr.Number))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
 			notifyBody(c, fmt.Sprintf("commented on !%d", mr.Number), body, fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
@@ -851,6 +852,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	// (closes #N, references) run here for the newly landed commits.
 	if mr.TargetRef == repo.DefaultBranch {
 		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
+		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
 	}
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {

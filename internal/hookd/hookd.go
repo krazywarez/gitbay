@@ -182,6 +182,7 @@ func (s *Server) postReceive(req Request) {
 		if pushedRepoErr == nil && branch == pushedRepo.DefaultBranch && !u.IsDelete {
 			dir := control.RepoDir(s.cfg.Server.Root, pushedRepo.OwnerName, pushedRepo.Name)
 			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, u.Old, u.New)
+			control.RecordLandedCommits(s.st, dir, pushedRepo, u.Old, u.New)
 		}
 		// Any branch/tag update schedules the push mirrors.
 		s.st.MarkMirrorsDirty(req.RepoID, "push")

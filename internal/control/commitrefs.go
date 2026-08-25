@@ -56,6 +56,22 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 	}
 }
 
+// RecordLandedCommits attributes commits that just landed on the default
+// branch to accounts by verified author email, for the activity graph.
+// Dedup by (repo, sha) makes rebases and re-runs harmless; unresolvable
+// authors are simply not activity.
+func RecordLandedCommits(st *store.Store, dir string, repo store.Repo, old, new string) {
+	authors, err := gitutil.RevListAuthors(dir, old, new, maxMessageCommits)
+	if err != nil {
+		return
+	}
+	for _, a := range authors {
+		if uid, ok := st.UserIDByVerifiedEmail(a.Email); ok {
+			st.RecordCommitActivity(repo.ID, a.SHA, uid, a.Day)
+		}
+	}
+}
+
 func actOnIssue(st *store.Store, repo store.Repo, actorID int64, sha string, number int64, close bool, subject string) {
 	issue, err := st.IssueByNumber(repo.ID, number)
 	if err != nil {

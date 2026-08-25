@@ -365,6 +365,22 @@ ul.repolist .meta { margin-top: var(--sp-1); }
 .profilehead .meta { margin: var(--sp-1) 0 0; }
 h2 .count { color: var(--muted); font-weight: 400; font-size: var(--fs-2); }
 
+/* activity graph: 53 week columns x 7 day rows, accent-tinted levels */
+.actgraph-scroll { overflow-x: auto; padding-bottom: var(--sp-1); }
+.actgraph { display: flex; gap: 3px; width: max-content; }
+.actweek { display: flex; flex-direction: column; gap: 3px; }
+.actday {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--faint);
+}
+.actday.pad { background: transparent; }
+.actday.l1 { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); }
+.actday.l2 { background: color-mix(in srgb, var(--accent) 50%, var(--bg)); }
+.actday.l3 { background: color-mix(in srgb, var(--accent) 75%, var(--bg)); }
+.actday.l4 { background: var(--accent); }
+
 /* heading row with actions on the right */
 .headrow {
   display: flex;

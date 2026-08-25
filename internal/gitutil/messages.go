@@ -8,6 +8,35 @@ import (
 
 const zeroSHA = "0000000000000000000000000000000000000000"
 
+type CommitAuthor struct {
+	SHA   string
+	Email string
+	Day   string // author date, YYYY-MM-DD
+}
+
+// RevListAuthors returns sha, author email, and author date for commits
+// reachable from new but not old, capped at max. Empty or zero old lists
+// from new alone.
+func RevListAuthors(dir, old, new string, max int) ([]CommitAuthor, error) {
+	args := []string{"-C", dir, "log", fmt.Sprintf("--max-count=%d", max), "--format=%H%x00%ae%x00%as", new}
+	if old != "" && old != zeroSHA {
+		args = append(args, "^"+old)
+	}
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("rev-list authors: %w", err)
+	}
+	var authors []CommitAuthor
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		parts := strings.SplitN(line, "\x00", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		authors = append(authors, CommitAuthor{SHA: parts[0], Email: parts[1], Day: parts[2]})
+	}
+	return authors, nil
+}
+
 // Parents returns a commit's parent shas.
 func Parents(dir, sha string) []string {
 	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%P", sha).Output()
