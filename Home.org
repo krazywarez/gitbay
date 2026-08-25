@@ -9,5 +9,6 @@ CLI-first git forge: SSH is the API, the web is a rendering.
 - [[API][API and webhooks]] — the JSON API contract, tokens, payloads
 - [[Roadmap][Roadmap]] — status, phases, decisions, what is not planned
 - [[Threat-Model][Threat model]] — what the forge trusts and never does
+- [[Performance][Performance]] — stress-test numbers from importing git.git
 
 This wiki is a git repository: =git clone ssh://git@gitbay.org/krz/gitbay.wiki.git=
