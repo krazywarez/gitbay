@@ -4,6 +4,28 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v0.4.0 — 2026-08-25
+
+- Git LFS: standard clients work over both transports.
+  =git-lfs-authenticate= joins the SSH dispatcher (deploy keys
+  included; download needs read, upload write), minting stateless
+  repo- and operation-scoped tokens for the batch API and basic
+  transfers. Anonymous HTTPS downloads for public repos; uploads
+  verified against size and sha256 before landing. Storage is
+  content-addressed under =[lfs] root= behind a small interface an
+  S3-compatible backend can drop into; =[lfs] max_object_bytes= caps
+  objects (512MB default).
+- Build failures mail the repo's notify targets with the log tail and
+  build link — failed scheduled jobs reach an inbox.
+- =release edit= updates a release's title and notes (absent flags
+  keep their field); omaha-style CI note rebuilds work again.
+- Syntax highlighting follows the color scheme: class-based chroma
+  with light and dark palettes, the light-pinned code background is
+  gone, and markdown fences and org src blocks highlight too. The UGC
+  sanitizer admits only chroma's token-code classes.
+
+No migrations. New config: =[lfs] root=, =[lfs] max_object_bytes=.
+
 * v0.3.0 — 2026-08-25
 
 - CI: =.gitbay/ci.yml= jobs run as builds claimed by =gitbay-runner=
