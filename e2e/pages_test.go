@@ -263,7 +263,10 @@ func TestPages(t *testing.T) {
 	if _, _, code = inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/held", "exp.example.org"); code != 2 {
 		t.Fatal("live pending claim did not hold the name")
 	}
-	time.Sleep(5500 * time.Millisecond) // one TTL (GITBAY_DOMAIN_PENDING_TTL=5s) plus slack
+	// One TTL (GITBAY_DOMAIN_PENDING_TTL=5s) plus real slack: timestamps
+	// have second granularity, so a 5.5s sleep can land on a diff of
+	// exactly 5, which is not > TTL.
+	time.Sleep(7 * time.Second)
 	if _, errOut, code = inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/held", "exp.example.org"); code != 0 {
 		t.Fatalf("expired claim still held the name: %s", errOut)
 	}
