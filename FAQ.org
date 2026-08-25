@@ -1,0 +1,9 @@
+#+title: FAQ
+
+- Where do I log in? :: You do not, for most things. The web is read
+  (and light write) — mint a browser session with =gitbay web login=.
+- Pull requests? :: Merge requests: =gitbay mr create= from a branch or
+  fork; merges are ff/merge/squash/rebase with signature policy.
+- Moving from GitHub? :: =gitbay repo import= (git data) then
+  =gitbay repo import-issues= (history); =repo mirror= covers the
+  transition window.
