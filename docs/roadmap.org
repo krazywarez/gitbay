@@ -101,15 +101,18 @@ and the whole set gates flipping gitbay.org to open registration.
 
 - [[https://gitbay.org/krz/gitbay/issues/14][#14]] audit logging, rate limiting, quotas, user disable — the
   multi-user half
-- [[https://gitbay.org/krz/gitbay/issues/28][#28]] hardening umbrella — the rest, both layers:
-  - software: fuzz all attacker-facing parsers (pkt-line, SSHSIG,
-    commit, armor), web security headers (CSP et al.), govulncheck,
-    constant-time comparison audit, a written threat model, signed
-    releases
-  - host: unattended OS patching, tighter systemd sandboxing
-    (SystemCallFilter and friends), auth throttling on both SSH
-    surfaces, database file modes and continuous replication,
-    service/disk/cert monitoring
+- [[https://gitbay.org/krz/gitbay/issues/28][#28]] hardening umbrella — concrete items done 2026-08-24
+  (umbrella stays open for ongoing work). Both layers landed:
+  - software: fuzz targets for every attacker-facing parser (found and
+    fixed a decodeArmor slice bug), CSP + security headers, govulncheck
+    in =deploy/audit.sh= (fixed circl GO-2026-4550), token comparison
+    audit (hash-lookup, no Go-level compare), =docs/threat-model.org=,
+    optional minisign over release manifests
+  - host: systemd sandbox (=SystemCallFilter=@system-service=,
+    =PrivateDevices=, =LockPersonality=, =MemoryDenyWriteExecute=, …),
+    unattended-upgrades, fail2ban + =MaxStartups=/=MaxAuthTries= on the
+    admin sshd, hourly disk/service/cert monitoring; DB file modes 0750,
+    litestream noted for continuous replication. Applied to bay1.
 
 Already true and worth preserving (the threat model will write these
 down): the forge never executes repository content; no server signing
