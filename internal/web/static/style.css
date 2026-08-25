@@ -68,7 +68,7 @@
 }
 
 * { box-sizing: border-box; }
-html { font-size: 15px; }
+html { font-size: 15px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   margin: 0;
   background: var(--bg);
@@ -765,7 +765,10 @@ pre.matchline mark {
 .wikinav li a:hover { color: var(--accent); text-decoration: none; }
 .wikinav li a.active { color: var(--accent); font-weight: 550; }
 @media (max-width: 40rem) {
-  .wikilayout { flex-direction: column; }
+  /* Column direction + the desktop align-items:flex-start lets .wikipage
+     take its content's intrinsic width, overflowing the viewport (and
+     triggering iOS font inflation). Stretch pins it to the container. */
+  .wikilayout { flex-direction: column; align-items: stretch; }
   .wikinav { width: auto; padding-top: 0; }
 }
 
@@ -819,7 +822,7 @@ pre.matchline mark {
   main.container { padding-top: var(--sp-2); }
   .repogrid { grid-template-columns: 1fr; }
   .thread { margin-left: var(--sp-3); }
-  table.tree td.mode { display: none; }
+  table.tree td.mode, table.tree th.mode { display: none; }
   .readme, .code { padding: var(--sp-3); }
   .blamehunk { flex-direction: column; gap: 0; }
   .blameinfo { width: auto; }

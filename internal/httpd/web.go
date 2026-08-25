@@ -222,10 +222,11 @@ type repoPage struct {
 }
 
 // mirrorLine is the admin-only mirror status shown in the repo header.
-// It carries no credentials: URL host/path only, sync time, and error.
+// It carries no credentials: the stored URL is credential-free.
 type mirrorLine struct {
 	Direction string
-	Target    string // URL without the scheme
+	URL       string
+	Target    string // URL without the scheme, for display
 	Synced    string
 	Error     string
 }
@@ -276,6 +277,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		for _, m := range ms {
 			mirrors = append(mirrors, mirrorLine{
 				Direction: m.Direction,
+				URL:       m.URL,
 				Target:    strings.TrimPrefix(strings.TrimPrefix(m.URL, "https://"), "http://"),
 				Synced:    syncedAt(m.LastSync),
 				Error:     m.LastError,

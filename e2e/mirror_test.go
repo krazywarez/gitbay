@@ -119,7 +119,7 @@ func TestMirrors(t *testing.T) {
 	if status, _ := browserGet(t, browser, inst.base()+loginPath); status != 200 {
 		t.Fatalf("login: %d", status)
 	}
-	if _, body := browserGet(t, browser, inst.base()+"/alice/app"); !strings.Contains(body, "mirrors to") {
+	if _, body := browserGet(t, browser, inst.base()+"/alice/app"); !strings.Contains(body, "mirrors to <a href=\""+remoteURL) {
 		t.Fatalf("admin repo page missing mirror line:\n%s", body)
 	}
 	if _, body := browserGet(t, newBrowser(t), inst.base()+"/alice/app"); strings.Contains(body, "mirrors to") {
