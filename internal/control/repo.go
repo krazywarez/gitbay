@@ -48,6 +48,8 @@ func init() {
 		Summary: "unprotect a branch: repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
 	register(Command{Path: []string{"repo", "settings", "description"},
 		Summary: "set the repository description: repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
+	register(Command{Path: []string{"repo", "settings", "website"},
+		Summary: "set the repository website: repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
 		Summary: "expose over git://: repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
 	register(Command{Path: []string{"repo", "archive"},
@@ -236,6 +238,7 @@ func runRepoShow(c *Ctx, args []string) int {
 	type out struct {
 		Path              string      `json:"path"`
 		Description       string      `json:"description,omitempty"`
+		Website           string      `json:"website,omitempty"`
 		Visibility        string      `json:"visibility"`
 		DefaultBranch     string      `json:"default_branch"`
 		ProtectedBranches []string    `json:"protected_branches,omitempty"`
@@ -248,8 +251,8 @@ func runRepoShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	d := out{repo.Path(), desc, repo.Visibility, repo.DefaultBranch, repo.Settings.ProtectedBranches,
-		repo.Settings.Archived, topics, nil}
+	d := out{repo.Path(), desc, repo.Settings.Website, repo.Visibility, repo.DefaultBranch,
+		repo.Settings.ProtectedBranches, repo.Settings.Archived, topics, nil}
 	// Mirror status is admin-only, like repo mirror list. The token never
 	// leaves the server.
 	if grant, err := c.Store.AccessRole(repo.ID, c.User.ID); err == nil && policy.CanAdmin(c.User, repo, grant) {
@@ -269,6 +272,9 @@ func runRepoShow(c *Ctx, args []string) int {
 		fmt.Fprintln(w, line)
 		if d.Description != "" {
 			fmt.Fprintf(w, "%s\n", d.Description)
+		}
+		if d.Website != "" {
+			fmt.Fprintf(w, "website: %s\n", d.Website)
 		}
 		if len(d.Topics) > 0 {
 			fmt.Fprintf(w, "topics: %s\n", strings.Join(d.Topics, ", "))
@@ -482,6 +488,35 @@ func runSetDescription(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]string{"description": gitutil.ReadDescription(dir)}, func(w io.Writer) {
 		fmt.Fprintf(w, "description set on %s\n", repo.Path())
+	})
+}
+
+func runSetWebsite(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo settings website <owner/name> <url>")
+	}
+	site := strings.TrimSpace(args[1])
+	if err := validateWebsite(site); err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if len(site) > 256 {
+		return c.fail(protocol.ExitUsage, "website URL too long (max 256)")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	s := repo.Settings
+	s.Website = site
+	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"website": site}, func(w io.Writer) {
+		if site == "" {
+			fmt.Fprintf(w, "website cleared on %s\n", repo.Path())
+		} else {
+			fmt.Fprintf(w, "website set on %s\n", repo.Path())
+		}
 	})
 }
 

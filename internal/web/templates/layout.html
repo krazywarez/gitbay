@@ -31,6 +31,7 @@
 <div class="repohead">
 <h1 class="repotitle"><a class="owner" href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a><span class="sep">/</span><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>{{if eq .Repo.Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Repo.Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}{{if .Viewer}}<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/pin" class="inline pinform"><button type="submit" class="pinbtn{{if .Pinned}} pinned{{end}}" title="{{if .Pinned}}unpin from dashboard{{else}}pin to dashboard{{end}}">{{if .Pinned}}★ pinned{{else}}☆ pin{{end}}</button></form>{{end}}</h1>
 {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
+{{if .Repo.Settings.Website}}<p class="meta repowebsite"><a href="{{.Repo.Settings.Website}}" rel="nofollow">{{.Repo.Settings.Website}}</a></p>{{end}}
 {{if .Topics}}<p class="topics">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
 {{range .Mirrors}}<p class="meta mirrorline">{{if eq .Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="mirrorerr">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
 {{end}}<nav class="tabs">

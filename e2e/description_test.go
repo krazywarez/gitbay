@@ -55,6 +55,38 @@ func TestRepoDescriptions(t *testing.T) {
 		}
 	}
 
+	// Website: set, shown in show and on the repo page; bad scheme and
+	// non-admins refused.
+	if _, errOut, code := inst.ssh(t, aliceKey, "",
+		"repo", "settings", "website", "alice/tool", "https://tool.example.org"); code != 0 {
+		t.Fatalf("settings website: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "show", "alice/tool", "--json")
+	if !strings.Contains(out, `"website":"https://tool.example.org"`) {
+		t.Fatalf("website show: %s", out)
+	}
+	if _, body := inst.get(t, "/alice/tool"); !strings.Contains(body, `href="https://tool.example.org"`) {
+		t.Fatalf("website missing on repo page:\n%s", body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "website", "alice/tool", "javascript:alert(1)"); code != 2 {
+		t.Fatalf("bad scheme accepted")
+	}
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "settings", "website", "alice/tool", "https://x.example"); code != 4 {
+		t.Fatalf("non-admin set website: want exit 4")
+	}
+	// Clearing removes it.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "website", "alice/tool", "''"); code != 0 {
+		t.Fatal("website clear failed")
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "show", "alice/tool", "--json")
+	if strings.Contains(out, `"website"`) {
+		t.Fatalf("website not cleared: %s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "",
+		"repo", "settings", "website", "alice/tool", "https://tool.example.org"); code != 0 {
+		t.Fatal("website re-set failed")
+	}
+
 	// Forks inherit the description.
 	if _, errOut, code := inst.ssh(t, bobKey, "", "repo", "fork", "alice/tool"); code != 0 {
 		t.Fatalf("fork: %s", errOut)
