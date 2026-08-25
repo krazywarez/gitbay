@@ -4,6 +4,43 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v0.3.0 — 2026-08-25
+
+- CI: =.gitbay/ci.yml= jobs run as builds claimed by =gitbay-runner=
+  over SSH (admin-only runner protocol; statuses feed =require-checks=).
+  Per-repo secrets set over stdin and injected into build environments;
+  cron schedules (server-local time) and tag-glob triggers, mutually
+  exclusive per job; =build list/show/log/trigger= and a builds tab.
+- Pages: public repos' =pages= branches served on =<owner>.<domain>=
+  (=[pages] domain=), custom domains with DNS TXT ownership challenges
+  and 7-day expiry for pending claims, per-subdomain on-demand ACME.
+- Wikis (=.wiki= companion repos, access mirrors the parent) and teams
+  within orgs (members-role scoping, per-repo team grants).
+- Activity graphs on user and org pages, backfillable
+  (=admin backfill-activity=); commits attributed by verified author
+  email, deduped by sha.
+- MR pages list the commits the MR carries; =mr show= gains a commits
+  section.
+- Per-file history: =?path== on the web log, =--path= on =repo log=,
+  history link on blob pages.
+- Mirror status surfaced in =repo show= and the repo header
+  (admin-only), with sync errors visible; tag-only pushes now schedule
+  mirror syncs.
+- Rendering: GFM tables/strikethrough/autolinks/task lists, blob image
+  previews, raw serves images with real content types (README images
+  render under nosniff), 0BSD license recognition, repo website links,
+  compact dashboard pins.
+- =admin user delete= for accounts that anchor nothing, with named
+  blockers otherwise.
+- Fixes: wiki pages no longer overflow on mobile (iOS font-inflation
+  trigger), GHSA-free deps, secret values pipe correctly through the
+  CLI.
+
+Migrations 0020-0025 apply on start. New config: =[pages] domain=.
+The runner is a new binary (=gitbay-runner=); see the wiki's Admin
+guide for setup. Stress-tested against an import of git.git (82k
+commits): see the wiki's Performance page.
+
 * v0.2.0 — 2026-08-24
 
 - Deploy keys: repo-bound CI keys (=repo deploy-key=), ro/rw, rename- and
