@@ -201,6 +201,12 @@ v1 runs steps directly on the host — no containers — so treat the
 runner machine as executing whatever your users push. Install the
 toolchains your builds need on it.
 
+Instance admin on the runner account only authorizes the claim/report
+protocol; it grants no repo access. A build that pushes back — a pages
+deploy, an archive publish, an automated MR branch — needs an explicit
+grant on that repo: =repo access grant <owner/name> ci write=. Private
+repos likewise need at least read for the clone.
+
 * Pages
 
 =[pages] domain = "example.site"= serves public repos' =pages= branches
