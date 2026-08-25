@@ -328,8 +328,10 @@ so scope them accordingly.
 Schedules: a job with =schedule: "17 11,23 * * *"= (five-field cron,
 server-local time; lists, ranges, and steps supported) runs on its cron
 against the default branch instead of on push. A default-branch push
-registers or updates the schedule. =build trigger <owner/name> <job>=
-queues any job immediately.
+registers or updates the schedule. A job with =tags: "v*"= runs when a
+matching tag is pushed — and only then; =schedule= and =tags= are
+mutually exclusive. =build trigger <owner/name> <job>= queues any job
+immediately.
 
 * Pages
 
