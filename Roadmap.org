@@ -54,8 +54,9 @@ step.
 - [[https://gitbay.org/krz/gitbay/issues/7][#7]] search — done 2026-08-24 (repo search by name/desc/topic,
   per-repo git grep on web+SSH; cross-repo indexer only if ever needed)
 - [[https://gitbay.org/krz/gitbay/issues/20][#20]] milestones and issue templates — done 2026-08-24
-- [[https://gitbay.org/krz/gitbay/issues/30][#30]] activity graph on owner pages (platform-recorded activity
-  signal; events table already covers issues/MRs, extend to commits)
+- [[https://gitbay.org/krz/gitbay/issues/30][#30]] activity graph on owner pages — done 2026-08-25 (commit_activity
+  by verified author email, dedup by sha; 53-week grid on user/org pages;
+  2,643 commits backfilled on gitbay.org)
 - [[https://gitbay.org/krz/gitbay/issues/31][#31]] issue actions from commit messages — done 2026-08-24
   (closes/fixes/resolves #N closes on landing; bare #N leaves a comment)
 
