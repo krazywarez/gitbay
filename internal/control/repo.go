@@ -252,7 +252,14 @@ func runRepoShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	domains, _ := c.Store.ListPageDomains(repo.ID)
+	var domains []string
+	if ds, err := c.Store.ListPageDomains(repo.ID); err == nil {
+		for _, pd := range ds {
+			if pd.Verified() {
+				domains = append(domains, pd.Domain)
+			}
+		}
+	}
 	d := out{repo.Path(), desc, repo.Settings.Website, repo.Visibility, repo.DefaultBranch,
 		repo.Settings.ProtectedBranches, repo.Settings.Archived, topics, domains, nil}
 	// Mirror status is admin-only, like repo mirror list. The token never

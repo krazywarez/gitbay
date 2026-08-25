@@ -1,13 +1,17 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // pagesGet fetches a path with a pages Host header against the instance.
@@ -29,7 +33,57 @@ func (i *instance) pagesGet(t *testing.T, host, path string) (*http.Response, st
 	return resp, string(body)
 }
 
+// fakeDNS answers every TXT query with the string in txt (none when empty),
+// standing in for the challenge record during domain verification.
+func fakeDNS(t *testing.T, txt *atomic.Value) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pc.Close() })
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			n, addr, err := pc.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			q := buf[:n]
+			if len(q) < 12 {
+				continue
+			}
+			i := 12
+			for i < len(q) && q[i] != 0 {
+				i += int(q[i]) + 1
+			}
+			i += 5 // name terminator + qtype + qclass
+			if i > len(q) {
+				continue
+			}
+			val, _ := txt.Load().(string)
+			resp := []byte{q[0], q[1], 0x81, 0x80, 0, 1, 0, 0, 0, 0, 0, 0}
+			if val != "" {
+				resp[7] = 1
+			}
+			resp = append(resp, q[12:i]...)
+			if val != "" {
+				resp = append(resp, 0xC0, 0x0C, 0, 16, 0, 1, 0, 0, 0, 60)
+				rdata := append([]byte{byte(len(val))}, val...)
+				resp = append(resp, byte(len(rdata)>>8), byte(len(rdata)))
+				resp = append(resp, rdata...)
+			}
+			pc.WriteTo(resp, addr)
+		}
+	}()
+	return pc.LocalAddr().String()
+}
+
 func TestPages(t *testing.T) {
+	var challenge atomic.Value
+	challenge.Store("")
+	t.Setenv("GITBAY_DNS_SERVER", fakeDNS(t, &challenge))
+	t.Setenv("GITBAY_DOMAIN_PENDING_TTL", "5s")
 	inst := startInstanceWith(t, "[pages]\ndomain = \"p.test\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -129,8 +183,36 @@ func TestPages(t *testing.T) {
 	if _, _, code := inst.ssh(t, bobKey, "", "repo", "domain", "add", "alice/site", "docs.example.org"); code != 4 {
 		t.Fatal("non-admin claimed a domain")
 	}
-	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "docs.example.org"); code != 0 {
+	out, errOut, code := inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "docs.example.org", "--json")
+	if code != 0 {
 		t.Fatalf("domain add: %s", errOut)
+	}
+	var addEnv struct {
+		Data struct {
+			ChallengeValue string `json:"challenge_value"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &addEnv); err != nil || addEnv.Data.ChallengeValue == "" {
+		t.Fatalf("no challenge in add output: %s", out)
+	}
+	// Pending claims hold the name but serve nothing.
+	if _, body = inst.pagesGet(t, "docs.example.org", "/"); strings.Contains(body, "project site") {
+		t.Fatal("pending claim already serves")
+	}
+	if _, errOut, code = inst.ssh(t, bobKey, "", "repo", "create", "bob/held"); code != 0 {
+		t.Fatalf("bob repo: %s", errOut)
+	}
+	if _, _, code = inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/held", "docs.example.org"); code != 2 {
+		t.Fatal("pending claim did not hold the name")
+	}
+	// Verification: wrong record refused, right record activates.
+	challenge.Store("gitbay-domain-verify=nope")
+	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "domain", "verify", "alice/site", "docs.example.org"); code != 4 {
+		t.Fatal("wrong TXT accepted")
+	}
+	challenge.Store(addEnv.Data.ChallengeValue)
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "domain", "verify", "alice/site", "docs.example.org"); code != 0 {
+		t.Fatalf("verify: %s", errOut)
 	}
 	// The whole path maps into the repo's pages branch, no /<repo>/ prefix.
 	resp, body = inst.pagesGet(t, "docs.example.org", "/")
@@ -161,7 +243,7 @@ func TestPages(t *testing.T) {
 		t.Fatal("private repo got a domain")
 	}
 	// repo show lists it; removal stops serving.
-	out, _, _ := inst.ssh(t, aliceKey, "", "repo", "show", "alice/site")
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "show", "alice/site")
 	if !strings.Contains(out, "pages domains: docs.example.org") {
 		t.Fatalf("repo show missing domains:\n%s", out)
 	}
@@ -172,5 +254,21 @@ func TestPages(t *testing.T) {
 	// site content specifically must be gone.
 	if _, body = inst.pagesGet(t, "docs.example.org", "/"); strings.Contains(body, "project site") {
 		t.Fatal("removed domain still serves")
+	}
+
+	// Expired pending claims free the name; live ones hold it.
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "domain", "add", "alice/site", "exp.example.org"); code != 0 {
+		t.Fatalf("expiry claim: %s", errOut)
+	}
+	if _, _, code = inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/held", "exp.example.org"); code != 2 {
+		t.Fatal("live pending claim did not hold the name")
+	}
+	time.Sleep(5500 * time.Millisecond) // one TTL (GITBAY_DOMAIN_PENDING_TTL=5s) plus slack
+	if _, errOut, code = inst.ssh(t, bobKey, "", "repo", "domain", "add", "bob/held", "exp.example.org"); code != 0 {
+		t.Fatalf("expired claim still held the name: %s", errOut)
+	}
+	// The original claimant's expired claim is gone, not resurrectable.
+	if _, _, code = inst.ssh(t, aliceKey, "", "repo", "domain", "verify", "alice/site", "exp.example.org"); code != 3 {
+		t.Fatal("expired claim still verifiable")
 	}
 }
