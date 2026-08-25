@@ -1,0 +1,225 @@
+#+title: gitbay admin guide
+
+One static binary (=gitbayd=), one SQLite file, bare repositories on
+disk, and the system =git=. Schema migrations run automatically on
+startup and on every admin command.
+
+* Install
+
+Build from source (=go build ./cmd/gitbayd=), install via the vanity
+module path (=go install gitbay.org/gitbay/cmd/gitbayd@latest=), or use
+a release build: =deploy/release.sh <tag>= cross-compiles reproducible
+linux/amd64, linux/arm64, and darwin/arm64 binaries with a SHA256SUMS
+manifest (CGO off, trimpath, stripped — byte-identical per commit and
+toolchain).
+
+#+begin_src sh
+install -m 755 gitbayd /usr/local/bin/
+adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
+install -d -o gitbay -g gitbay -m 750 /var/lib/gitbay
+gitbayd --config /etc/gitbay/config.toml check-config
+#+end_src
+
+=deploy/= in the source tree has a cloud-init file, a hardened systemd
+unit, and a nightly backup timer. Run as the unprivileged =gitbay= user;
+the unit's =AmbientCapabilities=CAP_NET_BIND_SERVICE= covers ports
+22/80/443 without root.
+
+** The SSH port decision
+
+- =ssh.mode = "embedded"= (default): gitbayd itself listens, normally on
+  22 — move the host's admin sshd to another port. Remotes read
+  =git@host:owner/repo= with no port gymnastics.
+- =ssh.mode = "system"=: the host sshd owns 22 and invokes gitbayd via
+  =AuthorizedKeysCommand=:
+  #+begin_example
+  AuthorizedKeysCommand /usr/local/bin/gitbayd --config /etc/gitbay/config.toml authorized-keys %t %k
+  AuthorizedKeysCommandUser gitbay
+  #+end_example
+  sshd requires that binary to be root-owned and not group/world
+  writable. Unknown keys fail authentication inside sshd, so system mode
+  requires =registration.mode = "closed"= (check-config enforces this).
+
+* Configuration reference
+
+=/etc/gitbay/config.toml=. =check-config= validates and names every
+contradiction; =--no-host-checks= skips port/path probes.
+
+** [server]
+- =root= (default =/var/lib/gitbay=) — repositories, database, host
+  keys, ACME cache all live here.
+- =site_url= (required) — canonical =https://host=; drives ACME, clone
+  URLs, mail links.
+
+** [ssh]
+- =mode= — =embedded= | =system= (above).
+- =port= (22) — embedded listener port.
+- =host_keys= — list of private key paths; empty generates an ed25519
+  key at =<root>/ssh/host_ed25519=.
+
+** [http]
+- =addr= (=:443=), =tls= — =acme= | =files= | =off=.
+- =acme=: certificates via TLS-ALPN-01 on the HTTPS port, cached at
+  =<root>/acme=; =acme_email= for the CA account; =acme_http_addr=
+  (=:80=, ="off"= to disable) adds HTTP-01 and an https redirect —
+  failing to bind it is a warning, not fatal. Requires an =https://=
+  site_url with a public DNS name.
+- =files=: =cert_file= + =key_file=.
+- =off=: plain HTTP — development, or behind a TLS-terminating proxy.
+
+** [web]
+- =mode= — =view_only= (default) | =accounts=. In view_only the mutating
+  web routes are never registered; in accounts, browser sessions are
+  minted over SSH (=web login=), and users with write access can create
+  repos, comment, and make simple file edits (which commit unsigned,
+  honestly). =password_auth= is reserved and currently rejected.
+
+** [registration]
+- =mode= — =closed= (default) | =invite= | =open=. invite/open require
+  [mail]. See the user guide for the flows.
+
+** [mail]
+- =smtp_host= (host:port, 587 assumed), =from=, optional =smtp_user= /
+  =smtp_pass=. STARTTLS when offered. Required for invite/open
+  registration and self-service =email add=; in closed mode you may omit
+  it entirely and assert addresses by hand (below).
+
+** [api]
+- =enabled= (false) — the JSON API surface; see [[API]]. Off
+  means no credential-bearing HTTP endpoint exists at all.
+
+** [webhooks]
+- =allow_local= (false) — permit webhook targets on loopback/private
+  addresses. Leave off unless you know why you need it (SSRF).
+
+** [limits]
+- =clone_timeout= (3600s) — cap on =repo import= fetches.
+- =max_blob_bytes= (100MB) — cap on raw file serving over the web.
+- =max_asset_bytes= (512MB) — cap per uploaded release asset.
+- =max_pack_bytes=, =ssh_auth_rate= — reserved, not yet enforced.
+
+** [git_daemon]
+- =enabled= (false), =port= (9418) — the anonymous =git://= listener.
+  Serves only public repositories that additionally ran
+  =repo settings git-daemon <repo> on=.
+
+** [mirrors]
+- =pull_interval_minutes= (15) — how often pull mirrors fetch their
+  upstream. Push mirrors sync shortly after each local ref update.
+  Mirror URLs pass the same SSRF rules as webhook targets.
+
+** [go_import]
+Vanity Go module paths, one per line: ="host/module" = "owner/repo"=.
+Requests with =?go-get=1= at or under the module path answer with the
+go-import meta tag pointing at the repository's HTTPS clone URL, so
+=go install host/module/cmd/...@latest= resolves. The repository should
+be public (the module path itself confirms it exists).
+
+* Users, email, invites
+
+#+begin_src sh
+gitbayd admin user create alice --key alice.pub --email a@example.org --verified [--admin]
+gitbayd admin email verify alice a@example.org   # admin assertion, no SMTP needed
+gitbayd admin invite --email b@example.org       # mails a code; prints it if no SMTP
+#+end_src
+
+"Verified" means SMTP-confirmed or host-admin-asserted; the database
+records which. Verified emails are what make commit signatures
+meaningful — an unverified address never produces a =verified= badge.
+
+* Audit and account control
+
+The audit log is the security feed (events are the product feed): every
+successful mutating command with its argv and source credential (SSH key
+fingerprint or API), registrations, admin actions, force-pushes, and
+auth failures/throttling. Secrets never appear — they travel on stdin,
+never in argv.
+
+#+begin_src sh
+gitbayd admin audit [--limit n]      # host-local
+ssh git@<host> audit [--limit n]     # instance admins, SSH only
+gitbayd admin user disable <name>    # suspend: SSH, web, API all refused;
+gitbayd admin user enable <name>     #   sessions dropped, nothing deleted
+#+end_src
+
+=limits.ssh_auth_rate= (10) throttles per-IP authentication *failures*
+per minute — successful auths never count and clear the slate.
+=limits.max_pack_bytes= is enforced as =receive.maxInputSize= on every
+push.
+
+* Maintenance
+
+#+begin_src sh
+gitbayd admin stats [--json]         # counts, database size, per-repo disk
+gitbayd admin gc [--repo owner/name] # git gc: repack and prune; per-repo sizes
+gitbayd admin gc --aggressive        # thorough repack; slow, rarely needed
+#+end_src
+
+=deploy/cloud-init.yaml= ships a =gitbay-gc.timer= that runs =admin gc=
+weekly (Sunday 07:00 UTC). Imported repositories keep whatever pack
+layout the source sent, so a first manual =admin gc= after a bulk
+import is worthwhile.
+
+* Backup and restore
+
+#+begin_src sh
+gitbayd admin backup --out /var/backups/gitbay/backup.tar.gz
+#+end_src
+
+One archive: a consistent SQLite snapshot (taken *before* the
+repositories are read, so the database never references objects the
+archive missed), every repository, and the SSH host keys. Excluded:
+hook socket, regenerated hook scripts, WAL files. Safe to run against a
+live daemon.
+
+Restore: extract into an empty directory, point =server.root= at it,
+start gitbayd. Host keys are preserved, so clients keep their
+known_hosts entries; hooks regenerate at startup.
+
+* Upgrades
+
+Replace the binary, restart the unit. Migrations apply automatically and
+are transactional; hook scripts under =<root>/hooks= are rewritten at
+startup to point at the current binary path.
+
+* Security
+
+The [[Threat-Model]] file is the reference for what the forge
+trusts and refuses to do. Operational checklist:
+
+- *Software checks.* =deploy/audit.sh= runs =go vet=, =govulncheck=
+  (the module list is deliberately short — review it on each release),
+  and a short fuzz pass over every attacker-facing parser (pkt-line,
+  commit, SSHSIG armor, OpenPGP key, SSH tokenizer). Run it before
+  tagging a release.
+- *Web responses* carry a scripts-forbidden CSP, =X-Frame-Options:
+  DENY=, =nosniff=, =no-referrer=, and HSTS when TLS is on — no
+  configuration needed.
+- *Host sandboxing.* The systemd unit in =deploy/cloud-init.yaml= runs
+  gitbayd unprivileged with =ProtectSystem=strict=, =PrivateDevices=,
+  =LockPersonality=, =MemoryDenyWriteExecute=,
+  =SystemCallFilter=@system-service=, and =RestrictAddressFamilies= to
+  INET/INET6/UNIX. It keeps =CAP_NET_BIND_SERVICE= only, to bind 22/80/443.
+- *OS patches* apply via =unattended-upgrades= (security origins,
+  auto-reboot 04:30 if required).
+- *Admin sshd (2222)* is throttled by =MaxStartups=/=MaxAuthTries= and
+  watched by =fail2ban=; gitbayd's own port 22 is throttled by
+  =limits.ssh_auth_rate= (auth failures per IP per minute).
+- *Monitoring.* =gitbay-monitor.timer= posts disk/service/cert status
+  hourly to the webhook URL in =/etc/gitbay/monitor.url= (create the
+  file to enable; absent = silent). Alerts fire on a stopped service or
+  disk ≥ 85%.
+- *Database.* =gitbay.db= and its WAL live under =/var/lib/gitbay= (mode
+  0750, owned by =gitbay=). The nightly archive plus provider snapshots
+  are the recovery path; for tighter RPO, add continuous replication
+  (litestream) against the same file — it coexists with the WAL.
+
+* Odds and ends
+
+- deleting a fork marks MRs sourced from it =source_gone=; their diffs
+  remain viewable and mergeable because the target repo owns the
+  objects.
+- =refs/merge-requests/*= is server-owned and unpushable by clients.
+- audit-relevant activity (issue/MR lifecycle, imports, pushes) lands in
+  the =events= table, which also feeds webhooks.
+- the daemon idles under 10MB RSS; the smallest VPS tier is adequate.

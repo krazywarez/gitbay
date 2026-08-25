@@ -4,4 +4,10 @@ CLI-first git forge: SSH is the API, the web is a rendering.
 
 - [[Quickstart][Quickstart]] — clone, push, first issue
 - [[FAQ][FAQ]] — common questions from GitHub migrants
-- Full guides live in the repo: [[https://gitbay.org/krz/gitbay/blob/main/docs/users.org][users]], [[https://gitbay.org/krz/gitbay/blob/main/docs/admin.org][admin]], [[https://gitbay.org/krz/gitbay/blob/main/docs/api.org][API]], [[https://gitbay.org/krz/gitbay/blob/main/docs/threat-model.org][threat model]]
+- [[Users][User guide]] — accounts, keys, verified commits, repos, issues, MRs
+- [[Admin][Admin guide]] — install, configuration reference, backup, security
+- [[API][API and webhooks]] — the JSON API contract, tokens, payloads
+- [[Roadmap][Roadmap]] — status, phases, decisions, what is not planned
+- [[Threat-Model][Threat model]] — what the forge trusts and never does
+
+This wiki is a git repository: =git clone ssh://git@gitbay.org/krz/gitbay.wiki.git=
