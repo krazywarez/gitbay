@@ -210,6 +210,11 @@ owners that exist). The domain must not be the site host or a parent of
 it — pages content runs its own scripts and must stay off the forge's
 origin.
 
+Users with repo admin claim custom domains with =repo domain add=; ACME
+issues certificates only for claimed hosts, so stray DNS pointed at the
+server gets nothing. Claims are unverified in v1 — fine while
+registration is closed; add DNS TXT verification before opening it.
+
 * Security
 
 The [[Threat-Model]] file is the reference for what the forge

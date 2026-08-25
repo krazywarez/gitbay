@@ -329,6 +329,13 @@ build and push the branch for automatic deploys. Sites run on a
 separate origin — your scripts work, and the forge's cookies are out of
 reach.
 
+A repo can also serve its pages branch on a domain you own:
+=gitbay repo domain add <owner/name> <domain>=, then point the domain's
+A/AAAA records at the instance (DNS-only if the domain sits behind a
+proxying provider — the instance issues its own certificates). Claims
+are exclusive per instance; =repo domain list= and =repo show= report
+them.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you: someone
