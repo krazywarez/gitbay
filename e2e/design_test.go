@@ -55,12 +55,13 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	}
 	// Explore rows carry topics, license, and updated date.
 	inst.ssh(t, aliceKey, "", "repo", "topics", "add", "alice/site", "web")
-	os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("Permission to use, copy, modify, and/or distribute this software...\n"), 0o644)
+	// Bare 0BSD grant (no notice-retention clause), wrapped mid-sentence.
+	os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("Permission to use, copy, modify,\nand/or distribute this software for any\npurpose with or without fee is hereby granted.\n"), 0o644)
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "license")
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
 	_, body = inst.get(t, "/explore")
-	for _, want := range []string{`href="/explore?q=web"`, "ISC", "updated 20"} {
+	for _, want := range []string{`href="/explore?q=web"`, "0BSD", "updated 20"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("explore row missing %q", want)
 		}

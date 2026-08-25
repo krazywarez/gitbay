@@ -23,7 +23,12 @@ var licenseChecks = []struct{ marker, name string }{
 	{"BSD 3-Clause", "BSD-3-Clause"},
 	{"BSD 2-Clause", "BSD-2-Clause"},
 	{"Redistribution and use in source and binary forms", "BSD"},
-	{"Permission to use, copy, modify, and/or distribute", "ISC"},
+	{"BSD Zero Clause License", "0BSD"},
+	{"Zero Clause BSD", "0BSD"},
+	// ISC is the 0BSD grant plus the notice-retention clause; match on the
+	// clause so title-less 0BSD files don't read as ISC.
+	{"hereby granted, provided that the above copyright notice", "ISC"},
+	{"Permission to use, copy, modify, and/or distribute", "0BSD"},
 	{"This is free and unencumbered software", "Unlicense"},
 	{"CC0", "CC0"},
 }
@@ -36,7 +41,8 @@ func detectLicense(dir, ref string) string {
 		if err != nil {
 			continue
 		}
-		text := string(raw)
+		// Collapse whitespace so markers match across line wraps.
+		text := strings.Join(strings.Fields(string(raw)), " ")
 		for _, c := range licenseChecks {
 			if strings.Contains(text, c.marker) {
 				return c.name
