@@ -23,7 +23,7 @@ func init() {
 	register(Command{Path: []string{"pgp", "remove"},
 		Summary: "remove an OpenPGP key by fingerprint", Run: runPGPRemove})
 	register(Command{Path: []string{"repo", "log"},
-		Summary: "commit log with signature states: repo log <owner/name> [--limit n]", ReadOnly: true, Run: runRepoLog})
+		Summary: "commit log with signature states: repo log <owner/name> [--limit n] [--path <file>]", ReadOnly: true, Run: runRepoLog})
 }
 
 func runPGPAdd(c *Ctx, args []string) int {
@@ -119,7 +119,7 @@ func VerifyCommitCached(st *store.Store, repo store.Repo, parsed *sig.Commit, sh
 
 func runRepoLog(c *Ctx, args []string) int {
 	limit := 30
-	var path string
+	var path, filePath string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--limit":
@@ -132,22 +132,34 @@ func runRepoLog(c *Ctx, args []string) int {
 			}
 			limit = n
 			i++
+		case "--path":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--path requires a value")
+			}
+			filePath = args[i+1]
+			i++
 		default:
 			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n]")
+				return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n] [--path <file>]")
 			}
 			path = args[i]
 		}
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n]")
+		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n] [--path <file>]")
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
-	shas, err := gitutil.RevList(dir, repo.DefaultBranch, limit)
+	var shas []string
+	var err error
+	if filePath != "" {
+		shas, err = gitutil.RevListPath(dir, repo.DefaultBranch, filePath, limit)
+	} else {
+		shas, err = gitutil.RevList(dir, repo.DefaultBranch, limit)
+	}
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "reading log: %v", err)
 	}

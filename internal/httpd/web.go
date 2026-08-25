@@ -1076,7 +1076,18 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Tab = "log"
 	const pageSize = 50
-	shas, err := gitutil.RevList(p.Dir, p.Ref, pageSize+1)
+	// ?path= filters to commits touching one file or directory.
+	filePath := strings.Trim(path.Clean("/"+r.URL.Query().Get("path")), "/")
+	if filePath == "." {
+		filePath = ""
+	}
+	var shas []string
+	var err error
+	if filePath != "" {
+		shas, err = gitutil.RevListPath(p.Dir, p.Ref, filePath, pageSize+1)
+	} else {
+		shas, err = gitutil.RevList(p.Dir, p.Ref, pageSize+1)
+	}
 	if err != nil {
 		s.notFound(w, r)
 		return
@@ -1104,9 +1115,10 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "log.html", struct {
 		repoPage
-		Commits []row
-		NextSHA string
-	}{p, rows, next})
+		Commits  []row
+		NextSHA  string
+		FilePath string
+	}{p, rows, next, filePath})
 }
 
 func (s *Server) commit(w http.ResponseWriter, r *http.Request) {

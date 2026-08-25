@@ -100,6 +100,25 @@ func RevList(dir, ref string, limit int) ([]string, error) {
 	return shas, nil
 }
 
+// RevListPath returns up to limit commit SHAs reachable from ref that
+// touch filePath, newest first. The "--" keeps the path from ever being
+// read as an option or ref.
+func RevListPath(dir, ref, filePath string, limit int) ([]string, error) {
+	cmd := exec.Command("git", "-C", dir, "rev-list",
+		fmt.Sprintf("--max-count=%d", limit), ref, "--", filePath)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("rev-list %s -- %s: %w", ref, filePath, err)
+	}
+	var shas []string
+	for _, l := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if l != "" {
+			shas = append(shas, l)
+		}
+	}
+	return shas, nil
+}
+
 // PeelToCommit resolves a ref or object to its commit — annotated tags
 // peel to the commit they point at.
 func PeelToCommit(dir, ref string) (string, error) {

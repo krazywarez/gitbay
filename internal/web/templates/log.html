@@ -1,6 +1,7 @@
 {{define "title"}}log · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{template "repoheader" .}}
+{{if .FilePath}}<p class="meta">history of <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.FilePath}}"><code>{{.FilePath}}</code></a> · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">full log</a></p>{{end}}
 <ul class="loglist">
 {{range .Commits}}<li>
   <div class="commitmain">
@@ -12,7 +13,7 @@
     <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code>
   </div>
 </li>
-{{else}}<li class="empty">no commits on {{.Ref}} yet</li>{{end}}
+{{else}}<li class="empty">{{if .FilePath}}nothing touches <code>{{.FilePath}}</code> on {{.Ref}}{{else}}no commits on {{.Ref}} yet{{end}}</li>{{end}}
 </ul>
-{{if .NextSHA}}<p class="pager"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.NextSHA}}">older →</a></p>{{end}}
+{{if .NextSHA}}<p class="pager"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.NextSHA}}{{if .FilePath}}?path={{.FilePath}}{{end}}">older →</a></p>{{end}}
 {{end}}

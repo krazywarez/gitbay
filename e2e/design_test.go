@@ -59,6 +59,26 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	if !strings.Contains(body, `class="refmenu"`) || !strings.Contains(body, ">all refs") {
 		t.Error("branch dropdown missing")
 	}
+	// Per-file history: ?path= filters the log; blob pages link to it.
+	os.WriteFile(filepath.Join(dir, "docs", "notes.txt"), []byte("n\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "touch only the notes")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	if _, body := inst.get(t, "/alice/site/log?path=docs/notes.txt"); !strings.Contains(body, "touch only the notes") ||
+		strings.Contains(body, ">base<") || !strings.Contains(body, "history of") {
+		t.Fatalf("per-file log wrong:\n%s", body)
+	}
+	if _, body := inst.get(t, "/alice/site/log?path=no/such/file"); !strings.Contains(body, "nothing touches") {
+		t.Fatalf("empty per-file log:\n%s", body)
+	}
+	if _, body := inst.get(t, "/alice/site/blob/main/docs/guide.md"); !strings.Contains(body, `log/main?path=docs%2fguide.md">history</a>`) {
+		t.Fatalf("blob history link missing:\n%s", body)
+	}
+	// CLI parity: repo log --path.
+	logOut, _, _ := inst.ssh(t, aliceKey, "", "repo", "log", "alice/site", "--path", "docs/notes.txt", "--json")
+	if !strings.Contains(logOut, "touch only the notes") || strings.Contains(logOut, `"subject":"base"`) {
+		t.Fatalf("repo log --path wrong:\n%s", logOut)
+	}
 	// Raw serves images with their real type (nosniff otherwise blocks
 	// <img>); everything else stays inert text/plain.
 	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/alice/site/raw/main/img/logo.png", inst.httpPort))
