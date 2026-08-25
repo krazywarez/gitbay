@@ -23,6 +23,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/niklasfasching/go-org/org"
 	"github.com/yuin/goldmark"
+	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/extension"
 
 	"gitbay.org/gitbay/internal/autolink"
@@ -765,7 +766,7 @@ var chromaCSS = func() []byte {
 	chromaFormatter.WriteCSS(&buf, styles.Get("friendly"))
 	buf.WriteString("\n@media (prefers-color-scheme: dark) {\n")
 	chromaFormatter.WriteCSS(&buf, styles.Get("github-dark"))
-	buf.WriteString("}\n.chroma, .bg { background: var(--code-bg) !important; }\n")
+	buf.WriteString("}\n.chroma, .bg { background: transparent !important; }\n")
 	return buf.Bytes()
 }()
 
@@ -828,8 +829,30 @@ func pickReadme(entries []gitutil.TreeEntry) string {
 }
 
 // markdown is the shared renderer: GFM (tables, strikethrough, autolinks,
-// task lists) on top of CommonMark. Raw HTML is still dropped.
-var markdown = goldmark.New(goldmark.WithExtensions(extension.GFM))
+// task lists) on top of CommonMark, with class-based fence highlighting
+// (the palette lives in the stylesheet, per scheme). Raw HTML is still
+// dropped.
+var markdown = goldmark.New(goldmark.WithExtensions(extension.GFM,
+	highlighting.NewHighlighting(highlighting.WithFormatOptions(html.WithClasses(true)))))
+
+// fenceHighlight renders one code block with chroma classes, for org and
+// anything else outside goldmark. Unknown languages fall back to plain.
+func fenceHighlight(source, lang string) string {
+	lexer := lexers.Get(lang)
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	iterator, err := lexer.Tokenise(nil, source)
+	if err != nil {
+		return "<pre>" + template.HTMLEscapeString(source) + "</pre>"
+	}
+	var buf bytes.Buffer
+	f := html.New(html.WithClasses(true))
+	if err := f.Format(&buf, styles.Get("friendly"), iterator); err != nil {
+		return "<pre>" + template.HTMLEscapeString(source) + "</pre>"
+	}
+	return buf.String()
+}
 
 // mdHTML renders user-authored markdown (issue and MR bodies, comments).
 // goldmark's default renderer drops raw HTML, so this is safe as-is.
@@ -921,8 +944,16 @@ func renderComments(cs []store.IssueComment, md func(string) template.HTML) []re
 
 // ugcPolicy sanitizes rendered repo content before it enters the forge's
 // origin: markdown is already safe (goldmark drops raw HTML), but org-mode
-// output and repo-authored HTML are not.
-var ugcPolicy = bluemonday.UGCPolicy()
+// output and repo-authored HTML are not. Chroma's highlighting classes
+// must survive; the pattern admits only short token codes, not the site's
+// own class names.
+var ugcPolicy = func() *bluemonday.Policy {
+	p := bluemonday.UGCPolicy()
+	p.AllowAttrs("class").
+		Matching(regexp.MustCompile(`^(chroma|[a-z0-9]{1,3})( (chroma|[a-z0-9]{1,3}))*$`)).
+		OnElements("span", "pre", "code", "div")
+	return p
+}()
 
 // renderReadme renders a README by extension: markdown, org-mode, and
 // (sanitized) HTML richly; everything else as escaped plaintext.
@@ -942,11 +973,18 @@ func renderReadme(name string, raw []byte) template.HTML {
 		return template.HTML(buf.String())
 	case ".org":
 		doc := org.New().Parse(bytes.NewReader(raw), name)
-		html, err := doc.Write(org.NewHTMLWriter())
+		writer := org.NewHTMLWriter()
+		writer.HighlightCodeBlock = func(source, lang string, inline bool, params map[string]string) string {
+			if inline {
+				return "<code>" + template.HTMLEscapeString(source) + "</code>"
+			}
+			return fenceHighlight(source, lang)
+		}
+		out, err := doc.Write(writer)
 		if err != nil {
 			return plain()
 		}
-		return template.HTML(ugcPolicy.Sanitize(html))
+		return template.HTML(ugcPolicy.Sanitize(out))
 	case ".html", ".htm":
 		return template.HTML(ugcPolicy.Sanitize(string(raw)))
 	default:

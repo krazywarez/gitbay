@@ -457,9 +457,9 @@ button.linklike:hover { text-decoration: underline; filter: none; }
   margin-top: var(--sp-4);
   overflow-x: auto;
 }
-/* chroma emits inline styles for a light background; pin code blocks to
-   light colors in both schemes so unstyled tokens stay legible. */
-.code { background: #f8f8f8; color: #1a1a1a; padding: var(--sp-3) var(--sp-4); color-scheme: light; }
+/* Highlighting is class-based with a palette per scheme, so code blocks
+   follow the site's own colors. */
+.code { background: var(--code-bg); color: var(--fg); padding: var(--sp-3) var(--sp-4); }
 .code pre { margin: 0; background: transparent !important; }
 @media (prefers-color-scheme: dark) {
   .code { border-color: var(--line); }

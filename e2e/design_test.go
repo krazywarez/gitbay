@@ -28,7 +28,8 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		"# site\n\n[guide](docs/guide.md) and [export](docs/paper.html) and "+
 			"[abs](https://example.org/x) here\n\n![logo](img/logo.png)\n"+
 			"![ext](https://example.org/pic.png)\n\n"+
-			"| flag | effect |\n|------|--------|\n| `-v` | verbose |\n"), 0o644)
+			"| flag | effect |\n|------|--------|\n| `-v` | verbose |\n\n"+
+			"```go\nfunc main() {}\n```\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "docs", "guide.md"), []byte("# guide\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "docs", "paper.org"), []byte("* paper\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "img", "logo.png"), []byte{0x89, 0x50}, 0o644)
@@ -48,6 +49,7 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		`src="https://example.org/pic.png"`,            // remote image untouched
 		`href="https://example.org/x"`,                 // absolute untouched
 		"<table>", "<td>verbose</td>",                  // GFM table renders
+		`<span class="kd">func</span>`, // fenced code highlighted via classes
 		`href="/alice/site/blob/main/README.md">README.md</a>`, // clickable card header
 		`<th>name</th>`, // file table column headers
 	} {
@@ -108,7 +110,7 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		t.Errorf("highlighting not class-based:\n%.2000s", body)
 	}
 	if _, css := inst.get(t, "/static/style.css"); strings.Count(css, "/* Background */") < 2 ||
-		!strings.Contains(css, ".chroma, .bg { background: var(--code-bg)") {
+		!strings.Contains(css, ".chroma, .bg { background: transparent") {
 		t.Error("stylesheet missing dual syntax palettes")
 	}
 	// Explore rows carry topics, license, and updated date.
