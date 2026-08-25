@@ -340,6 +340,22 @@ func runRunnerDone(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+args[1],
 		fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+	// A red build mails the repo's notify targets with the log tail — a
+	// failed scheduled job must not wait to be noticed.
+	if args[1] == "failure" {
+		if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
+			tail := ""
+			if log, err := c.Store.BuildLog(id); err == nil && len(log) > 0 {
+				if len(log) > 2000 {
+					log = log[len(log)-2000:]
+				}
+				tail = string(log)
+			}
+			notifyUsers(c, targets,
+				fmt.Sprintf("[%s] build %d failed: %s on %s", repo.Path(), b.Number, b.Job, b.Ref),
+				fmt.Sprintf("job %s failed at %.10s.\n\n…%s\n\n%s\n", b.Job, b.SHA, tail, url))
+		}
+	}
 	return c.emit(map[string]any{"build": b.Number, "status": args[1]}, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d %s\n", b.Number, args[1])
 	})

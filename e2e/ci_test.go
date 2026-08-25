@@ -38,6 +38,49 @@ func (i *instance) runnerOnce(t *testing.T, key string) string {
 	return string(out)
 }
 
+// A failed build mails the repo owner with the log tail; green builds
+// stay silent.
+func TestBuildFailureMail(t *testing.T) {
+	smtp := startFakeSMTP(t)
+	inst := startInstanceWith(t, fmt.Sprintf(
+		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))
+	inst.runner = buildRunner(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",
+		"--email", "alice@example.test", "--verified")
+	runnerKey := inst.newKey(t, "ci")
+	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  ok:\n    steps:\n      - echo fine\n  broken:\n    steps:\n      - echo the dataset went stale && false\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	inst.runnerOnce(t, runnerKey) // broken (sorts first)
+	inst.runnerOnce(t, runnerKey) // ok
+	mail := smtp.waitFor(t, "alice@example.test", "failed")
+	if !strings.Contains(mail, "broken") || !strings.Contains(mail, "the dataset went stale") ||
+		!strings.Contains(mail, "/alice/app/builds/") {
+		t.Fatalf("failure mail missing detail:\n%s", mail)
+	}
+	// Only the failure mailed: no message mentions the green job.
+	for _, m := range smtp.mailTo("alice@example.test") {
+		if strings.Contains(m, "build") && strings.Contains(m, " ok ") && strings.Contains(m, "failed") == false {
+			t.Fatalf("green build mailed:\n%s", m)
+		}
+	}
+}
+
 func TestCI(t *testing.T) {
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
