@@ -106,6 +106,13 @@ func TestCLI(t *testing.T) {
 
 	// Repo create + clone through the CLI.
 	c.must(t, "", "", "repo", "create", "alice/proj")
+
+	// Secret values travel on stdin through the CLI (piped, no flag).
+	c.must(t, "", "hunter2\n", "repo", "secret", "set", "alice/proj", "TOKEN")
+	if out := c.must(t, "", "", "repo", "secret", "list", "alice/proj"); !strings.Contains(out, "TOKEN") || strings.Contains(out, "hunter2") {
+		t.Fatalf("secret list via CLI: %s", out)
+	}
+
 	work := t.TempDir()
 	c.must(t, work, "", "repo", "clone", "alice/proj")
 	dir := filepath.Join(work, "proj")

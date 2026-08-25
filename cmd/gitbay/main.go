@@ -260,7 +260,7 @@ func repoCmd() *cobra.Command {
 			pass("sync", "schedule an immediate sync", passOpts{server: []string{"repo", "mirror", "sync"}, needsRepo: true}),
 		),
 		group("secret", "build secrets (values on stdin, injected into build env)",
-			pass("set", "set a secret: <NAME> (value on stdin)", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, stdinOK: true}),
+			pass("set", "set a secret: <NAME> (value on stdin)", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true}),
 			pass("list", "list secret names", passOpts{server: []string{"repo", "secret", "list"}, needsRepo: true}),
 			pass("remove", "remove a secret: <NAME>", passOpts{server: []string{"repo", "secret", "remove"}, needsRepo: true}),
 		),
