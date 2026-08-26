@@ -37,9 +37,9 @@ web dispatcher refuses =SSHOnly= commands outright.
 | create              | yes     | yes |
 | comment             | yes     | yes |
 | edit title and body | yes     | yes |
-| close and reopen    | yes     | no  |
-| labels, assignees   | yes     | no  |
-| milestone           | yes     | no  |
+| close and reopen    | yes     | yes |
+| labels, assignees   | yes     | yes |
+| milestone           | yes     | yes |
 
 * Repositories
 
@@ -49,12 +49,16 @@ web dispatcher refuses =SSHOnly= commands outright.
 | create                    | yes     | yes |
 | edit a file               | yes     | yes |
 | pin                       | yes     | yes |
-| settings, protection      | yes     | no  |
-| topics, website           | yes     | no  |
+| settings, protection      | yes     | yes |
+| topics, website           | yes     | yes |
+| visibility                | yes     | yes |
+| archive                   | yes     | yes |
+| delete, transfer          | yes     | no  |
 | releases, builds          | read    | read|
 
 * SSH only, by design
 
 Build secrets, mirror configuration and tokens, custom domain claims,
 API token minting, web session minting, deploy keys, account and
-instance administration.
+instance administration. Deleting or transferring a repository is also
+CLI-only: both want a typed confirmation, not a button.
