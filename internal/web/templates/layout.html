@@ -43,7 +43,7 @@
     {{if .Viewer}}<li><a {{if eq (str . "Tab") "account"}}aria-current="page" {{end}}href="/settings">Settings</a></li>{{end}}
   </ul>
   <div class="railfoot">
-    {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar">{{initial .Viewer}}</span>{{.Viewer}}</a>
+    {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar">{{initial .Viewer}}</span><span class="uname">{{.Viewer}}</span></a>
     <form method="post" action="/logout"><button type="submit" class="linklike">Log out</button></form>
     {{else}}<a href="/login">Sign in</a>{{end}}
   </div>

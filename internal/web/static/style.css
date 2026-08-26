@@ -279,8 +279,10 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
 }
 .railfoot a { color: var(--shell-fg); }
 a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
-/* the square is a graphic, not text: the link's hover underline stops at it */
-a.railuser:hover .avatar { text-decoration: none; }
+/* a descendant cannot cancel an ancestor's underline, so the link carries
+   none and the name draws its own — the avatar square stays undecorated */
+a.railuser:hover { text-decoration: none; }
+a.railuser:hover .uname { text-decoration: underline; }
 .railfoot .railsettings { color: var(--shell-muted); display: inline-flex; }
 .railfoot .railsettings:hover { color: var(--shell-fg); }
 .railfoot form { margin-left: auto; }
@@ -494,7 +496,7 @@ table.tree td, table.refs td {
 }
 table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: none; }
 table.tree tr:hover td, table.refs tr:hover td { background: var(--hover); }
-table.tree tr.cols th {
+tr.cols th {
   text-align: left;
   font-weight: 500;
   font-size: var(--fs-1);
@@ -503,10 +505,10 @@ table.tree tr.cols th {
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
-table.tree tr.cols:hover th { background: var(--bg); }
+tr.cols:hover th { background: var(--bg); }
 /* right-aligned columns keep their header with their values; this needs to
    outrank the tr.cols th rule above, which is why it names both */
-table.tree tr.cols th.age, table.tree tr.cols th.size { text-align: right; }
+tr.cols th.age, tr.cols th.size { text-align: right; }
 table.tree th.size { text-align: right; }
 table.tree td.name { width: 100%; }
 table.tree td.name a { color: var(--fg); }
@@ -825,6 +827,9 @@ form.logfilter input { flex: 1; min-width: 12rem; max-width: 28rem; }
 
 /* account settings */
 table.keys td { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }
+/* these tables sit flush with the page text, so the header row drops the
+   left padding the card-style listings use */
+table.keys tr.cols th { padding-left: 0; background: transparent; }
 table.keys td.mono, .mono { font-family: var(--mono); font-size: var(--fs-1); overflow-wrap: anywhere; }
 table.keys td.act { text-align: right; }
 ul.plain { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
