@@ -1,6 +1,11 @@
 {{define "title"}}builds · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>Builds</h1>
+<details class="editbox"><summary>Status badge</summary>
+<p class="meta">Paste into a README; it shows the newest build's state.</p>
+<pre class="code">[![build](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/badge/build.svg)](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds)</pre>
+<p class="meta">Add <code>?job=name</code> for one job.</p>
+</details>
 <ul class="loglist">
 {{range .Builds}}<li>
   <div class="commitmain">

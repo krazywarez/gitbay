@@ -13,6 +13,7 @@ type EntryCommit struct {
 	SHA     string
 	Subject string
 	Author  string
+	Email   string
 	When    time.Time
 }
 
@@ -44,7 +45,7 @@ func LastCommits(dir, ref, path string, names []string) map[string]EntryCommit {
 	}
 
 	args := []string{"-C", dir, "log", "--first-parent", "--name-only",
-		"--format=%x1e%H%x1f%ct%x1f%an%x1f%s", "-n", strconv.Itoa(lastCommitScan), ref}
+		"--format=%x1e%H%x1f%ct%x1f%an%x1f%ae%x1f%s", "-n", strconv.Itoa(lastCommitScan), ref}
 	if prefix != "" {
 		args = append(args, "--", strings.TrimSuffix(prefix, "/"))
 	}
@@ -89,14 +90,14 @@ func LastCommits(dir, ref, path string, names []string) map[string]EntryCommit {
 	return out
 }
 
-// parseCommitHeader reads sha, commit time, author, and subject, unit
-// separated so a subject containing spaces stays intact.
+// parseCommitHeader reads sha, commit time, author name and address, and
+// subject, unit separated so a subject containing spaces stays intact.
 func parseCommitHeader(s string) EntryCommit {
-	f := strings.SplitN(s, "\x1f", 4)
-	if len(f) != 4 {
+	f := strings.SplitN(s, "\x1f", 5)
+	if len(f) != 5 {
 		return EntryCommit{}
 	}
-	c := EntryCommit{SHA: f[0], Author: f[2], Subject: f[3]}
+	c := EntryCommit{SHA: f[0], Author: f[2], Email: f[3], Subject: f[4]}
 	if n, err := strconv.ParseInt(f[1], 10, 64); err == nil {
 		c.When = time.Unix(n, 0).UTC()
 	}
@@ -107,7 +108,7 @@ func parseCommitHeader(s string) EntryCommit {
 // answers "who touched this repository last".
 func TipCommit(dir, ref string) EntryCommit {
 	out, err := exec.Command("git", "-C", dir, "log", "-1",
-		"--format=%H%x1f%ct%x1f%an%x1f%s", ref).Output()
+		"--format=%H%x1f%ct%x1f%an%x1f%ae%x1f%s", ref).Output()
 	if err != nil {
 		return EntryCommit{}
 	}

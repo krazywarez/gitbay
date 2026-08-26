@@ -326,6 +326,9 @@ nav.tabs {
   gap: var(--sp-1);
   margin-top: var(--sp-4);
   overflow-x: auto;
+  /* with overflow-y left visible the browser computes it to auto, which
+     is a vertical drag on touch; the strip scrolls sideways only. */
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 nav.tabs::-webkit-scrollbar { display: none; }

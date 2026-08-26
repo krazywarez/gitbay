@@ -149,3 +149,69 @@ func (s *Store) OpenCounts(repoID int64) (issues, mrs int) {
 		repoID).Scan(&mrs)
 	return
 }
+
+// AssignedIssues returns open issues assigned to the user, wherever they
+// live. Assignment is a direct request for someone's attention, so it is
+// not narrowed by the involvement rule the other lists use.
+func (s *Store) AssignedIssues(userID int64) ([]DashboardItem, error) {
+	return s.dashboardQuery(`
+		SELECT COALESCE(u.username, o.name) || '/' || r.name,
+		       x.number, x.title, au.username, x.state, x.updated_at
+		FROM issues x
+		JOIN repos r ON r.id = x.repo_id
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		JOIN users au ON au.id = x.author_id
+		WHERE x.state = 'open'
+		  AND EXISTS (SELECT 1 FROM issue_assignees ia
+		              WHERE ia.issue_id = x.id AND ia.user_id = ?1)
+		ORDER BY x.updated_at DESC LIMIT 20`, userID)
+}
+
+// FeedEvent is one line of the dashboard's activity feed.
+type FeedEvent struct {
+	RepoPath  string
+	Actor     string
+	Kind      string
+	Data      string
+	CreatedAt string
+}
+
+// RecentEvents returns activity on repositories the user can reach. Push
+// events are excluded: they repeat what the commit lists already show.
+func (s *Store) RecentEvents(userID int64, limit int) ([]FeedEvent, error) {
+	rows, err := s.DB.Query(`
+		SELECT COALESCE(u.username, o.name) || '/' || r.name,
+		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
+		FROM events e
+		JOIN repos r ON r.id = e.repo_id
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		LEFT JOIN users ac ON ac.id = e.actor_id
+		WHERE e.kind <> 'push' AND (
+		  (r.owner_kind = 'user' AND r.owner_id = ?1)
+		  OR EXISTS (SELECT 1 FROM repo_access a
+		             WHERE a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?1)
+		  OR EXISTS (SELECT 1 FROM org_members mm
+		             JOIN orgs oo ON oo.id = mm.org_id
+		             WHERE r.owner_kind = 'org' AND mm.org_id = r.owner_id AND mm.user_id = ?1
+		               AND (mm.role = 'admin' OR oo.members_role <> 'none'))
+		  OR EXISTS (SELECT 1 FROM team_repos tr
+		             JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?1
+		             WHERE tr.repo_id = r.id)
+		)
+		ORDER BY e.id DESC LIMIT ?2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FeedEvent
+	for rows.Next() {
+		var e FeedEvent
+		if err := rows.Scan(&e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

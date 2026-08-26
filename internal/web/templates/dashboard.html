@@ -1,33 +1,46 @@
 {{define "title"}}dashboard · {{.Site}}{{end}}
-{{define "content"}}
-<div class="headrow">
-<h1>Dashboard</h1>
-<span class="spacer"></span>
-<p class="toolbar">logged in as <a href="/{{.Viewer}}">{{.Viewer}}</a></p>
-</div>
-{{if .Pinned}}<h2>Pinned</h2>
-<ul class="pinlist">
-{{range .Pinned}}<li><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</li>
+{{define "itemlist"}}
+<ul class="issuelist">
+{{range .Items}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{.RepoPath}}/{{$.Kind}}/{{.Number}}">{{.Title}}</a></p>
+    <p class="meta">{{.RepoPath}}{{if eq $.Kind "mrs"}}!{{else}}#{{end}}{{.Number}} · <a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
+  </div>
+</li>
+{{else}}<li class="empty">{{$.Empty}}</li>{{end}}
+</ul>
 {{end}}
-</ul>{{end}}
+{{define "content"}}
+<h1>Dashboard</h1>
+
+<div class="withaside">
+<div class="mainside">
+
+<h2>Waiting on your review <span class="count">{{len .Reviews}}</span></h2>
+{{template "itemlist" dict "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}
+
+<h2>Assigned to you <span class="count">{{len .Assigned}}</span></h2>
+{{template "itemlist" dict "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}
+
 <h2>Open merge requests <span class="count">{{len .MRs}}</span></h2>
-<ul class="issuelist">
-{{range .MRs}}<li>
-  <div class="issuemain">
-    <p class="title"><a href="/{{.RepoPath}}/mrs/{{.Number}}">{{.RepoPath}}!{{.Number}} {{.Title}}</a></p>
-    <p class="meta"><a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
-  </div>
-</li>
-{{else}}<li class="empty">no open merge requests</li>{{end}}
-</ul>
+{{template "itemlist" dict "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests"}}
+
 <h2>Open issues <span class="count">{{len .Issues}}</span></h2>
-<ul class="issuelist">
-{{range .Issues}}<li>
-  <div class="issuemain">
-    <p class="title"><a href="/{{.RepoPath}}/issues/{{.Number}}">{{.RepoPath}}#{{.Number}} {{.Title}}</a></p>
-    <p class="meta"><a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}</p>
+{{template "itemlist" dict "Items" .Issues "Kind" "issues" "Empty" "No open issues"}}
+
+</div>
+
+<aside class="aside">
+  <div class="grp">
+    <h2>Pinned</h2>
+    {{range .Pinned}}<p class="row"><a href="/{{.OwnerName}}/{{.Name}}"><span class="owner">{{.OwnerName}}/</span>{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip">Private</span>{{end}}</p>
+    {{else}}<p class="none">Pin a repository to keep it here</p>{{end}}
   </div>
-</li>
-{{else}}<li class="empty">no open issues</li>{{end}}
-</ul>
+  <div class="grp">
+    <h2>Recent activity</h2>
+    {{range .Feed}}<p class="row feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}">{{.Ref}}</a><br><span class="none">{{.Repo}} · {{when .When}}</span></p>
+    {{else}}<p class="none">No activity yet</p>{{end}}
+  </div>
+</aside>
+</div>
 {{end}}

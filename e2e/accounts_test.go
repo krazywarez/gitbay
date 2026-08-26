@@ -87,7 +87,9 @@ func TestWebAccounts(t *testing.T) {
 
 	browser := newBrowser(t)
 	status, body := browserGet(t, browser, inst.base()+loginPath)
-	if status != 200 || !strings.Contains(body, `logged in as <a href="/alice">alice</a>`) {
+	// The rail's footer carries the signed-in account now.
+	if status != 200 || !strings.Contains(body, ">Dashboard</h1>") ||
+		!strings.Contains(body, `class="railuser" href="/alice"`) {
 		t.Fatalf("login redirect landed wrong: %d\n%s", status, body)
 	}
 

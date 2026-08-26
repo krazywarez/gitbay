@@ -18,6 +18,20 @@ func (s *Store) UserIDByVerifiedEmail(address string) (int64, bool) {
 	return id, true
 }
 
+// UsernameByVerifiedEmail resolves a commit author address to the account
+// that has proven it, so the forge can show its own name for a person
+// rather than whatever git config happened to be set.
+func (s *Store) UsernameByVerifiedEmail(address string) (string, bool) {
+	var name string
+	err := s.DB.QueryRow(`
+		SELECT u.username FROM emails e JOIN users u ON u.id = e.user_id
+		WHERE e.address = ? AND e.verified_at IS NOT NULL`, address).Scan(&name)
+	if err != nil {
+		return "", false
+	}
+	return name, true
+}
+
 // RecordCommitActivity is idempotent per (repo, sha); it reports whether
 // this call recorded a new row.
 func (s *Store) RecordCommitActivity(repoID int64, sha string, userID int64, day string) bool {

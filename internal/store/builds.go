@@ -147,3 +147,20 @@ func (s *Store) BuildLog(id int64) ([]byte, error) {
 	}
 	return log, err
 }
+
+// LatestBuild returns the newest build for a repo, optionally narrowed to
+// one job. It is what a status badge reports.
+func (s *Store) LatestBuild(repoID int64, job string) (Build, error) {
+	q := buildSelect + " WHERE repo_id = ?"
+	args := []any{repoID}
+	if job != "" {
+		q += " AND job = ?"
+		args = append(args, job)
+	}
+	q += " ORDER BY number DESC LIMIT 1"
+	b, err := scanBuild(s.DB.QueryRow(q, args...))
+	if errors.Is(err, sql.ErrNoRows) {
+		return b, ErrNotFound
+	}
+	return b, err
+}

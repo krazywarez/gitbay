@@ -151,12 +151,18 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	}
 	mrs, _ := s.st.DashboardMRs(viewer.ID)
 	issues, _ := s.st.DashboardIssues(viewer.ID)
+	reviews, _ := s.st.ReviewQueue(viewer.ID)
+	assigned, _ := s.st.AssignedIssues(viewer.ID)
+	events, _ := s.st.RecentEvents(viewer.ID, 20)
 	s.render(w, "dashboard.html", struct {
 		basePage
-		Pinned []store.Repo
-		MRs    []store.DashboardItem
-		Issues []store.DashboardItem
-	}{s.baseFor(viewer), visible, mrs, issues})
+		Pinned   []store.Repo
+		Reviews  []store.DashboardItem
+		Assigned []store.DashboardItem
+		MRs      []store.DashboardItem
+		Issues   []store.DashboardItem
+		Feed     []feedLine
+	}{s.baseFor(viewer), visible, reviews, assigned, mrs, issues, feedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
@@ -477,8 +483,8 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		Tip         gitutil.EntryCommit
 	}{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches,
 		readmeName, readmeHTML,
-		gitutil.LastCommits(p.Dir, p.Ref, dirPath, names),
-		gitutil.TipCommit(p.Dir, p.Ref)})
+		s.namedCommits(gitutil.LastCommits(p.Dir, p.Ref, dirPath, names)),
+		s.namedTip(gitutil.TipCommit(p.Dir, p.Ref))})
 }
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
@@ -1198,13 +1204,14 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 		SHA, ShortSHA, Subject, AuthorName, AuthorEmail, Date string
 		Sig                                                   sigView
 	}
+	names := s.authorNames()
 	var rows []row
 	for _, sha := range shas {
 		v, parsed := s.sigFor(p.Repo, p.Dir, sha)
 		rw := row{SHA: sha, ShortSHA: sha[:10], Sig: v}
 		if parsed != nil {
 			rw.Subject = parsed.Subject
-			rw.AuthorName = parsed.AuthorName
+			rw.AuthorName = names.name(parsed.AuthorEmail, parsed.AuthorName)
 			rw.AuthorEmail = parsed.AuthorEmail
 			rw.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
 		}
@@ -1253,7 +1260,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		Sig                                                                   sigView
 		Checks                                                                []store.CommitStatus
 		DiffLines                                                             []diffLine
-	}{p, full, full[:10], parsed.AuthorName, parsed.AuthorEmail, committerEmail,
+	}{p, full, full[:10], s.authorNames().name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
 		gitutil.Parents(p.Dir, full), v, checks, lines})
 }
@@ -1478,6 +1485,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		SHA, ShortSHA, Subject, AuthorName, Date string
 		Sig                                      sigView
 	}
+	mrNames := s.authorNames()
 	var commits []commitRow
 	if base != "" {
 		const maxMRCommits = 100
@@ -1490,7 +1498,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			cr := commitRow{SHA: sha, ShortSHA: sha[:10], Sig: v}
 			if parsed != nil {
 				cr.Subject = parsed.Subject
-				cr.AuthorName = parsed.AuthorName
+				cr.AuthorName = mrNames.name(parsed.AuthorEmail, parsed.AuthorName)
 				cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
 			}
 			commits = append(commits, cr)

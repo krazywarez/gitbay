@@ -189,7 +189,7 @@ func TestWebInteractions(t *testing.T) {
 	if !strings.Contains(body, "★ Pinned") {
 		t.Fatal("repo header not pinned")
 	}
-	if _, body = browserGet(t, browser, inst.base()+"/"); !strings.Contains(body, "theorg<span") {
+	if _, body = browserGet(t, browser, inst.base()+"/"); !strings.Contains(body, ">theorg/</span>webborn") {
 		t.Fatal("dashboard missing pinned repo")
 	}
 	browserPost(t, browser, inst.base()+"/theorg/webborn/pin", url.Values{})
@@ -245,5 +245,51 @@ func TestCommitParentLinks(t *testing.T) {
 	_, body = inst.get(t, "/alice/app/commit/"+first)
 	if strings.Contains(body, ">parent") {
 		t.Fatal("root commit shows a parent")
+	}
+}
+
+// TestAuthorNamesResolve checks that a commit whose author address is
+// verified here displays the account's name rather than whatever git
+// config carried, and that an unknown address keeps its own name.
+func TestAuthorNamesResolve(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+
+	// One commit from the account's verified address under a different
+	// display name, one from an address nobody has proven.
+	known := append(append([]string{}, env...),
+		"GIT_AUTHOR_NAME=Alice Q. Longname", "GIT_AUTHOR_EMAIL=alice@example.test",
+		"GIT_COMMITTER_NAME=Alice Q. Longname", "GIT_COMMITTER_EMAIL=alice@example.test")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, known, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, known, "add", ".")
+	mustGit(t, dir, known, "commit", "-q", "-m", "from the account")
+	stranger := append(append([]string{}, env...),
+		"GIT_AUTHOR_NAME=Outside Person", "GIT_AUTHOR_EMAIL=outside@nowhere.test",
+		"GIT_COMMITTER_NAME=Outside Person", "GIT_COMMITTER_EMAIL=outside@nowhere.test")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	mustGit(t, dir, stranger, "add", ".")
+	mustGit(t, dir, stranger, "commit", "-q", "-m", "from a stranger")
+	mustGit(t, dir, known, "push", "-q", "origin", "main")
+
+	// The log shows the account name for the verified address only.
+	_, body := inst.get(t, "/alice/app/log")
+	if strings.Contains(body, "Alice Q. Longname") {
+		t.Fatalf("log showed the git config name for a known address:\n%s", body)
+	}
+	if !strings.Contains(body, "Outside Person") {
+		t.Fatalf("log lost an unknown author's name:\n%s", body)
+	}
+	if !strings.Contains(body, "alice") {
+		t.Fatalf("log missing the account name:\n%s", body)
 	}
 }
