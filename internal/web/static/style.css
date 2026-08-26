@@ -917,8 +917,8 @@ details.difffold summary:hover { background: var(--fill-subtle); }
 summary .fpath { font-family: var(--mono); overflow-wrap: anywhere; }
 summary .fpath .was { color: var(--muted); }
 summary .fstat { margin-left: auto; font-family: var(--mono); white-space: nowrap; }
-details.difffold .add { color: var(--ok); }
-details.difffold .del { color: var(--bad); }
+details.difffold summary .add { color: var(--ok); }
+details.difffold summary .del { color: var(--bad); }
 details.difffold > .none { padding: var(--sp-3); margin: 0; }
 details.difffold .tablewrap { border-radius: 0 0 var(--r-md) var(--r-md); }
 

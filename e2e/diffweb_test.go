@@ -82,6 +82,15 @@ func TestDiffRendering(t *testing.T) {
 	if !strings.Contains(body, "class=\"k\"") && !strings.Contains(body, "class=\"kd\"") {
 		t.Error("diff content is not syntax highlighted")
 	}
+	// Token classes alone prove nothing: chroma scopes every colour rule
+	// under .chroma, and the per-line markup has no wrapper of its own, so
+	// the cell has to be that wrapper or the classes are inert.
+	if !strings.Contains(body, `<td class="src chroma">`) {
+		t.Error("diff cell is not a chroma wrapper, so token classes go unstyled")
+	}
+	if !strings.Contains(stylesheet(t, inst), ".chroma .k") {
+		t.Error("stylesheet has no chroma token rules to match")
+	}
 	// The +/- markers are CSS, so a copied selection is real source.
 	if strings.Contains(body, `<td class="src">+`) {
 		t.Error("diff markers are in the markup, not the stylesheet")
@@ -106,4 +115,15 @@ func jsonField(blob, name string) string {
 		return ""
 	}
 	return rest[:j]
+}
+
+// stylesheet fetches the served CSS, so a test can check that a rule the
+// markup depends on actually exists.
+func stylesheet(t *testing.T, inst *instance) string {
+	t.Helper()
+	status, body := inst.get(t, "/static/style.css")
+	if status != 200 {
+		t.Fatalf("stylesheet: %d", status)
+	}
+	return body
 }
