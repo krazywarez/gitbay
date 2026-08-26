@@ -47,9 +47,9 @@ func TestRepoFacts(t *testing.T) {
 		"<strong>2</strong> commit", // both commits counted
 		"<strong>1</strong> branch",
 		"<strong>1</strong> tag",
-		"0BSD",   // license detected and surfaced
-		"Go",     // language census
-		"Shell",  // and it is not single-language
+		"0BSD",  // license detected and surfaced
+		"Go",    // language census
+		"Shell", // and it is not single-language
 		"2 contributors",
 	} {
 		if !strings.Contains(body, want) {

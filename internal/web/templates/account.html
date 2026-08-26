@@ -11,7 +11,7 @@ a CI checkout wants.</p>
 {{if .Keys}}<div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
 {{range .Keys}}<tr>
-  <td class="mono">{{.Fingerprint}}{{with .Comment}}<br><span class="muted">{{.}}</span>{{end}}</td>
+  <td class="mono">{{.Fingerprint}}</td>
   <td>{{.Algo}}</td>
   <td>{{.Scope}}</td>
   <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button type="submit" class="linklike">Remove</button></form></td>

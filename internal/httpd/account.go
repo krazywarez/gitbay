@@ -15,7 +15,6 @@ type accountKey struct {
 	Fingerprint string
 	Algo        string
 	Scope       string
-	Comment     string
 }
 
 type accountPGP struct {
@@ -31,10 +30,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
-			keys = append(keys, accountKey{
-				Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope,
-				Comment: keyComment(k.Blob),
-			})
+			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope})
 		}
 	}
 	var pgp []accountPGP
@@ -60,16 +56,6 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		Message string
 	}{s.baseFor(u), keys, pgp, emails, s.cfg.SiteHost(),
 		r.URL.Query().Get("e"), r.URL.Query().Get("m")})
-}
-
-// keyComment pulls the trailing comment off an authorized_keys blob, which
-// is how people tell their own keys apart.
-func keyComment(blob []byte) string {
-	f := strings.Fields(string(blob))
-	if len(f) < 3 {
-		return ""
-	}
-	return strings.Join(f[2:], " ")
 }
 
 // accountSubmit routes the account forms to their commands. Everything

@@ -38,6 +38,11 @@ func TestAccountSettingsWeb(t *testing.T) {
 	if !strings.Contains(body, "SHA256:") {
 		t.Error("no SSH key fingerprint listed")
 	}
+	// Keys are stored in wire format, which holds no comment; anything
+	// pulled out of it and printed would be binary noise.
+	if strings.Contains(body, "\ufffd") {
+		t.Error("key row is rendering raw blob bytes")
+	}
 	if !strings.Contains(body, "alice@example.test") || !strings.Contains(body, "verified") {
 		t.Error("verified address not shown")
 	}
