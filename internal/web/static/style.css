@@ -797,6 +797,9 @@ pre.message {
 }
 
 /* repo facts: the counts a visitor sizes a project up with */
+.teambody { padding: var(--sp-3); background: var(--bg); }
+.teambody .memberchip { margin-right: var(--sp-2); }
+
 /* account settings */
 table.keys td { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }
 table.keys td.mono, .mono { font-family: var(--mono); font-size: var(--fs-1); overflow-wrap: anywhere; }

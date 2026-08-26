@@ -20,4 +20,79 @@
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">no visible repositories</li>{{end}}
 </ul>
+
+{{if .CanAdmin}}{{$org := .Owner}}
+<h2>people <span class="count">{{len .Members}}</span></h2>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">member</th><th scope="col">role</th><th scope="col"></th></tr>
+{{range .Members}}<tr>
+  <td><a href="/{{.Username}}">{{.Username}}</a></td>
+  <td>{{.Role}}</td>
+  <td class="act"><form method="post" action="/{{$org}}"><input type="hidden" name="field" value="member-remove"><input type="hidden" name="user" value="{{.Username}}"><button type="submit" class="linklike">Remove</button></form></td>
+</tr>
+{{end}}</table></div>
+<details class="editbox">
+  <summary>Add or change a member</summary>
+  <form method="post" action="/{{$org}}" class="setform">
+    <input type="hidden" name="field" value="member-add">
+    <label for="member">Username</label>
+    <input type="text" id="member" name="user" required>
+    <label class="none" for="memberrole">Role</label>
+    <select id="memberrole" name="role">
+      <option value="member">member</option>
+      <option value="admin">admin</option>
+    </select>
+    <button type="submit">Apply</button>
+  </form>
+</details>
+
+<h2>teams <span class="count">{{len .Teams}}</span></h2>
+<p class="meta">Teams scope repository access inside the organization: members
+of a team get its role on every repository it is granted.</p>
+{{range .Teams}}<details class="difffold" open>
+  <summary><span class="fpath">{{.Name}}</span>
+    <span class="fstat">{{len .Members}} member{{if ne (len .Members) 1}}s{{end}} · {{len .Grants}} repo{{if ne (len .Grants) 1}}s{{end}}</span>
+  </summary>
+  <div class="teambody">
+    <p class="meta">members: {{range .Members}}<a class="memberchip" href="/{{.}}">{{.}}</a> {{else}}<span class="none">none yet</span>{{end}}</p>
+    <p class="meta">repositories: {{range .Grants}}<span class="memberchip"><a href="/{{.RepoPath}}">{{.RepoPath}}</a> <span class="role">{{.Role}}</span></span> {{else}}<span class="none">none yet</span>{{end}}</p>
+    <form method="post" action="/{{$org}}" class="setform">
+      <input type="hidden" name="team" value="{{.Name}}">
+      <label class="none" for="tm-{{.Name}}">Members</label>
+      <input type="text" id="tm-{{.Name}}" name="user" placeholder="usernames, space-separated">
+      <button type="submit" name="field" value="team-add">Add</button>
+      <button type="submit" name="field" value="team-remove">Remove</button>
+    </form>
+    <form method="post" action="/{{$org}}" class="setform">
+      <input type="hidden" name="team" value="{{.Name}}">
+      <label class="none" for="tr-{{.Name}}">Repository</label>
+      <input type="text" id="tr-{{.Name}}" name="repo" placeholder="owner/name">
+      <label class="none" for="trr-{{.Name}}">Role</label>
+      <select id="trr-{{.Name}}" name="role">
+        <option value="read">read</option>
+        <option value="write">write</option>
+        <option value="admin">admin</option>
+      </select>
+      <button type="submit" name="field" value="team-grant">Grant</button>
+      <button type="submit" name="field" value="team-revoke">Revoke</button>
+    </form>
+    <form method="post" action="/{{$org}}" class="setform">
+      <input type="hidden" name="field" value="team-delete">
+      <input type="hidden" name="team" value="{{.Name}}">
+      <button type="submit" class="linklike">Delete this team</button>
+    </form>
+  </div>
+</details>
+{{else}}<p class="none">No teams yet.</p>{{end}}
+<details class="editbox">
+  <summary>Create a team</summary>
+  <form method="post" action="/{{$org}}" class="setform">
+    <input type="hidden" name="field" value="team-create">
+    <label for="newteam">Name</label>
+    <input type="text" id="newteam" name="team" required>
+    <button type="submit">Create</button>
+  </form>
+</details>
+{{end}}
 {{end}}

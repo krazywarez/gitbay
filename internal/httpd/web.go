@@ -392,6 +392,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	}
 	weeks, activityTotal := activityGrid(counts)
 
+	teams, canAdmin := s.orgAdminView(viewer, kind, name)
 	s.render(w, "owner.html", struct {
 		basePage
 		Owner         string
@@ -402,8 +403,11 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Orgs          []store.OrgMember
 		Activity      []activityWeek
 		ActivityTotal int
+		Teams         []teamView
+		CanAdmin      bool
+		Notice        string
 	}{s.baseFor(viewer), name, kind, profile, s.describeAll(visible), members, orgs,
-		weeks, activityTotal})
+		weeks, activityTotal, teams, canAdmin, r.URL.Query().Get("e")})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
