@@ -36,7 +36,10 @@ func (r rail) Empty() bool { return len(r.Pinned) == 0 && len(r.Reviews) == 0 }
 // basePage is what the layout needs on every page, repo or not. Page
 // structs embed it so the rail and the site name are always in scope.
 type basePage struct {
+	// Site is the instance's display name; Host is the name a command or
+	// URL must use. Anything copy-pasteable takes Host.
 	Site   string
+	Host   string
 	Viewer string
 	Rail   rail
 }
@@ -45,7 +48,7 @@ type basePage struct {
 // resolved a viewer.
 func (s *Server) base(r *http.Request) basePage {
 	if s.cfg.Web.Mode != "accounts" {
-		return basePage{Site: s.siteName()}
+		return basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}
 	}
 	return s.baseFor(s.viewer(r))
 }
@@ -53,7 +56,7 @@ func (s *Server) base(r *http.Request) basePage {
 // baseFor is base for a handler that already holds the viewer, so the
 // session lookup is not repeated.
 func (s *Server) baseFor(viewer store.User) basePage {
-	b := basePage{Site: s.siteName()}
+	b := basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}
 	if viewer.ID == 0 {
 		return b
 	}

@@ -217,3 +217,24 @@ func TestViewOnlyHasNoLoginOnTheWire(t *testing.T) {
 		t.Fatalf("web login in view_only: exit %d, %s", code, errOut)
 	}
 }
+
+// TestTitleIsNotAHostname pins the split between the instance's display name
+// and its hostname: the login page prints a command to paste into a terminal,
+// so it must name the host even when the operator has set a display title.
+func TestTitleIsNotAHostname(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\ntitle = \"GitBay\"\n")
+
+	status, body := inst.get(t, "/login")
+	if status != 200 {
+		t.Fatalf("/login = %d", status)
+	}
+	if strings.Contains(body, "ssh git@GitBay") {
+		t.Fatal("login page tells you to ssh to the display title")
+	}
+	if !strings.Contains(body, "ssh git@gitbay.test web login") {
+		t.Fatalf("login page does not name the host:\n%s", body)
+	}
+	if !strings.Contains(body, "GitBay") {
+		t.Fatal("login page dropped the display title entirely")
+	}
+}

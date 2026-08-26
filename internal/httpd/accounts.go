@@ -66,7 +66,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "login.html", struct {
 			basePage
 			Error string
-		}{basePage{Site: s.siteName()}, ""})
+		}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, ""})
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
@@ -74,7 +74,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "login.html", struct {
 			basePage
 			Error string
-		}{basePage{Site: s.siteName()},
+		}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()},
 			"that login link is invalid, expired, or already used — mint a new one"})
 		return
 	}
@@ -226,7 +226,7 @@ func (s *Server) renderSignup(w http.ResponseWriter, errMsg, username string) {
 		Mode     string // open | invite
 		Error    string
 		Username string
-	}{basePage{Site: s.siteName()}, s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
+	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
 }
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +248,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
 		Username string
 		Message  string
 		Host     string
-	}{basePage{Site: s.siteName()}, username, msg, s.cfg.SiteHost()})
+	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, username, msg, s.cfg.SiteHost()})
 }
 
 // issueCreateForm renders the new-issue form, prefilled from the repo's
