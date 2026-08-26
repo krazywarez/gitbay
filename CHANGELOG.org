@@ -4,6 +4,43 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v0.5.0 — 2026-08-26
+
+A design pass and a parity pass. The web stops being a read-only
+mirror of the CLI without becoming the place you are expected to work.
+
+- New design: a black shell with a persistent left rail carrying
+  cross-repo state (pinned repos, review queue), the repo header
+  rendered identically on every tab so navigation never moves, sharp
+  lines, self-hosted IBM Plex, and code blocks that read against both
+  color schemes. Tree listings sort directories first and carry each
+  file's last commit; diffs, inputs and controls were reworked to
+  match.
+- Web parity with the CLI, dispatched through the same command
+  registry the CLI and JSON API use — every web write is the
+  equivalent =gitbay= command with =--source web=:
+  - merge requests: review, resolve threads, merge, close, and open a
+    new MR from the browser
+  - issues: state, labels, assignees, milestones
+  - repositories: settings, branch protection, visibility
+  - releases: create and edit; builds: trigger a job
+  Commands marked SSH-only still refuse over the web: build secrets,
+  mirror tokens, domain claims, token minting, deletion and transfer.
+- A dashboard that answers "what needs me": review queue, assigned
+  issues, pinned repos, and an activity feed. Author names resolve to
+  accounts and link to profiles wherever commits appear.
+- Build status badges at =/{owner}/{repo}/badge/build.svg= for public
+  repos.
+- =[web] title= sets the instance's display name, separate from the
+  hostname commands are pasted with.
+- =make build/test/deploy= targets.
+- Fixes: the mobile tab strip scrolls sideways only, long commit
+  subjects no longer overflow on narrow screens, the shell fills the
+  viewport with the line-length cap moved onto prose, and the account
+  cell lines up with the page footer.
+
+No migrations. New config: =[web] title=.
+
 * v0.4.0 — 2026-08-25
 
 - Git LFS: standard clients work over both transports.
