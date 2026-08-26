@@ -64,6 +64,9 @@ type GitDaemon struct {
 type Web struct {
 	Mode         string `toml:"mode"` // view_only | accounts
 	PasswordAuth bool   `toml:"password_auth"`
+	// Title is the instance's display name in the header and page titles.
+	// Empty falls back to the site host.
+	Title string `toml:"title"`
 	// PrivacyNotice is operator-provided text shown on /privacy under the
 	// fixed project-level statement. Plain text; blank paragraphs split.
 	PrivacyNotice string `toml:"privacy_notice"`

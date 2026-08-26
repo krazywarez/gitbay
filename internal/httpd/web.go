@@ -47,7 +47,12 @@ func (s *Server) render(w http.ResponseWriter, page string, data any) {
 	buf.WriteTo(w)
 }
 
+// siteName is the instance's display name: the operator's [web] title,
+// or the site host when they have not set one.
 func (s *Server) siteName() string {
+	if t := strings.TrimSpace(s.cfg.Web.Title); t != "" {
+		return t
+	}
 	h := strings.TrimPrefix(strings.TrimPrefix(s.cfg.Server.SiteURL, "https://"), "http://")
 	return strings.TrimSuffix(h, "/")
 }
