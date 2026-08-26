@@ -1,0 +1,59 @@
+#+title: Parity
+
+Which surface can do what. The CLI is the complete interface: every
+capability exists over SSH, and web writes call the same control
+commands, so the two cannot drift. This page is updated in the merge
+request that changes a row.
+
+* Rule
+
+A capability lands over SSH first. If it belongs to the
+triage/review/respond loop, it lands on the web in the same merge
+request. Anything whose input is a credential — secrets, mirror
+tokens, API tokens, session minting — stays SSH-only by design: the
+web dispatcher refuses =SSHOnly= commands outright.
+
+* Merge requests
+
+| capability            | ssh/cli | web |
+|-----------------------+---------+-----|
+| read, diff, commits   | yes     | yes |
+| comment               | yes     | yes |
+| edit title and body   | yes     | yes |
+| review (approve etc.) | yes     | yes |
+| resolve a thread      | yes     | yes |
+| merge (all strategies)| yes     | yes |
+| close                 | yes     | yes |
+| create                | yes     | no  |
+| comment on a diff line| yes     | no  |
+| retarget              | yes     | no  |
+
+* Issues
+
+| capability          | ssh/cli | web |
+|---------------------+---------+-----|
+| read, list, filter  | yes     | yes |
+| create              | yes     | yes |
+| comment             | yes     | yes |
+| edit title and body | yes     | yes |
+| close and reopen    | yes     | no  |
+| labels, assignees   | yes     | no  |
+| milestone           | yes     | no  |
+
+* Repositories
+
+| capability                | ssh/cli | web |
+|---------------------------+---------+-----|
+| browse, log, blame, search| yes     | yes |
+| create                    | yes     | yes |
+| edit a file               | yes     | yes |
+| pin                       | yes     | yes |
+| settings, protection      | yes     | no  |
+| topics, website           | yes     | no  |
+| releases, builds          | read    | read|
+
+* SSH only, by design
+
+Build secrets, mirror configuration and tokens, custom domain claims,
+API token minting, web session minting, deploy keys, account and
+instance administration.
