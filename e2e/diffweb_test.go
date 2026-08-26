@@ -83,8 +83,13 @@ func TestDiffRendering(t *testing.T) {
 		t.Error("diff content is not syntax highlighted")
 	}
 	// The +/- markers are CSS, so a copied selection is real source.
-	if strings.Contains(body, `<td class="code">+`) {
+	if strings.Contains(body, `<td class="src">+`) {
 		t.Error("diff markers are in the markup, not the stylesheet")
+	}
+	// The cell must not use .code: that class carries its own background,
+	// which would paint over the add/delete row tint.
+	if strings.Contains(body, `<td class="code">`) {
+		t.Error("diff cells use the blob code class, whose background hides the row tint")
 	}
 }
 

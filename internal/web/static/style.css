@@ -945,16 +945,18 @@ table.difftable td.ln {
   border-right: 1px solid var(--line);
   white-space: nowrap;
 }
-table.difftable td.code {
+/* not .code: that class is the blob/code-block style and carries its own
+   background, which painted over every row tint */
+table.difftable td.src {
   padding: 0 var(--sp-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 /* the marker is decoration, so it lives in CSS and stays out of a copied
    selection */
-table.difftable tr.add td.code::before { content: "+"; color: var(--ok); }
-table.difftable tr.del td.code::before { content: "\2212"; color: var(--bad); }
-table.difftable tr.ctx td.code::before { content: " "; }
+table.difftable tr.add td.src::before { content: "+"; color: var(--ok); }
+table.difftable tr.del td.src::before { content: "\2212"; color: var(--bad); }
+table.difftable tr.ctx td.src::before { content: " "; }
 table.difftable tr.add { background: var(--diff-add); }
 table.difftable tr.del { background: var(--diff-del); }
 table.difftable tr.hunk td, table.difftable tr.dmeta td {
@@ -964,7 +966,7 @@ table.difftable tr.hunk td, table.difftable tr.dmeta td {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-table.difftable tr.hunk td.code { color: var(--accent); }
+table.difftable tr.hunk td.src { color: var(--accent); }
 table.difftable tr.threadrow td { padding: var(--sp-2) var(--sp-3); background: var(--bg); }
 
 /* badges: signature and check states. Semantic colors stay distinct:
