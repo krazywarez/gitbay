@@ -258,6 +258,12 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
   padding: 0 0.35rem;
   border-radius: var(--r-sm);
 }
+/* pinned above the account cell: always reachable, never scrolled away */
+.railpinned {
+  flex: none;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--shell-line);
+}
 .railfoot {
   flex: none;
   border-top: 1px solid var(--shell-line);
@@ -273,8 +279,11 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
 }
 .railfoot a { color: var(--shell-fg); }
 a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
+/* the square is a graphic, not text: the link's hover underline stops at it */
+a.railuser:hover .avatar { text-decoration: none; }
 .railfoot .railsettings { color: var(--shell-muted); display: inline-flex; }
 .railfoot .railsettings:hover { color: var(--shell-fg); }
+.railfoot form { margin-left: auto; }
 .railfoot .linklike {
   background: none; border: 0; padding: 0; cursor: pointer;
   color: var(--shell-muted); font: inherit; text-decoration: underline;
@@ -399,6 +408,7 @@ nav.tabs a i {
   ul.raillist a[aria-current] { border-left: 0; border-bottom-color: var(--shell-mark); }
   /* the rail is a horizontal strip here: keep the account cell compact */
   .railfoot { border-top: 0; padding: var(--sp-2); }
+  .railpinned { border-top: 0; padding: 0; }
   .content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .repohead { padding: var(--sp-3) var(--sp-4) 0; }
 }

@@ -48,13 +48,14 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 
 	s.render(w, "account.html", struct {
 		basePage
+		Tab     string // marks the rail's Settings row as current
 		Keys    []accountKey
 		PGP     []accountPGP
 		Emails  []store.Email
 		Host    string
 		Notice  string
 		Message string
-	}{s.baseFor(u), keys, pgp, emails, s.cfg.SiteHost(),
+	}{s.baseFor(u), "account", keys, pgp, emails, s.cfg.SiteHost(),
 		r.URL.Query().Get("e"), r.URL.Query().Get("m")})
 }
 
