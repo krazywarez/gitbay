@@ -250,11 +250,15 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
 .railfoot {
   flex: none;
   border-top: 1px solid var(--shell-line);
-  padding: var(--sp-2) var(--sp-4);
+  /* same vertical rhythm as the page footer, so the two rules line up
+     when the page is scrolled to the bottom; horizontal padding stays on
+     the rail's own grid so the avatar aligns with the nav items above */
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   font-size: var(--fs-2);
+  line-height: 1.4;
 }
 .railfoot a { color: var(--shell-fg); }
 a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
@@ -381,7 +385,8 @@ nav.tabs a i {
   ul.raillist { display: flex; }
   ul.raillist a { border-left: 0; border-bottom: 2px solid transparent; padding: var(--sp-2) var(--sp-3); }
   ul.raillist a[aria-current] { border-left: 0; border-bottom-color: var(--shell-mark); }
-  .railfoot { border-top: 0; padding-left: var(--sp-2); }
+  /* the rail is a horizontal strip here: keep the account cell compact */
+  .railfoot { border-top: 0; padding: var(--sp-2); }
   .content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .repohead { padding: var(--sp-3) var(--sp-4) 0; }
 }
