@@ -494,6 +494,9 @@ table.tree tr.cols th {
   background: var(--bg);
 }
 table.tree tr.cols:hover th { background: var(--bg); }
+/* right-aligned columns keep their header with their values; this needs to
+   outrank the tr.cols th rule above, which is why it names both */
+table.tree tr.cols th.age, table.tree tr.cols th.size { text-align: right; }
 table.tree th.size { text-align: right; }
 table.tree td.name { width: 100%; }
 table.tree td.name a { color: var(--fg); }
