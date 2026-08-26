@@ -4,6 +4,43 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.0.0 — 2026-08-26
+
+The web finishes the job #35 set it: reading, reviewing and responding,
+with the CLI still the complete interface. Every capability exists over
+SSH, every web write dispatches the same control command, and anything
+whose input is a credential stays on the command line. The [[https://gitbay.org/krz/gitbay/wiki/Parity][Parity]] page in
+the wiki is the maintained matrix and says which rows are deliberately
+CLI-only.
+
+- Diff view: one foldable section per file with line-number gutters,
+  per-file stats, rename and binary handling, and syntax highlighting
+  run per hunk per side so multi-line constructs lex as real code.
+  Commit and merge request pages share it; review threads anchor
+  inline.
+- Repository facts on the code page: commit, branch and tag counts,
+  detected license, latest release, build status, a language census by
+  tracked bytes, and contributors resolved to accounts by verified
+  email. All derived from git at render time.
+- Account settings on the web: SSH keys with scope, OpenPGP keys, and
+  email addresses. Public keys are the only credential-shaped input the
+  web accepts — they are not secret, and a new user needs one
+  registered before the CLI is reachable to them. Token minting and
+  account export stay SSH-only.
+- Organizations are run from their page: membership and roles, teams,
+  team members, and team repository grants, for org admins.
+- Commit log shows each commit's combined check status and gains a path
+  filter, so per-file history is reachable without editing the URL.
+- Issue references from commit messages read "referenced in commit
+  <sha> by <author>", linking the author when their email is verified
+  here.
+- The rail's focus ring uses the shell's own mark: the light scheme's
+  accent was a dark blue ring on a black rail.
+
+No migrations. No new config.
+
+Upgrading from v0.5.0 is replace-the-binary-and-restart.
+
 * v0.5.0 — 2026-08-26
 
 A design pass and a parity pass. The web stops being a read-only
