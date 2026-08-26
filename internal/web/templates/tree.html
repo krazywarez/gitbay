@@ -10,6 +10,19 @@
   <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">Download</a>
 </div>
 {{if .Entries}}<p class="clone">Clone: <code>git clone {{.CloneURL}}</code></p>{{end}}
+{{if .Facts.Commits}}{{$r := printf "/%s/%s" .Repo.OwnerName .Repo.Name}}<div class="facts">
+  <p class="counts">
+    <a href="{{$r}}/log/{{.Ref}}"><strong>{{.Facts.Commits}}</strong> commit{{if ne .Facts.Commits 1}}s{{end}}</a>
+    <a href="{{$r}}/refs"><strong>{{.Facts.Branches}}</strong> branch{{if ne .Facts.Branches 1}}es{{end}}</a>
+    <a href="{{$r}}/refs"><strong>{{.Facts.Tags}}</strong> tag{{if ne .Facts.Tags 1}}s{{end}}</a>
+    {{with .Facts.License}}<span class="fact">{{.}}</span>{{end}}
+    {{with .Facts.Release}}<a href="{{$r}}/releases">latest <strong>{{.}}</strong></a>{{end}}
+    {{with .Facts.Build}}<a href="{{$r}}/builds">build <span class="badge badge-{{.}}">{{.}}</span></a>{{end}}
+  </p>
+  {{with .Facts.Languages}}<p class="langbar" aria-hidden="true">{{range .}}<span class="lang lang-{{slug .Name}}" style="width:{{pct .Percent}}%"></span>{{end}}</p>
+  <p class="langs">{{range .}}<span class="lang-name"><span class="dot lang-{{slug .Name}}"></span>{{.Name}} <span class="muted">{{pct .Percent}}%</span></span>{{end}}</p>{{end}}
+  {{with .Facts.Contributors}}<p class="contribs"><span class="label">{{len .}} contributor{{if ne (len .) 1}}s{{end}}</span>{{range .}}{{template "authorname" dict "Name" .Name "User" .User "Email" (printf "%s · %d commits" .Email .Commits)}}{{end}}</p>{{end}}
+</div>{{end}}
 {{with .Tip}}{{if .SHA}}<div class="tipbar">
   <span class="who">{{template "authorname" dict "Name" .Author "User" .User "Email" .Email}}</span>
   <a class="subject" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a>

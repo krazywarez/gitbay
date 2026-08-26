@@ -794,6 +794,55 @@ pre.message {
   overflow-wrap: anywhere;
 }
 
+/* repo facts: the counts a visitor sizes a project up with */
+.facts { margin: 0 0 var(--sp-4); }
+.facts .counts {
+  display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4);
+  margin: 0 0 var(--sp-3); font-size: var(--fs-2);
+}
+.facts .counts a { color: var(--fg); text-decoration: none; }
+.facts .counts a:hover { color: var(--accent); text-decoration: underline; }
+.facts .counts .fact { color: var(--muted); }
+.facts .counts strong { font-weight: 600; }
+
+.langbar {
+  display: flex; height: 0.5rem; margin: 0 0 var(--sp-2);
+  border-radius: var(--r-sm); overflow: hidden; background: var(--faint);
+}
+.langbar .lang { display: block; min-width: 2px; }
+.langs {
+  display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4);
+  margin: 0 0 var(--sp-3); font-size: var(--fs-1);
+}
+.langs .lang-name { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.langs .muted { color: var(--muted); }
+.langs .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; display: inline-block; }
+/* named where it reads as the language's own color, neutral otherwise */
+.lang { background: var(--neutral); }
+.lang-go { background: #00add8; }
+.lang-rust { background: #dea584; }
+.lang-c, .lang-c- { background: #555555; }
+.lang-python { background: #3572a5; }
+.lang-javascript { background: #f1e05a; }
+.lang-typescript { background: #3178c6; }
+.lang-shell { background: #89e051; }
+.lang-ruby { background: #701516; }
+.lang-java { background: #b07219; }
+.lang-swift { background: #f05138; }
+.lang-html { background: #e34c26; }
+.lang-css { background: #563d7c; }
+.lang-org { background: #77aa99; }
+.lang-markdown { background: #083fa1; }
+.lang-emacs-lisp { background: #c065db; }
+.lang-nix { background: #7e7eff; }
+.lang-sql { background: #e38c00; }
+
+.contribs {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-1) var(--sp-3); margin: 0; font-size: var(--fs-1);
+}
+.contribs .label { color: var(--muted); }
+
 /* diffs: one foldable section per file, a table so the line-number
    gutters stay put while the code scrolls */
 details.difffold {

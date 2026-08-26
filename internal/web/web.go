@@ -166,6 +166,26 @@ var funcs = template.FuncMap{
 	},
 	// ago renders a time as a coarse relative age, which is what a
 	// listing column is actually read for. The zero time yields "".
+	// slug turns a language name into a CSS class suffix, so the palette
+	// lives in the stylesheet rather than in inline styles the CSP would
+	// have to allow.
+	"slug": func(s string) string {
+		var b strings.Builder
+		for _, r := range strings.ToLower(s) {
+			switch {
+			case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+				b.WriteRune(r)
+			default:
+				b.WriteByte('-')
+			}
+		}
+		return b.String()
+	},
+	// pct renders a share to one decimal, dropping a trailing ".0".
+	"pct": func(f float64) string {
+		s := strconv.FormatFloat(f, 'f', 1, 64)
+		return strings.TrimSuffix(s, ".0")
+	},
 	"ago": func(t time.Time) string {
 		if t.IsZero() {
 			return ""
