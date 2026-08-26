@@ -853,10 +853,13 @@ var chromaCSS = func() []byte {
 	buf.WriteString(".chroma .na { color: #6f5a21 }\n")
 	buf.WriteString("}\n@media (prefers-color-scheme: dark) {\n")
 	chromaFormatter.WriteCSS(&buf, styles.Get(darkStyle))
-	// github-dark's line numbers are #6e7681, 4.31:1 on the page; lifted to
-	// the same grey its comments use, which clears the floor.
-	buf.WriteString(".chroma .lnt, .chroma .ln { color: #8b949e }\n")
 	buf.WriteString("}\n.chroma, .bg { background: transparent !important; }\n")
+	// Line numbers take the site's own gutter colour in both schemes. Left
+	// alone they are github-dark's #6e7681 (4.31:1 on the page) in dark and
+	// chroma's built-in #7f7f7f (3.67:1 on a code block) in light — the
+	// latter is a formatter fallback, not a style entry, so no palette test
+	// can see it.
+	buf.WriteString(".chroma .lnt, .chroma .ln { color: var(--muted) }\n")
 	return buf.Bytes()
 }()
 

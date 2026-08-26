@@ -34,9 +34,9 @@ func contrast(a, b chroma.Colour) float64 {
 // two diff tints. The chroma default (friendly) put 61 token/ground pairs
 // under the floor, which is why the styles are chosen rather than assumed.
 //
-// Two tokens are exempted because the stylesheet overrides them after
-// writing the palette, which this test cannot see: NameAttribute in light
-// (#6f5a21) and the line-number tokens in dark (#8b949e).
+// Tokens the stylesheet overrides after writing the palette are exempt,
+// since this test cannot see those rules: NameAttribute in light
+// (#6f5a21) and the line-number tokens in both (var(--muted)).
 func TestSyntaxPaletteContrast(t *testing.T) {
 	const floor = 4.5
 	// chroma's own line-number gutter renders on blob pages only — the diff
