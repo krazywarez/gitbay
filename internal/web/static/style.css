@@ -281,7 +281,6 @@ a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .content {
   flex: 1;
   padding: var(--sp-5) var(--sp-5) var(--sp-6);
-  max-width: 78rem;
   width: 100%;
 }
 
@@ -729,6 +728,12 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 
 /* rendered markdown / org / html */
 .rendered { max-width: 100%; overflow-wrap: anywhere; }
+/* line length is a reading constraint, so it applies to prose only —
+   tables, code blocks and images keep the full column */
+.rendered > p,
+.rendered > ul,
+.rendered > ol,
+.rendered > blockquote { max-width: 78ch; }
 .rendered pre {
   background: var(--code-bg);
   border: 1px solid var(--line);
@@ -1111,7 +1116,6 @@ button:hover { filter: brightness(1.15); }
 footer {
   border-top: 1px solid var(--faint);
   padding: var(--sp-4) var(--sp-5) var(--sp-5);
-  max-width: 78rem;
   width: 100%;
   color: var(--muted);
   font-size: var(--fs-1);
