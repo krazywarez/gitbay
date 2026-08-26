@@ -136,6 +136,35 @@ func (s *Store) UserEmailAddresses(userID int64) ([]string, error) {
 	return out, rows.Err()
 }
 
+// Email is one address on an account, with the state the signature rules
+// and notification routing depend on.
+type Email struct {
+	Address    string
+	Verified   bool
+	VerifiedBy string // smtp | admin, empty when unverified
+	Primary    bool
+}
+
+// ListEmails returns every address on the account with its state.
+func (s *Store) ListEmails(userID int64) ([]Email, error) {
+	rows, err := s.DB.Query(`SELECT address, verified_at IS NOT NULL,
+		COALESCE(verified_by, ''), is_primary
+		FROM emails WHERE user_id = ? ORDER BY is_primary DESC, address`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Email
+	for rows.Next() {
+		var e Email
+		if err := rows.Scan(&e.Address, &e.Verified, &e.VerifiedBy, &e.Primary); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 // SetUserDisabled suspends or restores an account. Disabling also drops
 // the user's web sessions; their keys and tokens stay registered but are
 // refused at every entry point until re-enabled.

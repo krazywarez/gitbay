@@ -1,0 +1,91 @@
+{{define "title"}}account settings{{end}}
+{{define "content"}}
+<h1>Account settings</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Message}}<p class="notice" role="status">{{.Message}}</p>{{end}}
+
+<h2>SSH keys</h2>
+<p class="meta">Your keys are your identity here. A <code>full</code> key can run
+commands and push; a <code>git</code> key can only move git data, which is what
+a CI checkout wants.</p>
+{{if .Keys}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
+{{range .Keys}}<tr>
+  <td class="mono">{{.Fingerprint}}{{with .Comment}}<br><span class="muted">{{.}}</span>{{end}}</td>
+  <td>{{.Algo}}</td>
+  <td>{{.Scope}}</td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button type="submit" class="linklike">Remove</button></form></td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No SSH keys — which cannot be right, since you signed in.</p>{{end}}
+<details class="editbox">
+  <summary>Add an SSH key</summary>
+  <form method="post" action="/settings" class="setform stack">
+    <input type="hidden" name="field" value="key-add">
+    <label for="key">Public key</label>
+    <textarea id="key" name="key" rows="3" required placeholder="ssh-ed25519 AAAA... you@machine"></textarea>
+    <label for="scope">Scope</label>
+    <select id="scope" name="scope">
+      <option value="full">full — commands and git</option>
+      <option value="git">git — git transport only</option>
+    </select>
+    <button type="submit" class="primary">Add key</button>
+  </form>
+</details>
+
+<h2>Email addresses</h2>
+<p class="meta">A verified address is what ties your signed commits to this
+account, and where notifications go.</p>
+{{if .Emails}}<ul class="plain">
+{{range .Emails}}<li>{{.Address}}
+  {{if .Primary}}<span class="chip">primary</span>{{end}}
+  {{if .Verified}}<span class="badge badge-verified">verified{{with .VerifiedBy}} · {{.}}{{end}}</span>
+  {{else}}<span class="badge badge-unsigned">unverified</span>{{end}}</li>
+{{end}}</ul>{{end}}
+<details class="editbox">
+  <summary>Add an address</summary>
+  <form method="post" action="/settings" class="setform">
+    <input type="hidden" name="field" value="email-add">
+    <label for="address">Address</label>
+    <input type="email" id="address" name="address" required placeholder="you@example.org">
+    <button type="submit">Send code</button>
+  </form>
+  <form method="post" action="/settings" class="setform">
+    <input type="hidden" name="field" value="email-verify">
+    <label for="code">Verification code</label>
+    <input type="text" id="code" name="code" required placeholder="from the mail">
+    <button type="submit">Verify</button>
+  </form>
+</details>
+
+<h2>OpenPGP keys</h2>
+<p class="meta">Only needed if you sign commits with GPG. SSH signing
+(<code>gpg.format = ssh</code>) uses the keys above.</p>
+{{if .PGP}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">fingerprint</th><th scope="col">identities</th><th scope="col"></th></tr>
+{{range .PGP}}<tr>
+  <td class="mono">{{.Fingerprint}}</td>
+  <td>{{range .UIDs}}{{.}}<br>{{end}}{{if .Revoked}}<span class="badge badge-bad_signature">revoked</span>{{else if .Expired}}<span class="badge badge-signed_key_expired">expired</span>{{end}}</td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="pgp-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button type="submit" class="linklike">Remove</button></form></td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No OpenPGP keys.</p>{{end}}
+<details class="editbox">
+  <summary>Add a PGP key</summary>
+  <form method="post" action="/settings" class="setform stack">
+    <input type="hidden" name="field" value="pgp-add">
+    <label for="pgpkey">Armored public key</label>
+    <textarea id="pgpkey" name="key" rows="6" required placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"></textarea>
+    <button type="submit" class="primary">Add key</button>
+  </form>
+</details>
+
+<h2>On SSH only</h2>
+<p class="meta">Anything whose input is a credential stays on the command line,
+where it can be piped instead of pasted:</p>
+<pre class="message">gitbay auth token mint --name laptop   # API tokens
+gitbay auth export &gt; account.bundle    # your account, portable
+gitbay admin ...                       # instance administration</pre>
+<p class="meta">All of the above works from stock OpenSSH too:
+<code>ssh git@{{.Host}} auth whoami</code>.</p>
+{{end}}

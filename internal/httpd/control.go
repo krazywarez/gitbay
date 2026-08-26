@@ -39,6 +39,32 @@ func (s *Server) runControl(u store.User, argv []string) (out string, msg string
 	return stdout.String(), m, code == protocol.ExitOK
 }
 
+// runControlStdin is runControl for the handful of commands whose input
+// arrives on stdin. Public keys are the only such input the web accepts:
+// they are not secret, and pasting one into a browser is how people who
+// have not set up the CLI get their first key registered. Secrets, tokens
+// and mirror credentials remain SSHOnly and are refused by the dispatcher.
+func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg string, ok bool) {
+	var stdout, stderr bytes.Buffer
+	ctx := &control.Ctx{
+		User:   u,
+		Source: "web",
+		Scope:  "full",
+		Store:  s.st,
+		Cfg:    s.cfg,
+		Stdin:  strings.NewReader(stdin),
+		Stdout: &stdout,
+		Stderr: &stderr,
+		ViaAPI: true,
+	}
+	code := control.Dispatch(ctx, argv)
+	m := strings.TrimSpace(stderr.String())
+	if m == "" {
+		m = strings.TrimSpace(stdout.String())
+	}
+	return m, code == protocol.ExitOK
+}
+
 // runControlJSON runs a command in JSON mode and returns its data object.
 // In JSON mode a failure is an envelope carrying the message rather than
 // stderr text, so both paths are read from the same envelope.

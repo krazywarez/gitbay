@@ -269,6 +269,8 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
 }
 .railfoot a { color: var(--shell-fg); }
 a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.railfoot .railsettings { color: var(--shell-muted); display: inline-flex; }
+.railfoot .railsettings:hover { color: var(--shell-fg); }
 .railfoot .linklike {
   background: none; border: 0; padding: 0; cursor: pointer;
   color: var(--shell-muted); font: inherit; text-decoration: underline;
@@ -795,6 +797,21 @@ pre.message {
 }
 
 /* repo facts: the counts a visitor sizes a project up with */
+/* account settings */
+table.keys td { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }
+table.keys td.mono, .mono { font-family: var(--mono); font-size: var(--fs-1); overflow-wrap: anywhere; }
+table.keys td.act { text-align: right; }
+ul.plain { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
+ul.plain li { padding: var(--sp-1) 0; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+form.setform.stack { display: block; }
+form.setform.stack textarea, form.setform.stack select { width: 100%; max-width: 48rem; display: block; margin-bottom: var(--sp-2); }
+p.notice {
+  border-left: 3px solid var(--ok);
+  background: var(--hover);
+  padding: var(--sp-2) var(--sp-3);
+  margin: 0 0 var(--sp-4);
+}
+
 .facts { margin: 0 0 var(--sp-4); }
 .facts .counts {
   display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4);
