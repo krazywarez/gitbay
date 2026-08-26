@@ -24,7 +24,8 @@ web dispatcher refuses =SSHOnly= commands outright.
 | resolve a thread      | yes     | yes |
 | merge (all strategies)| yes     | yes |
 | close                 | yes     | yes |
-| create                | yes     | no  |
+| create                | yes     | yes |
+| create from a fork    | yes     | no  |
 | comment on a diff line| yes     | no  |
 | retarget              | yes     | no  |
 
