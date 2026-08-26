@@ -61,8 +61,7 @@
 
 {{else}}
 <p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span></p>
-<pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
-{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="threadstate">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}{{template "threadact" dict "ID" .ID "Resolved" .Resolved "Base" $base "Can" $.CanWrite}}</div><pre class="diff">{{end}}{{end}}</pre>
+{{template "difffiles" dict "Files" .DiffFiles "Base" $base "Can" .CanWrite}}
 {{end}}
 
 </div>
@@ -119,4 +118,3 @@
 </div>
 {{end}}
 
-{{define "threadact"}}{{if .Can}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{.ID}}"><button type="submit" name="action" value="{{if .Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if .Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}{{end}}

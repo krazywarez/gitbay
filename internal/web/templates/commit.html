@@ -9,6 +9,5 @@
   {{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
 </div>
 <pre class="message">{{.Message}}</pre>
-<pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
-{{end}}</pre>
+{{template "difffiles" dict "Files" .DiffFiles "Base" "" "Can" false}}
 {{end}}

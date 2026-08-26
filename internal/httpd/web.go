@@ -1060,53 +1060,6 @@ func renderReadme(name string, raw []byte) template.HTML {
 	}
 }
 
-type diffLine struct {
-	Class   string
-	Text    string
-	Path    string // file this line belongs to
-	NewLine int64  // line number in the new file (0 when absent)
-	OldLine int64  // line number in the old file (0 when absent)
-	Threads []diffThread
-}
-
-var hunkPat = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
-
-// classifyDiff parses a unified diff into rendered lines, tracking the
-// file and old/new line numbers so review threads can anchor inline.
-func classifyDiff(patch string) []diffLine {
-	var lines []diffLine
-	path := ""
-	var oldN, newN int64
-	for _, l := range strings.Split(patch, "\n") {
-		d := diffLine{Text: l}
-		switch {
-		case strings.HasPrefix(l, "+++ "):
-			d.Class = "meta"
-			path = strings.TrimPrefix(strings.TrimPrefix(l, "+++ "), "b/")
-		case strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "):
-			d.Class = "meta"
-		case strings.HasPrefix(l, "@@"):
-			d.Class = "hunk"
-			if m := hunkPat.FindStringSubmatch(l); m != nil {
-				oldN, _ = strconv.ParseInt(m[1], 10, 64)
-				newN, _ = strconv.ParseInt(m[2], 10, 64)
-			}
-		case strings.HasPrefix(l, "+"):
-			d.Class, d.Path, d.NewLine = "add", path, newN
-			newN++
-		case strings.HasPrefix(l, "-"):
-			d.Class, d.Path, d.OldLine = "del", path, oldN
-			oldN++
-		default:
-			d.Path, d.OldLine, d.NewLine = path, oldN, newN
-			oldN++
-			newN++
-		}
-		lines = append(lines, d)
-	}
-	return lines
-}
-
 type diffThread struct {
 	ID       int64
 	Resolved string
@@ -1117,7 +1070,7 @@ type diffThread struct {
 // attachThreads injects review threads under their anchored diff lines;
 // threads whose anchor no longer appears (stale after force-push, or on a
 // context line outside the current diff) are returned separately.
-func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA string, md func(string) template.HTML) ([]diffLine, []diffThread) {
+func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md func(string) template.HTML) ([]diffFile, []diffThread) {
 	type anchor struct {
 		path string
 		side string
@@ -1137,19 +1090,24 @@ func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA strin
 		}
 	}
 	placed := map[int64]bool{}
-	for i := range lines {
-		for _, id := range order {
-			if placed[id] || threads[id].Stale {
-				continue
-			}
-			a := anchors[id]
-			if lines[i].Path != a.path {
-				continue
-			}
-			if (a.side == "new" && lines[i].NewLine == a.line && lines[i].Class != "del") ||
-				(a.side == "old" && lines[i].OldLine == a.line && lines[i].Class == "del") {
-				lines[i].Threads = append(lines[i].Threads, *threads[id])
-				placed[id] = true
+	for f := range files {
+		lines := files[f].Lines
+		for i := range lines {
+			for _, id := range order {
+				if placed[id] || threads[id].Stale {
+					continue
+				}
+				a := anchors[id]
+				if lines[i].Path != a.path {
+					continue
+				}
+				if (a.side == "new" && lines[i].NewLine == a.line && lines[i].Class != "del") ||
+					(a.side == "old" && lines[i].OldLine == a.line && lines[i].Class == "del") {
+					lines[i].Threads = append(lines[i].Threads, *threads[id])
+					files[f].Threads++
+					files[f].Open = true
+					placed[id] = true
+				}
 			}
 		}
 	}
@@ -1159,7 +1117,7 @@ func attachThreads(lines []diffLine, comments []store.DiffComment, headSHA strin
 			unplaced = append(unplaced, *threads[id])
 		}
 	}
-	return lines, unplaced
+	return files, unplaced
 }
 
 type sigView struct {
@@ -1263,7 +1221,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	patch, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
-	lines := classifyDiff(patch)
+	files := parseDiff(patch)
 	committerEmail := ""
 	if parsed.CommitterEmail != parsed.AuthorEmail {
 		committerEmail = parsed.CommitterEmail
@@ -1281,10 +1239,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		Parents                                                                           []string
 		Sig                                                                               sigView
 		Checks                                                                            []store.CommitStatus
-		DiffLines                                                                         []diffLine
+		DiffFiles                                                                         []diffFile
 	}{p, full, full[:10], commitNames.name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, commitUser, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
-		gitutil.Parents(p.Dir, full), v, checks, lines})
+		gitutil.Parents(p.Dir, full), v, checks, files})
 }
 
 // labelPalette provides default label chip colors: mid-tone hues that stay
@@ -1472,7 +1430,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	diffComments, _ := s.st.ListDiffComments(m.ID)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
-	var lines []diffLine
+	var files []diffFile
 	base := m.MergedBase
 	if base == "" {
 		if b, err := gitutil.MergeBase(p.Dir, "refs/heads/"+m.TargetRef, headRef); err == nil {
@@ -1481,27 +1439,13 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	if base != "" {
 		if patch, err := gitutil.Diff(p.Dir, base, headRef, 4<<20); err == nil {
-			lines = classifyDiff(patch)
+			files = parseDiff(patch)
 		}
 	}
 	md := s.ugcFor(r, p.Repo)
 	var detachedThreads []diffThread
-	lines, detachedThreads = attachThreads(lines, diffComments, m.HeadSHA, md)
-	type diffStat struct{ Files, Adds, Dels int }
-	var stat diffStat
-	seenFiles := map[string]bool{}
-	for _, l := range lines {
-		switch l.Class {
-		case "add":
-			stat.Adds++
-		case "del":
-			stat.Dels++
-		}
-		if l.Path != "" && !seenFiles[l.Path] {
-			seenFiles[l.Path] = true
-			stat.Files++
-		}
-	}
+	files, detachedThreads = attachThreads(files, diffComments, m.HeadSHA, md)
+	stat := statOf(files)
 	// The commits this MR carries: base..head, the same range as the diff.
 	type commitRow struct {
 		SHA, ShortSHA, Subject, AuthorName, AuthorUser, Date string
@@ -1544,7 +1488,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Combined        string
 		Comments        []renderedComment
 		Reviews         []store.MRReview
-		DiffLines       []diffLine
+		DiffFiles       []diffFile
 		Stat            diffStat
 		Commits         []commitRow
 		CanEdit         bool
@@ -1553,7 +1497,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Notice          string
 		DetachedThreads []diffThread
 	}{p, m, view, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
-		reviews, lines, stat, commits, s.canEditItem(r, p.Repo, m.Author),
+		reviews, files, stat, commits, s.canEditItem(r, p.Repo, m.Author),
 		s.canWriteRepo(r, p.Repo), unresolved, r.URL.Query().Get("e"), detachedThreads})
 }
 

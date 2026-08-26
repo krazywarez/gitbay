@@ -47,11 +47,12 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 			}
 		}
 		subject, _, _ := strings.Cut(m.Message, "\n")
+		author := authorLink(st, m.AuthorName, m.AuthorEmail)
 		for n := range closes {
-			actOnIssue(st, repo, actorID, m.SHA, n, true, subject)
+			actOnIssue(st, repo, actorID, m.SHA, n, true, subject, author)
 		}
 		for n := range refs {
-			actOnIssue(st, repo, actorID, m.SHA, n, false, subject)
+			actOnIssue(st, repo, actorID, m.SHA, n, false, subject, author)
 		}
 	}
 }
@@ -72,7 +73,20 @@ func RecordLandedCommits(st *store.Store, dir string, repo store.Repo, old, new 
 	}
 }
 
-func actOnIssue(st *store.Store, repo store.Repo, actorID int64, sha string, number int64, close bool, subject string) {
+// authorLink renders the commit's author for a system comment: a link to
+// their profile when the author email is verified on an account here, and
+// the name git recorded otherwise.
+func authorLink(st *store.Store, name, email string) string {
+	if user, ok := st.UsernameByVerifiedEmail(email); ok {
+		return fmt.Sprintf("[%s](/%s)", user, user)
+	}
+	if name == "" {
+		return email
+	}
+	return name
+}
+
+func actOnIssue(st *store.Store, repo store.Repo, actorID int64, sha string, number int64, close bool, subject, author string) {
 	issue, err := st.IssueByNumber(repo.ID, number)
 	if err != nil {
 		return // no such issue: the reference is just text
@@ -93,9 +107,9 @@ func actOnIssue(st *store.Store, repo store.Repo, actorID int64, sha string, num
 			slog.Error("commit refs: closing issue", "issue", number, "err", err)
 			return
 		}
-		st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("closed by commit %s: %s", link, subject))
+		st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("closed by commit %s by %s: %s", link, author, subject))
 		st.RecordEvent(repo.ID, actorID, "issue.closed", fmt.Sprintf(`{"number":%d,"sha":%q}`, number, sha))
 		return
 	}
-	st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("referenced in commit %s: %s", link, subject))
+	st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("referenced in commit %s by %s: %s", link, author, subject))
 }

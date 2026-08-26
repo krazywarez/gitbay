@@ -34,8 +34,10 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	// A closing keyword on the default branch closes the issue with a
 	// comment; a bare reference (and a nonexistent #99) only comments.
 	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	aliceEnv := append(append([]string{}, env...),
+		"GIT_AUTHOR_NAME=Alice", "GIT_AUTHOR_EMAIL=alice@example.test")
 	mustGit(t, dir, env, "add", ".")
-	mustGit(t, dir, env, "commit", "-q", "-m", "repair the widget\n\nFixes #1. Related to #2 but not #99.")
+	mustGit(t, dir, aliceEnv, "commit", "-q", "-m", "repair the widget\n\nFixes #1. Related to #2 but not #99.")
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
 
 	out, _, _ := inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "1", "--json")
@@ -54,6 +56,15 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	if !strings.Contains(out, `"state":"open"`) || !strings.Contains(out, "referenced in commit") ||
 		!strings.Contains(out, "repair the widget") {
 		t.Fatalf("issue 2 not referenced: %s", out)
+	}
+	// The reference names who wrote the commit, and links them when the
+	// author email is verified on an account here.
+	if !strings.Contains(out, "by [alice](/alice)") {
+		t.Fatalf("reference does not attribute the author: %s", out)
+	}
+	if status, body := inst.get(t, "/alice/app/issues/2"); status != 200 ||
+		!strings.Contains(body, `href="/alice"`) {
+		t.Fatalf("web reference does not link the author: %d\n%s", status, body)
 	}
 
 	// Commits on a feature branch do nothing until they land on the
@@ -77,6 +88,11 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "3", "--json")
 	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") {
 		t.Fatalf("merge did not close issue 3: %s", out)
+	}
+	// This one was authored by an address nobody has verified, so it names
+	// git's author without inventing a profile link for them.
+	if !strings.Contains(out, "by t:") || strings.Contains(out, "by [t]") {
+		t.Fatalf("unresolved author should stay plain text: %s", out)
 	}
 	if strings.Count(out, "closed by commit") != 1 {
 		t.Fatalf("duplicate close comments: %s", out)

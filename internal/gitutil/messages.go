@@ -62,15 +62,17 @@ func HasCommit(dir, sha string) bool {
 }
 
 type CommitMsg struct {
-	SHA     string
-	Message string
+	SHA         string
+	Message     string
+	AuthorName  string
+	AuthorEmail string
 }
 
 // RevListMessages returns sha and full message for commits reachable from
 // new but not old, newest first, capped at max. An empty or zero old (new
 // branch) lists from new alone, still capped.
 func RevListMessages(dir, old, new string, max int) ([]CommitMsg, error) {
-	args := []string{"-C", dir, "rev-list", fmt.Sprintf("-n%d", max), "--format=%B%x00", new}
+	args := []string{"-C", dir, "rev-list", fmt.Sprintf("-n%d", max), "--format=%an%x01%ae%x01%B%x00", new}
 	if old != "" && old != zeroSHA {
 		args = append(args, "^"+old)
 	}
@@ -88,7 +90,20 @@ func RevListMessages(dir, old, new string, max int) ([]CommitMsg, error) {
 		if !ok || !strings.HasPrefix(header, "commit ") {
 			continue
 		}
-		msgs = append(msgs, CommitMsg{SHA: strings.TrimPrefix(header, "commit "), Message: strings.TrimSpace(body)})
+		name, rest, ok := strings.Cut(body, "\x01")
+		if !ok {
+			continue
+		}
+		email, message, ok := strings.Cut(rest, "\x01")
+		if !ok {
+			continue
+		}
+		msgs = append(msgs, CommitMsg{
+			SHA:         strings.TrimPrefix(header, "commit "),
+			Message:     strings.TrimSpace(message),
+			AuthorName:  name,
+			AuthorEmail: email,
+		})
 	}
 	return msgs, nil
 }

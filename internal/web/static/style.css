@@ -42,6 +42,10 @@
   --surface: #ffffff;
   --hover: #f5f5f5;
   --code-bg: #f5f5f5;
+  --fill-subtle: #ececec;    /* hunk headers, summary hover */
+  --diff-add: #e4f6ea;       /* row grounds: tinted enough to scan, light
+                                enough that syntax colors stay legible */
+  --diff-del: #fdeaea;
 
   /* blue: what you can do */
   --accent: #0000f0;         /* links, focus — 9.30:1 on white */
@@ -104,6 +108,9 @@
     --surface: #0f0f0f;
     --hover: #161616;
     --code-bg: #050505;
+    --fill-subtle: #161616;
+    --diff-add: #0d2a18;
+    --diff-del: #2c1113;
     --accent: #5b6bff;       /* 4.71:1 — pure #0000f0 is 2.13:1 here */
     --accent-fg: #ffffff;
     --fill: #0000f0;         /* fills stay pure; white on it clears 9:1 */
@@ -787,34 +794,81 @@ pre.message {
   overflow-wrap: anywhere;
 }
 
-/* diffs */
+/* diffs: one foldable section per file, a table so the line-number
+   gutters stay put while the code scrolls */
+details.difffold {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  margin: 0 0 var(--sp-3);
+  background: var(--code-bg);
+}
 details.difffold summary {
   cursor: pointer;
   display: flex;
   align-items: baseline;
   gap: var(--sp-3);
-  margin: var(--sp-5) 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   list-style: none;
+  font-size: var(--fs-2);
 }
+details.difffold[open] summary { border-bottom: 1px solid var(--line); }
 details.difffold summary::-webkit-details-marker { display: none; }
 /* flex summaries lose the native disclosure marker; draw our own */
-details.difffold summary::before { content: "▸"; color: var(--muted); }
-details.difffold[open] summary::before { content: "▾"; }
-details.difffold summary h3 { display: inline; margin: 0; }
-details.difffold summary .add { color: var(--ok); }
-details.difffold summary .del { color: var(--bad); }
-pre.diff {
-  background: var(--code-bg);
-  border: 1px solid var(--line);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md);
-  overflow-x: auto;
+details.difffold summary::before { content: "\25b8"; color: var(--muted); }
+details.difffold[open] summary::before { content: "\25be"; }
+details.difffold summary:hover { background: var(--fill-subtle); }
+summary .fpath { font-family: var(--mono); overflow-wrap: anywhere; }
+summary .fpath .was { color: var(--muted); }
+summary .fstat { margin-left: auto; font-family: var(--mono); white-space: nowrap; }
+details.difffold .add { color: var(--ok); }
+details.difffold .del { color: var(--bad); }
+details.difffold > .none { padding: var(--sp-3); margin: 0; }
+details.difffold .tablewrap { border-radius: 0 0 var(--r-md) var(--r-md); }
+
+table.difftable {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: var(--fs-1);
   line-height: 1.5;
 }
-pre.diff .add { color: var(--ok); }
-pre.diff .del { color: var(--bad); }
-pre.diff .hunk { color: var(--accent); }
-pre.diff .meta { color: var(--muted); }
+table.difftable td {
+  border: 0;
+  padding: 0;
+  vertical-align: top;
+  font-size: inherit;
+}
+table.difftable td.ln {
+  width: 1%;
+  min-width: 2.5rem;
+  padding: 0 var(--sp-2);
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.difftable td.code {
+  padding: 0 var(--sp-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* the marker is decoration, so it lives in CSS and stays out of a copied
+   selection */
+table.difftable tr.add td.code::before { content: "+"; color: var(--ok); }
+table.difftable tr.del td.code::before { content: "\2212"; color: var(--bad); }
+table.difftable tr.ctx td.code::before { content: " "; }
+table.difftable tr.add { background: var(--diff-add); }
+table.difftable tr.del { background: var(--diff-del); }
+table.difftable tr.hunk td, table.difftable tr.dmeta td {
+  color: var(--muted);
+  padding: var(--sp-1) var(--sp-3);
+  background: var(--fill-subtle);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+table.difftable tr.hunk td.code { color: var(--accent); }
+table.difftable tr.threadrow td { padding: var(--sp-2) var(--sp-3); background: var(--bg); }
 
 /* badges: signature and check states. Semantic colors stay distinct:
    green verified/success, amber pending/stale, red bad/failure, muted

@@ -110,11 +110,11 @@ func TestDashboard(t *testing.T) {
 	if !strings.Contains(body, `href="/alice/app/mrs/1?view=diff"`) {
 		t.Fatal("merge request missing the files-changed view")
 	}
-	if strings.Contains(body, `class="diff"`) {
+	if strings.Contains(body, `class="difftable"`) {
 		t.Fatal("diff rendered on the conversation view")
 	}
 	_, body = inst.get(t, "/alice/app/mrs/1?view=diff")
-	if !strings.Contains(body, "1 file changed") || !strings.Contains(body, `class="diff"`) {
+	if !strings.Contains(body, "1 file changed") || !strings.Contains(body, `class="difftable"`) {
 		t.Fatalf("diff view missing stat or patch:\n%s", body)
 	}
 }
