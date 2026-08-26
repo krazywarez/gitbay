@@ -1,7 +1,6 @@
 {{define "title"}}new issue · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
-<h2>new issue</h2>
+<h1>New issue</h1>
 {{if gt (len .Templates) 1}}<p class="meta">template:
 {{range .Templates}}{{if eq .Name $.Template}}<strong>{{.Name}}</strong>{{else}}<a href="?template={{.Name}}">{{.Name}}</a>{{end}} {{end}}</p>{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new" class="commentform">

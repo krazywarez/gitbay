@@ -1,8 +1,7 @@
 {{define "title"}}{{.ShortSHA}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
 <div class="commithead">
-  <h2>commit <code>{{.ShortSHA}}</code></h2>
+  <h1>Commit <code>{{.ShortSHA}}</code></h1>
   <p class="meta"><code class="fullsha">{{.SHA}}</code></p>
   {{if .Parents}}<p class="meta">parent{{if gt (len .Parents) 1}}s{{end}}:{{range .Parents}} <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.}}">{{short .}}</a></code>{{end}}</p>{{end}}
   <p>{{template "sigbadge" .Sig}}{{range .Checks}} <span class="badge check-{{.State}}">{{.Context}}: {{.State}}</span>{{end}}</p>

@@ -1,6 +1,6 @@
 {{define "title"}}blame: {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
+<h1 class="vh">Blame: {{.Path}}</h1>
 <div class="pathbar">
   <span class="refchip">{{template "branchicon"}} {{.Ref}}</span>
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}<strong>{{.Base}}</strong></span>

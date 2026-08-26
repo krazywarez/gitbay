@@ -1,6 +1,6 @@
 {{define "title"}}search · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
+<h1>Search</h1>
 <form method="get" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search" class="searchform">
   <input type="search" name="q" value="{{.Query}}" placeholder="search file contents on {{.Ref}}" autofocus>
   <button type="submit">search</button>

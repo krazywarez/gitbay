@@ -8,65 +8,90 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-<header>
-  <nav class="topnav">
-    <a class="site" href="/"><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M5 9.5c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M5 15c2-2.5 4-2.5 6 0s4 2.5 6 0" stroke="var(--accent-fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>{{.Site}}</a>
-    <span class="spacer"></span>
-    {{if .Viewer}}<a class="avatar" href="/{{.Viewer}}" title="{{.Viewer}}" aria-label="{{.Viewer}}">{{initial .Viewer}}</a>
-    {{else}}<a class="avatar guest" href="/login" title="sign in" aria-label="sign in">→</a>{{end}}
-  </nav>
-</header>
+<a class="skip" href="#content">Skip to content</a>
 <div class="shell">
-<nav class="siderail" aria-label="site">
-  <div class="railmain">
-    <a {{if eq (str . "Tab") "explore"}}class="active" {{end}}href="/explore">explore</a>
-    {{if .Viewer}}<a href="/new">new repository</a>{{end}}
-    {{with field . "Repo"}}
-    <span class="glabel">{{.OwnerName}}/{{.Name}}</span>
-    <span class="glabel sub">code</span>
-    <a {{if eq (str $ "Tab") "files"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}">files</a>
-    <a {{if eq (str $ "Tab") "log"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/log">log</a>
-    <a {{if eq (str $ "Tab") "refs"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/refs">refs</a>
-    <span class="glabel sub">work</span>
-    <a {{if eq (str $ "Tab") "issues"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">issues</a>
-    <a {{if eq (str $ "Tab") "merge requests"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/mrs">merge requests</a>
-    <a {{if eq (str $ "Tab") "builds"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/builds">builds</a>
-    <span class="glabel sub">publish</span>
-    <a {{if eq (str $ "Tab") "releases"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/releases">releases</a>
-    {{if field $ "HasWiki"}}<a {{if eq (str $ "Tab") "wiki"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/wiki">wiki</a>{{end}}
-    <span class="glabel sub">tools</span>
-    <a {{if eq (str $ "Tab") "search"}}class="active" {{end}}href="/{{.OwnerName}}/{{.Name}}/search">search</a>
-    <a href="/{{.OwnerName}}/{{.Name}}/archive/{{str $ "Ref"}}.tar.gz">archive</a>
+
+{{$here := ""}}{{with field . "Repo"}}{{$here = printf "%s/%s" .OwnerName .Name}}{{end}}
+<nav class="rail" aria-label="Site">
+  <a class="brand" href="/">{{template "mark"}}<span>{{.Site}}</span></a>
+  <div class="railbody">
+    <ul class="raillist">
+      {{if .Viewer}}<li><a href="/">Dashboard</a></li>{{end}}
+      <li><a {{if eq (str . "Tab") "explore"}}aria-current="page" {{end}}href="/explore">Explore</a></li>
+      {{if .Viewer}}<li><a href="/new">New repository</a></li>{{end}}
+    </ul>
+    {{with .Rail.Pinned}}
+    <div class="railgroup">
+    <p class="raillabel" id="rail-pinned">Pinned</p>
+    <ul class="raillist" aria-labelledby="rail-pinned">
+      {{range .}}<li><a {{if eq $here (printf "%s/%s" .Owner .Name)}}aria-current="page" {{end}}href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a></li>
+      {{end}}
+    </ul>
+    </div>
+    {{end}}
+    {{with .Rail.Reviews}}
+    <div class="railgroup">
+    <p class="raillabel" id="rail-reviews">Waiting on you <b class="count">{{len .}}</b></p>
+    <ul class="raillist wide" aria-labelledby="rail-reviews">
+      {{range .}}<li><a href="/{{.RepoPath}}/mrs/{{.Number}}"><b>!{{.Number}} {{.Title}}</b><span class="owner">{{.RepoPath}}</span></a></li>
+      {{end}}
+    </ul>
+    </div>
     {{end}}
   </div>
   <div class="railfoot">
-    {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar sm">{{initial .Viewer}}</span>{{.Viewer}}</a>
-    <form method="post" action="/logout"><button type="submit" class="linklike">log out</button></form>
-    {{else}}<a href="/login">sign in</a>{{end}}
+    {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar">{{initial .Viewer}}</span>{{.Viewer}}</a>
+    <form method="post" action="/logout"><button type="submit" class="linklike">Log out</button></form>
+    {{else}}<a href="/login">Sign in</a>{{end}}
   </div>
 </nav>
-<main class="container">
+
+<div class="pane">
+{{with field . "Repo"}}
+<header class="repohead">
+  <div class="identity">
+    {{if field $ "RepoHome"}}<h1 class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span>{{.Name}}</h1>
+    {{else}}<p class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></p>{{end}}
+    {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
+    {{if .Settings.Archived}}<span class="chip">Archived</span>{{end}}
+    <span class="grow"></span>
+    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}">{{if field $ "Pinned"}}★ Pinned{{else}}☆ Pin{{end}}</button></form>{{end}}
+  </div>
+  {{if field $ "RepoHome"}}
+  {{with field $ "Desc"}}<p class="repodesc">{{.}}</p>{{end}}
+  {{with field $ "Topics"}}<p class="topics">{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
+  {{with $.Repo.Settings.Website}}<p class="repometa"><a href="{{.}}" rel="nofollow">{{.}}</a></p>{{end}}
+  {{range field $ "Mirrors"}}<p class="repometa">{{if eq .Direction "push"}}Mirrors to{{else}}Mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="bad">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
+  {{end}}
+  {{end}}
+  <nav class="tabs" aria-label="Repository">
+    {{$top := topTab (str $ "Tab")}}
+    <a {{if eq $top "code"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}">Code</a>
+    <a {{if eq $top "issues"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">Issues{{with field $ "OpenIssues"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>
+    <a {{if eq $top "mrs"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/mrs">Merge requests{{with field $ "OpenMRs"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>
+    <a {{if eq $top "builds"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/builds">Builds</a>
+    <a {{if eq $top "releases"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/releases">Releases</a>
+    {{if field $ "HasWiki"}}<a {{if eq $top "wiki"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/wiki">Wiki</a>{{end}}
+  </nav>
+</header>
+{{end}}
+
+<main id="content" class="content">
 {{template "content" .}}
 </main>
-</div>
+
 <footer>
-  <div class="container"><p>powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="/privacy">privacy</a></p></div>
+  <p>Powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="/privacy">Privacy</a></p>
 </footer>
+</div>
+</div>
 </body>
 </html>{{end}}
 
-{{define "repoheader"}}
-<div class="repohead">
-<h1 class="repotitle"><a class="owner" href="/{{.Repo.OwnerName}}">{{.Repo.OwnerName}}</a><span class="sep">/</span><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>{{if eq .Repo.Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Repo.Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}{{if .Viewer}}<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/pin" class="inline pinform"><button type="submit" class="pinbtn{{if .Pinned}} pinned{{end}}" title="{{if .Pinned}}unpin from dashboard{{else}}pin to dashboard{{end}}">{{if .Pinned}}★ pinned{{else}}☆ pin{{end}}</button></form>{{end}}</h1>
-{{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
-{{if .Repo.Settings.Website}}<p class="meta repowebsite"><a href="{{.Repo.Settings.Website}}" rel="nofollow">{{.Repo.Settings.Website}}</a></p>{{end}}
-{{if .Topics}}<p class="topics">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
-{{range .Mirrors}}<p class="meta mirrorline">{{if eq .Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="mirrorerr">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
-{{end}}</div>
-{{end}}
+{{define "mark"}}<svg class="mark" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.25 18.75 12H5.25z" fill="#ff6b3d"/><rect x="3" y="13.5" width="18" height="3" fill="currentColor"/><rect x="7.5" y="18" width="9" height="3" fill="currentColor"/></svg>{{end}}
 
 {{define "reporow"}}<li>
-  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}{{if .Settings.Archived}} <span class="chip chip-stale">archived</span>{{end}}</p>
+  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip">Private</span>{{end}}{{if .Settings.Archived}} <span class="chip">Archived</span>{{end}}</p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   {{if .Topics}}<p class="topics">{{range .Topics}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
   <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}{{if .License}} · {{.License}}{{end}}{{if .Updated}} · updated {{.Updated}}{{end}}</p>
@@ -76,7 +101,7 @@
   <summary class="refchip">{{template "branchicon"}} {{.Ref}}</summary>
   <div class="refdrop">
   {{range .Branches}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/{{$.RefKind}}/{{.Name}}/{{$.DirPath}}">{{.Name}}</a>
-  {{end}}<a class="allrefs" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">all refs →</a>
+  {{end}}<a class="allrefs" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/refs">All refs →</a>
   </div>
 </details>{{else}}<span class="refchip">{{template "branchicon"}} {{.Ref}}</span>{{end}}{{end}}
 

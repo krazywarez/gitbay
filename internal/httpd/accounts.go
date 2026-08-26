@@ -64,19 +64,18 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
 		s.render(w, "login.html", struct {
-			Site   string
-			Viewer string
-			Error  string
-		}{s.siteName(), "", ""})
+			basePage
+			Error string
+		}{basePage{Site: s.siteName()}, ""})
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
 		s.render(w, "login.html", struct {
-			Site   string
-			Viewer string
-			Error  string
-		}{s.siteName(), "", "that login link is invalid, expired, or already used — mint a new one"})
+			basePage
+			Error string
+		}{basePage{Site: s.siteName()},
+			"that login link is invalid, expired, or already used — mint a new one"})
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()
@@ -120,11 +119,10 @@ func (s *Server) adminOrgs(u store.User) []string {
 
 func (s *Server) renderNewRepo(w http.ResponseWriter, u store.User, errMsg string) {
 	s.render(w, "new.html", struct {
-		Site   string
-		Viewer string
-		Orgs   []string
-		Error  string
-	}{s.siteName(), u.Username, s.adminOrgs(u), errMsg})
+		basePage
+		Orgs  []string
+		Error string
+	}{s.baseFor(u), s.adminOrgs(u), errMsg})
 }
 
 func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -223,13 +221,12 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderSignup(w http.ResponseWriter, errMsg, username string) {
 	s.render(w, "register.html", struct {
-		Site     string
-		Viewer   string
+		basePage
 		Host     string
 		Mode     string // open | invite
 		Error    string
 		Username string
-	}{s.siteName(), "", s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
+	}{basePage{Site: s.siteName()}, s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
 }
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
@@ -247,12 +244,11 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "registered.html", struct {
-		Site     string
-		Viewer   string
+		basePage
 		Username string
 		Message  string
 		Host     string
-	}{s.siteName(), "", username, msg, s.cfg.SiteHost()})
+	}{basePage{Site: s.siteName()}, username, msg, s.cfg.SiteHost()})
 }
 
 // issueCreateForm renders the new-issue form, prefilled from the repo's
@@ -441,8 +437,7 @@ func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store
 }
 
 type editPage struct {
-	Site    string
-	Viewer  string
+	basePage
 	Repo    store.Repo
 	Ref     string
 	Path    string
@@ -467,7 +462,7 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 		return
 	}
 	s.render(w, "edit.html", editPage{
-		Site: s.siteName(), Viewer: u.Username, Repo: repo,
+		basePage: s.baseFor(u), Repo: repo,
 		Ref: ref, Path: filePath, Content: string(content),
 	})
 }
@@ -481,7 +476,7 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request, u store.User
 	filePath := strings.Trim(r.PathValue("path"), "/")
 	fail := func(msg string) {
 		s.render(w, "edit.html", editPage{
-			Site: s.siteName(), Viewer: u.Username, Repo: repo,
+			basePage: s.baseFor(u), Repo: repo,
 			Ref: ref, Path: filePath, Content: r.FormValue("content"), Error: msg,
 		})
 	}

@@ -88,7 +88,7 @@ func TestWebUI(t *testing.T) {
 	if !strings.Contains(body, "<h1>hello site</h1>") || !strings.Contains(body, "<em>markdown</em>") {
 		t.Fatalf("README not rendered:\n%s", body)
 	}
-	for _, tab := range []string{">issues<", ">merge requests<"} {
+	for _, tab := range []string{">Issues<", ">Merge requests<"} {
 		if !strings.Contains(body, tab) {
 			t.Fatalf("repo header missing %s tab", tab)
 		}

@@ -118,3 +118,34 @@ func (s *Store) PinnedRepos(userID int64) ([]Repo, error) {
 	}
 	return out, rows.Err()
 }
+
+// ReviewQueue returns open merge requests the user is involved in, has not
+// authored, and has not reviewed at the current head — what the rail shows
+// as waiting on them. Ordered most recently touched first.
+func (s *Store) ReviewQueue(userID int64) ([]DashboardItem, error) {
+	return s.dashboardQuery(`
+		SELECT COALESCE(u.username, o.name) || '/' || r.name,
+		       x.number, x.title, au.username, x.state, x.updated_at
+		FROM merge_requests x
+		JOIN repos r ON r.id = x.repo_id
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		JOIN users au ON au.id = x.author_id
+		WHERE x.state IN ('open', 'source_gone')
+		  AND x.author_id <> ?1
+		  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
+		                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
+		                    AND rv.head_sha = x.head_sha)
+		  AND `+involvedCond+`
+		ORDER BY x.updated_at DESC LIMIT 8`, userID)
+}
+
+// OpenCounts returns the repo's open issue and open merge request counts,
+// for the repo tab badges.
+func (s *Store) OpenCounts(repoID int64) (issues, mrs int) {
+	s.DB.QueryRow("SELECT COUNT(*) FROM issues WHERE repo_id = ? AND state = 'open'",
+		repoID).Scan(&issues)
+	s.DB.QueryRow("SELECT COUNT(*) FROM merge_requests WHERE repo_id = ? AND state IN ('open', 'source_gone')",
+		repoID).Scan(&mrs)
+	return
+}

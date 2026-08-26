@@ -1,8 +1,7 @@
 {{define "title"}}milestones · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
 <div class="listhead">
-  <h2>milestones</h2>
+  <h1>Milestones</h1>
   <nav class="filters">
     <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
     <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>

@@ -62,8 +62,8 @@ func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
 	w.Write(web.FaviconSVG)
 }
 
-// font serves the embedded IBM Plex subsets. Same-origin, so the CSP's
-// default-src 'self' covers it — no font CDN.
+// font serves the embedded Atkinson Hyperlegible subsets. Same-origin,
+// so the CSP's default-src 'self' covers it — no font CDN.
 func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 	data, err := web.FontFS.ReadFile("static" + r.URL.Path[len("/static"):])
 	if err != nil {
@@ -79,10 +79,9 @@ func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 // the stock plain-text response if the template fails.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	if err := web.Render(&buf, "404.html", struct {
-		Site   string
-		Viewer string
-	}{s.siteName(), s.viewerName(r)}); err != nil {
+	if err := web.Render(&buf, "404.html", basePage{
+		Site: s.siteName(), Viewer: s.viewerName(r),
+	}); err != nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -129,12 +128,11 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(
 		s.cfg.Server.SiteURL, "https://"), "http://"), "/")
 	s.render(w, "landing.html", struct {
-		Site     string
-		Viewer   string
+		basePage
 		Host     string
 		Accounts bool
 		Signup   bool
-	}{s.siteName(), "", host, s.cfg.Web.Mode == "accounts",
+	}{basePage{Site: s.siteName()}, host, s.cfg.Web.Mode == "accounts",
 		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed"})
 }
 
@@ -150,12 +148,11 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	mrs, _ := s.st.DashboardMRs(viewer.ID)
 	issues, _ := s.st.DashboardIssues(viewer.ID)
 	s.render(w, "dashboard.html", struct {
-		Site   string
-		Viewer string
+		basePage
 		Pinned []store.Repo
 		MRs    []store.DashboardItem
 		Issues []store.DashboardItem
-	}{s.siteName(), viewer.Username, visible, mrs, issues})
+	}{s.baseFor(viewer), visible, mrs, issues})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +167,10 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	s.render(w, "explore.html", struct {
-		Site   string
-		Viewer string
-		Query  string
-		Repos  []describedRepo
-	}{s.siteName(), viewer.Username, q, s.filterRepos(q, s.describeAll(repos))})
+		basePage
+		Query string
+		Repos []describedRepo
+	}{s.baseFor(viewer), q, s.filterRepos(q, s.describeAll(repos))})
 }
 
 // viewerName returns the logged-in username for header rendering, or "".
@@ -189,11 +185,10 @@ func (s *Server) viewerName(r *http.Request) string {
 // data, plus this instance's operator-provided notes.
 func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "privacy.html", struct {
-		Site   string
-		Viewer string
+		basePage
 		Host   string
 		Notice string
-	}{s.siteName(), s.viewerName(r), s.cfg.SiteHost(), s.cfg.Web.PrivacyNotice})
+	}{s.base(r), s.cfg.SiteHost(), s.cfg.Web.PrivacyNotice})
 }
 
 // filterRepos keeps repos whose path, description, or topics contain the
@@ -222,8 +217,7 @@ func (s *Server) filterRepos(q string, repos []describedRepo) []describedRepo {
 
 // repoPage is the shared context for repo-scoped pages.
 type repoPage struct {
-	Site     string
-	Viewer   string
+	basePage
 	Desc     string
 	Repo     store.Repo
 	Ref      string
@@ -235,6 +229,13 @@ type repoPage struct {
 	HasWiki  bool
 	Host     string
 	Mirrors  []mirrorLine // repo admins only
+	// OpenIssues and OpenMRs are the counts on the header tabs.
+	OpenIssues int
+	OpenMRs    int
+	// RepoHome asks the layout for the full header — description, topics,
+	// website, mirrors. Every other page gets identity and tabs only, so a
+	// repo describes itself once rather than on all twelve of its pages.
+	RepoHome bool
 }
 
 // mirrorLine is the admin-only mirror status shown in the repo header.
@@ -300,19 +301,21 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 			})
 		}
 	}
+	openIssues, openMRs := s.st.OpenCounts(repo.ID)
 	return repoPage{
-		Mirrors:  mirrors,
-		Site:     s.siteName(),
-		Viewer:   viewer.Username,
-		Pinned:   pinned,
-		HasWiki:  s.wikiDir(repo.OwnerName, repo.Name) != "",
-		Host:     s.cfg.SiteHost(),
-		Desc:     gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
-		Repo:     repo,
-		Ref:      ref,
-		CloneURL: s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
-		Dir:      control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name),
-		Topics:   topics,
+		basePage:   s.baseFor(viewer),
+		Mirrors:    mirrors,
+		Pinned:     pinned,
+		HasWiki:    s.wikiDir(repo.OwnerName, repo.Name) != "",
+		Host:       s.cfg.SiteHost(),
+		Desc:       gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
+		Repo:       repo,
+		Ref:        ref,
+		CloneURL:   s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
+		Dir:        control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name),
+		Topics:     topics,
+		OpenIssues: openIssues,
+		OpenMRs:    openMRs,
 	}, true
 }
 
@@ -385,8 +388,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	weeks, activityTotal := activityGrid(counts)
 
 	s.render(w, "owner.html", struct {
-		Site          string
-		Viewer        string
+		basePage
 		Owner         string
 		Kind          string
 		Profile       store.Profile
@@ -395,7 +397,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Orgs          []store.OrgMember
 		Activity      []activityWeek
 		ActivityTotal int
-	}{s.siteName(), viewer.Username, name, kind, profile, s.describeAll(visible), members, orgs,
+	}{s.baseFor(viewer), name, kind, profile, s.describeAll(visible), members, orgs,
 		weeks, activityTotal})
 }
 
@@ -405,6 +407,7 @@ func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "files"
+	p.RepoHome = true
 	s.renderTree(w, r, p, "")
 }
 

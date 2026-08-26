@@ -1,8 +1,7 @@
 {{define "title"}}build {{.Build.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
 <div class="headrow">
-<h1>build {{.Build.Number}} <span class="chip check-{{.Build.Status}}">{{.Build.Status}}</span></h1>
+<h1>Build {{.Build.Number}} <span class="chip check-{{.Build.Status}}">{{.Build.Status}}</span></h1>
 </div>
 <p class="meta">{{.Build.Job}} on {{.Build.Ref}} · <code><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/commit/{{.Build.SHA}}">{{printf "%.10s" .Build.SHA}}</a></code> · queued {{when .Build.CreatedAt}}{{if .Build.FinishedAt}} · finished {{when .Build.FinishedAt}}{{end}}</p>
 {{if .Log}}<pre class="code buildlog">{{.Log}}</pre>{{else}}<p class="empty-note">no log yet</p>{{end}}

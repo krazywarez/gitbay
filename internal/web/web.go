@@ -77,6 +77,20 @@ var funcs = template.FuncMap{
 	},
 	"add": func(a, b int) int { return a + b },
 	"sub": func(a, b int) int { return a - b },
+	// topTab maps a page's Tab to the repo header tab that should read as
+	// current. Everything that browses the tree or its history sits under
+	// code, whose own toolbar carries the log, search, and refs links.
+	"topTab": func(tab string) string {
+		switch tab {
+		case "files", "log", "refs", "search":
+			return "code"
+		case "issues":
+			return "issues"
+		case "merge requests":
+			return "mrs"
+		}
+		return tab
+	},
 	// initial is the avatar letter for a username.
 	"initial": func(s string) string {
 		for _, r := range s {

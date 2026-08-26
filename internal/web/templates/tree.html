@@ -1,6 +1,6 @@
 {{define "title"}}{{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
+{{if .DirPath}}<h1 class="vh">{{.DirPath}}</h1>{{end}}
 <div class="pathbar">
   {{template "refmenu" .}}
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</span>

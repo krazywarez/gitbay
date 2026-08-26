@@ -1,7 +1,6 @@
 {{define "title"}}!{{.MR.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
-<h2 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h2>
+<h1 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h1>
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
 <a href="/{{.MR.Author}}">{{.MR.Author}}</a> wants to merge {{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}} into {{.MR.TargetRef}}
  at <code>{{short .MR.HeadSHA}}</code>{{if .MR.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.MR.Milestone}}</a>{{end}}</p>

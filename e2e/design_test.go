@@ -58,7 +58,7 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		}
 	}
 	// Branch dropdown lists branches.
-	if !strings.Contains(body, `class="refmenu"`) || !strings.Contains(body, ">all refs") {
+	if !strings.Contains(body, `class="refmenu"`) || !strings.Contains(body, ">All refs") {
 		t.Error("branch dropdown missing")
 	}
 	// Per-file history: ?path= filters the log; blob pages link to it.
@@ -164,14 +164,14 @@ func TestWebInteractions(t *testing.T) {
 		t.Fatal("pin toggle failed")
 	}
 	_, body := browserGet(t, browser, inst.base()+"/theorg/webborn")
-	if !strings.Contains(body, "★ pinned") {
+	if !strings.Contains(body, "★ Pinned") {
 		t.Fatal("repo header not pinned")
 	}
 	if _, body = browserGet(t, browser, inst.base()+"/"); !strings.Contains(body, "theorg<span") {
 		t.Fatal("dashboard missing pinned repo")
 	}
 	browserPost(t, browser, inst.base()+"/theorg/webborn/pin", url.Values{})
-	if _, body = browserGet(t, browser, inst.base()+"/theorg/webborn"); !strings.Contains(body, "☆ pin") {
+	if _, body = browserGet(t, browser, inst.base()+"/theorg/webborn"); !strings.Contains(body, "☆ Pin") {
 		t.Fatal("unpin failed")
 	}
 

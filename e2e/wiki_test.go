@@ -23,7 +23,7 @@ func TestWikis(t *testing.T) {
 	// No wiki yet: the tab is absent, the page shows the push hint, and
 	// cloning the companion says so.
 	_, body := inst.get(t, "/alice/app")
-	if strings.Contains(body, ">wiki<") {
+	if strings.Contains(body, ">Wiki<") {
 		t.Fatal("wiki tab shown with no wiki")
 	}
 	_, body = inst.get(t, "/alice/app/wiki")
@@ -55,7 +55,7 @@ func TestWikis(t *testing.T) {
 	// Rendering: home resolves, tab appears, links rewrite to wiki pages
 	// and images to the wiki raw route; org pages render too.
 	_, body = inst.get(t, "/alice/app")
-	if !strings.Contains(body, ">wiki<") {
+	if !strings.Contains(body, ">Wiki<") {
 		t.Fatal("wiki tab missing after push")
 	}
 	_, body = inst.get(t, "/alice/app/wiki")

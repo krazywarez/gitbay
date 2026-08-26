@@ -1,6 +1,6 @@
 {{define "title"}}builds · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
+<h1>Builds</h1>
 <ul class="loglist">
 {{range .Builds}}<li>
   <div class="commitmain">

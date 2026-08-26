@@ -1,28 +1,31 @@
-/* gitbay stylesheet, Carbon-school: black shell, sharp lines, one blue.
-   One file, light and dark via prefers-color-scheme. Tokens first;
-   components use tokens only. No external requests: IBM Plex is served
-   from this origin. */
+/* gitbay stylesheet — Harbor: black and white ground, two accents with
+   separate jobs. Blue is what you can do (links, buttons, focus); orange
+   is where you are and what wants you (active nav, counts, pending state,
+   unverified signatures). Orange is never a button, so the two never
+   compete. One file, light and dark via prefers-color-scheme. Tokens
+   first; components use tokens only. No external requests: Atkinson
+   Hyperlegible is served from this origin. */
 
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/static/fonts/atkinson-next-roman.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/static/fonts/atkinson-next-italic.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
   font-style: normal;
   font-weight: 400 600;
   font-display: swap;
-  src: url(/static/fonts/plex-sans.woff2) format("woff2");
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url(/static/fonts/plex-mono-400.woff2) format("woff2");
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url(/static/fonts/plex-mono-500.woff2) format("woff2");
+  src: url(/static/fonts/atkinson-mono-roman.woff2) format("woff2");
 }
 
 :root {
@@ -30,39 +33,50 @@
      scrollbars per scheme, and opt out of browser auto-darkening */
   color-scheme: light dark;
 
-  /* palette (Carbon g10) */
-  --bg: #f4f4f4;
-  --fg: #161616;
-  --muted: #525252;
-  --faint: #ececec;          /* hairlines, row separators */
-  --line: #e0e0e0;           /* control borders, tile edges */
-  --surface: #ffffff;        /* tiles, cards */
-  --hover: #f0f2f8;          /* row hover on tiles */
-  --accent: #0f62fe;         /* blue-60: links, active nav, primary */
-  --accent-fg: #ffffff;      /* text on accent */
-  --ok: #198038;
-  --warn: #8e6a00;
-  --bad: #da1e28;
-  --done: #8a3ffc;           /* merged */
-  --neutral: #525252;
-  --code-bg: #f4f4f4;
-  /* the shell is ink in both schemes */
-  --shell-bg: #161616;
-  --shell-fg: #f4f4f4;
-  --shell-muted: #c6c6c6;
-  --shell-line: #161616;
+  /* ground and ink */
+  --bg: #ffffff;
+  --fg: #0d0d0d;
+  --muted: #595959;          /* 7.00:1 on white */
+  --faint: #eaeaea;          /* hairlines, row separators */
+  --line: #d4d4d4;           /* control borders, table edges */
+  --surface: #ffffff;
+  --hover: #f5f5f5;
+  --code-bg: #f5f5f5;
+
+  /* blue: what you can do */
+  --accent: #0000f0;         /* links, focus — 9.30:1 on white */
+  --accent-fg: #ffffff;
+  --fill: #0000f0;           /* button grounds; white on it is 9.30:1 */
+
+  /* orange: where you are, what wants you */
+  --mark: #e4572e;           /* bars and underlines — non-text, 3.0 bar */
+  --warn: #c2410c;           /* the same orange at text size — 5.18:1 */
+
+  /* semantic */
+  --ok: #0a7d3c;
+  --bad: #c62828;
+  --done: #6b21a8;           /* merged */
+  --neutral: #595959;
+
+  /* the rail is black in both schemes: the one brand constant */
+  --shell-bg: #000000;
+  --shell-fg: #f2f2f2;
+  --shell-muted: #8f8f8f;
+  --shell-line: #1c1c1c;
+  --shell-hover: #141414;
+  --shell-mark: #ff6b3d;     /* 7.42:1 on black, both schemes */
 
   /* type */
-  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
-          Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo,
-          Consolas, "Liberation Mono", monospace;
-  --fs-0: 0.8rem;    /* 12.8px: chips, fine print */
-  --fs-1: 0.866rem;  /* ~13px: metadata, mono in tables */
-  --fs-2: 0.933rem;  /* 14px: dense table text */
-  --fs-3: 1rem;      /* 15px: body */
-  --fs-4: 1.135rem;  /* ~17px: h2 */
-  --fs-5: 1.335rem;  /* ~20px: h1 */
+  --sans: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono",
+          SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --fs-0: 0.78rem;
+  --fs-1: 0.85rem;
+  --fs-2: 0.92rem;
+  --fs-3: 1rem;
+  --fs-4: 1.2rem;
+  --fs-5: 1.6rem;
 
   /* spacing */
   --sp-1: 0.25rem;
@@ -72,31 +86,31 @@
   --sp-5: 1.5rem;
   --sp-6: 2.5rem;
 
-  /* radii: sharp everywhere; only tags stay pills */
-  --r-sm: 0;
-  --r-md: 0;
-  --r-lg: 0;
-  --r-pill: 999px;
+  /* radii: 2px everywhere — chart plates, not pills */
+  --r-sm: 2px;
+  --r-md: 2px;
+  --r-lg: 2px;
+  --r-pill: 2px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Carbon g100 */
-    --bg: #161616;
-    --fg: #f4f4f4;
-    --muted: #a8a8a8;
-    --faint: #2a2a2a;
-    --line: #393939;
-    --surface: #262626;
-    --hover: #2e3440;
-    --accent: #78a9ff;       /* blue-40 reads on dark grounds */
-    --accent-fg: #161616;
-    --ok: #42be65;
-    --warn: #d2a106;
-    --bad: #fa4d56;
-    --done: #a56eff;
-    --neutral: #a8a8a8;
-    --code-bg: #131313;
-    --shell-line: #393939;
+    --bg: #0a0a0a;
+    --fg: #f2f2f2;
+    --muted: #a1a1a1;        /* 7.66:1 on #0a0a0a */
+    --faint: #1c1c1c;
+    --line: #2e2e2e;
+    --surface: #0f0f0f;
+    --hover: #161616;
+    --code-bg: #050505;
+    --accent: #5b6bff;       /* 4.71:1 — pure #0000f0 is 2.13:1 here */
+    --accent-fg: #ffffff;
+    --fill: #0000f0;         /* fills stay pure; white on it clears 9:1 */
+    --mark: #ff6b3d;
+    --warn: #ff6b3d;
+    --ok: #3fce7a;
+    --bad: #ff6b6b;
+    --done: #c084fc;
+    --neutral: #a1a1a1;
   }
 }
 
@@ -108,18 +122,46 @@ body {
   color: var(--fg);
   font: var(--fs-3)/1.6 var(--sans);
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
-main { flex: 1; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-h1 { font-size: var(--fs-5); font-weight: 600; line-height: 1.3;
-     margin: var(--sp-5) 0 var(--sp-3); letter-spacing: -0.01em; }
-h2 { font-size: var(--fs-4); font-weight: 600; line-height: 1.35;
-     margin: var(--sp-5) 0 var(--sp-3); }
+/* one authored focus ring, so keyboard position is never the browser's
+   guess. Blue, because focus is an interactive state. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+/* visually hidden, still read aloud: for headings a sighted reader gets
+   from the layout but a screen reader would otherwise miss */
+.vh {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* the rail runs ahead of the content in source order, so give keyboard
+   and screen-reader users a way past it */
+a.skip {
+  position: absolute;
+  left: var(--sp-3); top: -3rem;
+  z-index: 50;
+  background: var(--fill);
+  color: #ffffff;
+  padding: var(--sp-2) var(--sp-4);
+  font-weight: 600;
+}
+a.skip:focus { top: var(--sp-3); text-decoration: none; }
+
+h1 { font-size: var(--fs-5); font-weight: 700; line-height: 1.18;
+     margin: 0 0 var(--sp-3); letter-spacing: -0.025em; text-wrap: balance; }
+h2 { font-size: var(--fs-4); font-weight: 700; line-height: 1.3;
+     margin: var(--sp-5) 0 var(--sp-3); letter-spacing: -0.015em; }
 h3 { font-size: var(--fs-3); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2); }
 
 code, pre, .code, td.mode, td.size {
@@ -127,167 +169,213 @@ code, pre, .code, td.mode, td.size {
   font-size: var(--fs-1);
 }
 
-/* layout: one shared container aligns header, content, and footer */
-.container {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: 0 var(--sp-5);
-}
-/* the shell: an ink bar in both schemes, Carbon UI-shell style. Scoped
-   to the page header so cards with their own <header> stay untouched. */
-body > header {
+/* ---- shell: black rail, content pane ---- */
+.shell { display: flex; align-items: stretch; min-height: 100vh; }
+
+.rail {
+  flex: none;
+  width: 13rem;
   background: var(--shell-bg);
-  border-bottom: 1px solid var(--shell-line);
-  padding: 0;
+  color: var(--shell-fg);
+  border-right: 1px solid var(--shell-line);
   position: sticky;
   top: 0;
-  z-index: 30;
-}
-a.site {
-  font-weight: 600;
-  color: var(--shell-fg);
-  letter-spacing: -0.01em;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 0 var(--sp-4);
-}
-a.site:hover { text-decoration: none; color: #ffffff; }
-a.site svg.mark { display: block; }
-a.site svg.mark rect { fill: #0f62fe; }
-a.site svg.mark path { stroke: #ffffff; }
-nav.topnav {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  height: 3rem;
-}
-nav.topnav .spacer { flex: 1; }
-/* the avatar square is the only nav item in the shell; everything else
-   lives in the rail */
-a.avatar {
-  width: 2rem;
-  height: 2rem;
-  margin-right: var(--sp-3);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: #ffffff;
-  font-size: var(--fs-2);
-  font-weight: 600;
-  flex: none;
-}
-a.avatar:hover { text-decoration: none; filter: brightness(1.12); }
-a.avatar.guest { background: #393939; color: #f4f4f4; }
-
-/* the rail: persistent navigation, global links first, repo sections
-   below them, the signed-in user pinned to the bottom */
-.shell { display: flex; flex: 1; align-items: stretch; }
-.siderail {
-  flex: none;
-  width: 13.5rem;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-  position: sticky;
-  top: 3rem;
-  height: calc(100vh - 3rem);
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
-.railmain { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
-.railfoot {
-  flex: none;
-  border-top: 1px solid var(--line);
-  padding: var(--sp-2) 0;
-  background: var(--surface);
-}
-.siderail a, .siderail button.linklike {
+a.brand {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  width: 100%;
-  text-align: left;
-  color: var(--fg);
-  font-size: var(--fs-2);
-  padding: 0.4rem var(--sp-4);
-  border-left: 3px solid transparent;
-  line-height: 1.35;
+  padding: var(--sp-3) var(--sp-4);
+  color: var(--shell-fg);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--shell-line);
 }
-.siderail a:hover, .siderail button.linklike:hover {
-  background: var(--hover);
-  text-decoration: none;
-  color: var(--fg);
-}
-.siderail a.active {
-  border-left-color: var(--accent);
-  background: var(--hover);
-  font-weight: 600;
-}
-.siderail .glabel {
+a.brand:hover { text-decoration: none; color: #ffffff; }
+a.brand svg.mark { display: block; flex: none; }
+a.brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.railbody { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
+ul.raillist { list-style: none; margin: 0; padding: 0; }
+ul.raillist a {
   display: block;
-  font-size: var(--fs-0);
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  padding: 0 var(--sp-4);
-  margin: var(--sp-4) 0 var(--sp-1);
+  padding: 0.28rem var(--sp-4);
+  color: var(--shell-fg);
+  font-size: var(--fs-2);
+  border-left: 3px solid transparent;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.siderail .glabel:not(.sub) {
-  color: var(--fg);
+ul.raillist a:hover { background: var(--shell-hover); text-decoration: none; }
+/* orange marks position — the rail's only accent */
+ul.raillist a[aria-current] {
+  border-left-color: var(--shell-mark);
+  background: var(--shell-hover);
   font-weight: 600;
-  border-top: 1px solid var(--line);
-  padding-top: var(--sp-3);
-  overflow-wrap: anywhere;
 }
-.siderail .glabel.sub { margin-top: var(--sp-2); }
-.siderail .railuser { font-weight: 600; }
-.siderail .avatar.sm {
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: 0;
+ul.raillist .owner { color: var(--shell-muted); }
+ul.raillist.wide a { white-space: normal; padding-top: var(--sp-1); padding-bottom: var(--sp-1); }
+ul.raillist.wide b { display: block; font-weight: 500; font-size: var(--fs-1); }
+ul.raillist.wide .owner { font-size: var(--fs-0); }
+
+.raillabel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 var(--sp-1);
+  padding: 0 var(--sp-4);
+  font-family: var(--mono);
   font-size: var(--fs-0);
-  background: var(--accent);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+.raillabel .count {
+  font-family: var(--sans);
+  font-size: var(--fs-0);
+  font-weight: 700;
+  letter-spacing: 0;
+  background: var(--shell-mark);
+  color: #000000;
+  padding: 0 0.35rem;
+  border-radius: var(--r-sm);
+}
+.railfoot {
+  flex: none;
+  border-top: 1px solid var(--shell-line);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-2);
+}
+.railfoot a { color: var(--shell-fg); }
+a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.railfoot .linklike {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--shell-muted); font: inherit; text-decoration: underline;
+}
+.railfoot .linklike:hover { color: var(--shell-fg); }
+.avatar {
+  width: 1.4rem; height: 1.4rem; flex: none;
+  display: inline-grid; place-items: center;
+  background: var(--fill);
   color: #ffffff;
+  font-size: var(--fs-0);
+  font-weight: 700;
+  border-radius: var(--r-sm);
 }
-main.container {
-  width: 100%;
-  min-width: 0;
+
+.pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.content {
   flex: 1;
-  margin: 0;
-  max-width: 66rem;
-  padding-top: var(--sp-4);
-  padding-bottom: var(--sp-6);
+  padding: var(--sp-5) var(--sp-5) var(--sp-6);
+  max-width: 78rem;
+  width: 100%;
 }
+
+/* ---- repo header: identity and tabs on every page, the rest once ---- */
+.repohead {
+  padding: var(--sp-4) var(--sp-5) 0;
+  border-bottom: 1px solid var(--line);
+}
+.repohead .identity { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.repohead .identity .grow { flex: 1; }
+.repotitle {
+  margin: 0;
+  font-size: var(--fs-4);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+h1.repotitle { font-size: var(--fs-5); }
+.repotitle a { color: var(--fg); }
+.repotitle a.owner { color: var(--muted); font-weight: 400; }
+.repotitle a:hover { color: var(--accent); text-decoration: none; }
+.repotitle .sep { color: var(--muted); margin: 0 0.12em; font-weight: 400; }
+.repodesc { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-2); max-width: 62ch; }
+.repometa { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-1); }
+.repohead .topics { margin: var(--sp-2) 0 0; }
+
+button.btn {
+  font: inherit;
+  font-size: var(--fs-1);
+  font-weight: 600;
+  padding: 0.15rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+button.btn:hover { border-color: var(--accent); color: var(--accent); }
+button.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+form.inline { display: inline; }
+
+nav.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  margin-top: var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+nav.tabs::-webkit-scrollbar { display: none; }
+nav.tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) 0.6rem;
+  color: var(--muted);
+  font-size: var(--fs-2);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+nav.tabs a:hover { color: var(--fg); text-decoration: none; }
+/* orange marks position here too */
+nav.tabs a[aria-current] {
+  color: var(--fg);
+  font-weight: 700;
+  border-bottom-color: var(--mark);
+}
+nav.tabs a i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  background: var(--hover);
+  border-radius: var(--r-sm);
+  padding: 0 0.35rem;
+}
+
+/* ---- mobile: the rail becomes a single strip, not a wall of links ---- */
 @media (max-width: 52rem) {
-  /* the rail folds into a wrapping strip above the content */
   .shell { display: block; }
-  .siderail {
+  .rail {
     width: auto;
     height: auto;
     position: static;
     flex-direction: row;
-    flex-wrap: wrap;
     align-items: center;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+    gap: var(--sp-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--shell-line);
+    overflow-x: auto;
   }
-  .railmain, .railfoot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    overflow: visible;
-    padding: var(--sp-1) var(--sp-2);
-    border-top: none;
-  }
-  .railmain { flex: 1 1 auto; }
-  .siderail a, .siderail button.linklike {
-    width: auto;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    padding: var(--sp-1) var(--sp-2);
-  }
-  .siderail a.active { border-left: none; border-bottom-color: var(--accent); background: none; }
-  .siderail .glabel { display: none; }
+  a.brand { border-bottom: 0; padding-right: var(--sp-2); }
+  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; align-items: center; }
+  /* pinned repos and the review queue both live on the dashboard, so the
+     strip keeps only what has nowhere else to go */
+  .railgroup { display: none; }
+  ul.raillist { display: flex; }
+  ul.raillist a { border-left: 0; border-bottom: 2px solid transparent; padding: var(--sp-2) var(--sp-3); }
+  ul.raillist a[aria-current] { border-left: 0; border-bottom-color: var(--shell-mark); }
+  .railfoot { border-top: 0; padding-left: var(--sp-2); }
+  .content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
+  .repohead { padding: var(--sp-3) var(--sp-4) 0; }
 }
 
 /* tables */
@@ -300,66 +388,6 @@ td {
 }
 td:last-child { padding-right: 0; }
 td.size, td.mode { color: var(--muted); white-space: nowrap; }
-
-/* repo header */
-.repohead { margin-bottom: var(--sp-4); }
-h1.repotitle { margin: var(--sp-4) 0 var(--sp-1); font-weight: 400; }
-h1.repotitle a { color: var(--fg); }
-h1.repotitle a:last-of-type { font-weight: 650; }
-h1.repotitle a:hover { color: var(--accent); text-decoration: none; }
-h1.repotitle .sep { color: var(--muted); margin: 0 0.15em; }
-form.pinform { display: inline; margin-left: var(--sp-2); vertical-align: middle; }
-button.pinbtn {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  color: var(--muted);
-  font-size: var(--fs-0);
-  padding: 0.05rem 0.55rem;
-  cursor: pointer;
-}
-button.pinbtn:hover { border-color: var(--accent); color: var(--accent); filter: none; }
-button.pinbtn.pinned { color: var(--accent); border-color: var(--accent); }
-a.chip.label:hover, a.chip.topic:hover { text-decoration: none; filter: brightness(1.15); }
-.repohead .desc { margin: 0 0 var(--sp-2); }
-
-/* repo rail: grouped vertical navigation on the left */
-nav.tabs { display: flex; flex-direction: column; margin-top: var(--sp-1); }
-nav.tabs .glabel {
-  font-size: var(--fs-0);
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  margin: var(--sp-4) 0 var(--sp-1);
-}
-nav.tabs .glabel:first-child { margin-top: 0; }
-nav.tabs a {
-  color: var(--fg);
-  padding: 0.32rem var(--sp-3);
-  font-size: var(--fs-2);
-  border-left: 3px solid transparent;
-}
-nav.tabs a:hover { background: var(--hover); text-decoration: none; }
-nav.tabs a.active {
-  border-left-color: var(--accent);
-  background: var(--surface);
-  font-weight: 600;
-}
-@media (max-width: 52rem) {
-  /* the rail folds back into a wrapping strip on narrow screens */
-  main.container:has(> nav.tabs) { display: block; }
-  nav.tabs { flex-direction: row; flex-wrap: wrap; gap: 0 var(--sp-1); border-bottom: 1px solid var(--line); padding-bottom: var(--sp-2); position: static; }
-  nav.tabs .glabel { display: none; }
-  nav.tabs a { border-left: none; border-bottom: 3px solid transparent; padding: var(--sp-1) var(--sp-2); }
-  nav.tabs a.active { border-bottom-color: var(--accent); background: none; }
-}
-
-.clone { color: var(--muted); font-size: var(--fs-2); }
-.clone code {
-  background: var(--code-bg);
-  border: 1px solid var(--line);
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--r-sm);
-}
 
 /* path bar on tree and blob pages */
 .pathbar {

@@ -1,6 +1,6 @@
 {{define "title"}}wiki{{if .Page}}: {{.Page}}{{end}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{template "repoheader" .}}
+<h1 class="vh">Wiki{{if .Page}}: {{.Page}}{{end}}</h1>
 {{if .Missing}}<p class="empty-note">no wiki yet — create one by pushing pages:<br>
 <code>git clone ssh://git@{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}.wiki.git</code> then add <code>Home.md</code> (or .org) and push.</p>
 {{else}}
