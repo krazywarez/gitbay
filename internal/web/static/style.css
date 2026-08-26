@@ -144,6 +144,10 @@ a:hover { text-decoration: underline; }
   outline-offset: 2px;
   border-radius: 1px;
 }
+/* the shell is black in both schemes, and --accent is a dark blue in the
+   light one — a ring nobody could see. The shell's own mark clears 7:1 on
+   black either way. */
+.rail :focus-visible { outline-color: var(--shell-mark); }
 
 /* visually hidden, still read aloud: for headings a sighted reader gets
    from the layout but a screen reader would otherwise miss */
@@ -799,6 +803,12 @@ pre.message {
 /* repo facts: the counts a visitor sizes a project up with */
 .teambody { padding: var(--sp-3); background: var(--bg); }
 .teambody .memberchip { margin-right: var(--sp-2); }
+
+form.logfilter {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-4); flex-wrap: wrap;
+}
+form.logfilter input { flex: 1; min-width: 12rem; max-width: 28rem; }
 
 /* account settings */
 table.keys td { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }

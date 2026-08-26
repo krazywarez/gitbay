@@ -1,14 +1,21 @@
 {{define "title"}}log · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-{{if .FilePath}}<p class="meta">history of <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.FilePath}}"><code>{{.FilePath}}</code></a> · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log">full log</a></p>{{end}}
 <h1 class="vh">Commits</h1>
+<form method="get" class="logfilter" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">
+  <label for="path">Path</label>
+  <input type="text" id="path" name="path" value="{{.FilePath}}" placeholder="filter to a file or directory">
+  <button type="submit">Filter</button>
+  {{if .FilePath}}<a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">Clear</a>{{end}}
+</form>
+{{if .FilePath}}<p class="meta">history of <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.FilePath}}"><code>{{.FilePath}}</code></a></p>{{end}}
 <ul class="loglist">
-{{range .Commits}}<li>
+{{range .Commits}}{{$c := .}}<li>
   <div class="commitmain">
     <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a></p>
     <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" .AuthorEmail}} · {{.Date}}</p>
   </div>
   <div class="commitside">
+    {{with .Check}}<a class="badge badge-{{.}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{$c.SHA}}" title="checks: {{.}}">{{.}}</a>{{end}}
     {{template "sigbadge" .Sig}}
     <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code>
   </div>

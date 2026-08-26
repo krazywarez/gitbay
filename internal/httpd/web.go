@@ -1183,12 +1183,14 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		SHA, ShortSHA, Subject, AuthorName, AuthorEmail, AuthorUser, Date string
 		Sig                                                               sigView
+		Check                                                             string // combined status, "" when none ran
 	}
 	names := s.authorNames()
+	checks, _ := s.st.CombinedStatusFor(p.Repo.ID, shas)
 	var rows []row
 	for _, sha := range shas {
 		v, parsed := s.sigFor(p.Repo, p.Dir, sha)
-		rw := row{SHA: sha, ShortSHA: sha[:10], Sig: v}
+		rw := row{SHA: sha, ShortSHA: sha[:10], Sig: v, Check: checks[sha]}
 		if parsed != nil {
 			rw.Subject = parsed.Subject
 			rw.AuthorName = names.name(parsed.AuthorEmail, parsed.AuthorName)
