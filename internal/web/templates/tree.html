@@ -17,6 +17,7 @@
   <a class="sha" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}"><code>{{short .SHA}}</code></a>
   <span class="age">{{ago .When}}</span>
 </div>{{end}}{{end}}
+<div class="tablewrap">
 <table class="tree">
 <tr class="cols"><th scope="col">name</th><th scope="col" class="lastcommit">last commit</th><th scope="col" class="age">updated</th></tr>
 {{range .Entries}}{{$c := index $.LastCommits .Name}}<tr>
@@ -27,6 +28,7 @@
 </tr>
 {{else}}<tr><td class="name empty" colspan="3">this repository is empty — push something:<br><code>git remote add origin {{.CloneURL}}</code></td></tr>{{end}}
 </table>
+</div>
 {{if .ReadmeHTML}}<section class="readme">
 <div class="cardhead"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.Prefix}}{{.ReadmeName}}">{{.ReadmeName}}</a></div>
 <div class="rendered">{{.ReadmeHTML}}</div>

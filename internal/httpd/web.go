@@ -1349,15 +1349,20 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := s.ugcFor(r, p.Repo)
+	milestones, _ := s.st.ListMilestones(p.Repo.ID, "open")
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue       store.Issue
 		BodyHTML    template.HTML
 		Comments    []renderedComment
 		CanEdit     bool
+		CanWrite    bool
+		Milestones  []store.Milestone
+		Notice      string
 		LabelColors map[string]template.CSS
 	}{p, iss, md(iss.Body), renderComments(comments, md),
-		s.canEditItem(r, p.Repo, iss.Author), s.labelColors(p.Repo.ID)})
+		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
+		milestones, r.URL.Query().Get("e"), s.labelColors(p.Repo.ID)})
 }
 
 // canEditItem: the author or anyone with write access may edit.

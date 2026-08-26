@@ -446,6 +446,9 @@ details.refmenu .refdrop a:hover { background: var(--hover); text-decoration: no
 details.refmenu .refdrop a.allrefs { color: var(--accent); font-family: var(--sans); border-top: 1px solid var(--faint); margin-top: var(--sp-1); }
 
 /* file and refs tables: bordered cards, rows inside */
+/* wide listings scroll inside their own box; the page never does */
+.tablewrap { overflow-x: auto; max-width: 100%; }
+
 table.tree, table.refs {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1190,7 +1193,12 @@ pre.matchline mark {
   main.container { padding-top: var(--sp-2); }
   .repogrid { grid-template-columns: 1fr; }
   .thread { margin-left: var(--sp-3); }
+  /* the commit subject is the widest thing in the listing and the one
+     column a phone can do without: the tipbar above already names the
+     latest commit. */
+  table.tree td.lastcommit, table.tree th.lastcommit { display: none; }
   table.tree td.mode, table.tree th.mode { display: none; }
+  .clone, .pathbar { overflow-wrap: anywhere; }
   .readme, .code { padding: var(--sp-3); }
   .blamehunk { flex-direction: column; gap: 0; }
   .blameinfo { width: auto; }

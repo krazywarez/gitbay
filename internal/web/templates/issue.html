@@ -6,6 +6,10 @@
 {{if .Issue.Labels}} · {{range .Issue.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.}}">{{.}}</a> {{end}}{{end}}
 {{if .Issue.Assignees}} · assigned to {{range .Issue.Assignees}}{{.}} {{end}}{{end}}
 {{if .Issue.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a>{{end}}</p>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+
+<div class="withaside">
+<div class="mainside">
 {{if .CanEdit}}<details class="editbox"><summary>edit</summary>
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/edit" class="commentform">
 <p><input type="text" name="title" aria-label="Title" value="{{.Issue.Title}}" required></p>
@@ -30,4 +34,58 @@
 <p><button type="submit">comment</button></p>
 </form>
 {{end}}
+</div>
+
+{{$base := printf "/%s/%s/issues/%d" .Repo.OwnerName .Repo.Name .Issue.Number}}
+<aside class="aside">
+  {{if .CanWrite}}
+  <div class="grp">
+    <h2>State</h2>
+    <form method="post" action="{{$base}}/state" class="actions">
+      {{if eq .Issue.State "open"}}<button type="submit" name="action" value="close">Close issue</button>
+      {{else}}<button type="submit" name="action" value="reopen">Reopen issue</button>{{end}}
+    </form>
+  </div>
+  {{end}}
+  <div class="grp">
+    <h2>Labels</h2>
+    {{if .Issue.Labels}}<p class="row">{{range .Issue.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.}}">{{.}}</a> {{end}}</p>
+    {{else}}<p class="none">None yet</p>{{end}}
+    {{if .CanWrite}}
+    <form method="post" action="{{$base}}/label" class="actions">
+      <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove labels" placeholder="remove">
+      <button type="submit">Apply</button>
+    </form>
+    {{end}}
+  </div>
+  <div class="grp">
+    <h2>Assignees</h2>
+    {{if .Issue.Assignees}}<p class="row">{{range .Issue.Assignees}}<a href="/{{.}}">{{.}}</a> {{end}}</p>
+    {{else}}<p class="none">Nobody yet</p>{{end}}
+    {{if .CanWrite}}
+    <form method="post" action="{{$base}}/assign" class="actions">
+      <input type="text" name="add" aria-label="Add assignees" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove assignees" placeholder="remove">
+      <button type="submit">Apply</button>
+    </form>
+    {{end}}
+  </div>
+  <div class="grp">
+    <h2>Milestone</h2>
+    {{if .Issue.Milestone}}<p class="row"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a></p>
+    {{else}}<p class="none">None</p>{{end}}
+    {{if .CanWrite}}
+    <form method="post" action="{{$base}}/milestone" class="actions">
+      <label class="none" for="milestone">Set milestone</label>
+      <select id="milestone" name="milestone">
+        <option value="none">No milestone</option>
+        {{range .Milestones}}<option value="{{.Title}}"{{if eq .Title $.Issue.Milestone}} selected{{end}}>{{.Title}}</option>{{end}}
+      </select>
+      <button type="submit">Apply</button>
+    </form>
+    {{end}}
+  </div>
+</aside>
+</div>
 {{end}}
