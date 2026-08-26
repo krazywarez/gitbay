@@ -1,15 +1,21 @@
 {{define "title"}}new repository · {{.Site}}{{end}}
 {{define "content"}}
 <h1>New repository</h1>
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/new">
 <p><label>Owner <select name="owner">
   <option value="{{.Viewer}}">{{.Viewer}}</option>
   {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
 </select></label>
-<label>/ Name <input name="name" required pattern="[a-z0-9][a-z0-9._-]*"></label></p>
-<p><label><input type="radio" name="visibility" value="public" checked> Public</label>
-   <label><input type="radio" name="visibility" value="private"> Private</label></p>
+<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="namehint"></label>
+<span class="hint" id="namehint">Lowercase letters, digits, dot, dash and underscore; must start with a letter or digit; up to 63 characters.</span></p>
+<fieldset class="segmented">
+  <legend>Visibility</legend>
+  <div class="options">
+    <label><input type="radio" name="visibility" value="public" checked><span>Public</span></label>
+    <label><input type="radio" name="visibility" value="private"><span>Private</span></label>
+  </div>
+</fieldset>
 <p><button type="submit">Create repository</button></p>
 </form>
 {{end}}

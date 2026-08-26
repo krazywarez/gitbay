@@ -1,7 +1,7 @@
 {{define "title"}}edit {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>edit {{.Repo.OwnerName}}/{{.Repo.Name}} : {{.Path}} @ {{.Ref}}</h1>
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">
 <p><textarea name="content" aria-label="File contents" rows="24" style="width:100%" spellcheck="false">{{.Content}}</textarea></p>
 <p><input name="message" aria-label="Commit message" placeholder="commit message" style="width:60%">

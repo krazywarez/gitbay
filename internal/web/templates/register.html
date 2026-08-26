@@ -4,7 +4,7 @@
 <h1>Create an account</h1>
 {{if eq .Mode "invite"}}<p class="lede">This instance is invite-only: you need an invite code from an admin.</p>
 {{else}}<p class="lede">Open registration — your account activates once you verify your email.</p>{{end}}
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/register" class="signupform">
 <p><label>username<br><input type="text" name="username" value="{{.Username}}" required autofocus></label></p>
 {{if eq .Mode "invite"}}<p><label>invite code<br><input type="text" name="invite" required></label></p>

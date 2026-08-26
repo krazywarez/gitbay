@@ -5,7 +5,7 @@
   <input type="search" name="q" aria-label="Search file contents" value="{{.Query}}" placeholder="search file contents on {{.Ref}}" autofocus>
   <button type="submit">search</button>
 </form>
-{{if .QueryErr}}<p class="error">{{.QueryErr}}</p>
+{{if .QueryErr}}<p class="error" role="alert">{{.QueryErr}}</p>
 {{else if .Query}}
 {{if .Matches}}
 <p class="meta">{{len .Matches}} match{{if ne (len .Matches) 1}}es{{end}}{{if .Capped}} (capped — refine the query){{end}} on <code>{{.Ref}}</code></p>

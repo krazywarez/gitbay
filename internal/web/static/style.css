@@ -530,7 +530,14 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
 .empty-note { color: var(--muted); }
 .crumbs { color: var(--muted); font-size: var(--fs-2); }
 .desc, td.desc { color: var(--muted); }
-.error { color: var(--bad); }
+.error {
+  color: var(--fg);
+  border: 1px solid var(--bad);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
 .meta { color: var(--muted); font-size: var(--fs-1); }
 svg.icon { vertical-align: -0.125em; }
 .lede { font-size: var(--fs-3); margin: var(--sp-2) 0; }
@@ -970,6 +977,64 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 input[type="radio"], input[type="checkbox"] { accent-color: var(--fill); }
 label:has(> input[type="radio"]), label:has(> input[type="checkbox"]),
 label:has(> select) { display: inline-flex; align-items: center; gap: var(--sp-2); }
+
+/* Shape carries the meaning on these two and nothing else does: a circle
+   takes one answer, a square takes any number. It survives colour being
+   removed — greyscale, high contrast, colour blindness — so the native
+   shapes stay and only the colour joins the system. Drawing them by hand
+   would align the corners at the cost of the one cue that always works. */
+input[type="radio"], input[type="checkbox"] { accent-color: var(--fill); }
+
+/* a segmented control for a small, mutually exclusive set: real radios
+   underneath, so arrow keys and screen readers behave as they always did */
+fieldset.segmented { border: 0; margin: 0 0 var(--sp-4); padding: 0; }
+fieldset.segmented legend {
+  padding: 0;
+  margin-bottom: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-2);
+}
+fieldset.segmented .options { display: inline-flex; }
+fieldset.segmented label { gap: 0; }
+fieldset.segmented input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+fieldset.segmented span {
+  display: block;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  font-size: var(--fs-2);
+  cursor: pointer;
+}
+fieldset.segmented label + label span { border-left: 0; }
+fieldset.segmented label:first-child span { border-radius: var(--r-sm) 0 0 var(--r-sm); }
+fieldset.segmented label:last-child span { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+fieldset.segmented span:hover { border-color: var(--muted); }
+fieldset.segmented input:checked + span {
+  background: var(--fill);
+  border-color: var(--fill);
+  color: #ffffff;
+  font-weight: 600;
+}
+fieldset.segmented input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* remaining input states */
+::placeholder { color: var(--muted); opacity: 1; }
+::selection { background: var(--fill); color: #ffffff; }
+/* :user-invalid, not :invalid — a required field is invalid the moment
+   the page loads, and colouring it red before anyone has typed is a
+   scolding, not a hint */
+input:user-invalid, textarea:user-invalid {
+  border-color: var(--bad);
+}
+.hint { display: block; color: var(--muted); font-size: var(--fs-1); margin-top: var(--sp-1); }
 button {
   background: var(--fill);
   color: #ffffff;
