@@ -1,6 +1,22 @@
 {{define "title"}}releases · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>Releases</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if and .CanWrite .FreeTags}}
+<details class="editbox"><summary>New release</summary>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases" class="commentform">
+  <p class="branchpick">
+    <label for="tag">Tag</label>
+    <select id="tag" name="tag" required>
+      {{range .FreeTags}}<option value="{{.}}">{{.}}</option>{{end}}
+    </select>
+  </p>
+  <p><input type="text" name="title" aria-label="Title" placeholder="title (defaults to the tag)"></p>
+  <p><textarea name="notes" aria-label="Notes" rows="6" placeholder="what changed"></textarea></p>
+  <p><button type="submit" class="primary">Create release</button></p>
+</form>
+</details>
+{{else if .CanWrite}}<p class="meta">Push a tag to create a release from it.</p>{{end}}
 {{range $rel := .Releases}}
 <article class="release">
   <header class="releasehead">
@@ -8,6 +24,14 @@
     <p class="meta"><span class="refchip">{{$rel.Tag}}</span> {{if $rel.Author}}{{$rel.Author}} · {{end}}{{when $rel.CreatedAt}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/archive/{{$rel.Tag}}.tar.gz">source tar.gz</a></p>
   </header>
   {{if $rel.NotesHTML}}<div class="rendered">{{$rel.NotesHTML}}</div>{{end}}
+  {{if $.CanWrite}}<details class="editbox"><summary>Edit</summary>
+  <form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases" class="commentform">
+    <input type="hidden" name="action" value="edit">
+    <input type="hidden" name="tag" value="{{$rel.Tag}}">
+    <p><input type="text" name="title" aria-label="Title" value="{{$rel.Title}}"></p>
+    <p><textarea name="notes" aria-label="Notes" rows="6">{{$rel.Notes}}</textarea></p>
+    <p><button type="submit">Save</button></p>
+  </form></details>{{end}}
   {{if $rel.Assets}}<table class="assets">
   {{range $rel.Assets}}<tr>
     <td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/download/{{$rel.Tag}}/{{.Name}}">{{.Name}}</a></td>

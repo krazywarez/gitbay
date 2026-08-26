@@ -136,7 +136,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		Host     string
 		Accounts bool
 		Signup   bool
-	}{basePage{Site: s.siteName()}, host, s.cfg.Web.Mode == "accounts",
+	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, host, s.cfg.Web.Mode == "accounts",
 		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed"})
 }
 
@@ -566,10 +566,26 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 	for _, rel := range rels {
 		views = append(views, relView{rel, md(rel.Notes)})
 	}
+	// Tags without a release yet are what a create form can offer.
+	released := map[string]bool{}
+	for _, rel := range rels {
+		released[rel.Tag] = true
+	}
+	var freeTags []string
+	if tags, err := gitutil.Refs(p.Dir, "tags"); err == nil {
+		for _, tg := range tags {
+			if !released[tg.Name] {
+				freeTags = append(freeTags, tg.Name)
+			}
+		}
+	}
 	s.render(w, "releases.html", struct {
 		repoPage
 		Releases []relView
-	}{p, views})
+		FreeTags []string
+		CanWrite bool
+		Notice   string
+	}{p, views, freeTags, s.canWriteRepo(r, p.Repo), r.URL.Query().Get("e")})
 }
 
 // releaseAsset streams one uploaded asset. Tags containing '/' are not

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"gitbay.org/gitbay/internal/ci"
+	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -14,10 +16,25 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Tab = "builds"
 	builds, _ := s.st.ListBuilds(p.Repo.ID, 50)
+	// The jobs a trigger can name come from the config on the default
+	// branch, the same file the scheduler reads.
+	var jobs []string
+	if sha, err := gitutil.ResolveRef(p.Dir, "refs/heads/"+p.Repo.DefaultBranch); err == nil {
+		if raw, err := gitutil.ReadBlob(p.Dir, sha, ci.ConfigPath, 1<<16); err == nil {
+			if parsed, err := ci.Parse(raw); err == nil {
+				for _, j := range parsed {
+					jobs = append(jobs, j.Name)
+				}
+			}
+		}
+	}
 	s.render(w, "builds.html", struct {
 		repoPage
-		Builds []store.Build
-	}{p, builds})
+		Builds   []store.Build
+		Jobs     []string
+		CanWrite bool
+		Notice   string
+	}{p, builds, jobs, s.canWriteRepo(r, p.Repo), r.URL.Query().Get("e")})
 }
 
 func (s *Server) build(w http.ResponseWriter, r *http.Request) {

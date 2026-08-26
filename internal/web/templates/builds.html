@@ -1,6 +1,16 @@
 {{define "title"}}builds · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>Builds</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if and .CanWrite .Jobs}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds" class="setform">
+  <label for="job">Run a job now</label>
+  <select id="job" name="job">
+    {{range .Jobs}}<option value="{{.}}">{{.}}</option>{{end}}
+  </select>
+  <button type="submit" class="primary">Run</button>
+</form>
+{{end}}
 <details class="editbox"><summary>Status badge</summary>
 <p class="meta">Paste into a README; it shows the newest build's state.</p>
 <pre class="code">[![build](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/badge/build.svg)](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds)</pre>
