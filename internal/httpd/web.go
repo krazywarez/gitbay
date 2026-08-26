@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -433,6 +434,12 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		s.notFound(w, r)
 		return
 	}
+	// Directories first. git's tree order interleaves them with files, but
+	// a listing is scanned by shape before name. Stable, so each group
+	// keeps the ordering git gave it.
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].Type == "tree" && entries[j].Type != "tree"
+	})
 	prefix := ""
 	if dirPath != "" {
 		prefix = dirPath + "/"

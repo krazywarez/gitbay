@@ -57,6 +57,19 @@ func TestReadmeRelativeLinks(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
+	// Directories sort ahead of files, whatever git's own tree order was:
+	// docs/ and img/ precede LICENSE and README.md despite sorting after
+	// them byte-wise.
+	for _, dir := range []string{"docs", "img"} {
+		d := strings.Index(body, `/tree/main/`+dir+`">`)
+		f := strings.Index(body, `/blob/main/README.md">`)
+		if d < 0 || f < 0 {
+			t.Fatalf("listing missing %s/ or README.md", dir)
+		}
+		if d > f {
+			t.Errorf("%s/ listed after README.md; directories should come first", dir)
+		}
+	}
 	// Branch dropdown lists branches.
 	if !strings.Contains(body, `class="refmenu"`) || !strings.Contains(body, ">All refs") {
 		t.Error("branch dropdown missing")
