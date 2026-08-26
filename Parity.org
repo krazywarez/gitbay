@@ -54,7 +54,9 @@ web dispatcher refuses =SSHOnly= commands outright.
 | visibility                | yes     | yes |
 | archive                   | yes     | yes |
 | delete, transfer          | yes     | no  |
-| releases, builds          | read    | read|
+| release create, edit      | yes     | yes |
+| build trigger             | yes     | yes |
+| release delete            | yes     | no  |
 
 * SSH only, by design
 
