@@ -227,7 +227,7 @@ func highlightLines(lexer chroma.Lexer, src string) []template.HTML {
 		return nil
 	}
 	var buf bytes.Buffer
-	if err := diffFormatter.Format(&buf, styles.Get("friendly"), it); err != nil {
+	if err := diffFormatter.Format(&buf, styles.Get(lightStyle), it); err != nil {
 		return nil
 	}
 	body := buf.String()

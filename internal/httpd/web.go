@@ -823,7 +823,7 @@ func highlight(filePath string, data []byte) template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	var buf bytes.Buffer
-	if err := chromaFormatter.Format(&buf, styles.Get("friendly"), iterator); err != nil {
+	if err := chromaFormatter.Format(&buf, styles.Get(lightStyle), iterator); err != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	return template.HTML(buf.String())
@@ -835,12 +835,27 @@ func highlight(filePath string, data []byte) template.HTML {
 // light-theme colour on a black ground — NameAttribute landed at 2.97:1.
 // Scoped, an unnamed token inherits the wrapper's colour instead, which is
 // readable in both. The site's --code-bg stays the background either way.
+// lightStyle and darkStyle are chosen on measured contrast against the
+// grounds code actually sits on here — page, code block, and the diff
+// tints. friendly, the chroma default, put 61 token/ground pairs under
+// 4.5:1; xcode puts one.
+const (
+	lightStyle = "xcode"
+	darkStyle  = "github-dark"
+)
+
 var chromaCSS = func() []byte {
 	var buf bytes.Buffer
 	buf.WriteString("@media (prefers-color-scheme: light) {\n")
-	chromaFormatter.WriteCSS(&buf, styles.Get("friendly"))
+	chromaFormatter.WriteCSS(&buf, styles.Get(lightStyle))
+	// xcode's NameAttribute is its one token under 4.5:1 against the diff
+	// tints (4.51 on additions, 4.38 on deletions); darkened it clears both.
+	buf.WriteString(".chroma .na { color: #6f5a21 }\n")
 	buf.WriteString("}\n@media (prefers-color-scheme: dark) {\n")
-	chromaFormatter.WriteCSS(&buf, styles.Get("github-dark"))
+	chromaFormatter.WriteCSS(&buf, styles.Get(darkStyle))
+	// github-dark's line numbers are #6e7681, 4.31:1 on the page; lifted to
+	// the same grey its comments use, which clears the floor.
+	buf.WriteString(".chroma .lnt, .chroma .ln { color: #8b949e }\n")
 	buf.WriteString("}\n.chroma, .bg { background: transparent !important; }\n")
 	return buf.Bytes()
 }()
@@ -923,7 +938,7 @@ func fenceHighlight(source, lang string) string {
 	}
 	var buf bytes.Buffer
 	f := html.New(html.WithClasses(true))
-	if err := f.Format(&buf, styles.Get("friendly"), iterator); err != nil {
+	if err := f.Format(&buf, styles.Get(lightStyle), iterator); err != nil {
 		return "<pre>" + template.HTMLEscapeString(source) + "</pre>"
 	}
 	return buf.String()
