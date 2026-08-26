@@ -111,7 +111,11 @@
     --fill-subtle: #161616;
     --diff-add: #0d2a18;
     --diff-del: #2c1113;
-    --accent: #5b6bff;       /* 4.71:1 — pure #0000f0 is 2.13:1 here */
+    --accent: #6272ff;       /* pure #0000f0 is 2.13:1 here. Picked against
+                                the lightest ground it lands on, not the page:
+                                a link wrapping inline code sits on #161616,
+                                where the old #5b6bff was 4.30:1. Now 4.63:1
+                                there and 5.06:1 on the page. */
     --accent-fg: #ffffff;
     --fill: #0000f0;         /* fills stay pure; white on it clears 9:1 */
     --mark: #ff6b3d;
