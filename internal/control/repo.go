@@ -48,6 +48,8 @@ func init() {
 		Summary: "unprotect a branch: repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
 	register(Command{Path: []string{"repo", "settings", "description"},
 		Summary: "set the repository description: repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
+	register(Command{Path: []string{"repo", "settings", "visibility"},
+		Summary: "set repository visibility: repo settings visibility <owner/name> public|private", Run: runSetVisibility})
 	register(Command{Path: []string{"repo", "settings", "website"},
 		Summary: "set the repository website: repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
@@ -529,6 +531,35 @@ func runSetWebsite(c *Ctx, args []string) int {
 		} else {
 			fmt.Fprintf(w, "website set on %s\n", repo.Path())
 		}
+	})
+}
+
+func runSetVisibility(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "public" && args[1] != "private") {
+		return c.fail(protocol.ExitUsage, "usage: repo settings visibility <owner/name> public|private")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	if repo.Visibility == args[1] {
+		return c.emit(map[string]string{"visibility": args[1]}, func(w io.Writer) {
+			fmt.Fprintf(w, "%s is already %s\n", repo.Path(), args[1])
+		})
+	}
+	if err := c.Store.SetRepoVisibility(repo.ID, args[1]); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	// Going private takes the repository off every anonymous surface, so
+	// git:// exposure cannot outlive the change.
+	if args[1] == "private" && repo.Settings.GitDaemon {
+		s := repo.Settings
+		s.GitDaemon = false
+		c.Store.SetRepoSettings(repo.ID, s)
+	}
+	c.Store.Audit(c.User.ID, "repo.visibility", map[string]any{"repo": repo.ID, "visibility": args[1]})
+	return c.emit(map[string]string{"visibility": args[1]}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s is now %s\n", repo.Path(), args[1])
 	})
 }
 

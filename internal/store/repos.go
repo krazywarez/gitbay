@@ -82,6 +82,15 @@ func (s *Store) RepoByPath(path string) (Repo, error) {
 	return r, err
 }
 
+// SetRepoVisibility switches a repository between public and private.
+func (s *Store) SetRepoVisibility(repoID int64, visibility string) error {
+	if visibility != "public" && visibility != "private" {
+		return fmt.Errorf("visibility must be public or private")
+	}
+	_, err := s.DB.Exec("UPDATE repos SET visibility = ? WHERE id = ?", visibility, repoID)
+	return err
+}
+
 func (s *Store) SetRepoSettings(repoID int64, settings RepoSettings) error {
 	raw, err := json.Marshal(settings)
 	if err != nil {

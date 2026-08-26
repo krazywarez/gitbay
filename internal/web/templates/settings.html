@@ -1,0 +1,103 @@
+{{define "title"}}settings · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+{{$base := printf "/%s/%s/settings" .Repo.OwnerName .Repo.Name}}
+<h1>Settings</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+
+<h2>Identity</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="description">
+  <label for="description">Description</label>
+  <input type="text" id="description" name="description" value="{{.Desc}}" placeholder="one line, shown in listings">
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="website">
+  <label for="website">Website</label>
+  <input type="text" id="website" name="website" value="{{.Repo.Settings.Website}}" placeholder="https://example.org">
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="topics">
+  <label for="topics-add">Topics</label>
+  <input type="text" id="topics-add" name="add" placeholder="add, space-separated">
+  <input type="text" name="remove" placeholder="remove">
+  <button type="submit">Apply</button>
+</form>
+{{if .Topics}}<p class="meta">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
+
+<h2>Access</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="visibility">
+  <label for="visibility">Visibility</label>
+  <select id="visibility" name="visibility">
+    <option value="public"{{if eq .Repo.Visibility "public"}} selected{{end}}>Public</option>
+    <option value="private"{{if eq .Repo.Visibility "private"}} selected{{end}}>Private</option>
+  </select>
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="git-daemon">
+  <label for="git-daemon">Serve over git://</label>
+  <input type="checkbox" id="git-daemon" name="git-daemon" value="on"{{if .Repo.Settings.GitDaemon}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+
+<h2>Merge gates</h2>
+<p class="meta">Checked before a merge, in this order: checks, approvals, resolved threads, signatures.</p>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-checks">
+  <label for="require-checks">Require green checks</label>
+  <input type="checkbox" id="require-checks" name="require-checks" value="on"{{if .Repo.Settings.RequireChecks}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-approvals">
+  <label for="approvals">Required approvals</label>
+  <input type="number" id="approvals" name="approvals" min="0" max="10" value="{{.Repo.Settings.RequireApprovals}}">
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-resolved">
+  <label for="require-resolved">Require resolved threads</label>
+  <input type="checkbox" id="require-resolved" name="require-resolved" value="on"{{if .Repo.Settings.RequireResolved}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-signed">
+  <label for="require-signed">Require signed commits</label>
+  <input type="checkbox" id="require-signed" name="require-signed" value="on"{{if .Repo.Settings.RequireSignedCommits}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+
+<h2>Protected branches</h2>
+{{if .Repo.Settings.ProtectedBranches}}
+<ul class="protlist">
+{{range .Repo.Settings.ProtectedBranches}}<li><code>{{.}}</code>
+  <form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="unprotect">
+    <input type="hidden" name="branch" value="{{.}}">
+    <button type="submit" class="linklike">Unprotect</button>
+  </form></li>
+{{end}}
+</ul>
+{{else}}<p class="meta">No protected branches. A protected branch refuses deletion and force-pushes.</p>{{end}}
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="protect">
+  <label for="branch">Protect a branch</label>
+  <select id="branch" name="branch">
+    {{range .Branches}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+  </select>
+  <button type="submit">Protect</button>
+</form>
+
+<h2>Lifecycle</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="archive">
+  <label for="archive">Archived (read-only)</label>
+  <input type="checkbox" id="archive" name="archive" value="on"{{if .Repo.Settings.Archived}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<p class="meta">Deleting or transferring a repository is a CLI operation:
+<code>gitbay repo delete {{.Repo.OwnerName}}/{{.Repo.Name}} --yes</code></p>
+{{end}}

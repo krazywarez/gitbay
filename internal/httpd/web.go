@@ -231,6 +231,7 @@ type repoPage struct {
 	HasWiki  bool
 	Host     string
 	Mirrors  []mirrorLine // repo admins only
+	CanAdmin bool         // gates the settings tab
 	// OpenIssues and OpenMRs are the counts on the header tabs.
 	OpenIssues int
 	OpenMRs    int
@@ -290,8 +291,9 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	if viewer.ID != 0 {
 		pinned = s.st.IsPinned(viewer.ID, repo.ID)
 	}
+	canAdmin := viewer.ID != 0 && policy.CanAdmin(viewer, repo, grant)
 	var mirrors []mirrorLine
-	if viewer.ID != 0 && policy.CanAdmin(viewer, repo, grant) {
+	if canAdmin {
 		ms, _ := s.st.ListMirrors(repo.ID)
 		for _, m := range ms {
 			mirrors = append(mirrors, mirrorLine{
@@ -306,6 +308,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	openIssues, openMRs := s.st.OpenCounts(repo.ID)
 	return repoPage{
 		basePage:   s.baseFor(viewer),
+		CanAdmin:   canAdmin,
 		Mirrors:    mirrors,
 		Pinned:     pinned,
 		HasWiki:    s.wikiDir(repo.OwnerName, repo.Name) != "",
@@ -1259,10 +1262,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "commit.html", struct {
 		repoPage
 		SHA, ShortSHA, AuthorName, AuthorEmail, AuthorUser, CommitterEmail, Date, Message string
-		Parents                                                               []string
-		Sig                                                                   sigView
-		Checks                                                                []store.CommitStatus
-		DiffLines                                                             []diffLine
+		Parents                                                                           []string
+		Sig                                                                               sigView
+		Checks                                                                            []store.CommitStatus
+		DiffLines                                                                         []diffLine
 	}{p, full, full[:10], commitNames.name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, commitUser, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
 		gitutil.Parents(p.Dir, full), v, checks, lines})
@@ -1571,6 +1574,10 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", prefix+".tar.gz"))
 	gitutil.Archive(p.Dir, ref, prefix, w)
+}
+
+func policyCanAdmin(u store.User, repo store.Repo, grant string) bool {
+	return policy.CanAdmin(u, repo, grant)
 }
 
 func policyCanRead(u store.User, repo store.Repo, grant string) bool {

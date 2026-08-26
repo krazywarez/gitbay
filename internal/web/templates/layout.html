@@ -70,6 +70,7 @@
     <a {{if eq $top "builds"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/builds">Builds</a>
     <a {{if eq $top "releases"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/releases">Releases</a>
     {{if field $ "HasWiki"}}<a {{if eq $top "wiki"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/wiki">Wiki</a>{{end}}
+    {{if field $ "CanAdmin"}}<a {{if eq $top "settings"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/settings">Settings</a>{{end}}
   </nav>
 </header>
 {{end}}

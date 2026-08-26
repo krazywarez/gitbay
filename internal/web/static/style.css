@@ -546,6 +546,21 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-4);
 }
+/* settings: one row per control, label then input then its own button */
+form.setform {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--faint);
+}
+form.setform label { min-width: 12rem; color: var(--muted); font-size: var(--fs-2); }
+form.setform input[type="text"], form.setform select { flex: 1 1 16rem; }
+form.setform input[type="number"] { width: 5rem; }
+ul.protlist { list-style: none; padding: 0; margin: var(--sp-2) 0; }
+ul.protlist li { padding: var(--sp-1) 0; display: flex; gap: var(--sp-3); align-items: baseline; }
+
 /* branch picker on the new merge request form */
 p.branchpick {
   display: flex;
