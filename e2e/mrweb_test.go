@@ -155,3 +155,62 @@ func TestMRWebReviewLoop(t *testing.T) {
 		t.Fatalf("reader was not refused:\n%s", denied)
 	}
 }
+
+// TestMRWebCreate opens a merge request from the browser and checks the
+// form survives a refusal with the draft intact.
+func TestMRWebCreate(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/lib"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/lib"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "topic")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "topic work")
+	mustGit(t, dir, env, "push", "-q", "origin", "topic")
+
+	alice := inst.login(t, aliceKey)
+	base := inst.base() + "/alice/lib"
+
+	// The list links to the form, and the form offers the pushed branches.
+	if _, body := browserGet(t, alice, base+"/mrs"); !strings.Contains(body, "/alice/lib/mrs/new") {
+		t.Fatalf("no create link on the list:\n%s", body)
+	}
+	_, form := browserGet(t, alice, base+"/mrs/new")
+	for _, want := range []string{`name="source"`, `value="topic"`, `value="main"`} {
+		if !strings.Contains(form, want) {
+			t.Fatalf("form missing %q:\n%s", want, form)
+		}
+	}
+
+	// A refusal keeps the draft: the branch does not exist.
+	_, retry := browserPost(t, alice, base+"/mrs/new", url.Values{
+		"source": {"nope"}, "target": {"main"}, "title": {"my title"}, "body": {"my body"}})
+	if !strings.Contains(retry, `class="error"`) || !strings.Contains(retry, "my title") ||
+		!strings.Contains(retry, "my body") {
+		t.Fatalf("refusal lost the draft:\n%s", retry)
+	}
+
+	// A real one lands on the merge request it created.
+	status, created := browserPost(t, alice, base+"/mrs/new", url.Values{
+		"source": {"topic"}, "target": {"main"}, "title": {"topic into main"}, "body": {"please review"}})
+	if status != 200 || !strings.Contains(created, "topic into main") {
+		t.Fatalf("create failed: %d\n%s", status, created)
+	}
+	show := inst.mrShow(t, aliceKey, "alice/lib", "1")
+	if show.State != "open" || show.Source != "topic" {
+		t.Fatalf("created MR wrong: %+v", show)
+	}
+}

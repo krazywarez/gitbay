@@ -9,6 +9,7 @@
     <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
   </nav>
 </div>
+{{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
 <ul class="issuelist">
 {{range .MRs}}<li>
   <div class="issuemain">

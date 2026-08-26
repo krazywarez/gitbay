@@ -540,6 +540,16 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-4);
 }
+/* branch picker on the new merge request form */
+p.branchpick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+p.branchpick label { color: var(--muted); font-size: var(--fs-2); }
+p.branchpick select { flex: 1 1 12rem; }
+
 /* merge request actions in the aside: stacked controls, full width */
 .aside form.actions {
   display: flex;

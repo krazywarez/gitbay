@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
@@ -35,4 +36,40 @@ func (s *Server) runControl(u store.User, argv []string) (out string, msg string
 		m = strings.TrimSpace(stdout.String())
 	}
 	return stdout.String(), m, code == protocol.ExitOK
+}
+
+// runControlJSON runs a command in JSON mode and returns its data object.
+// In JSON mode a failure is an envelope carrying the message rather than
+// stderr text, so both paths are read from the same envelope.
+func (s *Server) runControlJSON(u store.User, argv []string) (data map[string]any, msg string, ok bool) {
+	var stdout, stderr bytes.Buffer
+	ctx := &control.Ctx{
+		User:   u,
+		Source: "web",
+		Scope:  "full",
+		Store:  s.st,
+		Cfg:    s.cfg,
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+		JSON:   true,
+		ViaAPI: true,
+	}
+	code := control.Dispatch(ctx, argv)
+	var env struct {
+		Data  map[string]any `json:"data"`
+		Error string         `json:"error"`
+	}
+	json.Unmarshal(stdout.Bytes(), &env)
+	if code != protocol.ExitOK {
+		m := env.Error
+		if m == "" {
+			m = strings.TrimSpace(stderr.String())
+		}
+		if m == "" {
+			m = "the command failed"
+		}
+		return nil, m, false
+	}
+	return env.Data, "", true
 }

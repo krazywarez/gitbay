@@ -1,0 +1,23 @@
+{{define "title"}}new merge request · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+<h1>New merge request</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new" class="commentform">
+<p class="branchpick">
+  <label for="source">Merge</label>
+  <select id="source" name="source" required>
+    <option value="">Choose a branch…</option>
+    {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.Source}} selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <label for="target">into</label>
+  <select id="target" name="target">
+    {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.Target}} selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+</p>
+<p><input type="text" name="title" aria-label="Title" placeholder="title" value="{{.Title}}" required></p>
+<p><textarea name="body" aria-label="Description" rows="10" placeholder="what changes, and why">{{.Body}}</textarea></p>
+<p><button type="submit" class="primary">Open merge request</button></p>
+</form>
+<p class="meta">A branch in a fork opens from the CLI:
+<code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source owner/fork:branch --target {{.Repo.DefaultBranch}} --title "…"</code></p>
+{{end}}
