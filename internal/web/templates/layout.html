@@ -57,12 +57,10 @@
     <span class="grow"></span>
     {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}">{{if field $ "Pinned"}}★ Pinned{{else}}☆ Pin{{end}}</button></form>{{end}}
   </div>
-  {{if field $ "RepoHome"}}
   {{with field $ "Desc"}}<p class="repodesc">{{.}}</p>{{end}}
   {{with field $ "Topics"}}<p class="topics">{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
   {{with $.Repo.Settings.Website}}<p class="repometa"><a href="{{.}}" rel="nofollow">{{.}}</a></p>{{end}}
   {{range field $ "Mirrors"}}<p class="repometa">{{if eq .Direction "push"}}Mirrors to{{else}}Mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="bad">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
-  {{end}}
   {{end}}
   <nav class="tabs" aria-label="Repository">
     {{$top := topTab (str $ "Tab")}}

@@ -288,6 +288,9 @@ a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
 }
 .repohead .identity { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .repohead .identity .grow { flex: 1; }
+/* h1 on the repo home, p elsewhere so each page keeps its own h1 — but
+   identical in size, because the tabs sit below this and navigation must
+   not move when you use it */
 .repotitle {
   margin: 0;
   font-size: var(--fs-4);
@@ -295,7 +298,6 @@ a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
   letter-spacing: -0.02em;
   line-height: 1.3;
 }
-h1.repotitle { font-size: var(--fs-5); }
 .repotitle a { color: var(--fg); }
 .repotitle a.owner { color: var(--muted); font-weight: 400; }
 .repotitle a:hover { color: var(--accent); text-decoration: none; }

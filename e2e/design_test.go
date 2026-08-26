@@ -139,6 +139,15 @@ func TestReadmeRelativeLinks(t *testing.T) {
 			t.Errorf("explore row missing %q", want)
 		}
 	}
+	// The repo header renders the same on every tab of the repo. It sits
+	// above the tab bar, so anything that appears on one tab and not
+	// another moves the navigation between clicks of that navigation.
+	for _, page := range []string{"", "/issues", "/mrs", "/releases"} {
+		_, body := inst.get(t, "/alice/site"+page)
+		if !strings.Contains(body, `href="/explore?q=web"`) {
+			t.Errorf("repo header topics missing on /alice/site%s", page)
+		}
+	}
 }
 
 func TestWebInteractions(t *testing.T) {
