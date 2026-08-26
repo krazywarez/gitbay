@@ -1,7 +1,7 @@
 {{define "title"}}register · {{.Site}}{{end}}
 {{define "content"}}
 <div class="landing">
-<h1>create an account</h1>
+<h1>Create an account</h1>
 {{if eq .Mode "invite"}}<p class="lede">This instance is invite-only: you need an invite code from an admin.</p>
 {{else}}<p class="lede">Open registration — your account activates once you verify your email.</p>{{end}}
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
@@ -10,8 +10,8 @@
 {{if eq .Mode "invite"}}<p><label>invite code<br><input type="text" name="invite" required></label></p>
 {{else}}<p><label>email<br><input type="text" name="email" required></label></p>{{end}}
 <p><label>SSH public key — your key is your identity; paste e.g. <code>~/.ssh/id_ed25519.pub</code><br>
-<textarea name="key" rows="3" required placeholder="ssh-ed25519 AAAA... you@host"></textarea></label></p>
-<p><button type="submit">create account</button></p>
+<textarea name="key" aria-label="SSH public key" rows="3" required placeholder="ssh-ed25519 AAAA... you@host"></textarea></label></p>
+<p><button type="submit">Create account</button></p>
 </form>
 <p class="meta">Prefer the terminal? <code>ssh git@{{.Host}} register --username you {{if eq .Mode "invite"}}--invite &lt;code&gt;{{else}}--email you@example.org{{end}}</code></p>
 </div>

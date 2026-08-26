@@ -5,14 +5,25 @@
   {{template "refmenu" .}}
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</span>
   <span class="spacer"></span>
-  <span class="clone">clone: <code>git clone {{.CloneURL}}</code></span>
+  <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search">Find file</a>
+  <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">History</a>
+  <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">Download</a>
 </div>
+{{if .Entries}}<p class="clone">Clone: <code>git clone {{.CloneURL}}</code></p>{{end}}
+{{with .Tip}}{{if .SHA}}<div class="tipbar">
+  <span class="who">{{.Author}}</span>
+  <a class="subject" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a>
+  <span class="spacer"></span>
+  <a class="sha" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}"><code>{{short .SHA}}</code></a>
+  <span class="age">{{ago .When}}</span>
+</div>{{end}}{{end}}
 <table class="tree">
-<tr class="cols"><th>name</th><th class="size">size</th><th class="mode">mode</th></tr>
-{{range .Entries}}<tr>
-  {{if eq .Type "tree"}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}/</a></td><td class="size"></td>
-  {{else}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}</a></td><td class="size">{{.Size}}</td>{{end}}
-  <td class="mode">{{.Mode}}</td>
+<tr class="cols"><th scope="col">name</th><th scope="col" class="lastcommit">last commit</th><th scope="col" class="age">updated</th></tr>
+{{range .Entries}}{{$c := index $.LastCommits .Name}}<tr>
+  {{if eq .Type "tree"}}<td class="name dir"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}/</a></td>
+  {{else}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}</a></td>{{end}}
+  <td class="lastcommit">{{with $c.Subject}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{$c.SHA}}" title="{{.}}">{{.}}</a>{{end}}</td>
+  <td class="age">{{ago $c.When}}</td>
 </tr>
 {{else}}<tr><td class="name empty" colspan="3">this repository is empty — push something:<br><code>git remote add origin {{.CloneURL}}</code></td></tr>{{end}}
 </table>

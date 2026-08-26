@@ -86,6 +86,8 @@
   --sp-5: 1.5rem;
   --sp-6: 2.5rem;
 
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23595959' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
   /* radii: 2px everywhere — chart plates, not pills */
   --r-sm: 2px;
   --r-md: 2px;
@@ -111,6 +113,7 @@
     --bad: #ff6b6b;
     --done: #c084fc;
     --neutral: #a1a1a1;
+    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a1a1a1' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 }
 
@@ -936,27 +939,47 @@ details.editbox input[type="text"] { width: 100%; }
 .thread .rendered p { margin: var(--sp-1) 0; }
 .thread .threadstate { color: var(--muted); font-size: var(--fs-1); margin: var(--sp-1) 0 0; }
 
-/* forms */
+/* forms: every control shares one shell, so a select reads as a sibling
+   of the text inputs beside it rather than as an OS control dropped in */
 input, textarea, button, select { font: inherit; color: inherit; }
-input[type="text"], input:not([type]), textarea {
+input[type="text"], input[type="search"], input[type="email"],
+input[type="password"], input:not([type]), textarea, select {
   background: var(--bg);
+  color: var(--fg);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-3);
+  line-height: 1.4;
 }
 textarea { width: 100%; resize: vertical; }
 textarea[name="content"] { font-family: var(--mono); font-size: var(--fs-1); }
-input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
-button {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border: none;
-  border-radius: var(--r-md);
-  padding: var(--sp-1) var(--sp-3);
-  font-weight: 500;
+/* the native arrow cannot be restyled, so draw our own and match the
+   inputs exactly; --chev carries the stroke colour per scheme */
+select {
+  appearance: none;
+  padding-right: 1.9rem;
+  background-image: var(--chev);
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.62rem;
   cursor: pointer;
 }
-button:hover { filter: brightness(1.08); }
+input:hover, textarea:hover, select:hover { border-color: var(--muted); }
+/* the global :focus-visible ring covers these; only the border moves */
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+input[type="radio"], input[type="checkbox"] { accent-color: var(--fill); }
+label:has(> input[type="radio"]), label:has(> input[type="checkbox"]),
+label:has(> select) { display: inline-flex; align-items: center; gap: var(--sp-2); }
+button {
+  background: var(--fill);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.15); }
 
 /* 404 */
 .notfound { text-align: center; padding: var(--sp-6) 0; }
@@ -1087,3 +1110,100 @@ pre.matchline mark {
     padding: var(--sp-2) var(--sp-3);
   }
 }
+
+/* tree listing: the last commit is what a file table is scanned for, so
+   it leads. The file's own facts moved to the blob page. */
+.tipbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--hover);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  font-size: var(--fs-2);
+}
+.tipbar .who { font-weight: 600; }
+.tipbar .subject { color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tipbar .subject:hover { color: var(--accent); }
+.tipbar .spacer { flex: 1; }
+.tipbar .age { color: var(--muted); white-space: nowrap; }
+.tipbar + table.tree { border-radius: 0 0 var(--r-lg) var(--r-lg); }
+table.tree th.lastcommit, table.tree td.lastcommit { width: 55%; }
+table.tree td.lastcommit a { color: var(--muted); display: block; overflow: hidden;
+                             text-overflow: ellipsis; white-space: nowrap; }
+table.tree td.lastcommit a:hover { color: var(--accent); }
+table.tree th.age, table.tree td.age {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+table.tree td.name { width: 25%; white-space: nowrap; }
+table.tree td.name.dir a { color: var(--accent); }
+p.clone { margin: 0 0 var(--sp-3); }
+p.filefacts { color: var(--muted); font-size: var(--fs-1); margin: 0 0 var(--sp-3); }
+.pathbar .act { font-size: var(--fs-1); }
+
+/* merge request: a two-column split, so state has somewhere to live that
+   is not a run-on sentence under the title */
+.withaside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: var(--sp-5);
+  align-items: start;
+}
+.withaside .mainside { min-width: 0; }
+@media (max-width: 62rem) { .withaside { grid-template-columns: 1fr; } }
+
+.aside { font-size: var(--fs-2); }
+.aside .grp { border-top: 1px solid var(--line); padding: var(--sp-3) 0; }
+.aside .grp:first-child { border-top: 0; padding-top: 0; }
+.aside h2 {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.aside .row { display: flex; align-items: center; gap: var(--sp-2); margin: 0 0 var(--sp-1); flex-wrap: wrap; }
+.aside .row:last-child { margin-bottom: 0; }
+.aside .none { color: var(--muted); }
+.aside .dot { width: 0.45rem; height: 0.45rem; flex: none; border-radius: 50%; background: var(--muted); }
+.aside .dot.ok { background: var(--ok); }
+.aside .dot.bad { background: var(--bad); }
+.aside .dot.pend { background: var(--mark); }
+
+/* sub-navigation within an item; orange marks position as it does above */
+nav.subtabs {
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 var(--sp-4);
+}
+nav.subtabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 0 var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-2);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+nav.subtabs a:hover { color: var(--fg); text-decoration: none; }
+nav.subtabs a[aria-current] { color: var(--fg); font-weight: 700; border-bottom-color: var(--mark); }
+nav.subtabs a i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: var(--fs-0);
+  background: var(--hover);
+  border-radius: var(--r-sm);
+  padding: 0 0.35rem;
+}
+p.diffstat { color: var(--muted); font-size: var(--fs-2); margin: 0 0 var(--sp-3); }
+p.diffstat .add { color: var(--ok); }
+p.diffstat .del { color: var(--bad); }

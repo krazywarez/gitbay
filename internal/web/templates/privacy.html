@@ -1,9 +1,9 @@
 {{define "title"}}privacy · {{.Site}}{{end}}
 {{define "content"}}
 <div class="landing">
-<h1>privacy</h1>
+<h1>Privacy</h1>
 
-<h2>the software</h2>
+<h2>The software</h2>
 <p>This site runs <a href="https://gitbay.org/krz/gitbay">gitbay</a>, a
 self-hosted, CLI-first git forge. The software makes no external
 requests from your browser: no analytics, no CDNs, no webfonts, no
@@ -20,7 +20,7 @@ they are indistinguishable from nonexistent.</p>
 downloads your account bundle, git data is yours by clone, and
 <code>gitbay migrate</code> moves everything to another instance.</p>
 
-<h2>this instance ({{.Host}})</h2>
+<h2>This instance ({{.Host}})</h2>
 {{if .Notice}}{{range paragraphs .Notice}}<p>{{.}}</p>{{end}}
 {{else}}<p class="desc">The operator of this instance has not added
 instance-specific notes. Questions about backups, retention, or

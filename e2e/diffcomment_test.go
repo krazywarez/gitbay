@@ -92,12 +92,13 @@ func TestDiffComments(t *testing.T) {
 	if !strings.Contains(out, `"unresolved_threads":1`) {
 		t.Fatalf("mr show count: %s", out)
 	}
-	status, body := inst.get(t, "/alice/lib/mrs/1")
+	status, body := inst.get(t, "/alice/lib/mrs/1?view=diff")
 	if status != 200 || !strings.Contains(body, "use log instead of fmt") ||
 		!strings.Contains(body, `class="thread`) {
 		t.Fatalf("web thread: %d", status)
 	}
-	if strings.Contains(body, "threads on earlier revisions") {
+	// Detached threads belong to the conversation, not the current diff.
+	if _, conv := inst.get(t, "/alice/lib/mrs/1"); strings.Contains(conv, "Threads on earlier revisions") {
 		t.Fatal("fresh thread rendered as detached")
 	}
 
@@ -126,7 +127,7 @@ func TestDiffComments(t *testing.T) {
 		t.Fatalf("thread not stale after force-push: %s", out)
 	}
 	_, body = inst.get(t, "/alice/lib/mrs/1")
-	if !strings.Contains(body, "threads on earlier revisions") {
+	if !strings.Contains(body, "Threads on earlier revisions") {
 		t.Fatal("stale thread not moved to detached section")
 	}
 }

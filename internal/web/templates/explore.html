@@ -1,9 +1,9 @@
 {{define "title"}}explore · {{.Site}}{{end}}
 {{define "content"}}
 <div class="headrow">
-<h1>explore</h1>
+<h1>Explore</h1>
 <form method="get" action="/explore" class="searchform compact">
-  <input type="search" name="q" value="{{.Query}}" placeholder="filter by name, description, topic">
+  <input type="search" name="q" aria-label="Filter repositories" value="{{.Query}}" placeholder="filter by name, description, topic">
 </form>
 <span class="spacer"></span>
 </div>

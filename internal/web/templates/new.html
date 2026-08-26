@@ -1,15 +1,15 @@
 {{define "title"}}new repository · {{.Site}}{{end}}
 {{define "content"}}
-<h1>new repository</h1>
+<h1>New repository</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 <form method="post" action="/new">
-<p><label>owner <select name="owner">
+<p><label>Owner <select name="owner">
   <option value="{{.Viewer}}">{{.Viewer}}</option>
   {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
 </select></label>
-<label>/ name <input name="name" required pattern="[a-z0-9][a-z0-9._-]*"></label></p>
-<p><label><input type="radio" name="visibility" value="public" checked> public</label>
-   <label><input type="radio" name="visibility" value="private"> private</label></p>
-<p><button type="submit">create</button></p>
+<label>/ Name <input name="name" required pattern="[a-z0-9][a-z0-9._-]*"></label></p>
+<p><label><input type="radio" name="visibility" value="public" checked> Public</label>
+   <label><input type="radio" name="visibility" value="private"> Private</label></p>
+<p><button type="submit">Create repository</button></p>
 </form>
 {{end}}

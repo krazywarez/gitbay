@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +131,58 @@ var funcs = template.FuncMap{
 			return nil
 		}
 		return f.Interface()
+	},
+	// sigLabel turns a stored signature state into words. The state names
+	// are the CLI's vocabulary and belong in its output; a reader of the
+	// web UI needs to know what is wrong, not what the column is called.
+	"sigLabel": func(state string) string {
+		switch state {
+		case "verified":
+			return "Verified"
+		case "signed_unknown_key":
+			return "Unregistered key"
+		case "signed_email_mismatch":
+			return "Email mismatch"
+		case "signed_key_expired":
+			return "Key expired"
+		case "signed_key_revoked":
+			return "Key revoked"
+		case "bad_signature":
+			return "Bad signature"
+		case "unsigned":
+			return "Unsigned"
+		}
+		return state
+	},
+	// ago renders a time as a coarse relative age, which is what a
+	// listing column is actually read for. The zero time yields "".
+	"ago": func(t time.Time) string {
+		if t.IsZero() {
+			return ""
+		}
+		d := time.Since(t)
+		if d < 0 {
+			d = 0
+		}
+		plural := func(n int, unit string) string {
+			if n == 1 {
+				return "1 " + unit + " ago"
+			}
+			return strconv.Itoa(n) + " " + unit + "s ago"
+		}
+		switch {
+		case d < time.Minute:
+			return "just now"
+		case d < time.Hour:
+			return plural(int(d/time.Minute), "minute")
+		case d < 24*time.Hour:
+			return plural(int(d/time.Hour), "hour")
+		case d < 30*24*time.Hour:
+			return plural(int(d/(24*time.Hour)), "day")
+		case d < 365*24*time.Hour:
+			return plural(int(d/(30*24*time.Hour)), "month")
+		}
+		return plural(int(d/(365*24*time.Hour)), "year")
 	},
 	// when formats a stored RFC3339 timestamp for display; unparseable
 	// values pass through unchanged.

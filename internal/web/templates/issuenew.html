@@ -4,9 +4,9 @@
 {{if gt (len .Templates) 1}}<p class="meta">template:
 {{range .Templates}}{{if eq .Name $.Template}}<strong>{{.Name}}</strong>{{else}}<a href="?template={{.Name}}">{{.Name}}</a>{{end}} {{end}}</p>{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new" class="commentform">
-<p><input type="text" name="title" placeholder="title" required></p>
-<p><textarea name="body" rows="12">{{.Body}}</textarea></p>
-<p><input type="text" name="labels" placeholder="labels, space-separated (write access)"></p>
-<p><button type="submit">open issue</button></p>
+<p><input type="text" name="title" aria-label="Title" placeholder="title" required></p>
+<p><textarea name="body" aria-label="Description" rows="12">{{.Body}}</textarea></p>
+<p><input type="text" name="labels" aria-label="Labels" placeholder="labels, space-separated (write access)"></p>
+<p><button type="submit">Open issue</button></p>
 </form>
 {{end}}

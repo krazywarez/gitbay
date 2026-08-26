@@ -51,7 +51,7 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		"<table>", "<td>verbose</td>",                  // GFM table renders
 		`<span class="kd">func</span>`, // fenced code highlighted via classes
 		`href="/alice/site/blob/main/README.md">README.md</a>`, // clickable card header
-		`<th>name</th>`, // file table column headers
+		`<th scope="col">name</th>`, // file table column headers
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)

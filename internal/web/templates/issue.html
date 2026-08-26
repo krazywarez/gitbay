@@ -8,9 +8,9 @@
 {{if .Issue.Milestone}} · milestone <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a>{{end}}</p>
 {{if .CanEdit}}<details class="editbox"><summary>edit</summary>
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/edit" class="commentform">
-<p><input type="text" name="title" value="{{.Issue.Title}}" required></p>
-<p><textarea name="body" rows="8">{{.Issue.Body}}</textarea></p>
-<p><input type="text" name="labels" value="{{range $i, $l := .Issue.Labels}}{{if $i}} {{end}}{{$l}}{{end}}" placeholder="labels, space-separated (write access)"></p>
+<p><input type="text" name="title" aria-label="Title" value="{{.Issue.Title}}" required></p>
+<p><textarea name="body" aria-label="Description" rows="8">{{.Issue.Body}}</textarea></p>
+<p><input type="text" name="labels" aria-label="Labels" value="{{range $i, $l := .Issue.Labels}}{{if $i}} {{end}}{{$l}}{{end}}" placeholder="labels, space-separated (write access)"></p>
 <p><button type="submit">save</button></p>
 </form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
@@ -26,7 +26,7 @@
 {{end}}
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">
-<p><textarea name="body" rows="4" placeholder="comment as {{.Viewer}}"></textarea></p>
+<p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
 <p><button type="submit">comment</button></p>
 </form>
 {{end}}

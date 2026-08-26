@@ -1,16 +1,16 @@
 {{define "title"}}dashboard · {{.Site}}{{end}}
 {{define "content"}}
 <div class="headrow">
-<h1>dashboard</h1>
+<h1>Dashboard</h1>
 <span class="spacer"></span>
 <p class="toolbar">logged in as <a href="/{{.Viewer}}">{{.Viewer}}</a></p>
 </div>
-{{if .Pinned}}<h2>pinned</h2>
+{{if .Pinned}}<h2>Pinned</h2>
 <ul class="pinlist">
 {{range .Pinned}}<li><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip chip-neutral">private</span>{{end}}</li>
 {{end}}
 </ul>{{end}}
-<h2>open merge requests <span class="count">{{len .MRs}}</span></h2>
+<h2>Open merge requests <span class="count">{{len .MRs}}</span></h2>
 <ul class="issuelist">
 {{range .MRs}}<li>
   <div class="issuemain">
@@ -20,7 +20,7 @@
 </li>
 {{else}}<li class="empty">no open merge requests</li>{{end}}
 </ul>
-<h2>open issues <span class="count">{{len .Issues}}</span></h2>
+<h2>Open issues <span class="count">{{len .Issues}}</span></h2>
 <ul class="issuelist">
 {{range .Issues}}<li>
   <div class="issuemain">

@@ -264,12 +264,13 @@ func TestMergeRequests(t *testing.T) {
 	if status != 200 || !strings.Contains(body, "stale") || !strings.Contains(body, "merged") {
 		t.Fatalf("mr detail: %d\n%s", status, body)
 	}
-	if !strings.Contains(body, "feature.txt") {
-		t.Fatalf("merged MR web diff empty:\n%s", body)
+	if _, diff := inst.get(t, "/alice/lib/mrs/1?view=diff"); !strings.Contains(diff, "feature.txt") {
+		t.Fatalf("merged MR web diff empty:\n%s", diff)
 	}
-	// The MR page lists the commits it carries, linked to commit pages.
-	if !strings.Contains(body, ">commits <") || !strings.Contains(body, "/alice/lib/commit/") {
-		t.Fatalf("mr commits section missing:\n%s", body)
+	// The MR lists the commits it carries, linked to commit pages.
+	_, commits := inst.get(t, "/alice/lib/mrs/1?view=commits")
+	if !strings.Contains(commits, "/alice/lib/commit/") {
+		t.Fatalf("mr commits view missing:\n%s", commits)
 	}
 	// So does mr show, human and JSON.
 	showOut, _, code := inst.ssh(t, aliceKey, "", "mr", "show", "alice/lib", "1")

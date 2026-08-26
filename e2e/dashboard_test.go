@@ -93,7 +93,7 @@ func TestDashboard(t *testing.T) {
 		t.Fatalf("dashboard: %d", status)
 	}
 	for _, want := range []string{
-		">pinned</h2>", ">app<", // pinned card
+		">Pinned</h2>", ">app<", // pinned card
 		"alice/app!1 from bob", "alice/app#1 todo one",
 		`href="/alice/app/mrs/1"`, `href="/alice/app/issues/1"`,
 	} {
@@ -102,11 +102,18 @@ func TestDashboard(t *testing.T) {
 		}
 	}
 
-	// The MR diff is collapsed by default in a <details> with stats.
+	// The diff has its own view rather than a fold at the foot of the
+	// conversation: the default view offers it, and asking for it renders
+	// the stat line and the patch.
 	_, body = inst.get(t, "/alice/app/mrs/1")
-	if !strings.Contains(body, `<details class="difffold">`) ||
-		strings.Contains(body, `<details class="difffold" open`) ||
-		!strings.Contains(body, "1 file changed") {
-		t.Fatal("diff not collapsed with stats")
+	if !strings.Contains(body, `href="/alice/app/mrs/1?view=diff"`) {
+		t.Fatal("merge request missing the files-changed view")
+	}
+	if strings.Contains(body, `class="diff"`) {
+		t.Fatal("diff rendered on the conversation view")
+	}
+	_, body = inst.get(t, "/alice/app/mrs/1?view=diff")
+	if !strings.Contains(body, "1 file changed") || !strings.Contains(body, `class="diff"`) {
+		t.Fatalf("diff view missing stat or patch:\n%s", body)
 	}
 }

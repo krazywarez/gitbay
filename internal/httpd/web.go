@@ -79,9 +79,7 @@ func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 // the stock plain-text response if the template fails.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	if err := web.Render(&buf, "404.html", basePage{
-		Site: s.siteName(), Viewer: s.viewerName(r),
-	}); err != nil {
+	if err := web.Render(&buf, "404.html", s.base(r)); err != nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -171,14 +169,6 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 		Query string
 		Repos []describedRepo
 	}{s.baseFor(viewer), q, s.filterRepos(q, s.describeAll(repos))})
-}
-
-// viewerName returns the logged-in username for header rendering, or "".
-func (s *Server) viewerName(r *http.Request) string {
-	if s.cfg.Web.Mode != "accounts" {
-		return ""
-	}
-	return s.viewer(r).Username
 }
 
 // privacy renders the privacy page: what the gitbay software does with
@@ -425,14 +415,16 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		// Empty repo: render the page with no entries rather than 404.
 		s.render(w, "tree.html", struct {
 			repoPage
-			Crumbs     []crumb
-			Prefix     string
-			DirPath    string
-			RefKind    string
-			Entries    []gitutil.TreeEntry
-			Branches   []gitutil.Ref
-			ReadmeName string
-			ReadmeHTML template.HTML
+			Crumbs      []crumb
+			Prefix      string
+			DirPath     string
+			RefKind     string
+			Entries     []gitutil.TreeEntry
+			Branches    []gitutil.Ref
+			ReadmeName  string
+			ReadmeHTML  template.HTML
+			LastCommits map[string]gitutil.EntryCommit
+			Tip         gitutil.EntryCommit
 		}{repoPage: p, RefKind: "tree"})
 		return
 	}
@@ -455,17 +447,26 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	}
 
 	branches, _ := gitutil.Refs(p.Dir, "heads")
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name)
+	}
 	s.render(w, "tree.html", struct {
 		repoPage
-		Crumbs     []crumb
-		Prefix     string
-		DirPath    string
-		RefKind    string
-		Entries    []gitutil.TreeEntry
-		Branches   []gitutil.Ref
-		ReadmeName string
-		ReadmeHTML template.HTML
-	}{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches, readmeName, readmeHTML})
+		Crumbs      []crumb
+		Prefix      string
+		DirPath     string
+		RefKind     string
+		Entries     []gitutil.TreeEntry
+		Branches    []gitutil.Ref
+		ReadmeName  string
+		ReadmeHTML  template.HTML
+		LastCommits map[string]gitutil.EntryCommit
+		Tip         gitutil.EntryCommit
+	}{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches,
+		readmeName, readmeHTML,
+		gitutil.LastCommits(p.Dir, p.Ref, dirPath, names),
+		gitutil.TipCommit(p.Dir, p.Ref)})
 }
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
@@ -494,6 +495,16 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		cs = cs[:len(cs)-1]
 	}
 	branches, _ := gitutil.Refs(p.Dir, "heads")
+	lines := 0
+	if !binary && !image && len(data) > 0 {
+		lines = bytes.Count(data, []byte("\n"))
+		if data[len(data)-1] != '\n' {
+			lines++
+		}
+	}
+	// The file listing leads with the last commit now, so the facts about
+	// the file itself are reported here instead.
+	entry, _ := gitutil.StatPath(p.Dir, p.Ref, filePath)
 	s.render(w, "blob.html", struct {
 		repoPage
 		Crumbs   []crumb
@@ -504,9 +515,13 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		Binary   bool
 		Image    bool
 		Size     int
+		Lines    int
+		Exec     bool
+		Symlink  bool
 		Branches []gitutil.Ref
 		CodeHTML template.HTML
-	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), branches, codeHTML})
+	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), lines,
+		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML})
 }
 
 // releases lists tag-anchored releases with notes and assets.
@@ -1450,9 +1465,17 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			commits = append(commits, cr)
 		}
 	}
+	// The diff is the reason most people open a merge request, so it gets
+	// its own view rather than a fold at the foot of the conversation.
+	// A query parameter keeps this working without JavaScript.
+	view := r.URL.Query().Get("view")
+	if view != "commits" && view != "diff" {
+		view = "conversation"
+	}
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
+		View            string
 		BodyHTML        template.HTML
 		Checks          []store.CommitStatus
 		Combined        string
@@ -1463,7 +1486,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Commits         []commitRow
 		CanEdit         bool
 		DetachedThreads []diffThread
-	}{p, m, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
+	}{p, m, view, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
 		reviews, lines, stat, commits, s.canEditItem(r, p.Repo, m.Author), detachedThreads})
 }
 
