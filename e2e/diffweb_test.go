@@ -88,8 +88,20 @@ func TestDiffRendering(t *testing.T) {
 	if !strings.Contains(body, `<td class="src chroma">`) {
 		t.Error("diff cell is not a chroma wrapper, so token classes go unstyled")
 	}
-	if !strings.Contains(stylesheet(t, inst), ".chroma .k") {
+	css := stylesheet(t, inst)
+	if !strings.Contains(css, ".chroma .k") {
 		t.Error("stylesheet has no chroma token rules to match")
+	}
+	// Each palette is scoped to its own scheme. Unscoped, the light one
+	// leaks into dark mode for every token the dark palette does not name.
+	if !strings.Contains(css, "@media (prefers-color-scheme: light)") ||
+		!strings.Contains(css, "@media (prefers-color-scheme: dark)") {
+		t.Error("chroma palettes are not both scheme-scoped")
+	}
+	if i := strings.Index(css, ".chroma .na"); i >= 0 {
+		if j := strings.LastIndex(css[:i], "prefers-color-scheme"); j < 0 {
+			t.Error("a chroma token rule sits outside any scheme scope")
+		}
 	}
 	// The +/- markers are CSS, so a copied selection is real source.
 	if strings.Contains(body, `<td class="src">+`) {

@@ -829,13 +829,17 @@ func highlight(filePath string, data []byte) template.HTML {
 	return template.HTML(buf.String())
 }
 
-// chromaCSS is both syntax palettes: light by default, dark under the same
-// media query the rest of the stylesheet uses. The site's --code-bg stays
-// the background either way.
+// chromaCSS is both syntax palettes, each scoped to the scheme it is for.
+// The light one cannot be left unscoped: the two palettes do not name the
+// same token set, and every token github-dark omits would keep its
+// light-theme colour on a black ground — NameAttribute landed at 2.97:1.
+// Scoped, an unnamed token inherits the wrapper's colour instead, which is
+// readable in both. The site's --code-bg stays the background either way.
 var chromaCSS = func() []byte {
 	var buf bytes.Buffer
+	buf.WriteString("@media (prefers-color-scheme: light) {\n")
 	chromaFormatter.WriteCSS(&buf, styles.Get("friendly"))
-	buf.WriteString("\n@media (prefers-color-scheme: dark) {\n")
+	buf.WriteString("}\n@media (prefers-color-scheme: dark) {\n")
 	chromaFormatter.WriteCSS(&buf, styles.Get("github-dark"))
 	buf.WriteString("}\n.chroma, .bg { background: transparent !important; }\n")
 	return buf.Bytes()
