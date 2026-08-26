@@ -97,7 +97,7 @@ Done for the wiki half (2026-08-25): the docs now live in this wiki,
 dogfooding #25. When #15 (pages) lands they can graduate to a published
 site.
 
-* Phase 5 — the web grows up (v0.5.0, [[https://gitbay.org/krz/gitbay/issues/35][#35]])
+* Phase 5 — the web grows up [COMPLETE 2026-08-26; v0.5.0 and v1.0.0, [[https://gitbay.org/krz/gitbay/issues/35][#35]]]
 
 Two goals, one structure. The design needs sustained iteration, and the
 web needs enough capability that nobody calls it useless — without
@@ -152,6 +152,22 @@ before merge.
    safe subset of repo settings; plus SSH key management for accounts
    (add/remove keys from an authenticated session).
 8. Releases/builds: create and edit releases, retrigger builds.
+
+** Outcome
+
+All eight page workstreams landed, plus the foundations. The web is now
+the reading, reviewing and responding surface it was scoped to be: a
+maintainer completes the triage/review/merge loop, manages their own
+keys and addresses, and runs an organization from a browser. The diff
+renderer (foldable per-file sections, line-number gutters, syntax
+highlighting per hunk per side) is shared by the commit and merge
+request pages. Repository homes state their own facts — commits,
+branches, tags, license, latest release, build status, language census,
+contributors resolved to accounts by verified email.
+
+Still SSH-only by design, and listed as such on [[Parity]]: token
+minting, account export, secrets, mirror tokens, domain claims,
+repository delete and transfer, organization create/rename/delete.
 
 ** Guardrails
 
