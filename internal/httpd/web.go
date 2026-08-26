@@ -435,8 +435,8 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 			Branches    []gitutil.Ref
 			ReadmeName  string
 			ReadmeHTML  template.HTML
-			LastCommits map[string]gitutil.EntryCommit
-			Tip         gitutil.EntryCommit
+			LastCommits map[string]namedCommit
+			Tip         namedCommit
 		}{repoPage: p, RefKind: "tree"})
 		return
 	}
@@ -479,8 +479,8 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		Branches    []gitutil.Ref
 		ReadmeName  string
 		ReadmeHTML  template.HTML
-		LastCommits map[string]gitutil.EntryCommit
-		Tip         gitutil.EntryCommit
+		LastCommits map[string]namedCommit
+		Tip         namedCommit
 	}{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches,
 		readmeName, readmeHTML,
 		s.namedCommits(gitutil.LastCommits(p.Dir, p.Ref, dirPath, names)),
@@ -1201,8 +1201,8 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 		shas = shas[:pageSize]
 	}
 	type row struct {
-		SHA, ShortSHA, Subject, AuthorName, AuthorEmail, Date string
-		Sig                                                   sigView
+		SHA, ShortSHA, Subject, AuthorName, AuthorEmail, AuthorUser, Date string
+		Sig                                                               sigView
 	}
 	names := s.authorNames()
 	var rows []row
@@ -1212,6 +1212,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 		if parsed != nil {
 			rw.Subject = parsed.Subject
 			rw.AuthorName = names.name(parsed.AuthorEmail, parsed.AuthorName)
+			rw.AuthorUser, _ = names.account(parsed.AuthorEmail)
 			rw.AuthorEmail = parsed.AuthorEmail
 			rw.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
 		}
@@ -1249,18 +1250,20 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		committerEmail = parsed.CommitterEmail
 	}
 	checks, _ := s.st.ListCommitStatuses(p.Repo.ID, full)
+	commitNames := s.authorNames()
+	commitUser, _ := commitNames.account(parsed.AuthorEmail)
 	msg := ""
 	if i := bytes.Index(parsed.Payload, []byte("\n\n")); i >= 0 {
 		msg = string(parsed.Payload[i+2:])
 	}
 	s.render(w, "commit.html", struct {
 		repoPage
-		SHA, ShortSHA, AuthorName, AuthorEmail, CommitterEmail, Date, Message string
+		SHA, ShortSHA, AuthorName, AuthorEmail, AuthorUser, CommitterEmail, Date, Message string
 		Parents                                                               []string
 		Sig                                                                   sigView
 		Checks                                                                []store.CommitStatus
 		DiffLines                                                             []diffLine
-	}{p, full, full[:10], s.authorNames().name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, committerEmail,
+	}{p, full, full[:10], commitNames.name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, commitUser, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
 		gitutil.Parents(p.Dir, full), v, checks, lines})
 }
@@ -1482,8 +1485,8 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	// The commits this MR carries: base..head, the same range as the diff.
 	type commitRow struct {
-		SHA, ShortSHA, Subject, AuthorName, Date string
-		Sig                                      sigView
+		SHA, ShortSHA, Subject, AuthorName, AuthorUser, Date string
+		Sig                                                  sigView
 	}
 	mrNames := s.authorNames()
 	var commits []commitRow
@@ -1499,6 +1502,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			if parsed != nil {
 				cr.Subject = parsed.Subject
 				cr.AuthorName = mrNames.name(parsed.AuthorEmail, parsed.AuthorName)
+				cr.AuthorUser, _ = mrNames.account(parsed.AuthorEmail)
 				cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
 			}
 			commits = append(commits, cr)

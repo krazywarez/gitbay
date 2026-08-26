@@ -11,7 +11,7 @@
 </div>
 {{if .Entries}}<p class="clone">Clone: <code>git clone {{.CloneURL}}</code></p>{{end}}
 {{with .Tip}}{{if .SHA}}<div class="tipbar">
-  <span class="who">{{.Author}}</span>
+  <span class="who">{{template "authorname" dict "Name" .Author "User" .User "Email" .Email}}</span>
   <a class="subject" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a>
   <span class="spacer"></span>
   <a class="sha" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}"><code>{{short .SHA}}</code></a>

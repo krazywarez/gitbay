@@ -1,6 +1,8 @@
 #+title: gitbay
 #+author: Christian Cleberg
 
+[[https://gitbay.org/krz/gitbay/builds][file:https://gitbay.org/krz/gitbay/badge/build.svg]]
+
 A CLI-first git forge. One binary, SQLite, and the system =git= — designed
 so the command line is the product and the web UI is a rendering of state
 the CLI already manages. Runs at [[https://gitbay.org]].

@@ -108,33 +108,44 @@ func (a *authorNames) name(email, fallback string) string {
 	return name
 }
 
-// known reports whether the address belongs to an account, so callers can
-// decide to link the name.
-func (a *authorNames) known(email string) bool {
+// account returns the account name behind an address, if any, so callers
+// can link the displayed name to a profile.
+func (a *authorNames) account(email string) (string, bool) {
 	if email == "" {
-		return false
+		return "", false
 	}
 	if got, ok := a.cache[email]; ok {
-		return got != ""
+		return got, got != ""
 	}
 	name, _ := a.st.UsernameByVerifiedEmail(email)
 	a.cache[email] = name
-	return name != ""
+	return name, name != ""
+}
+
+// namedCommit is a listing commit plus the account behind its author
+// address, when there is one, so the name can link to a profile.
+type namedCommit struct {
+	gitutil.EntryCommit
+	User string
 }
 
 // namedCommits rewrites listing authors to account names where the
 // address is verified here.
-func (s *Server) namedCommits(m map[string]gitutil.EntryCommit) map[string]gitutil.EntryCommit {
+func (s *Server) namedCommits(m map[string]gitutil.EntryCommit) map[string]namedCommit {
 	names := s.authorNames()
+	out := make(map[string]namedCommit, len(m))
 	for k, c := range m {
+		user, _ := names.account(c.Email)
 		c.Author = names.name(c.Email, c.Author)
-		m[k] = c
+		out[k] = namedCommit{EntryCommit: c, User: user}
 	}
-	return m
+	return out
 }
 
 // namedTip does the same for the single commit above a tree listing.
-func (s *Server) namedTip(c gitutil.EntryCommit) gitutil.EntryCommit {
-	c.Author = s.authorNames().name(c.Email, c.Author)
-	return c
+func (s *Server) namedTip(c gitutil.EntryCommit) namedCommit {
+	names := s.authorNames()
+	user, _ := names.account(c.Email)
+	c.Author = names.name(c.Email, c.Author)
+	return namedCommit{EntryCommit: c, User: user}
 }

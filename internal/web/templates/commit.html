@@ -5,7 +5,7 @@
   <p class="meta"><code class="fullsha">{{.SHA}}</code></p>
   {{if .Parents}}<p class="meta">parent{{if gt (len .Parents) 1}}s{{end}}:{{range .Parents}} <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.}}">{{short .}}</a></code>{{end}}</p>{{end}}
   <p>{{template "sigbadge" .Sig}}{{range .Checks}} <span class="badge check-{{.State}}">{{.Context}}: {{.State}}</span>{{end}}</p>
-  <p class="meta"><span title="{{.AuthorEmail}}">{{.AuthorName}}</span> &lt;{{.AuthorEmail}}&gt; · {{.Date}}
+  <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" .AuthorEmail}} &lt;{{.AuthorEmail}}&gt; · {{.Date}}
   {{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
 </div>
 <pre class="message">{{.Message}}</pre>

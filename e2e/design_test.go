@@ -279,6 +279,10 @@ func TestAuthorNamesResolve(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
 	mustGit(t, dir, stranger, "add", ".")
 	mustGit(t, dir, stranger, "commit", "-q", "-m", "from a stranger")
+	// The tip is the account's, so the bar above the listing shows a link.
+	os.WriteFile(filepath.Join(dir, "c.txt"), []byte("c\n"), 0o644)
+	mustGit(t, dir, known, "add", ".")
+	mustGit(t, dir, known, "commit", "-q", "-m", "back to the account")
 	mustGit(t, dir, known, "push", "-q", "origin", "main")
 
 	// The log shows the account name for the verified address only.
@@ -291,5 +295,16 @@ func TestAuthorNamesResolve(t *testing.T) {
 	}
 	if !strings.Contains(body, "alice") {
 		t.Fatalf("log missing the account name:\n%s", body)
+	}
+	// A resolved name links to the profile; an unknown one stays text.
+	if !strings.Contains(body, `class="authorlink" href="/alice"`) {
+		t.Fatalf("account name is not a link:\n%s", body)
+	}
+	if strings.Contains(body, `href="/Outside Person"`) {
+		t.Fatalf("unknown author was linked:\n%s", body)
+	}
+	// The tipbar resolves and links the same way when the tip is an account's.
+	if _, tree := inst.get(t, "/alice/app"); !strings.Contains(tree, `class="authorlink" href="/alice"`) {
+		t.Fatalf("tipbar name is not a link:\n%s", tree)
 	}
 }
