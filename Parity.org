@@ -58,6 +58,27 @@ web dispatcher refuses =SSHOnly= commands outright.
 | build trigger             | yes     | yes |
 | release delete            | yes     | no  |
 
+* Accounts
+
+| capability                 | ssh/cli | web |
+|----------------------------+---------+-----|
+| SSH keys: list, add, remove| yes     | yes |
+| PGP keys: list, add, remove| yes     | yes |
+| email add and verify       | yes     | yes |
+| API token mint             | yes     | no  |
+| account export bundle      | yes     | no  |
+
+* Organizations
+
+| capability                | ssh/cli | web |
+|---------------------------+---------+-----|
+| read members and teams    | yes     | yes |
+| members add, remove, role | yes     | yes |
+| teams create, delete      | yes     | yes |
+| team members              | yes     | yes |
+| team repo grants          | yes     | yes |
+| create, rename, delete    | yes     | no  |
+
 * SSH only, by design
 
 Build secrets, mirror configuration and tokens, custom domain claims,
