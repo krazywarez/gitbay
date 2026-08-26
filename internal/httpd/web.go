@@ -1361,6 +1361,20 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 }
 
 // canEditItem: the author or anyone with write access may edit.
+// canWriteRepo reports whether the browser session may push to the repo,
+// which is what gates the review and merge controls.
+func (s *Server) canWriteRepo(r *http.Request, repo store.Repo) bool {
+	if s.cfg.Web.Mode != "accounts" {
+		return false
+	}
+	u := s.viewer(r)
+	if u.ID == 0 {
+		return false
+	}
+	grant, _ := s.st.AccessRole(repo.ID, u.ID)
+	return policy.CanWrite(u, repo, grant)
+}
+
 func (s *Server) canEditItem(r *http.Request, repo store.Repo, author string) bool {
 	if s.cfg.Web.Mode != "accounts" {
 		return false
@@ -1480,6 +1494,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	// The diff is the reason most people open a merge request, so it gets
 	// its own view rather than a fold at the foot of the conversation.
 	// A query parameter keeps this working without JavaScript.
+	unresolved, _ := s.st.UnresolvedThreadCount(m.ID)
 	view := r.URL.Query().Get("view")
 	if view != "commits" && view != "diff" {
 		view = "conversation"
@@ -1497,9 +1512,13 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Stat            diffStat
 		Commits         []commitRow
 		CanEdit         bool
+		CanWrite        bool
+		Unresolved      int
+		Notice          string
 		DetachedThreads []diffThread
 	}{p, m, view, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
-		reviews, lines, stat, commits, s.canEditItem(r, p.Repo, m.Author), detachedThreads})
+		reviews, lines, stat, commits, s.canEditItem(r, p.Repo, m.Author),
+		s.canWriteRepo(r, p.Repo), unresolved, r.URL.Query().Get("e"), detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

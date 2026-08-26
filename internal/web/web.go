@@ -76,6 +76,16 @@ var funcs = template.FuncMap{
 		}
 		return s
 	},
+	// dict builds a map for {{template}} calls that need several values.
+	"dict": func(pairs ...any) map[string]any {
+		m := map[string]any{}
+		for i := 0; i+1 < len(pairs); i += 2 {
+			if k, ok := pairs[i].(string); ok {
+				m[k] = pairs[i+1]
+			}
+		}
+		return m
+	},
 	"add": func(a, b int) int { return a + b },
 	"sub": func(a, b int) int { return a - b },
 	// topTab maps a page's Tab to the repo header tab that should read as

@@ -540,6 +540,17 @@ code.fullsha { color: var(--muted); overflow-wrap: anywhere; }
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-4);
 }
+/* merge request actions in the aside: stacked controls, full width */
+.aside form.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.aside form.actions button { flex: 1 1 auto; }
+.aside form.actions select { width: 100%; }
+form.threadact { margin: var(--sp-1) 0 0; padding: 0 var(--sp-3) var(--sp-2); }
+
 .meta { color: var(--muted); font-size: var(--fs-1); }
 svg.icon { vertical-align: -0.125em; }
 .lede { font-size: var(--fs-3); margin: var(--sp-2) 0; }

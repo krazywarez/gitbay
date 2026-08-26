@@ -5,6 +5,8 @@
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
 <a href="/{{.MR.Author}}">{{.MR.Author}}</a> wants to merge <code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
 
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+
 <div class="withaside">
 <div class="mainside">
 
@@ -33,7 +35,7 @@
 </article>{{end}}
 {{end}}
 {{if .DetachedThreads}}<h2>Threads on earlier revisions</h2>
-{{range .DetachedThreads}}<div class="thread stale"><p class="threadstate">{{if .Stale}}stale{{end}}{{if .Resolved}}{{if .Stale}} · {{end}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div>{{end}}{{end}}
+{{range .DetachedThreads}}<div class="thread stale"><p class="threadstate">{{if .Stale}}stale{{end}}{{if .Resolved}}{{if .Stale}} · {{end}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}{{template "threadact" dict "ID" .ID "Resolved" .Resolved "Base" $base "Can" $.CanWrite}}</div>{{end}}{{end}}
 {{if .Viewer}}
 <form method="post" action="{{$base}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
@@ -60,12 +62,39 @@
 {{else}}
 <p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span></p>
 <pre class="diff">{{range .DiffLines}}<span class="{{.Class}}">{{.Text}}</span>
-{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="threadstate">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}</div><pre class="diff">{{end}}{{end}}</pre>
+{{range .Threads}}</pre><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="threadstate">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}{{template "threadact" dict "ID" .ID "Resolved" .Resolved "Base" $base "Can" $.CanWrite}}</div><pre class="diff">{{end}}{{end}}</pre>
 {{end}}
 
 </div>
 
 <aside class="aside">
+  {{if and .CanWrite (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
+  <div class="grp">
+    <h2>Review</h2>
+    <form method="post" action="{{$base}}/review" class="actions">
+      <button type="submit" name="verdict" value="approve">Approve</button>
+      <button type="submit" name="verdict" value="request-changes">Request changes</button>
+    </form>
+  </div>
+  <div class="grp">
+    <h2>Merge</h2>
+    {{if .Unresolved}}<p class="row none">{{.Unresolved}} unresolved thread{{if ne .Unresolved 1}}s{{end}}</p>{{end}}
+    <form method="post" action="{{$base}}/merge" class="actions">
+      <label class="none" for="strategy">Strategy</label>
+      <select id="strategy" name="strategy">
+        <option value="auto">Automatic</option>
+        <option value="ff">Fast-forward</option>
+        <option value="merge">Merge commit</option>
+        <option value="squash">Squash</option>
+        <option value="rebase">Rebase</option>
+      </select>
+      <button type="submit" class="primary">Merge</button>
+    </form>
+    <form method="post" action="{{$base}}/close" class="actions">
+      <button type="submit">Close without merging</button>
+    </form>
+  </div>
+  {{end}}
   <div class="grp">
     <h2>Reviews</h2>
     {{range .Reviews}}<p class="row"><span class="dot {{if eq .Verdict "approve"}}ok{{else}}pend{{end}}"></span><a href="/{{.Reviewer}}">{{.Reviewer}}</a> {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}</p>
@@ -89,3 +118,5 @@
 </aside>
 </div>
 {{end}}
+
+{{define "threadact"}}{{if .Can}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{.ID}}"><button type="submit" name="action" value="{{if .Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if .Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}{{end}}
