@@ -58,6 +58,36 @@ printf '{"argv":["issue","create","you/project","--title","t","--file","-"],"std
 curl -s -H "Authorization: Bearer $TOKEN" -d @- https://gitbay.org/api/v1/cmd
 #+end_src
 
+** GET /api/v1/read
+
+The conditional half: the same registry over GET, admitting only
+commands the registry marks read-only, so a GET structurally cannot
+mutate. Responses carry an =ETag=; =If-None-Match= answers 304.
+
+#+begin_src sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+     "https://gitbay.org/api/v1/read?argv=repo&argv=show&argv=you/project"
+#+end_src
+
+** The dashboard read
+
+=dashboard= returns the account aggregate — pinned repositories, open
+merge requests, assigned issues, recent builds — in one call:
+
+#+begin_src sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+     "https://gitbay.org/api/v1/read?argv=dashboard"
+#+end_src
+
+** Cursor pagination
+
+=issue list=, =mr list=, =repo list=, and =feed= accept =--limit <n>=
+(1–200) and =--cursor <c>=. With either flag present the =data=
+envelope becomes ={"items": [...], "next": "..."}=; =next= is an
+opaque cursor for the following page, absent on the last one. Without
+the flags the response stays the complete bare array; a bare =feed=
+returns the newest 50 events.
+
 * Commit statuses (CI reporting)
 
 CI reports results through the same command surface (over SSH or the

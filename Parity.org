@@ -65,6 +65,8 @@ web dispatcher refuses =SSHOnly= commands outright.
 | SSH keys: list, add, remove| yes     | yes |
 | PGP keys: list, add, remove| yes     | yes |
 | email add and verify       | yes     | yes |
+| dashboard aggregate        | yes     | yes |
+| activity feed              | yes     | yes |
 | API token mint             | yes     | no  |
 | account export bundle      | yes     | no  |
 
@@ -78,6 +80,13 @@ web dispatcher refuses =SSHOnly= commands outright.
 | team members              | yes     | yes |
 | team repo grants          | yes     | yes |
 | create, rename, delete    | yes     | no  |
+
+* Pagination
+
+=issue list=, =mr list=, =repo list=, and =feed= take =--limit <n>=
+and =--cursor <c>=. Cursors are opaque; each page carries the next
+one. Without the flags a list stays complete, so existing scripts are
+unchanged. The web renders server-side and does not paginate.
 
 * SSH only, by design
 
