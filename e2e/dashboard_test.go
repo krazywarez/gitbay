@@ -119,6 +119,131 @@ func TestDashboard(t *testing.T) {
 	}
 }
 
+// The dashboard control command returns the same aggregate as the web
+// dashboard — pinned repos, open MRs, assigned issues, recent builds — in
+// one read.
+func TestDashboardCommand(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "access", "grant", "alice/app", "bob", "write"); code != 0 {
+		t.Fatal("grant failed")
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  test:\n    steps:\n      - echo ok\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "feat")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "feat")
+	mustGit(t, dir, env, "push", "-q", "origin", "feat")
+
+	if _, _, code := inst.ssh(t, bobKey, "", "mr", "create", "alice/app",
+		"--source", "feat", "--target", "main", "--title", "'from bob'"); code != 0 {
+		t.Fatal("mr create failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/app", "--title", "'todo one'"); code != 0 {
+		t.Fatal("issue create failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "assign", "alice/app", "1", "--add", "alice"); code != 0 {
+		t.Fatal("assign failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "pin", "alice/app"); code != 0 {
+		t.Fatal("pin failed")
+	}
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "pin", "alice/app"); code != 0 {
+		t.Fatal("bob pin failed")
+	}
+
+	out, errOut, code := inst.ssh(t, aliceKey, "", "dashboard", "--json")
+	if code != 0 {
+		t.Fatalf("dashboard: %s", errOut)
+	}
+	var env2 struct {
+		Data struct {
+			Pinned []struct {
+				Path string `json:"path"`
+			} `json:"pinned"`
+			MRs []struct {
+				Repo   string `json:"repo"`
+				Number int64  `json:"number"`
+				Title  string `json:"title"`
+				Author string `json:"author"`
+				State  string `json:"state"`
+			} `json:"open_mrs"`
+			Assigned []struct {
+				Repo   string `json:"repo"`
+				Number int64  `json:"number"`
+				Title  string `json:"title"`
+			} `json:"assigned_issues"`
+			Builds []struct {
+				Repo   string `json:"repo"`
+				Job    string `json:"job"`
+				Status string `json:"status"`
+				Ref    string `json:"ref"`
+			} `json:"builds"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env2); err != nil {
+		t.Fatalf("bad json: %v\n%s", err, out)
+	}
+	d := env2.Data
+	if len(d.Pinned) != 1 || d.Pinned[0].Path != "alice/app" {
+		t.Fatalf("pinned = %+v", d.Pinned)
+	}
+	if len(d.MRs) != 1 || d.MRs[0].Repo != "alice/app" || d.MRs[0].Number != 1 ||
+		d.MRs[0].Title != "from bob" || d.MRs[0].Author != "bob" || d.MRs[0].State != "open" {
+		t.Fatalf("open_mrs = %+v", d.MRs)
+	}
+	if len(d.Assigned) != 1 || d.Assigned[0].Repo != "alice/app" || d.Assigned[0].Number != 1 ||
+		d.Assigned[0].Title != "todo one" {
+		t.Fatalf("assigned_issues = %+v", d.Assigned)
+	}
+	// Both pushes hit main and feat; each queues the ci.yml job.
+	if len(d.Builds) == 0 || d.Builds[0].Repo != "alice/app" || d.Builds[0].Job != "test" ||
+		d.Builds[0].Status != "pending" {
+		t.Fatalf("builds = %+v", d.Builds)
+	}
+
+	// Bob is not assigned and pinned repos he can no longer read disappear.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "visibility", "alice/app", "private"); code != 0 {
+		t.Fatal("visibility failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "access", "revoke", "alice/app", "bob"); code != 0 {
+		t.Fatal("revoke failed")
+	}
+	out, _, code = inst.ssh(t, bobKey, "", "dashboard", "--json")
+	if code != 0 {
+		t.Fatal("bob dashboard failed")
+	}
+	if err := json.Unmarshal([]byte(out), &env2); err != nil {
+		t.Fatalf("bad json: %v\n%s", err, out)
+	}
+	if len(env2.Data.Pinned) != 0 {
+		t.Fatalf("bob still sees pinned = %+v", env2.Data.Pinned)
+	}
+	if len(env2.Data.Assigned) != 0 {
+		t.Fatalf("bob assigned = %+v", env2.Data.Assigned)
+	}
+	if len(env2.Data.Builds) != 0 {
+		t.Fatalf("bob builds = %+v", env2.Data.Builds)
+	}
+}
+
 // TestDashboardQueues covers the parts of the dashboard that answer "what
 // needs me": the review queue, assigned issues, and the activity feed.
 func TestDashboardQueues(t *testing.T) {

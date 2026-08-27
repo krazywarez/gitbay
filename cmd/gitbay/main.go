@@ -36,6 +36,8 @@ func main() {
 			pass("log", "a build's log: <owner/name> <n>", passOpts{server: []string{"build", "log"}, needsRepo: true}),
 			pass("trigger", "queue a job now: <job>", passOpts{server: []string{"build", "trigger"}, needsRepo: true}),
 		),
+		pass("dashboard", "one read for the account dashboard: pinned repos, open MRs, assigned issues, recent builds",
+			passOpts{server: []string{"dashboard"}}),
 		repoCmd(),
 		issueCmd(),
 		milestoneCmd(),

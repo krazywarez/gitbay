@@ -10,11 +10,10 @@ type DashboardItem struct {
 	UpdatedAt string
 }
 
-// involvedRepos filters to repositories the user owns, is granted on, or
-// reaches through org membership — or rows the user authored anywhere.
-const involvedCond = `(
-	x.author_id = ?1
-	OR (r.owner_kind = 'user' AND r.owner_id = ?1)
+// reachableCond filters to repositories the user owns, is granted on, or
+// reaches through org or team membership.
+const reachableCond = `(
+	(r.owner_kind = 'user' AND r.owner_id = ?1)
 	OR EXISTS (SELECT 1 FROM repo_access a
 	           WHERE a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?1)
 	OR EXISTS (SELECT 1 FROM org_members mm
@@ -25,6 +24,9 @@ const involvedCond = `(
 	           JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?1
 	           WHERE tr.repo_id = r.id)
 )`
+
+// involvedCond widens reachableCond to rows the user authored anywhere.
+const involvedCond = `(x.author_id = ?1 OR ` + reachableCond + `)`
 
 func (s *Store) dashboardQuery(q string, userID int64) ([]DashboardItem, error) {
 	rows, err := s.DB.Query(q, userID)
@@ -168,6 +170,45 @@ func (s *Store) AssignedIssues(userID int64) ([]DashboardItem, error) {
 		ORDER BY x.updated_at DESC LIMIT 20`, userID)
 }
 
+// DashboardBuild is one build row on the dashboard, with its repo resolved.
+type DashboardBuild struct {
+	RepoPath   string
+	Number     int64
+	Job        string
+	Status     string
+	SHA        string
+	Ref        string
+	CreatedAt  string
+	FinishedAt string
+}
+
+// RecentBuilds returns the newest builds on repositories the user can
+// reach, most recent first.
+func (s *Store) RecentBuilds(userID int64, limit int) ([]DashboardBuild, error) {
+	rows, err := s.DB.Query(`
+		SELECT COALESCE(u.username, o.name) || '/' || r.name,
+		       b.number, b.job, b.status, b.sha, b.ref, b.created_at, b.finished_at
+		FROM builds b
+		JOIN repos r ON r.id = b.repo_id
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		WHERE `+reachableCond+`
+		ORDER BY b.id DESC LIMIT ?2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DashboardBuild
+	for rows.Next() {
+		var b DashboardBuild
+		if err := rows.Scan(&b.RepoPath, &b.Number, &b.Job, &b.Status, &b.SHA, &b.Ref, &b.CreatedAt, &b.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 // FeedEvent is one line of the dashboard's activity feed.
 type FeedEvent struct {
 	RepoPath  string
@@ -188,18 +229,7 @@ func (s *Store) RecentEvents(userID int64, limit int) ([]FeedEvent, error) {
 		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
 		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 		LEFT JOIN users ac ON ac.id = e.actor_id
-		WHERE e.kind <> 'push' AND (
-		  (r.owner_kind = 'user' AND r.owner_id = ?1)
-		  OR EXISTS (SELECT 1 FROM repo_access a
-		             WHERE a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?1)
-		  OR EXISTS (SELECT 1 FROM org_members mm
-		             JOIN orgs oo ON oo.id = mm.org_id
-		             WHERE r.owner_kind = 'org' AND mm.org_id = r.owner_id AND mm.user_id = ?1
-		               AND (mm.role = 'admin' OR oo.members_role <> 'none'))
-		  OR EXISTS (SELECT 1 FROM team_repos tr
-		             JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?1
-		             WHERE tr.repo_id = r.id)
-		)
+		WHERE e.kind <> 'push' AND `+reachableCond+`
 		ORDER BY e.id DESC LIMIT ?2`, userID, limit)
 	if err != nil {
 		return nil, err
