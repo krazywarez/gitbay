@@ -14,7 +14,7 @@ import (
 
 func init() {
 	register(Command{Path: []string{"dashboard"},
-		Summary:  "one read for the account dashboard: pinned repos, open MRs, assigned issues, recent builds",
+		Summary:  "one read for the account dashboard: review queue, assigned and open work, pins, activity, builds",
 		ReadOnly: true, Run: runDashboard})
 	register(Command{Path: []string{"feed"},
 		Summary:  "activity on repositories you can reach: feed [--limit <n>] [--cursor <c>]",
@@ -53,12 +53,18 @@ func runDashboard(c *Ctx, args []string) int {
 		FinishedAt string `json:"finished_at,omitempty"`
 	}
 	type out struct {
-		Pinned   []pinnedOut     `json:"pinned"`
-		MRs      []dashboardItem `json:"open_mrs"`
+		Reviews  []dashboardItem `json:"review_queue"`
 		Assigned []dashboardItem `json:"assigned_issues"`
+		MRs      []dashboardItem `json:"open_mrs"`
+		Issues   []dashboardItem `json:"open_issues"`
+		Pinned   []pinnedOut     `json:"pinned"`
+		Activity []feedOut       `json:"recent_activity"`
 		Builds   []buildOut      `json:"builds"`
 	}
-	d := out{Pinned: []pinnedOut{}, MRs: []dashboardItem{}, Assigned: []dashboardItem{}, Builds: []buildOut{}}
+	d := out{
+		Reviews: []dashboardItem{}, Assigned: []dashboardItem{}, MRs: []dashboardItem{},
+		Issues: []dashboardItem{}, Pinned: []pinnedOut{}, Activity: []feedOut{}, Builds: []buildOut{},
+	}
 
 	pinned, err := c.Store.PinnedRepos(c.User.ID)
 	if err != nil {
@@ -84,6 +90,14 @@ func runDashboard(c *Ctx, args []string) int {
 		d.MRs = append(d.MRs, dashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
 	}
 
+	reviews, err := c.Store.ReviewQueue(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	for _, m := range reviews {
+		d.Reviews = append(d.Reviews, dashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
+	}
+
 	assigned, err := c.Store.AssignedIssues(c.User.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -91,6 +105,20 @@ func runDashboard(c *Ctx, args []string) int {
 	for _, i := range assigned {
 		d.Assigned = append(d.Assigned, dashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
 	}
+
+	issues, err := c.Store.DashboardIssues(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	for _, i := range issues {
+		d.Issues = append(d.Issues, dashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
+	}
+
+	events, err := c.Store.RecentEvents(c.User.ID, 20, 0)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	d.Activity = feedOutputs(events)
 
 	builds, err := c.Store.RecentBuilds(c.User.ID, 20)
 	if err != nil {
@@ -101,6 +129,14 @@ func runDashboard(c *Ctx, args []string) int {
 	}
 
 	return c.emit(d, func(w io.Writer) {
+		fmt.Fprintln(w, "waiting on your review:")
+		printDashboardItems(w, d.Reviews, "!")
+		fmt.Fprintln(w, "assigned to you:")
+		printDashboardItems(w, d.Assigned, "#")
+		fmt.Fprintln(w, "open merge requests:")
+		printDashboardItems(w, d.MRs, "!")
+		fmt.Fprintln(w, "open issues:")
+		printDashboardItems(w, d.Issues, "#")
 		fmt.Fprintln(w, "pinned:")
 		for _, p := range d.Pinned {
 			mark := ""
@@ -109,13 +145,9 @@ func runDashboard(c *Ctx, args []string) int {
 			}
 			fmt.Fprintf(w, "  %s\t%s\t%s%s\n", p.Path, p.Visibility, p.Description, mark)
 		}
-		fmt.Fprintln(w, "open merge requests:")
-		for _, m := range d.MRs {
-			fmt.Fprintf(w, "  %s!%d\t%s\t%s\n", m.Repo, m.Number, m.Title, m.Author)
-		}
-		fmt.Fprintln(w, "assigned issues:")
-		for _, i := range d.Assigned {
-			fmt.Fprintf(w, "  %s#%d\t%s\t%s\n", i.Repo, i.Number, i.Title, i.Author)
+		fmt.Fprintln(w, "recent activity:")
+		for _, e := range d.Activity {
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n", e.CreatedAt, e.Actor, e.Kind, e.Repo, string(e.Data))
 		}
 		fmt.Fprintln(w, "builds:")
 		for _, b := range d.Builds {
@@ -124,9 +156,36 @@ func runDashboard(c *Ctx, args []string) int {
 	})
 }
 
+func printDashboardItems(w io.Writer, items []dashboardItem, marker string) {
+	for _, item := range items {
+		fmt.Fprintf(w, "  %s%s%d\t%s\t%s\n", item.Repo, marker, item.Number, item.Title, item.Author)
+	}
+}
+
 // feedDefaultLimit caps a bare `feed` call; pagination reaches further
 // back.
 const feedDefaultLimit = 50
+
+type feedOut struct {
+	ID        int64           `json:"id"`
+	Repo      string          `json:"repo"`
+	Actor     string          `json:"actor,omitempty"`
+	Kind      string          `json:"kind"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	CreatedAt string          `json:"created_at"`
+}
+
+func feedOutputs(events []store.FeedEvent) []feedOut {
+	ds := make([]feedOut, 0, len(events))
+	for _, e := range events {
+		d := feedOut{ID: e.ID, Repo: e.RepoPath, Actor: e.Actor, Kind: e.Kind, CreatedAt: e.CreatedAt}
+		if json.Valid([]byte(e.Data)) {
+			d.Data = json.RawMessage(e.Data)
+		}
+		ds = append(ds, d)
+	}
+	return ds
+}
 
 func runFeed(c *Ctx, args []string) int {
 	rest, p, code := parsePageFlags(c, args, "feed", true)
@@ -146,22 +205,7 @@ func runFeed(c *Ctx, args []string) int {
 	events, next := trimPage(p, events, "feed", func(e store.FeedEvent) string {
 		return strconv.FormatInt(e.ID, 10)
 	})
-	type feedOut struct {
-		ID        int64           `json:"id"`
-		Repo      string          `json:"repo"`
-		Actor     string          `json:"actor,omitempty"`
-		Kind      string          `json:"kind"`
-		Data      json.RawMessage `json:"data,omitempty"`
-		CreatedAt string          `json:"created_at"`
-	}
-	var ds []feedOut
-	for _, e := range events {
-		d := feedOut{ID: e.ID, Repo: e.RepoPath, Actor: e.Actor, Kind: e.Kind, CreatedAt: e.CreatedAt}
-		if json.Valid([]byte(e.Data)) {
-			d.Data = json.RawMessage(e.Data)
-		}
-		ds = append(ds, d)
-	}
+	ds := feedOutputs(events)
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", d.CreatedAt, d.Actor, d.Kind, d.Repo, string(d.Data))

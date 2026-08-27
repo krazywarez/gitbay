@@ -120,8 +120,8 @@ func TestDashboard(t *testing.T) {
 }
 
 // The dashboard control command returns the same aggregate as the web
-// dashboard — pinned repos, open MRs, assigned issues, recent builds — in
-// one read.
+// dashboard — review queue, assigned/open work, pins, and activity — in
+// one read. Builds remain for clients that already consume them.
 func TestDashboardCommand(t *testing.T) {
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
@@ -175,6 +175,11 @@ func TestDashboardCommand(t *testing.T) {
 	}
 	var env2 struct {
 		Data struct {
+			Reviews []struct {
+				Repo   string `json:"repo"`
+				Number int64  `json:"number"`
+				Title  string `json:"title"`
+			} `json:"review_queue"`
 			Pinned []struct {
 				Path string `json:"path"`
 			} `json:"pinned"`
@@ -190,6 +195,16 @@ func TestDashboardCommand(t *testing.T) {
 				Number int64  `json:"number"`
 				Title  string `json:"title"`
 			} `json:"assigned_issues"`
+			Issues []struct {
+				Repo   string `json:"repo"`
+				Number int64  `json:"number"`
+				Title  string `json:"title"`
+			} `json:"open_issues"`
+			Activity []struct {
+				Repo  string `json:"repo"`
+				Actor string `json:"actor"`
+				Kind  string `json:"kind"`
+			} `json:"recent_activity"`
 			Builds []struct {
 				Repo   string `json:"repo"`
 				Job    string `json:"job"`
@@ -209,9 +224,20 @@ func TestDashboardCommand(t *testing.T) {
 		d.MRs[0].Title != "from bob" || d.MRs[0].Author != "bob" || d.MRs[0].State != "open" {
 		t.Fatalf("open_mrs = %+v", d.MRs)
 	}
+	if len(d.Reviews) != 1 || d.Reviews[0].Repo != "alice/app" || d.Reviews[0].Number != 1 ||
+		d.Reviews[0].Title != "from bob" {
+		t.Fatalf("review_queue = %+v", d.Reviews)
+	}
 	if len(d.Assigned) != 1 || d.Assigned[0].Repo != "alice/app" || d.Assigned[0].Number != 1 ||
 		d.Assigned[0].Title != "todo one" {
 		t.Fatalf("assigned_issues = %+v", d.Assigned)
+	}
+	if len(d.Issues) != 1 || d.Issues[0].Repo != "alice/app" || d.Issues[0].Number != 1 ||
+		d.Issues[0].Title != "todo one" {
+		t.Fatalf("open_issues = %+v", d.Issues)
+	}
+	if len(d.Activity) == 0 || d.Activity[0].Repo != "alice/app" {
+		t.Fatalf("recent_activity = %+v", d.Activity)
 	}
 	// Both pushes hit main and feat; each queues the ci.yml job.
 	if len(d.Builds) == 0 || d.Builds[0].Repo != "alice/app" || d.Builds[0].Job != "test" ||
