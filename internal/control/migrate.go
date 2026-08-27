@@ -88,7 +88,7 @@ func runAccountExport(c *Ctx, args []string) int {
 			Settings:      r.Settings,
 		}
 		br.Topics, _ = c.Store.ListTopics(r.ID)
-		issues, _ := c.Store.ListIssues(r.ID, "all")
+		issues, _ := c.Store.ListIssues(r.ID, "all", 0, 0)
 		for i := len(issues) - 1; i >= 0; i-- { // ascending numbers
 			iss := issues[i]
 			full, err := c.Store.IssueByNumber(r.ID, iss.Number)
@@ -104,7 +104,7 @@ func runAccountExport(c *Ctx, args []string) int {
 			}
 			br.Issues = append(br.Issues, bi)
 		}
-		mrs, _ := c.Store.ListMRs(r.ID, "all")
+		mrs, _ := c.Store.ListMRs(r.ID, "all", 0, 0)
 		for i := len(mrs) - 1; i >= 0; i-- {
 			m := mrs[i]
 			bm := bundleMR{Number: m.Number, Title: m.Title, Body: m.Body, State: m.State,

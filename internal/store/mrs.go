@@ -84,14 +84,25 @@ func (s *Store) MRByNumber(repoID, number int64) (MR, error) {
 	return m, err
 }
 
-func (s *Store) ListMRs(repoID int64, state string) ([]MR, error) {
+// ListMRs returns merge requests for a repo. limit 0 means everything;
+// before (an MR number) starts the page strictly below it, matching the
+// number-descending order.
+func (s *Store) ListMRs(repoID int64, state string, limit int, before int64) ([]MR, error) {
 	q := mrSelect + " WHERE m.repo_id = ?"
 	args := []any{repoID}
 	if state != "all" {
 		q += " AND m.state = ?"
 		args = append(args, state)
 	}
+	if before > 0 {
+		q += " AND m.number < ?"
+		args = append(args, before)
+	}
 	q += " ORDER BY m.number DESC"
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
 	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err

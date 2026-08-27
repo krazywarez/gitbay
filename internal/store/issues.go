@@ -95,8 +95,10 @@ func (s *Store) issueStrings(issueID int64, query string) ([]string, error) {
 	return out, rows.Err()
 }
 
-// ListIssues returns issues for a repo; state is "open", "closed", or "all".
-func (s *Store) ListIssues(repoID int64, state string) ([]Issue, error) {
+// ListIssues returns issues for a repo; state is "open", "closed", or
+// "all". limit 0 means everything; before (an issue number) starts the
+// page strictly below it, matching the number-descending order.
+func (s *Store) ListIssues(repoID int64, state string, limit int, before int64) ([]Issue, error) {
 	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state,
 	             COALESCE(m.title, ''), i.created_at, i.updated_at
 	      FROM issues i JOIN users u ON u.id = i.author_id
@@ -107,7 +109,15 @@ func (s *Store) ListIssues(repoID int64, state string) ([]Issue, error) {
 		q += " AND i.state = ?"
 		args = append(args, state)
 	}
+	if before > 0 {
+		q += " AND i.number < ?"
+		args = append(args, before)
+	}
 	q += " ORDER BY i.number DESC"
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
 	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err

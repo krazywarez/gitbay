@@ -211,6 +211,7 @@ func (s *Store) RecentBuilds(userID int64, limit int) ([]DashboardBuild, error) 
 
 // FeedEvent is one line of the dashboard's activity feed.
 type FeedEvent struct {
+	ID        int64
 	RepoPath  string
 	Actor     string
 	Kind      string
@@ -220,17 +221,25 @@ type FeedEvent struct {
 
 // RecentEvents returns activity on repositories the user can reach. Push
 // events are excluded: they repeat what the commit lists already show.
-func (s *Store) RecentEvents(userID int64, limit int) ([]FeedEvent, error) {
-	rows, err := s.DB.Query(`
-		SELECT COALESCE(u.username, o.name) || '/' || r.name,
+// before (an event id) starts the page strictly below it, matching the
+// id-descending order; 0 starts at the newest.
+func (s *Store) RecentEvents(userID int64, limit int, before int64) ([]FeedEvent, error) {
+	q := `
+		SELECT e.id, COALESCE(u.username, o.name) || '/' || r.name,
 		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
 		FROM events e
 		JOIN repos r ON r.id = e.repo_id
 		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
 		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 		LEFT JOIN users ac ON ac.id = e.actor_id
-		WHERE e.kind <> 'push' AND `+reachableCond+`
-		ORDER BY e.id DESC LIMIT ?2`, userID, limit)
+		WHERE e.kind <> 'push' AND ` + reachableCond
+	args := []any{userID, limit}
+	if before > 0 {
+		q += " AND e.id < ?3"
+		args = append(args, before)
+	}
+	q += " ORDER BY e.id DESC LIMIT ?2"
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +247,7 @@ func (s *Store) RecentEvents(userID int64, limit int) ([]FeedEvent, error) {
 	var out []FeedEvent
 	for rows.Next() {
 		var e FeedEvent
-		if err := rows.Scan(&e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

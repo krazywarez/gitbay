@@ -30,7 +30,7 @@ func init() {
 		Summary:    "open a merge request: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -]",
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
-		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all]", ReadOnly: true, Run: runMRList})
+		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
 		Summary: "show a merge request: mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
 	register(Command{Path: []string{"mr", "diff"},
@@ -324,6 +324,10 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 }
 
 func runMRList(c *Ctx, args []string) int {
+	args, p, code := parsePageFlags(c, args, "mr", true)
+	if code >= 0 {
+		return code
+	}
 	state := "open"
 	var path string
 	for i := 0; i < len(args); i++ {
@@ -343,21 +347,24 @@ func runMRList(c *Ctx, args []string) int {
 	}
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
 	if path == "" || !valid[state] {
-		return c.fail(protocol.ExitUsage, "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all]")
+		return c.fail(protocol.ExitUsage, "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]")
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
-	mrs, err := c.Store.ListMRs(repo.ID, state)
+	mrs, err := c.Store.ListMRs(repo.ID, state, p.queryLimit(), p.keyInt())
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	mrs, next := trimPage(p, mrs, "mr", func(m store.MR) string {
+		return strconv.FormatInt(m.Number, 10)
+	})
 	var ds []mrOut
 	for _, m := range mrs {
 		ds = append(ds, mrToOut(repo, m, false))
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
 			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s\n", d.Number, d.State, d.Title, d.Source, d.TargetRef)
 		}

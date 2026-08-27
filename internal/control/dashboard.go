@@ -1,18 +1,24 @@
 package control
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 func init() {
 	register(Command{Path: []string{"dashboard"},
 		Summary:  "one read for the account dashboard: pinned repos, open MRs, assigned issues, recent builds",
 		ReadOnly: true, Run: runDashboard})
+	register(Command{Path: []string{"feed"},
+		Summary:  "activity on repositories you can reach: feed [--limit <n>] [--cursor <c>]",
+		ReadOnly: true, Run: runFeed})
 }
 
 // dashboardItem is one open issue or MR row, with its repo resolved so a
@@ -114,6 +120,51 @@ func runDashboard(c *Ctx, args []string) int {
 		fmt.Fprintln(w, "builds:")
 		for _, b := range d.Builds {
 			fmt.Fprintf(w, "  %s\t%d\t%s\t%s\t%.10s\t%s\n", b.Repo, b.Number, b.Job, b.Status, b.SHA, b.Ref)
+		}
+	})
+}
+
+// feedDefaultLimit caps a bare `feed` call; pagination reaches further
+// back.
+const feedDefaultLimit = 50
+
+func runFeed(c *Ctx, args []string) int {
+	rest, p, code := parsePageFlags(c, args, "feed", true)
+	if code >= 0 {
+		return code
+	}
+	if len(rest) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: feed [--limit <n>] [--cursor <c>]")
+	}
+	if p.limit == 0 {
+		p.limit = feedDefaultLimit
+	}
+	events, err := c.Store.RecentEvents(c.User.ID, p.queryLimit(), p.keyInt())
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	events, next := trimPage(p, events, "feed", func(e store.FeedEvent) string {
+		return strconv.FormatInt(e.ID, 10)
+	})
+	type feedOut struct {
+		ID        int64           `json:"id"`
+		Repo      string          `json:"repo"`
+		Actor     string          `json:"actor,omitempty"`
+		Kind      string          `json:"kind"`
+		Data      json.RawMessage `json:"data,omitempty"`
+		CreatedAt string          `json:"created_at"`
+	}
+	var ds []feedOut
+	for _, e := range events {
+		d := feedOut{ID: e.ID, Repo: e.RepoPath, Actor: e.Actor, Kind: e.Kind, CreatedAt: e.CreatedAt}
+		if json.Valid([]byte(e.Data)) {
+			d.Data = json.RawMessage(e.Data)
+		}
+		ds = append(ds, d)
+	}
+	return c.emitPage(p, ds, next, func(w io.Writer) {
+		for _, d := range ds {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", d.CreatedAt, d.Actor, d.Kind, d.Repo, string(d.Data))
 		}
 	})
 }

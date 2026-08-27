@@ -153,7 +153,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	issues, _ := s.st.DashboardIssues(viewer.ID)
 	reviews, _ := s.st.ReviewQueue(viewer.ID)
 	assigned, _ := s.st.AssignedIssues(viewer.ID)
-	events, _ := s.st.RecentEvents(viewer.ID, 20)
+	events, _ := s.st.RecentEvents(viewer.ID, 20, 0)
 	s.render(w, "dashboard.html", struct {
 		basePage
 		Pinned   []store.Repo
@@ -1308,7 +1308,7 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	if state != "closed" && state != "all" {
 		state = "open"
 	}
-	issues, err := s.st.ListIssues(p.Repo.ID, state)
+	issues, err := s.st.ListIssues(p.Repo.ID, state, 0, 0)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -1423,7 +1423,7 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	if !valid[state] {
 		state = "open"
 	}
-	mrs, err := s.st.ListMRs(p.Repo.ID, state)
+	mrs, err := s.st.ListMRs(p.Repo.ID, state, 0, 0)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

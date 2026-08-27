@@ -19,7 +19,7 @@ func init() {
 		Summary:    "open an issue: issue create <owner/name> --title <t> [--body <b> | --file -]",
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
-		Summary: "list issues: issue list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runIssueList})
+		Summary: "list issues: issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
 		Summary: "show an issue with comments: issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
 	register(Command{Path: []string{"issue", "edit"},
@@ -156,6 +156,10 @@ func runIssueCreate(c *Ctx, args []string) int {
 }
 
 func runIssueList(c *Ctx, args []string) int {
+	args, p, code := parsePageFlags(c, args, "issue", true)
+	if code >= 0 {
+		return code
+	}
 	state := "open"
 	var path string
 	for i := 0; i < len(args); i++ {
@@ -174,21 +178,24 @@ func runIssueList(c *Ctx, args []string) int {
 		}
 	}
 	if path == "" || (state != "open" && state != "closed" && state != "all") {
-		return c.fail(protocol.ExitUsage, "usage: issue list <owner/name> [--state open|closed|all]")
+		return c.fail(protocol.ExitUsage, "usage: issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]")
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
-	issues, err := c.Store.ListIssues(repo.ID, state)
+	issues, err := c.Store.ListIssues(repo.ID, state, p.queryLimit(), p.keyInt())
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	issues, next := trimPage(p, issues, "issue", func(i store.Issue) string {
+		return strconv.FormatInt(i.Number, 10)
+	})
 	var ds []issueOut
 	for _, i := range issues {
 		ds = append(ds, issueToOut(i, false))
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
 			fmt.Fprintf(w, "#%d\t%s\t%s\t%s\n", d.Number, d.State, d.Title, d.Author)
 		}

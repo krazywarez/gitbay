@@ -118,20 +118,35 @@ func (s *Store) DeleteRepo(repoID int64) error {
 
 // ListReposForUser returns repos the user owns, reaches through an org
 // (unless the org scopes members to 'none'), has an explicit grant on, or
-// reaches through a team.
-func (s *Store) ListReposForUser(userID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+`
+// reaches through a team. limit 0 means everything; after (an owner/name
+// path) starts the page strictly beyond it, matching the path-ascending
+// order.
+func (s *Store) ListReposForUser(userID int64, limit int, after string) ([]Repo, error) {
+	q := repoSelect + `
 		LEFT JOIN repo_access a ON a.repo_id = r.id AND a.subject_kind = 'user' AND a.subject_id = ?
 		LEFT JOIN org_members m ON r.owner_kind = 'org' AND m.org_id = r.owner_id AND m.user_id = ?
 		LEFT JOIN orgs og ON r.owner_kind = 'org' AND og.id = r.owner_id
-		WHERE (r.owner_kind = 'user' AND r.owner_id = ?)
+		WHERE ((r.owner_kind = 'user' AND r.owner_id = ?)
 		   OR a.subject_id IS NOT NULL
 		   OR (m.user_id IS NOT NULL AND (m.role = 'admin' OR og.members_role <> 'none'))
 		   OR EXISTS (SELECT 1 FROM team_repos tr
 		              JOIN team_members tm ON tm.team_id = tr.team_id AND tm.user_id = ?
-		              WHERE tr.repo_id = r.id)
+		              WHERE tr.repo_id = r.id))`
+	args := []any{userID, userID, userID, userID}
+	if after != "" {
+		owner, name, _ := strings.Cut(after, "/")
+		q += ` AND (COALESCE(u.username, o.name) > ?
+		         OR (COALESCE(u.username, o.name) = ? AND r.name > ?))`
+		args = append(args, owner, owner, name)
+	}
+	q += `
 		GROUP BY r.id
-		ORDER BY 4, r.name`, userID, userID, userID, userID)
+		ORDER BY 4, r.name`
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

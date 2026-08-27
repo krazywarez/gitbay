@@ -27,7 +27,7 @@ func init() {
 	register(Command{Path: []string{"repo", "create"},
 		Summary: "create a repository: repo create <owner/name> [--private]", Run: runRepoCreate})
 	register(Command{Path: []string{"repo", "list"},
-		Summary: "list repositories you own or can access", ReadOnly: true, Run: runRepoList})
+		Summary: "list repositories you own or can access: repo list [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runRepoList})
 	register(Command{Path: []string{"repo", "show"},
 		Summary: "show repository details: repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
 	register(Command{Path: []string{"repo", "transfer"},
@@ -196,10 +196,18 @@ func hostOf(siteURL string) string {
 }
 
 func runRepoList(c *Ctx, args []string) int {
-	repos, err := c.Store.ListReposForUser(c.User.ID)
+	args, p, code := parsePageFlags(c, args, "repo", false)
+	if code >= 0 {
+		return code
+	}
+	if len(args) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: repo list [--limit <n>] [--cursor <c>]")
+	}
+	repos, err := c.Store.ListReposForUser(c.User.ID, p.queryLimit(), p.key)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	repos, next := trimPage(p, repos, "repo", store.Repo.Path)
 	type out struct {
 		Path        string `json:"path"`
 		Visibility  string `json:"visibility"`
@@ -211,7 +219,7 @@ func runRepoList(c *Ctx, args []string) int {
 		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
 		ds = append(ds, out{r.Path(), r.Visibility, desc, r.Settings.Archived})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
 			mark := ""
 			if d.Archived {
@@ -706,7 +714,7 @@ func runRepoSearch(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	own, err := c.Store.ListReposForUser(c.User.ID)
+	own, err := c.Store.ListReposForUser(c.User.ID, 0, "")
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
