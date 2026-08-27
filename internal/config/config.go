@@ -114,6 +114,9 @@ type Limits struct {
 	MaxAssetBytes   int64 `toml:"max_asset_bytes"` // per release asset
 	CloneTimeoutSec int   `toml:"clone_timeout"`
 	SSHAuthRate     int   `toml:"ssh_auth_rate"`
+	// APIRate is sustained JSON-API requests per minute per caller; writes
+	// draw on a tenth of it. 0 uses the default.
+	APIRate int `toml:"api_rate"`
 }
 
 type Mail struct {
@@ -141,6 +144,7 @@ func Default() Config {
 			MaxAssetBytes:   512 << 20,
 			CloneTimeoutSec: 3600,
 			SSHAuthRate:     10,
+			APIRate:         120,
 		},
 	}
 }

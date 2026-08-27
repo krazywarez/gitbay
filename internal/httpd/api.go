@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
@@ -44,6 +45,18 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	switch req.Argv[0] {
 	case "git-upload-pack", "git-receive-pack", "git-upload-archive":
 		apiError(w, http.StatusBadRequest, "git transport does not run over the JSON API; use git with an SSH remote")
+		return
+	}
+
+	// Rate limit after auth so the bucket follows the token rather than the
+	// network, but before dispatch so a rejected call costs nothing beyond
+	// the lookup. A write draws on a separate, smaller budget.
+	write := true
+	if cmd, _, ok := control.Lookup(req.Argv); ok {
+		write = !cmd.ReadOnly
+	}
+	if allowed, wait := s.apiLimit.allow(limitKey(r, user), write); !allowed {
+		tooManyRequests(w, wait)
 		return
 	}
 
@@ -89,6 +102,15 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(body)
+}
+
+// limitKey buckets an authenticated caller by account, so rotating tokens
+// buys no extra budget, and everyone else by peer address.
+func limitKey(r *http.Request, user store.User) string {
+	if user.ID != 0 {
+		return "u" + strconv.FormatInt(user.ID, 10)
+	}
+	return "ip" + clientIP(r)
 }
 
 // apiAuth resolves the bearer token; failures are uniform 401s.

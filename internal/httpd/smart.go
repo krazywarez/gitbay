@@ -20,12 +20,13 @@ import (
 )
 
 type Server struct {
-	cfg config.Config
-	st  *store.Store
+	cfg      config.Config
+	st       *store.Store
+	apiLimit *apiLimiter
 }
 
 func New(cfg config.Config, st *store.Store) *Server {
-	return &Server{cfg: cfg, st: st}
+	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate)}
 }
 
 // receivePackRefusal exists only to fail legibly if a client POSTs without

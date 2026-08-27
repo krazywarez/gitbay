@@ -161,3 +161,84 @@ func TestJSONAPI(t *testing.T) {
 		t.Fatalf("API on disabled instance: %d, want 404", resp.StatusCode)
 	}
 }
+
+// TestAPIRateLimit covers the limiter over the wire: a caller who exceeds
+// their budget gets 429 with a Retry-After a client can honour, writes are
+// metered separately from reads, and one caller cannot spend another's
+// budget.
+func TestAPIRateLimit(t *testing.T) {
+	// 6/minute sustained, so the read burst is 6 and the write burst 0.6 —
+	// the first write is allowed and the second is not.
+	inst := startInstanceWith(t, "[api]\nenabled = true\n[limits]\napi_rate = 6\n")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	aliceTok := mintToken(t, inst, aliceKey, "alice-app")
+	bobTok := mintToken(t, inst, bobKey, "bob-app")
+
+	// Reads: the burst is spendable, then the door closes.
+	var limited bool
+	for i := 0; i < 12; i++ {
+		status, body := inst.apiCall(t, aliceTok, []string{"whoami"}, "")
+		if status == http.StatusTooManyRequests {
+			limited = true
+			if msg, _ := body["error"].(string); !strings.Contains(msg, "retry") {
+				t.Errorf("429 body does not say when to retry: %v", body)
+			}
+			break
+		}
+	}
+	if !limited {
+		t.Fatal("a caller never hit the rate limit")
+	}
+
+	// The 429 carries Retry-After, so a client backs off correctly instead
+	// of hammering.
+	req, _ := http.NewRequest("POST",
+		fmt.Sprintf("http://127.0.0.1:%d/api/v1/cmd", inst.httpPort),
+		strings.NewReader(`{"argv":["whoami"]}`))
+	req.Header.Set("Authorization", "Bearer "+aliceTok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("expected a second 429, got %d", resp.StatusCode)
+	}
+	if ra := resp.Header.Get("Retry-After"); ra == "" || ra == "0" {
+		t.Errorf("Retry-After = %q", ra)
+	}
+
+	// One caller's flood does not spend another's budget.
+	if status, _ := inst.apiCall(t, bobTok, []string{"whoami"}, ""); status != http.StatusOK {
+		t.Errorf("bob was limited by alice's traffic: %d", status)
+	}
+
+	// Writes are metered separately: bob's read budget is nearly full, but
+	// his write budget is not.
+	inst.apiCall(t, bobTok, []string{"repo", "create", "bob/one"}, "")
+	status, _ := inst.apiCall(t, bobTok, []string{"repo", "create", "bob/two"}, "")
+	if status != http.StatusTooManyRequests {
+		t.Errorf("second write status %d, want 429 from the write budget", status)
+	}
+}
+
+// mintToken creates an API token over SSH and returns its value.
+func mintToken(t *testing.T, inst *instance, key, name string) string {
+	t.Helper()
+	out, errOut, code := inst.ssh(t, key, "", "token", "create", "--name", name, "--json")
+	if code != 0 {
+		t.Fatalf("token create: %s", errOut)
+	}
+	var env struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil || env.Data.Token == "" {
+		t.Fatalf("token JSON: %v\n%s", err, out)
+	}
+	return env.Data.Token
+}
