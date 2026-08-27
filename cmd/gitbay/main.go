@@ -239,6 +239,8 @@ func repoCmd() *cobra.Command {
 		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
 		pass("search", "find repositories by name, description, or topic: <query>", passOpts{server: []string{"repo", "search"}}),
 		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
+		pass("tree", "list a directory: [<path>] [--ref <ref>]", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
+		pass("cat", "read a file: <path> [--ref <ref>]", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
 		pass("pin", "pin a repository to your dashboard", passOpts{server: []string{"repo", "pin"}, needsRepo: true}),
 		pass("unpin", "unpin a repository", passOpts{server: []string{"repo", "unpin"}, needsRepo: true}),
 		pass("archive", "archive a repository (read-only)", passOpts{server: []string{"repo", "archive"}, needsRepo: true}),
