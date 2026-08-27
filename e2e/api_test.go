@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -241,4 +242,110 @@ func mintToken(t *testing.T, inst *instance, key, name string) string {
 		t.Fatalf("token JSON: %v\n%s", err, out)
 	}
 	return env.Data.Token
+}
+
+// apiGet fetches one read command, optionally conditionally.
+func (i *instance) apiGet(t *testing.T, token string, argv []string, ifNoneMatch string) (int, string, string) {
+	t.Helper()
+	q := url.Values{}
+	for _, a := range argv {
+		q.Add("argv", a)
+	}
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("http://127.0.0.1:%d/api/v1/read?%s", i.httpPort, q.Encode()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if ifNoneMatch != "" {
+		req.Header.Set("If-None-Match", ifNoneMatch)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, resp.Header.Get("ETag"), string(raw)
+}
+
+// TestAPIReadGET covers the conditional-request surface: reads over GET
+// with an ETag, 304 on revalidation, writes refused, and one caller's ETag
+// never matching another's.
+func TestAPIReadGET(t *testing.T) {
+	inst := startInstanceWith(t, "[api]\nenabled = true\n")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	aliceTok := mintToken(t, inst, aliceKey, "alice-get")
+	bobTok := mintToken(t, inst, bobKey, "bob-get")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+
+	status, etag, body := inst.apiGet(t, aliceTok, []string{"repo", "show", "alice/app"}, "")
+	if status != 200 {
+		t.Fatalf("GET read: %d %s", status, body)
+	}
+	if etag == "" {
+		t.Fatal("no ETag, so a client cannot revalidate")
+	}
+	if !strings.Contains(body, `"alice/app"`) {
+		t.Errorf("body: %s", body)
+	}
+
+	// Revalidation returns 304 with no body — the point of the surface.
+	status, _, body = inst.apiGet(t, aliceTok, []string{"repo", "show", "alice/app"}, etag)
+	if status != http.StatusNotModified {
+		t.Fatalf("revalidation status %d, want 304", status)
+	}
+	if body != "" {
+		t.Errorf("304 carried a body: %q", body)
+	}
+	// A weak validator from an intermediary still matches.
+	if status, _, _ := inst.apiGet(t, aliceTok, []string{"repo", "show", "alice/app"}, "W/"+etag); status != http.StatusNotModified {
+		t.Errorf("weak ETag not honoured: %d", status)
+	}
+
+	// A stale ETag gets the real body back, not a 304.
+	if status, _, body := inst.apiGet(t, aliceTok, []string{"repo", "show", "alice/app"}, `"stale"`); status != 200 || body == "" {
+		t.Errorf("stale ETag: %d %q", status, body)
+	}
+
+	// The ETag is salted per caller, so one account can never be handed a
+	// 304 for another account's cached answer.
+	if status, _, _ := inst.apiGet(t, bobTok, []string{"repo", "show", "alice/app"}, etag); status == http.StatusNotModified {
+		t.Error("another caller's ETag matched")
+	}
+
+	// Responses must not be storable by shared caches.
+	req, _ := http.NewRequest("GET",
+		fmt.Sprintf("http://127.0.0.1:%d/api/v1/read?argv=whoami", inst.httpPort), nil)
+	req.Header.Set("Authorization", "Bearer "+aliceTok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if cc := resp.Header.Get("Cache-Control"); !strings.Contains(cc, "private") {
+		t.Errorf("Cache-Control = %q, want private", cc)
+	}
+
+	// A GET can never mutate: writes are refused by the registry's own
+	// ReadOnly flag rather than by a hand-kept list.
+	status, _, body = inst.apiGet(t, aliceTok, []string{"repo", "create", "alice/sneaky"}, "")
+	if status != http.StatusBadRequest || !strings.Contains(body, "POST it") {
+		t.Fatalf("write over GET: %d %s", status, body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "show", "alice/sneaky"); code == 0 {
+		t.Fatal("a GET created a repository")
+	}
+
+	// Unauthenticated reads are refused like everywhere else.
+	if status, _, _ := inst.apiGet(t, "", []string{"whoami"}, ""); status != http.StatusUnauthorized {
+		t.Errorf("anonymous GET status %d, want 401", status)
+	}
 }

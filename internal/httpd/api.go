@@ -76,15 +76,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	}
 	code := control.Dispatch(ctx, req.Argv)
 
-	status := map[int]int{
-		protocol.ExitOK:       http.StatusOK,
-		protocol.ExitUsage:    http.StatusBadRequest,
-		protocol.ExitNotFound: http.StatusNotFound,
-		protocol.ExitDenied:   http.StatusForbidden,
-	}[code]
-	if status == 0 {
-		status = http.StatusInternalServerError
-	}
+	status := statusForExit(code)
 
 	// Commands normally emit exactly one JSON envelope; inject exit_code.
 	// A few (mr diff, help) write raw text instead — wrap those.
@@ -102,6 +94,22 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(body)
+}
+
+// statusForExit maps a command's exit code onto an HTTP status, shared by
+// both API surfaces so they cannot answer the same failure differently.
+func statusForExit(code int) int {
+	switch code {
+	case protocol.ExitOK:
+		return http.StatusOK
+	case protocol.ExitUsage:
+		return http.StatusBadRequest
+	case protocol.ExitNotFound:
+		return http.StatusNotFound
+	case protocol.ExitDenied:
+		return http.StatusForbidden
+	}
+	return http.StatusInternalServerError
 }
 
 // limitKey buckets an authenticated caller by account, so rotating tokens

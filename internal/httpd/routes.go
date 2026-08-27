@@ -77,6 +77,7 @@ func (s *Server) Routes() []Route {
 	if s.cfg.API.Enabled {
 		routes = append(routes,
 			Route{Method: "POST", Pattern: "/api/v1/cmd", Mutating: true, Handler: s.apiCmd},
+			Route{Method: "GET", Pattern: "/api/v1/read", Handler: s.apiRead},
 		)
 	}
 

@@ -155,8 +155,11 @@ func gitHeaderPaths(l string) (string, string, bool) {
 }
 
 // diffFormatter is the blob formatter without line numbers: the diff
-// supplies its own gutters.
-var diffFormatter = html.New(html.WithClasses(true))
+// supplies its own gutters. PreventSurroundingPre also drops chroma's
+// per-line <span class="line"> wrapper, which the generated CSS gives
+// display:flex — inside a diff row that breaks the +/- marker onto a line
+// of its own.
+var diffFormatter = html.New(html.WithClasses(true), html.PreventSurroundingPre(true))
 
 // highlightFile syntax-highlights a file's diff content one hunk at a time,
 // each side separately. A hunk's context+deletions are contiguous lines of
@@ -230,15 +233,7 @@ func highlightLines(lexer chroma.Lexer, src string) []template.HTML {
 	if err := diffFormatter.Format(&buf, styles.Get(lightStyle), it); err != nil {
 		return nil
 	}
-	body := buf.String()
-	// Strip the wrapper chroma puts around the whole block.
-	if i := strings.Index(body, "<code"); i >= 0 {
-		if j := strings.IndexByte(body[i:], '>'); j >= 0 {
-			body = body[i+j+1:]
-		}
-	}
-	body = strings.TrimSuffix(strings.TrimSuffix(body, "</pre>"), "</code>")
-	body = strings.TrimSuffix(body, "\n")
+	body := strings.TrimSuffix(buf.String(), "\n")
 
 	var out []template.HTML
 	for _, line := range splitHighlighted(body) {

@@ -118,6 +118,17 @@ func TestParseDiffHighlighting(t *testing.T) {
 	}
 }
 
+// chroma wraps each line in <span class="line">, and its stylesheet gives
+// that display:flex. A diff row is already one line, so the wrapper only
+// serves to break the +/- marker onto a row of its own.
+func TestParseDiffHasNoLineWrappers(t *testing.T) {
+	for _, l := range parseDiff(samplePatch)[0].Lines {
+		if strings.Contains(string(l.Code), `class="line"`) {
+			t.Errorf("%s line %q kept chroma's line wrapper: %s", l.Class, l.Content, l.Code)
+		}
+	}
+}
+
 // A file whose type chroma does not know renders as plain text rather than
 // being guessed at.
 func TestParseDiffUnknownType(t *testing.T) {
