@@ -1,7 +1,7 @@
 package store
 
 import (
-		"time"
+	"time"
 )
 
 type Webhook struct {

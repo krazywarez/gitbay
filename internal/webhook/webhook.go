@@ -55,11 +55,11 @@ func isForbidden(ip net.IP) bool {
 }
 
 type Deliverer struct {
-	St         *store.Store
-	AllowLocal bool
-	RetryBase  time.Duration // first retry delay; doubles per attempt
+	St          *store.Store
+	AllowLocal  bool
+	RetryBase   time.Duration // first retry delay; doubles per attempt
 	MaxAttempts int
-	client     *http.Client
+	client      *http.Client
 }
 
 // New builds a deliverer whose dialer re-checks resolved addresses at

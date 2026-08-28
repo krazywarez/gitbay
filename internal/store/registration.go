@@ -53,6 +53,18 @@ func (s *Store) ConsumeEmailToken(userID int64, tokenHash string) (string, error
 	return address, err
 }
 
+// EmailTokenBelongsToAnotherUser reports whether a live code exists but
+// is owned by someone else. It answers only yes or no: naming the owner
+// would turn a guessed code into an account oracle.
+func (s *Store) EmailTokenBelongsToAnotherUser(userID int64, tokenHash string) (bool, error) {
+	var n int
+	err := s.DB.QueryRow(`
+		SELECT COUNT(*) FROM email_tokens
+		WHERE token_hash = ? AND user_id != ? AND used_at IS NULL AND expires_at > ?`,
+		tokenHash, userID, fmtTime(time.Now())).Scan(&n)
+	return n > 0, err
+}
+
 // CreateRegisteredUser makes a self-registered account, pending until its
 // email is verified.
 func (s *Store) CreateRegisteredUser(username string, pending bool) (int64, error) {

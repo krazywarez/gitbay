@@ -10,12 +10,12 @@ const Version = 1
 
 // Exit codes shared by the CLI and by control commands run over bare ssh.
 const (
-	ExitOK        = 0
-	ExitFailure   = 1 // general failure
-	ExitUsage     = 2 // usage error
-	ExitNotFound  = 3
-	ExitDenied    = 4
-	ExitProtocol  = 5 // server/protocol error
+	ExitOK       = 0
+	ExitFailure  = 1 // general failure
+	ExitUsage    = 2 // usage error
+	ExitNotFound = 3
+	ExitDenied   = 4
+	ExitProtocol = 5 // server/protocol error
 )
 
 // Envelope wraps every JSON response from a control command.

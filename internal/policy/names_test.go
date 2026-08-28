@@ -12,17 +12,17 @@ func TestValidateOwnerName(t *testing.T) {
 
 	invalid := []string{
 		"",
-		"Alice",     // uppercase
-		"-lead",     // bad first char
-		".hidden",   // bad first char
-		"a b",       // space
-		"repo.git",  // .git suffix
-		"..",        //
-		"login",     // reserved
-		"admin",     // reserved
-		"static",    // reserved
-		"api",       // reserved
-		"register",  // reserved
+		"Alice",    // uppercase
+		"-lead",    // bad first char
+		".hidden",  // bad first char
+		"a b",      // space
+		"repo.git", // .git suffix
+		"..",       //
+		"login",    // reserved
+		"admin",    // reserved
+		"static",   // reserved
+		"api",      // reserved
+		"register", // reserved
 	}
 	for _, n := range invalid {
 		if err := ValidateOwnerName(n); err == nil {

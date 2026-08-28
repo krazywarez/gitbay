@@ -73,9 +73,21 @@ func runEmailVerify(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.fail(protocol.ExitUsage, "usage: email verify <code>")
 	}
-	address, err := c.Store.ConsumeEmailToken(c.User.ID, store.HashToken(args[0]))
+	hash := store.HashToken(args[0])
+	address, err := c.Store.ConsumeEmailToken(c.User.ID, hash)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
+			// A code is scoped to the account that asked for it. Running
+			// this with the wrong key authenticates as the wrong account
+			// and looks exactly like a bad code, which is misleading when
+			// the code is fine and the key is not.
+			if other, e := c.Store.EmailTokenBelongsToAnotherUser(c.User.ID, hash); e == nil && other {
+				return c.fail(protocol.ExitDenied,
+					"that code belongs to a different account; this key authenticated you as %s. "+
+						"Re-run with the key registered to the account being verified: "+
+						"ssh -i <that key> git@<host> email verify <code>",
+					c.User.Username)
+			}
 			return c.fail(protocol.ExitUsage, "that code is invalid, expired, or already used")
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
