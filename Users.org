@@ -87,6 +87,48 @@ key, author line claims someone else), =signed_key_expired= /
 (web edits, merge commits) are always =unsigned= — the server holds no
 signing key on principle.
 
+* Profiles
+
+A profile is what =/{owner}= shows: a one-line description, a website, a
+set of links, long-form about text, the repositories you can see, org
+membership, and a year of activity. Users and orgs have the same fields.
+
+#+begin_src sh
+gitbay profile show               # your own
+gitbay profile show alice
+gitbay profile set --description "builds small tools" --website https://alice.example
+#+end_src
+
+About text is markdown by default, or org-mode. It takes inline text or
+stdin, so it can live in a file you keep:
+
+#+begin_src sh
+gitbay profile set --about "I maintain a few small tools."
+gitbay profile set --file - --about-format org < about.org
+#+end_src
+
+Up to five links, each =label|url= or a bare url, http(s) only. Passing
+=--link= replaces the whole set; a single empty one clears it:
+
+#+begin_src sh
+gitbay profile set --link "Mastodon|https://fosstodon.example/@alice" \
+                   --link https://alice.example/now
+gitbay profile set --link ""      # clear
+#+end_src
+
+Every field follows the same rule as the rest of the CLI: a flag you
+leave out is untouched, and ='' clears the one you name. Org profiles
+work the same way and need org admin:
+
+#+begin_src sh
+gitbay org profile krz --description "software and experiments" --about-format org --file - < krz.org
+gitbay org profile krz            # no flags shows it
+#+end_src
+
+The web renders profiles but has no form for editing one, so the CLI is
+the only interface today. =profile set= is not =SSHOnly=, so the JSON API
+runs it like any other write command.
+
 * Repositories
 
 #+begin_src sh

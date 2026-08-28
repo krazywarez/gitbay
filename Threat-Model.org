@@ -82,9 +82,11 @@ JavaScript, so =script-src 'none'= costs nothing.
 
 * Residual risks, accepted
 
-- External images in rendered READMEs load from their origin (no image
-  proxy), which a repo author can use as a tracking pixel against a
-  viewer. Documented; proxying is future work.
+- External images in rendered READMEs and profile about text load from
+  their origin (no image proxy), which the author can use as a tracking
+  pixel against a viewer. A profile is the wider surface of the two: it
+  is linked from every commit and issue its owner touches. Documented;
+  proxying is future work.
 - Backups are consistent per the DB-snapshot-first ordering but are not a
   single atomic snapshot; a few orphaned git objects are possible and
   harmless (see [[Admin]]).

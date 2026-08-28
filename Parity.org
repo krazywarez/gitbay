@@ -133,9 +133,10 @@ so it ignores =about= and =links= rather than breaking on them.
 | account export bundle       | yes | no  | no  |
 | profile set                 | yes | no  | no  |
 
-=profile set= carries description, website, about and links. Editing a
-profile has always been SSH-only; nothing about it is a credential,
-so this is a gap rather than a rule.
+=profile set= carries description, website, about and links. It is not
+=SSHOnly= — nothing about a bio is a credential, and the JSON API runs
+it — but no surface has ever offered a form, so the =no= above is
+missing UI rather than a rule.
 
 * Organizations
 
