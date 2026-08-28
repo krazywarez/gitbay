@@ -19,9 +19,11 @@ request. Anything whose input is a credential — secrets, mirror
 tokens, API tokens, session minting — stays SSH-only by design: the
 web dispatcher refuses =SSHOnly= commands outright.
 
-Rows are one page or one action each. Grouped rows hide gaps: an
-earlier version of this page carried "browse, log, blame, search" as a
-single row, which read as covered while blame had no command at all.
+Rows are one page or one action each. Grouped rows hide gaps, twice
+now: "browse, log, blame, search" read as covered while blame had no
+command at all, and "build list, log" read as covered while the job
+list a trigger can name had none (krz/gitbay#50), leaving the picker
+browser-only and the iOS build screen unable to say more than the log.
 
 * Merge requests
 
@@ -79,7 +81,10 @@ Creating from a fork works anywhere the source can be typed as
 | archive (read-only flag)    | yes | yes | yes |
 | release list, show          | yes | yes | yes |
 | release create, edit        | yes | yes | yes |
-| build list, log             | yes | yes | yes |
+| build list                  | yes | yes | yes |
+| build show (one build)      | yes | yes | yes |
+| build log                   | yes | yes | yes |
+| build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | no  | no  |
