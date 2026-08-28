@@ -18,32 +18,105 @@ func init() {
 	register(Command{Path: []string{"profile", "show"},
 		Summary: "show a user's or org's profile: profile show [name]", ReadOnly: true, Run: runProfileShow})
 	register(Command{Path: []string{"profile", "set"},
-		Summary: "set your profile: profile set [--description <d>] [--website <url>] ('' clears)", Run: runProfileSet})
+		Summary: "set your profile: profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]... ('' clears)", ReadsStdin: true, Run: runProfileSet})
 	register(Command{Path: []string{"org", "profile"},
-		Summary: "show or set an org's profile: org profile <org> [--description <d>] [--website <url>]", Run: runOrgProfile})
+		Summary: "show or set an org's profile: org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...", ReadsStdin: true, Run: runOrgProfile})
 }
 
-// parseProfileFlags pulls --description/--website out of args; a flag given
-// with an empty value clears the field, an absent flag leaves it untouched.
-func parseProfileFlags(args []string) (rest []string, desc, site *string, err error) {
+// maxProfileLinks caps the free-form link list. A profile is a header,
+// not a linktree.
+const maxProfileLinks = 5
+
+// profileEdit is the set of profile fields a command may change. A nil
+// field is left alone; an empty value clears it.
+type profileEdit struct {
+	Description *string
+	Website     *string
+	About       *string
+	AboutFormat *string
+	Links       *[]store.ProfileLink
+}
+
+func (e profileEdit) empty() bool {
+	return e.Description == nil && e.Website == nil && e.About == nil &&
+		e.AboutFormat == nil && e.Links == nil
+}
+
+// parseProfileFlags pulls the profile flags out of args. --about takes
+// inline text or reads stdin via --file -; --link repeats, and a single
+// empty --link clears the list.
+func parseProfileFlags(c *Ctx, args []string) (rest []string, e profileEdit, err error) {
+	about, file := "", ""
+	sawAbout := false
+	var links []store.ProfileLink
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--description", "--website":
+		case "--description", "--website", "--about", "--about-format", "--file", "--link":
 			if i+1 >= len(args) {
-				return nil, nil, nil, fmt.Errorf("%s requires a value", args[i])
+				return nil, e, fmt.Errorf("%s requires a value", args[i])
 			}
 			v := args[i+1]
-			if args[i] == "--description" {
-				desc = &v
-			} else {
-				site = &v
+			switch args[i] {
+			case "--description":
+				e.Description = &v
+			case "--website":
+				e.Website = &v
+			case "--about":
+				about, sawAbout = v, true
+			case "--about-format":
+				e.AboutFormat = &v
+			case "--file":
+				file, sawAbout = v, true
+			case "--link":
+				if v == "" {
+					links = nil
+					e.Links = &links
+					break
+				}
+				l, lerr := parseProfileLink(v)
+				if lerr != nil {
+					return nil, e, lerr
+				}
+				links = append(links, l)
+				e.Links = &links
 			}
 			i++
 		default:
 			rest = append(rest, args[i])
 		}
 	}
-	return rest, desc, site, nil
+	if sawAbout {
+		body, berr := bodyFrom(c, about, file)
+		if berr != nil {
+			return nil, e, berr
+		}
+		e.About = &body
+	}
+	if len(links) > maxProfileLinks {
+		return nil, e, fmt.Errorf("at most %d links", maxProfileLinks)
+	}
+	return rest, e, nil
+}
+
+// parseProfileLink splits "label|url"; without a separator the whole
+// value is the URL.
+func parseProfileLink(v string) (store.ProfileLink, error) {
+	label, url, ok := strings.Cut(v, "|")
+	if !ok {
+		label, url = "", v
+	}
+	label = strings.TrimSpace(label)
+	if len(label) > 32 {
+		label = label[:32]
+	}
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return store.ProfileLink{}, errors.New("a link needs a url")
+	}
+	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
+		return store.ProfileLink{}, errors.New("link url must start with https:// or http://")
+	}
+	return store.ProfileLink{Label: label, URL: url}, nil
 }
 
 func validateWebsite(url string) error {
@@ -53,20 +126,33 @@ func validateWebsite(url string) error {
 	return errors.New("website must start with https:// or http://")
 }
 
-func applyProfile(p store.Profile, desc, site *string) (store.Profile, error) {
-	if desc != nil {
-		d, _, _ := strings.Cut(strings.TrimSpace(*desc), "\n")
+func applyProfile(p store.Profile, e profileEdit) (store.Profile, error) {
+	if e.Description != nil {
+		d, _, _ := strings.Cut(strings.TrimSpace(*e.Description), "\n")
 		if len(d) > 256 {
 			d = d[:256]
 		}
 		p.Description = d
 	}
-	if site != nil {
-		s := strings.TrimSpace(*site)
+	if e.Website != nil {
+		s := strings.TrimSpace(*e.Website)
 		if err := validateWebsite(s); err != nil {
 			return p, err
 		}
 		p.Website = s
+	}
+	if e.About != nil {
+		p.About = strings.TrimSpace(*e.About)
+	}
+	if e.AboutFormat != nil {
+		f := strings.TrimSpace(*e.AboutFormat)
+		if f != "md" && f != "org" {
+			return p, errors.New("about format must be md or org")
+		}
+		p.AboutFormat = f
+	}
+	if e.Links != nil {
+		p.Links = *e.Links
 	}
 	return p, nil
 }
@@ -76,6 +162,11 @@ type profileOut struct {
 	Kind        string `json:"kind"`
 	Description string `json:"description,omitempty"`
 	Website     string `json:"website,omitempty"`
+	// About is long-form markdown, rendered by the web between the
+	// header and the activity graph.
+	About       string              `json:"about,omitempty"`
+	AboutFormat string              `json:"about_format,omitempty"`
+	Links       []store.ProfileLink `json:"links,omitempty"`
 	// The rest is what a profile page shows: who they work with, what
 	// they own that you can see, and how active they have been. The web
 	// read these straight out of the store, which kept them off every
@@ -124,6 +215,9 @@ func emitProfile(c *Ctx, d profileOut) int {
 		if d.Website != "" {
 			fmt.Fprintf(w, "%s\n", d.Website)
 		}
+		for _, l := range d.Links {
+			fmt.Fprintf(w, "link\t%s\t%s\n", l.Label, l.URL)
+		}
 		for _, m := range d.Orgs {
 			fmt.Fprintf(w, "org\t%s\t%s\n", m.Name, m.Role)
 		}
@@ -135,6 +229,9 @@ func emitProfile(c *Ctx, d profileOut) int {
 		}
 		if d.ActivityTotal > 0 {
 			fmt.Fprintf(w, "activity\t%d in the last year\n", d.ActivityTotal)
+		}
+		if d.About != "" {
+			fmt.Fprintf(w, "\n%s\n", d.About)
 		}
 	})
 }
@@ -159,7 +256,7 @@ func runProfileShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	d := profileOut{Name: name, Kind: kind, Description: p.Description, Website: p.Website,
-		Repos: []profileRepo{}}
+		About: p.About, AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}}
 
 	// Who they work with. Both lists are public on a profile — the web
 	// has always shown them — and neither exposes anything a member
@@ -226,18 +323,22 @@ func runProfileShow(c *Ctx, args []string) int {
 }
 
 func runProfileSet(c *Ctx, args []string) int {
-	rest, desc, site, err := parseProfileFlags(args)
-	if err != nil || len(rest) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: profile set [--description <d>] [--website <url>]")
+	rest, e, err := parseProfileFlags(c, args)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	if desc == nil && site == nil {
-		return c.fail(protocol.ExitUsage, "nothing to set: pass --description and/or --website")
+	if len(rest) != 0 {
+		return c.fail(protocol.ExitUsage,
+			"usage: profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...")
+	}
+	if e.empty() {
+		return c.fail(protocol.ExitUsage, "nothing to set: pass --description, --website, --about and/or --link")
 	}
 	p, err := c.Store.OwnerProfile("user", c.User.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	p, err = applyProfile(p, desc, site)
+	p, err = applyProfile(p, e)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -245,16 +346,21 @@ func runProfileSet(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitProfile(c, profileOut{Name: c.User.Username, Kind: "user",
-		Description: p.Description, Website: p.Website, Repos: []profileRepo{}})
+		Description: p.Description, Website: p.Website, About: p.About,
+		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}})
 }
 
 func runOrgProfile(c *Ctx, args []string) int {
-	rest, desc, site, err := parseProfileFlags(args)
-	if err != nil || len(rest) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org profile <org> [--description <d>] [--website <url>]")
+	rest, e, err := parseProfileFlags(c, args)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if len(rest) != 1 {
+		return c.fail(protocol.ExitUsage,
+			"usage: org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...")
 	}
 	name := rest[0]
-	if desc == nil && site == nil {
+	if e.empty() {
 		return runProfileShow(c, []string{name})
 	}
 	org, code := orgAdmin(c, name)
@@ -265,7 +371,7 @@ func runOrgProfile(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	p, err = applyProfile(p, desc, site)
+	p, err = applyProfile(p, e)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -273,5 +379,6 @@ func runOrgProfile(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitProfile(c, profileOut{Name: org.Name, Kind: "org",
-		Description: p.Description, Website: p.Website, Repos: []profileRepo{}})
+		Description: p.Description, Website: p.Website, About: p.About,
+		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}})
 }

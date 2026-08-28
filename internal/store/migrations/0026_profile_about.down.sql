@@ -1,0 +1,6 @@
+ALTER TABLE users DROP COLUMN about;
+ALTER TABLE users DROP COLUMN about_format;
+ALTER TABLE users DROP COLUMN links;
+ALTER TABLE orgs DROP COLUMN about;
+ALTER TABLE orgs DROP COLUMN about_format;
+ALTER TABLE orgs DROP COLUMN links;

@@ -96,10 +96,95 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Fatalf("org profile show: %s", out)
 	}
 
-	// Owner pages render description and website link.
+	// About: long-form markdown, set inline or piped, rendered on the page.
+	if _, errOut, code := inst.ssh(t, aliceKey, "# Hello\n\nI maintain *small tools*.\n",
+		"profile", "set", "--file", "-"); code != 0 {
+		t.Fatalf("about from stdin: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, "I maintain *small tools*.") {
+		t.Fatalf("about not stored: %s", out)
+	}
+	if !strings.Contains(out, "tinkerer") {
+		t.Fatalf("about clobbered the description: %s", out)
+	}
+
+	// Org-mode about: the stored format picks the renderer.
+	if _, errOut, code := inst.ssh(t, aliceKey, "* Tools\n\nI maintain /small tools/.\n",
+		"profile", "set", "--file", "-", "--about-format", "org"); code != 0 {
+		t.Fatalf("org about: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, `"about_format":"org"`) {
+		t.Fatalf("about format not stored: %s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--about-format", "rst"); code != 2 {
+		t.Fatal("unknown about format accepted")
+	}
+	// Org emphasis parsed, not left as literal slashes the way the
+	// markdown renderer would.
 	status, body := inst.get(t, "/alice")
+	if !strings.Contains(body, "<em>small tools</em>") || strings.Contains(body, "/small tools/") {
+		t.Fatalf("org about not rendered as org: %s", body)
+	}
+
+	// Back to markdown for the rest of the checks.
+	if _, _, code := inst.ssh(t, aliceKey, "# Hello\n\nI maintain *small tools*.\n",
+		"profile", "set", "--file", "-", "--about-format", "md"); code != 0 {
+		t.Fatal("markdown about")
+	}
+
+	// Links: free-form, labelled or bare, capped, cleared by an empty one.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "profile", "set",
+		"--link", "'Mastodon|https://fosstodon.example/@alice'",
+		"--link", "https://alice.example/now"); code != 0 {
+		t.Fatalf("links: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, `"label":"Mastodon"`) ||
+		!strings.Contains(out, `"url":"https://fosstodon.example/@alice"`) ||
+		!strings.Contains(out, `"url":"https://alice.example/now"`) {
+		t.Fatalf("links not stored: %s", out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--link", "'x|gopher://nope'"); code != 2 {
+		t.Fatal("bad link scheme accepted")
+	}
+	sixth := []string{"profile", "set"}
+	for i := 0; i < 6; i++ {
+		sixth = append(sixth, "--link", "https://example.org/"+string(rune('a'+i)))
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", sixth...); code != 2 {
+		t.Fatal("more than five links accepted")
+	}
+
+	// Owner pages render description and website link.
+	status, body = inst.get(t, "/alice")
 	if status != 200 || !strings.Contains(body, "tinkerer") {
 		t.Fatalf("user page profile: %d", status)
+	}
+	// About renders as markdown between the header and the activity graph;
+	// links render as chips.
+	if !strings.Contains(body, "<em>small tools</em>") {
+		t.Fatalf("about not rendered: %s", body)
+	}
+	if !strings.Contains(body, `href="https://fosstodon.example/@alice"`) ||
+		!strings.Contains(body, ">Mastodon<") {
+		t.Fatalf("links not rendered: %s", body)
+	}
+	if strings.Index(body, "<em>small tools</em>") > strings.Index(body, `class="activity"`) {
+		t.Error("about renders below the activity graph")
+	}
+
+	// Clearing works the same way as the other fields.
+	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--link", "''"); code != 0 {
+		t.Fatal("clear links failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--about", "''"); code != 0 {
+		t.Fatal("clear about failed")
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if strings.Contains(out, "fosstodon") || strings.Contains(out, "small tools") {
+		t.Fatalf("about or links not cleared: %s", out)
 	}
 	status, body = inst.get(t, "/workshop")
 	if status != 200 || !strings.Contains(body, "where things get made") ||

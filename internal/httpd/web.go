@@ -398,6 +398,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Owner         string
 		Kind          string
 		Profile       store.Profile
+		AboutHTML     template.HTML
 		Repos         []describedRepo
 		Members       []store.OrgMember
 		Orgs          []store.OrgMember
@@ -406,7 +407,8 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Teams         []teamView
 		CanAdmin      bool
 		Notice        string
-	}{s.baseFor(viewer), name, kind, profile, s.describeAll(visible), members, orgs,
+	}{s.baseFor(viewer), name, kind, profile, aboutHTML(profile),
+		s.describeAll(visible), members, orgs,
 		weeks, activityTotal, teams, canAdmin, r.URL.Query().Get("e")})
 }
 
@@ -987,6 +989,20 @@ func mdHTML(raw string) template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
 	}
 	return template.HTML(buf.String())
+}
+
+// aboutHTML renders a profile's about text. It has no filename to
+// dispatch on, so the stored format picks the extension; anything other
+// than org is markdown.
+func aboutHTML(p store.Profile) template.HTML {
+	if strings.TrimSpace(p.About) == "" {
+		return ""
+	}
+	name := "about.md"
+	if p.AboutFormat == "org" {
+		name = "about.org"
+	}
+	return renderReadme(name, []byte(p.About))
 }
 
 // webResolver answers autolink lookups for one viewer. Cross-repo
