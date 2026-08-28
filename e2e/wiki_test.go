@@ -77,6 +77,54 @@ func TestWikis(t *testing.T) {
 		t.Fatalf("wiki raw: %d", status)
 	}
 
+	// A wiki is readable from every surface, not just a browser: the
+	// commands are what the web dispatches, and what the CLI and the
+	// JSON API reach.
+	out, errOut, code := inst.ssh(t, aliceKey, "", "wiki", "list", "alice/app", "--json")
+	if code != 0 {
+		t.Fatalf("wiki list: %s", errOut)
+	}
+	if !strings.Contains(out, `"Home"`) || !strings.Contains(out, `"Setup"`) {
+		t.Errorf("wiki list pages: %s", out)
+	}
+	if !strings.Contains(out, `"home":"Home"`) {
+		t.Errorf("wiki list did not name the landing page: %s", out)
+	}
+	// shot.png is not a page.
+	if strings.Contains(out, "shot") {
+		t.Errorf("wiki list included a non-page file: %s", out)
+	}
+
+	// Named page, and the landing page when none is named.
+	out, _, code = inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "Setup", "--json")
+	if code != 0 || !strings.Contains(out, "steps here") {
+		t.Errorf("wiki show Setup: %s", out)
+	}
+	out, _, code = inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "--json")
+	if code != 0 || !strings.Contains(out, "welcome") {
+		t.Errorf("wiki show default page: %s", out)
+	}
+	// An extension is accepted and ignored, as the web's routes do.
+	if _, _, code := inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "Setup.org"); code != 0 {
+		t.Error("wiki show rejected a page named with its extension")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "Nope"); code == 0 {
+		t.Error("a missing wiki page resolved")
+	}
+	// A page name cannot climb out of the wiki.
+	if _, _, code := inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "../../etc/passwd"); code == 0 {
+		t.Error("wiki show escaped the repository")
+	}
+	// A repository with no wiki says so rather than failing oddly.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "wiki", "list", "alice/secretive"); code == 0 ||
+		!strings.Contains(errOut, "no wiki") {
+		t.Errorf("wiki list on a repo without one: %d %s", code, errOut)
+	}
+	// Wiki access derives from the parent: a stranger gets nothing.
+	if _, _, code := inst.ssh(t, bobKey, "", "wiki", "list", "alice/secretive"); code == 0 {
+		t.Error("a stranger listed a private repository's wiki")
+	}
+
 	// 404-parity: a private repo's wiki is invisible, over web and git.
 	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/secretive.wiki"), "main")
 	if status, _ := inst.get(t, "/alice/secretive/wiki"); status != 404 {

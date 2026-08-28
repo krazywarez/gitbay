@@ -12,6 +12,7 @@ import (
 
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // wikiDir returns the companion repo path, or "" when the repo has none.
@@ -43,8 +44,16 @@ func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 		}{repoPage: p, Missing: true})
 		return
 	}
-	entries, err := gitutil.ListTree(dir, "main", "")
-	if err != nil { // wiki repo exists but has no commits yet
+	var listing struct {
+		Home  string   `json:"home"`
+		Pages []string `json:"pages"`
+	}
+	var viewer store.User
+	if s.cfg.Web.Mode == "accounts" {
+		viewer = s.viewer(r)
+	}
+	_, listed := s.runControlInto(viewer, []string{"wiki", "list", p.Repo.Path()}, &listing)
+	if !listed || len(listing.Pages) == 0 { // no wiki, or no commits yet
 		s.render(w, "wiki.html", struct {
 			repoPage
 			Page     string
@@ -54,47 +63,24 @@ func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 		}{repoPage: p, Missing: true})
 		return
 	}
-	var pages []string
-	for _, e := range entries {
-		if e.Type != "blob" {
-			continue
-		}
-		ext := strings.ToLower(path.Ext(e.Name))
-		if ext == ".md" || ext == ".org" || ext == ".markdown" {
-			pages = append(pages, strings.TrimSuffix(e.Name, path.Ext(e.Name)))
-		}
-	}
+	pages := listing.Pages
 
 	page := strings.Trim(r.PathValue("page"), "/")
 	if page == "" {
-		for _, home := range []string{"Home", "home", "README", "index"} {
-			for _, pg := range pages {
-				if pg == home {
-					page = home
-				}
-			}
-			if page != "" {
-				break
-			}
-		}
-		if page == "" && len(pages) > 0 {
-			page = pages[0]
-		}
+		page = listing.Home
 	}
 	var pageHTML template.HTML
 	if page != "" {
-		fileName, raw := "", []byte(nil)
-		for _, ext := range []string{".md", ".org", ".markdown"} {
-			if b, err := gitutil.ReadBlob(dir, "main", page+ext, maxRenderBytes); err == nil {
-				fileName, raw = page+ext, b
-				break
-			}
+		var shown struct {
+			File    string `json:"file"`
+			Content string `json:"content"`
 		}
-		if fileName == "" {
+		if _, ok := s.runControlInto(viewer,
+			[]string{"wiki", "show", p.Repo.Path(), page}, &shown); !ok {
 			s.notFound(w, r)
 			return
 		}
-		pageHTML = rewriteWikiLinks(renderReadme(fileName, raw), p)
+		pageHTML = rewriteWikiLinks(renderReadme(shown.File, []byte(shown.Content)), p)
 	}
 	s.render(w, "wiki.html", struct {
 		repoPage
