@@ -700,8 +700,8 @@ h2 .count { color: var(--muted); font-weight: 400; font-size: var(--fs-2); }
 }
 .headrow .spacer { flex: 1; }
 
-/* member, org and profile link chips on owner pages */
-a.memberchip, a.linkchip {
+/* member and org chips on owner pages */
+a.memberchip {
   display: inline-block;
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
@@ -710,7 +710,7 @@ a.memberchip, a.linkchip {
   font-size: var(--fs-1);
   margin: 0 0.15rem 0.15rem 0;
 }
-a.memberchip:hover, a.linkchip:hover { text-decoration: none; border-color: var(--accent); color: var(--accent); }
+a.memberchip:hover { text-decoration: none; border-color: var(--accent); color: var(--accent); }
 a.memberchip .role { color: var(--muted); }
 
 /* landing page */
