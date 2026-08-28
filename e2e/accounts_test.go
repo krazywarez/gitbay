@@ -155,6 +155,30 @@ func TestWebAccounts(t *testing.T) {
 		t.Fatalf("edited content not served: %d %q", status, body)
 	}
 
+	// Editing is a command, so it works from the CLI too — the web is one
+	// rendering of it. This is the capability that used to be web-only.
+	if _, errOut, code := inst.ssh(t, aliceKey, "edited from ssh\n",
+		"repo", "commit-file", "alice/site", "notes.txt",
+		"--ref", "main", "--message", "'ssh edit'", "--file", "-"); code != 0 {
+		t.Fatalf("repo commit-file: %s", errOut)
+	}
+	if status, body = browserGet(t, browser, inst.base()+"/alice/site/raw/main/notes.txt"); !strings.Contains(body, "edited from ssh") {
+		t.Fatalf("ssh edit not served: %d %q", status, body)
+	}
+	// A path cannot climb out of the repository.
+	if _, _, code := inst.ssh(t, aliceKey, "x", "repo", "commit-file", "alice/site",
+		"../../etc/passwd", "--ref", "main", "--file", "-"); code == 0 {
+		t.Error("commit-file escaped the repository")
+	}
+	// A stranger with no write access cannot commit.
+	strangerKey := inst.newKey(t, "mallory")
+	inst.admin(t, "admin", "user", "create", "mallory",
+		"--key", strangerKey+".pub", "--email", "mallory@example.test", "--verified")
+	if _, _, code := inst.ssh(t, strangerKey, "x", "repo", "commit-file", "alice/site",
+		"notes.txt", "--ref", "main", "--file", "-"); code == 0 {
+		t.Error("a stranger committed to a repository they cannot write")
+	}
+
 	// A require-signed repo refuses web edits instead of violating itself.
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-signed", "alice/site", "on"); code != 0 {
 		t.Fatal("require-signed failed")

@@ -77,6 +77,10 @@ func TestMilestonesAndTemplates(t *testing.T) {
 	if !strings.Contains(out, `"milestone":"v1.0"`) {
 		t.Fatalf("issue show milestone: %s", out)
 	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "mr", "show", "alice/app", "1", "--json")
+	if !strings.Contains(out, `"milestone":"v1.0"`) {
+		t.Fatalf("mr show milestone: %s", out)
+	}
 
 	// Progress: 2 open (issue 1 + MR 1); closing the issue moves it.
 	out, _, _ = inst.ssh(t, aliceKey, "", "milestone", "list", "alice/app", "--json")

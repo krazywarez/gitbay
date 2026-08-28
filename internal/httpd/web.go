@@ -725,10 +725,6 @@ func markMatch(text, q string) template.HTML {
 	return template.HTML(b.String())
 }
 
-// blamePageSize caps how many lines one blame page renders; blame is a
-// per-line subprocess cost, so large files paginate.
-const blamePageSize = 1000
-
 func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, r.PathValue("ref"))
 	if !ok {
@@ -736,16 +732,48 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Tab = "files"
 	filePath := strings.Trim(r.PathValue("path"), "/")
-	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, s.cfg.Limits.MaxBlobBytes)
-	if err != nil {
-		s.notFound(w, r)
-		return
+
+	// Blame is a control command; the web renders what it returns rather
+	// than shelling out to git itself, so all three surfaces agree.
+	page := 1
+	if n, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && n >= 1 {
+		page = n
 	}
-	total := bytes.Count(data, []byte("\n"))
-	if len(data) > 0 && !bytes.HasSuffix(data, []byte("\n")) {
-		total++
+	from := (page-1)*control.BlameSpan + 1
+
+	var out struct {
+		From       int `json:"from"`
+		To         int `json:"to"`
+		TotalLines int `json:"total_lines"`
+		Hunks      []struct {
+			SHA         string   `json:"sha"`
+			AuthorName  string   `json:"author_name"`
+			AuthorEmail string   `json:"author_email"`
+			Date        string   `json:"date"`
+			Summary     string   `json:"summary"`
+			StartLine   int      `json:"start_line"`
+			Lines       []string `json:"lines"`
+		} `json:"hunks"`
 	}
-	binary := gitutil.IsBinary(data)
+	argv := []string{"repo", "blame", p.Repo.Path(), filePath,
+		"--ref", p.Ref, "--from", strconv.Itoa(from), "--to", strconv.Itoa(from + control.BlameSpan - 1)}
+	var viewer store.User
+	if s.cfg.Web.Mode == "accounts" {
+		viewer = s.viewer(r)
+	}
+	msg, ok := s.runControlInto(viewer, argv, &out)
+
+	// A binary or empty file is a refusal, not a 404: the page still
+	// renders and says why there is nothing to attribute.
+	binary := false
+	if !ok {
+		if strings.Contains(msg, "is binary") {
+			binary = true
+		} else {
+			s.notFound(w, r)
+			return
+		}
+	}
 
 	type hunkView struct {
 		gitutil.BlameHunk
@@ -755,36 +783,37 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 		Numbered []numberedLine
 	}
 	var hunks []hunkView
-	page, pages := 1, (total+blamePageSize-1)/blamePageSize
+	sigs := map[string]sigView{}
+	for _, h := range out.Hunks {
+		v, seen := sigs[h.SHA]
+		if !seen {
+			v, _ = s.sigFor(p.Repo, p.Dir, h.SHA)
+			sigs[h.SHA] = v
+		}
+		date := h.Date
+		if t, err := time.Parse(time.RFC3339, h.Date); err == nil {
+			date = t.Format("2006-01-02")
+		}
+		hv := hunkView{
+			BlameHunk: gitutil.BlameHunk{SHA: h.SHA, AuthorName: h.AuthorName,
+				AuthorEmail: h.AuthorEmail, Summary: h.Summary,
+				StartLine: h.StartLine, Lines: h.Lines},
+			ShortSHA: h.SHA[:min(10, len(h.SHA))], Date: date, Sig: v,
+		}
+		for i, l := range h.Lines {
+			hv.Numbered = append(hv.Numbered, numberedLine{h.StartLine + i, l})
+		}
+		hunks = append(hunks, hv)
+	}
+
+	pages := (out.TotalLines + control.BlameSpan - 1) / control.BlameSpan
 	if pages == 0 {
 		pages = 1
 	}
-	if n, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && n >= 1 && n <= pages {
-		page = n
+	if page > pages {
+		page = pages
 	}
-	if !binary && total > 0 {
-		start := (page-1)*blamePageSize + 1
-		end := min(total, page*blamePageSize)
-		raw, err := gitutil.Blame(p.Dir, p.Ref, filePath, start, end)
-		if err != nil {
-			s.notFound(w, r)
-			return
-		}
-		sigs := map[string]sigView{}
-		for _, h := range raw {
-			v, ok := sigs[h.SHA]
-			if !ok {
-				v, _ = s.sigFor(p.Repo, p.Dir, h.SHA)
-				sigs[h.SHA] = v
-			}
-			hv := hunkView{BlameHunk: h, ShortSHA: h.SHA[:10],
-				Date: time.Unix(h.AuthorUnix, 0).UTC().Format("2006-01-02"), Sig: v}
-			for i, l := range h.Lines {
-				hv.Numbered = append(hv.Numbered, numberedLine{h.StartLine + i, l})
-			}
-			hunks = append(hunks, hv)
-		}
-	}
+
 	cs := crumbs(p, "blame", filePath)
 	base := ""
 	if len(cs) > 0 {

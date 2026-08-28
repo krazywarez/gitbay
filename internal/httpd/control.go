@@ -65,6 +65,44 @@ func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg
 	return m, code == protocol.ExitOK
 }
 
+// runControlInto runs a command in JSON mode and decodes its data into
+// target. Read handlers use it so the web renders exactly what the CLI
+// and the API return, rather than reaching past the registry into git.
+func (s *Server) runControlInto(u store.User, argv []string, target any) (msg string, ok bool) {
+	var stdout, stderr bytes.Buffer
+	ctx := &control.Ctx{
+		User:   u,
+		Source: "web",
+		Scope:  "full",
+		Store:  s.st,
+		Cfg:    s.cfg,
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+		JSON:   true,
+		ViaAPI: true,
+	}
+	code := control.Dispatch(ctx, argv)
+	var env struct {
+		Data  json.RawMessage `json:"data"`
+		Error string          `json:"error"`
+	}
+	json.Unmarshal(stdout.Bytes(), &env)
+	if code != protocol.ExitOK {
+		m := env.Error
+		if m == "" {
+			m = strings.TrimSpace(stderr.String())
+		}
+		return m, false
+	}
+	if len(env.Data) > 0 {
+		if err := json.Unmarshal(env.Data, target); err != nil {
+			return "unreadable response", false
+		}
+	}
+	return "", true
+}
+
 // runControlJSON runs a command in JSON mode and returns its data object.
 // In JSON mode a failure is an envelope carrying the message rather than
 // stderr text, so both paths are read from the same envelope.

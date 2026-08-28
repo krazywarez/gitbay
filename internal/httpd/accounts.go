@@ -474,37 +474,20 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request, u store.User
 	}
 	ref := r.PathValue("ref")
 	filePath := strings.Trim(r.PathValue("path"), "/")
-	fail := func(msg string) {
+
+	// Editing is a control command; the web supplies the form and lets
+	// the registry enforce the rules — signed-commit policy, verified
+	// identity, archived repositories — so every surface agrees on them.
+	argv := []string{"repo", "commit-file", repo.Path(), filePath, "--ref", ref, "--file", "-"}
+	if message := strings.TrimSpace(r.FormValue("message")); message != "" {
+		argv = append(argv, "--message", message)
+	}
+	if msg, ok := s.runControlStdin(u, argv, r.FormValue("content")); !ok {
 		s.render(w, "edit.html", editPage{
 			basePage: s.baseFor(u), Repo: repo,
 			Ref: ref, Path: filePath, Content: r.FormValue("content"), Error: msg,
 		})
-	}
-	// Web edits produce unsigned commits; a repo that requires signed
-	// commits must refuse them rather than violate its own policy.
-	if repo.Settings.RequireSignedCommits {
-		fail("this repository requires signed commits; web edits are unsigned — push a signed commit over SSH instead")
 		return
 	}
-	email, err := s.st.PrimaryVerifiedEmail(u.ID)
-	if err != nil {
-		fail("internal error")
-		return
-	}
-	if email == "" {
-		fail("commits carry your identity: your account needs a verified primary email")
-		return
-	}
-	message := strings.TrimSpace(r.FormValue("message"))
-	if message == "" {
-		message = "edit " + filePath
-	}
-	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	if _, err := gitutil.CommitFileChange(dir, ref, filePath,
-		[]byte(r.FormValue("content")), u.Username, email, message); err != nil {
-		fail(err.Error())
-		return
-	}
-	s.st.MarkMirrorsDirty(repo.ID, "push")
 	http.Redirect(w, r, fmt.Sprintf("/%s/blob/%s/%s", repo.Path(), ref, filePath), http.StatusSeeOther)
 }

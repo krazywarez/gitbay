@@ -35,9 +35,25 @@ func TestRepoTreeAndCat(t *testing.T) {
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "base")
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "feature")
+	mustGit(t, dir, env, "push", "-q", "origin", "feature")
+	mustGit(t, dir, env, "tag", "v1.0.0")
+	mustGit(t, dir, env, "push", "-q", "origin", "v1.0.0")
+
+	// Refs are a control-plane read so native clients can present the same
+	// branch and tag choices as the web without synthesizing them.
+	out, errOut, code := inst.ssh(t, aliceKey, "", "repo", "refs", "alice/app", "--json")
+	if code != 0 {
+		t.Fatalf("repo refs: %s", errOut)
+	}
+	if !strings.Contains(out, `"name":"main"`) ||
+		!strings.Contains(out, `"name":"feature"`) ||
+		!strings.Contains(out, `"name":"v1.0.0"`) {
+		t.Fatalf("repo refs output: %s", out)
+	}
 
 	// Tree at the root: directories and files, with sizes and object ids.
-	out, errOut, code := inst.ssh(t, aliceKey, "", "repo", "tree", "alice/app", "--json")
+	out, errOut, code = inst.ssh(t, aliceKey, "", "repo", "tree", "alice/app", "--json")
 	if code != 0 {
 		t.Fatalf("repo tree: %s", errOut)
 	}
@@ -133,6 +149,9 @@ func TestRepoTreeAndCat(t *testing.T) {
 	}
 	if _, _, code := inst.ssh(t, bobKey, "", "repo", "cat", "alice/app", "README.md"); code == 0 {
 		t.Error("a stranger read a private repository's file")
+	}
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "refs", "alice/app"); code == 0 {
+		t.Error("a stranger listed a private repository's refs")
 	}
 
 	// Paths cannot climb out of the repository.

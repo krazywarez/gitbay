@@ -303,6 +303,7 @@ type mrOut struct {
 	TargetRef string `json:"target_ref"`
 	HeadSHA   string `json:"head_sha"`
 	Body      string `json:"body,omitempty"`
+	Milestone string `json:"milestone,omitempty"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -316,7 +317,8 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 		}
 	}
 	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Author: m.Author,
-		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, CreatedAt: m.CreatedAt}
+		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
+		CreatedAt: m.CreatedAt}
 	if withBody {
 		o.Body = m.Body
 	}
