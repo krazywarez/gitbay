@@ -19,10 +19,10 @@ import (
 
 func init() {
 	register(Command{Path: []string{"release", "create"},
-		Summary: "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
+		Summary:    "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
 		ReadsStdin: true, Run: runReleaseCreate})
 	register(Command{Path: []string{"release", "edit"},
-		Summary: "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
+		Summary:    "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
 		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
 		Summary: "list releases: release list <owner/name>", ReadOnly: true, Run: runReleaseList})
@@ -31,10 +31,10 @@ func init() {
 	register(Command{Path: []string{"release", "delete"},
 		Summary: "delete a release and its assets: release delete <owner/name> <tag> --yes", Run: runReleaseDelete})
 	register(Command{Path: []string{"release", "asset", "add"},
-		Summary: "upload an asset from stdin: release asset add <owner/name> <tag> <filename> < file",
+		Summary:    "upload an asset from stdin: release asset add <owner/name> <tag> <filename> < file",
 		ReadsStdin: true, Run: runAssetAdd})
 	register(Command{Path: []string{"release", "asset", "get"},
-		Summary: "write an asset to stdout: release asset get <owner/name> <tag> <filename> > file",
+		Summary:  "write an asset to stdout: release asset get <owner/name> <tag> <filename> > file",
 		ReadOnly: true, Run: runAssetGet})
 	register(Command{Path: []string{"release", "asset", "remove"},
 		Summary: "remove an asset: release asset remove <owner/name> <tag> <filename>", Run: runAssetRemove})

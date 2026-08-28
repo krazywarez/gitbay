@@ -13,14 +13,14 @@ import (
 
 func init() {
 	register(Command{
-		Path:    []string{"whoami"},
-		Summary: "show the authenticated account",
+		Path:     []string{"whoami"},
+		Summary:  "show the authenticated account",
 		ReadOnly: true,
 		Run:      runWhoami,
 	})
 	register(Command{
-		Path:    []string{"keys", "list"},
-		Summary: "list registered SSH keys",
+		Path:     []string{"keys", "list"},
+		Summary:  "list registered SSH keys",
 		ReadOnly: true,
 		Run:      runKeysList,
 	})

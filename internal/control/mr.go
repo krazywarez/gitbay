@@ -889,9 +889,12 @@ func runMRMerge(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
 	// Merges bypass receive-pack, so the commit-message issue actions
-	// (closes #N, references) run here for the newly landed commits.
+	// (closes #N, references) run here for the newly landed commits. The
+	// description is scanned after them, so a commit wins the attribution
+	// when both name the same issue.
 	if mr.TargetRef == repo.DefaultBranch {
 		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
+		ProcessMRDescription(c.Store, repo, mr, c.User.ID, newSHA)
 		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
 	}
 	c.Store.MarkMirrorsDirty(repo.ID, "push")

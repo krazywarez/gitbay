@@ -35,10 +35,8 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 	}
 	for _, m := range msgs {
 		closes := map[int64]bool{}
-		for _, g := range closePat.FindAllStringSubmatch(m.Message, -1) {
-			if n, err := strconv.ParseInt(g[1], 10, 64); err == nil {
-				closes[n] = true
-			}
+		for _, n := range closingRefs(m.Message) {
+			closes[n] = true
 		}
 		refs := map[int64]bool{}
 		for _, g := range refPat.FindAllStringSubmatch(m.Message, -1) {
@@ -55,6 +53,50 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 			actOnIssue(st, repo, actorID, m.SHA, n, false, subject, author)
 		}
 	}
+}
+
+// ProcessMRDescription acts on closing keywords in a merged merge
+// request's title and body. Commit messages remain the primary record —
+// they are what lands — but the intent is written in the merge request
+// just as often, and a "Closes #N" there used to close nothing.
+//
+// The dedup key is the merged sha, shared with ProcessCommitMessages, so
+// an issue named in both a commit and the description is acted on once.
+func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID int64, sha string) {
+	for _, n := range closingRefs(mr.Title + "\n" + mr.Body) {
+		issue, err := st.IssueByNumber(repo.ID, n)
+		if err != nil || issue.State != "open" {
+			continue // no such issue, or a commit already closed it
+		}
+		fresh, err := st.TryRecordCommitRef(issue.ID, sha)
+		if err != nil || !fresh {
+			continue
+		}
+		if err := st.SetIssueState(issue.ID, "closed"); err != nil {
+			slog.Error("mr refs: closing issue", "issue", n, "err", err)
+			continue
+		}
+		link := fmt.Sprintf("[!%d](/%s/mrs/%d)", mr.Number, repo.Path(), mr.Number)
+		st.AddIssueSystemComment(issue.ID, actorID,
+			fmt.Sprintf("closed by merge request %s: %s", link, mr.Title))
+		st.RecordEvent(repo.ID, actorID, "issue.closed",
+			fmt.Sprintf(`{"number":%d,"mr":%d}`, n, mr.Number))
+	}
+}
+
+// closingRefs returns the issue numbers a text closes, in no order.
+func closingRefs(text string) []int64 {
+	seen := map[int64]bool{}
+	var out []int64
+	for _, g := range closePat.FindAllStringSubmatch(text, -1) {
+		n, err := strconv.ParseInt(g[1], 10, 64)
+		if err != nil || seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 // RecordLandedCommits attributes commits that just landed on the default

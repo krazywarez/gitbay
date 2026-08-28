@@ -184,5 +184,3 @@ func RegisterAccount(cfg config.Config, st *store.Store, pub ssh.PublicKey, user
 		return "", "registration is closed on this instance", protocol.ExitDenied
 	}
 }
-
-
