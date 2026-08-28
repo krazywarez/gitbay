@@ -894,7 +894,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	// when both name the same issue.
 	if mr.TargetRef == repo.DefaultBranch {
 		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
-		ProcessMRDescription(c.Store, repo, mr, c.User.ID, newSHA)
+		ProcessMRDescription(c.Store, repo, mr, c.User.ID)
 		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
 	}
 	c.Store.MarkMirrorsDirty(repo.ID, "push")

@@ -60,17 +60,20 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 // they are what lands — but the intent is written in the merge request
 // just as often, and a "Closes #N" there used to close nothing.
 //
-// The dedup key is the merged sha, shared with ProcessCommitMessages, so
-// an issue named in both a commit and the description is acted on once.
-func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID int64, sha string) {
+// Acting once is guaranteed by the state check, not by the dedup key: a
+// commit that closed the issue leaves it closed, and this skips it. The
+// key is per merge request rather than the merged sha, because sharing
+// the sha let a bare "#N" in a commit message claim it first and silently
+// suppress the close.
+func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID int64) {
 	for _, n := range closingRefs(mr.Title + "\n" + mr.Body) {
 		issue, err := st.IssueByNumber(repo.ID, n)
 		if err != nil || issue.State != "open" {
 			continue // no such issue, or a commit already closed it
 		}
-		fresh, err := st.TryRecordCommitRef(issue.ID, sha)
+		fresh, err := st.TryRecordCommitRef(issue.ID, mrRefKey(mr.Number))
 		if err != nil || !fresh {
-			continue
+			continue // this merge request already acted on this issue
 		}
 		if err := st.SetIssueState(issue.ID, "closed"); err != nil {
 			slog.Error("mr refs: closing issue", "issue", n, "err", err)
@@ -82,6 +85,12 @@ func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID
 		st.RecordEvent(repo.ID, actorID, "issue.closed",
 			fmt.Sprintf(`{"number":%d,"mr":%d}`, n, mr.Number))
 	}
+}
+
+// mrRefKey namespaces a merge request's dedup record so it cannot
+// collide with a commit sha.
+func mrRefKey(number int64) string {
+	return fmt.Sprintf("mr-%d", number)
 }
 
 // closingRefs returns the issue numbers a text closes, in no order.

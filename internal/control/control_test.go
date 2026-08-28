@@ -69,3 +69,20 @@ func TestBuildJobsIsAReadCommand(t *testing.T) {
 		t.Error("build jobs must not be SSHOnly; the web and the app need it")
 	}
 }
+
+// A merge request's dedup key must not collide with a commit sha. It did:
+// a bare "#N" in a commit message recorded (issue, sha) first, and the
+// description's "Closes #N" then found the key taken and silently gave
+// up. That is how krz/gitbay-ios#8 stayed open after its own MR merged.
+func TestMRDedupKeyCannotCollideWithASHA(t *testing.T) {
+	key := mrRefKey(24)
+	if key == "51b6a14eab49ab08e890597653fcf02f8f38f3d6" || len(key) == 40 {
+		t.Errorf("mrRefKey(24) = %q, which is shaped like a sha", key)
+	}
+	if key != "mr-24" {
+		t.Errorf("mrRefKey(24) = %q, want \"mr-24\"", key)
+	}
+	if mrRefKey(24) == mrRefKey(25) {
+		t.Error("different merge requests share a dedup key")
+	}
+}
