@@ -1,9 +1,15 @@
 #+title: Parity
 
-Which surface can do what. The CLI is the complete interface: every
-capability exists over SSH, and web writes call the same control
-commands, so the two cannot drift. This page is updated in the merge
-request that changes a row.
+Which surface can do what. The CLI is meant to be the complete
+interface: every capability exists over SSH, and the other surfaces
+dispatch the same control commands rather than reimplementing them, so
+they cannot drift. This page is updated in the merge request that
+changes a row.
+
+Three surfaces now: the CLI over SSH, the web, and the iOS client
+(krz/gitbay-ios). A =no= in the cli column is a defect, not a
+preference — it means some surface reached around the registry and
+stranded a capability where only it can reach.
 
 * Rule
 
@@ -13,80 +19,116 @@ request. Anything whose input is a credential — secrets, mirror
 tokens, API tokens, session minting — stays SSH-only by design: the
 web dispatcher refuses =SSHOnly= commands outright.
 
+Rows are one page or one action each. Grouped rows hide gaps: an
+earlier version of this page carried "browse, log, blame, search" as a
+single row, which read as covered while blame had no command at all.
+
 * Merge requests
 
-| capability            | ssh/cli | web |
-|-----------------------+---------+-----|
-| read, diff, commits   | yes     | yes |
-| comment               | yes     | yes |
-| edit title and body   | yes     | yes |
-| review (approve etc.) | yes     | yes |
-| resolve a thread      | yes     | yes |
-| merge (all strategies)| yes     | yes |
-| close                 | yes     | yes |
-| create                | yes     | yes |
-| create from a fork    | yes     | no  |
-| comment on a diff line| yes     | no  |
-| retarget              | yes     | no  |
+| capability             | cli | web | ios |
+|------------------------+-----+-----+-----|
+| read, diff, commits    | yes | yes | yes |
+| comment                | yes | yes | yes |
+| edit title and body    | yes | yes | yes |
+| review (approve etc.)  | yes | yes | yes |
+| resolve a thread       | yes | yes | yes |
+| comment on a diff line | yes | no  | yes |
+| merge (all strategies) | yes | yes | yes |
+| close                  | yes | yes | yes |
+| create                 | yes | yes | yes |
+| create from a fork     | yes | no  | yes |
+| milestone              | yes | yes | no  |
+
+Diff-line comments are the one place the web trails: krz/gitbay#44.
+Creating from a fork works anywhere the source can be typed as
+=owner/name:branch=; only the web lacks it.
 
 * Issues
 
-| capability          | ssh/cli | web |
-|---------------------+---------+-----|
-| read, list, filter  | yes     | yes |
-| create              | yes     | yes |
-| comment             | yes     | yes |
-| edit title and body | yes     | yes |
-| close and reopen    | yes     | yes |
-| labels, assignees   | yes     | yes |
-| milestone           | yes     | yes |
+| capability          | cli | web | ios |
+|---------------------+-----+-----+-----|
+| read, list, filter  | yes | yes | yes |
+| create              | yes | yes | yes |
+| comment             | yes | yes | yes |
+| edit title and body | yes | yes | yes |
+| close and reopen    | yes | yes | yes |
+| labels, assignees   | yes | yes | yes |
+| milestone           | yes | yes | yes |
+| milestone list      | yes | yes | no  |
 
 * Repositories
 
-| capability                | ssh/cli | web |
-|---------------------------+---------+-----|
-| browse, log, blame, search| yes     | yes |
-| create                    | yes     | yes |
-| edit a file               | yes     | yes |
-| pin                       | yes     | yes |
-| settings, protection      | yes     | yes |
-| topics, website           | yes     | yes |
-| visibility                | yes     | yes |
-| archive                   | yes     | yes |
-| delete, transfer          | yes     | no  |
-| release create, edit      | yes     | yes |
-| build trigger             | yes     | yes |
-| release delete            | yes     | no  |
+| capability                  | cli | web | ios |
+|-----------------------------+-----+-----+-----|
+| browse files                | yes | yes | yes |
+| read a file                 | yes | yes | yes |
+| commit log                  | yes | yes | yes |
+| commit log at a ref         | no  | yes | no  |
+| one commit with its patch   | yes | yes | yes |
+| blame                       | yes | yes | yes |
+| search file contents        | yes | yes | yes |
+| branches and tags           | yes | yes | no  |
+| wiki                        | no  | yes | no  |
+| download an archive         | no  | yes | no  |
+| edit a file                 | yes | yes | yes |
+| create                      | yes | yes | yes |
+| pin                         | yes | yes | yes |
+| settings, protection        | yes | yes | yes |
+| topics, website             | yes | yes | yes |
+| visibility                  | yes | yes | yes |
+| archive (read-only flag)    | yes | yes | yes |
+| release list, show          | yes | yes | yes |
+| release create, edit        | yes | yes | yes |
+| build list, log             | yes | yes | yes |
+| build trigger               | yes | yes | yes |
+| delete, transfer            | yes | no  | no  |
+| release delete              | yes | no  | no  |
+
+Four rows here are web-only because the handler reads git or the store
+directly instead of dispatching a command: wiki (krz/gitbay#48), log at
+a ref, and archive download. Blame and file editing were in the same
+state until krz/gitbay!99 gave them commands.
+
+* Discovery
+
+| capability                    | cli | web | ios |
+|-------------------------------+-----+-----+-----|
+| search repositories           | yes | yes | yes |
+| browse all public repositories| no  | yes | no  |
+| profile page                  | yes | yes | yes |
+| activity feed                 | yes | yes | yes |
+
+=repo search= needs a query, so there is no browse-all outside the web.
 
 * Accounts
 
-| capability                 | ssh/cli | web |
-|----------------------------+---------+-----|
-| SSH keys: list, add, remove| yes     | yes |
-| PGP keys: list, add, remove| yes     | yes |
-| email add and verify       | yes     | yes |
-| dashboard aggregate        | yes     | yes |
-| activity feed              | yes     | yes |
-| API token mint             | yes     | no  |
-| account export bundle      | yes     | no  |
+| capability                  | cli | web | ios |
+|-----------------------------+-----+-----+-----|
+| SSH keys: list, add, remove | yes | yes | yes |
+| PGP keys: list, add, remove | yes | yes | yes |
+| email add and verify        | yes | yes | yes |
+| dashboard aggregate         | yes | yes | yes |
+| API token mint              | yes | no  | no  |
+| account export bundle       | yes | no  | no  |
 
 * Organizations
 
-| capability                | ssh/cli | web |
-|---------------------------+---------+-----|
-| read members and teams    | yes     | yes |
-| members add, remove, role | yes     | yes |
-| teams create, delete      | yes     | yes |
-| team members              | yes     | yes |
-| team repo grants          | yes     | yes |
-| create, rename, delete    | yes     | no  |
+| capability                | cli | web | ios |
+|---------------------------+-----+-----+-----|
+| read members and teams    | yes | yes | yes |
+| members add, remove, role | yes | yes | yes |
+| teams create, delete      | yes | yes | yes |
+| team members              | yes | yes | yes |
+| team repo grants          | yes | yes | yes |
+| create, rename, delete    | yes | no  | no  |
 
 * Pagination
 
 =issue list=, =mr list=, =repo list=, and =feed= take =--limit <n>=
 and =--cursor <c>=. Cursors are opaque; each page carries the next
 one. Without the flags a list stays complete, so existing scripts are
-unchanged. The web renders server-side and does not paginate.
+unchanged. The web renders server-side and does not paginate; iOS
+pages with the cursors.
 
 * SSH only, by design
 
@@ -94,3 +136,6 @@ Build secrets, mirror configuration and tokens, custom domain claims,
 API token minting, web session minting, deploy keys, account and
 instance administration. Deleting or transferring a repository is also
 CLI-only: both want a typed confirmation, not a button.
+
+These are the only rows where a =no= is intended. Everywhere else a
+=no= is work outstanding.
