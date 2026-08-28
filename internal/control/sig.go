@@ -27,7 +27,7 @@ func init() {
 		Summary:  "show one commit with its patch: repo commit <owner/name> <sha>",
 		ReadOnly: true, Run: runRepoCommit})
 	register(Command{Path: []string{"repo", "log"},
-		Summary: "commit log with signature states: repo log <owner/name> [--limit n] [--path <file>]", ReadOnly: true, Run: runRepoLog})
+		Summary: "commit log with signature states: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]", ReadOnly: true, Run: runRepoLog})
 }
 
 func runPGPAdd(c *Ctx, args []string) int {
@@ -123,9 +123,15 @@ func VerifyCommitCached(st *store.Store, repo store.Repo, parsed *sig.Commit, sh
 
 func runRepoLog(c *Ctx, args []string) int {
 	limit := 30
-	var path, filePath string
+	var path, filePath, ref string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--ref":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--ref requires a value")
+			}
+			ref = args[i+1]
+			i++
 		case "--limit":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "--limit requires a value")
@@ -144,25 +150,31 @@ func runRepoLog(c *Ctx, args []string) int {
 			i++
 		default:
 			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n] [--path <file>]")
+				return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]")
 			}
 			path = args[i]
 		}
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--limit n] [--path <file>]")
+		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]")
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	if _, err := gitutil.ResolveRef(dir, ref); err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", ref, repo.Path())
+	}
 	var shas []string
 	var err error
 	if filePath != "" {
-		shas, err = gitutil.RevListPath(dir, repo.DefaultBranch, filePath, limit)
+		shas, err = gitutil.RevListPath(dir, ref, filePath, limit)
 	} else {
-		shas, err = gitutil.RevList(dir, repo.DefaultBranch, limit)
+		shas, err = gitutil.RevList(dir, ref, limit)
 	}
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "reading log: %v", err)
