@@ -1,13 +1,17 @@
 package httpd
 
-import "time"
+import (
+	"time"
+
+	"gitbay.org/gitbay/internal/control"
+)
 
 // activityDay is one cell of the graph; Level buckets Count into the five
 // intensity classes the stylesheet colors.
 type activityDay struct {
 	Date  string
 	Count int
-	Level int // 0..4
+	Level int  // 0..4
 	Pad   bool // before the range start / after today
 }
 
@@ -57,8 +61,6 @@ func activityLevel(n int) int {
 }
 
 // activitySince is the first day the grid can show, for the query bound.
-func activitySince() string {
-	today := time.Now().UTC()
-	end := today.AddDate(0, 0, int(time.Saturday-today.Weekday()))
-	return end.AddDate(0, 0, -53*7+1).Format("2006-01-02")
-}
+// activitySince is control.ActivityWindow: the profile command and the
+// web must report the same year, so the span has one definition.
+func activitySince() string { return control.ActivityWindow() }

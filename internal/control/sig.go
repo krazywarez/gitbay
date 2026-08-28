@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/gitutil"
@@ -22,6 +23,9 @@ func init() {
 		Summary: "list registered OpenPGP keys", ReadOnly: true, Run: runPGPList})
 	register(Command{Path: []string{"pgp", "remove"},
 		Summary: "remove an OpenPGP key by fingerprint", Run: runPGPRemove})
+	register(Command{Path: []string{"repo", "commit"},
+		Summary:  "show one commit with its patch: repo commit <owner/name> <sha>",
+		ReadOnly: true, Run: runRepoCommit})
 	register(Command{Path: []string{"repo", "log"},
 		Summary: "commit log with signature states: repo log <owner/name> [--limit n] [--path <file>]", ReadOnly: true, Run: runRepoLog})
 }
@@ -214,5 +218,102 @@ func runRepoLog(c *Ctx, args []string) int {
 		for _, d := range ds {
 			fmt.Fprintf(w, "%.10s  %-22s %s (%s <%s>)\n", d.SHA, d.Signature.State, d.Subject, d.AuthorName, d.AuthorEmail)
 		}
+	})
+}
+
+// runRepoCommit shows one commit: its metadata, signature verdict, check
+// statuses, and its patch. The web's commit page read these straight from
+// git, which is why no other surface could open a commit.
+func runRepoCommit(c *Ctx, args []string) int {
+	const usage = "repo commit <owner/name> <sha>"
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	full, err := gitutil.ResolveRef(dir, args[1])
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no commit %q in %s", args[1], repo.Path())
+	}
+	raw, err := gitutil.ReadCommit(dir, full)
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no commit %q in %s", args[1], repo.Path())
+	}
+	parsed, err := sig.ParseCommit(raw)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "parsing %s: %v", full, err)
+	}
+	res, err := VerifyCommitCached(c.Store, repo, parsed, full)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "verifying %s: %v", full, err)
+	}
+	patch, err := gitutil.ShowPatch(dir, full, 4<<20)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	statuses, err := c.Store.ListCommitStatuses(repo.ID, full)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+
+	// The message body is everything after the subject line.
+	message := ""
+	if i := strings.Index(string(parsed.Payload), "\n\n"); i >= 0 {
+		message = string(parsed.Payload)[i+2:]
+	}
+
+	type checkOut struct {
+		Context string `json:"context"`
+		State   string `json:"state"`
+		URL     string `json:"url,omitempty"`
+	}
+	type sigOut struct {
+		State       string `json:"state"`
+		Signer      string `json:"signer,omitempty"`
+		Fingerprint string `json:"key_fingerprint,omitempty"`
+	}
+	type out struct {
+		Path           string     `json:"path"`
+		SHA            string     `json:"sha"`
+		Subject        string     `json:"subject"`
+		Message        string     `json:"message,omitempty"`
+		AuthorName     string     `json:"author_name"`
+		AuthorEmail    string     `json:"author_email"`
+		CommitterEmail string     `json:"committer_email,omitempty"`
+		Date           string     `json:"date"`
+		Signature      sigOut     `json:"signature"`
+		Checks         []checkOut `json:"checks,omitempty"`
+		// Diff is the unified patch, parsed by the client the same way
+		// mr diff is.
+		Diff string `json:"diff"`
+	}
+	d := out{
+		Path: repo.Path(), SHA: full, Subject: parsed.Subject, Message: message,
+		AuthorName: parsed.AuthorName, AuthorEmail: parsed.AuthorEmail,
+		Date:      time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339),
+		Signature: sigOut{State: string(res.State), Fingerprint: res.KeyFingerprint},
+		Diff:      patch,
+	}
+	if parsed.CommitterEmail != parsed.AuthorEmail {
+		d.CommitterEmail = parsed.CommitterEmail
+	}
+	if res.SignerUserID != 0 {
+		if u, err := c.Store.UserByID(res.SignerUserID); err == nil {
+			d.Signature.Signer = u.Username
+		}
+	}
+	for _, st := range statuses {
+		d.Checks = append(d.Checks, checkOut{st.Context, st.State, st.TargetURL})
+	}
+	return c.emit(d, func(w io.Writer) {
+		fmt.Fprintf(w, "commit %s\nAuthor: %s <%s>\nDate:   %s\n\n    %s\n",
+			d.SHA, d.AuthorName, d.AuthorEmail, d.Date, d.Subject)
+		if d.Message != "" {
+			fmt.Fprintf(w, "\n%s\n", d.Message)
+		}
+		fmt.Fprintf(w, "\n%s", d.Diff)
 	})
 }

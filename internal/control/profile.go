@@ -4,8 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+	"time"
 
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -72,6 +76,43 @@ type profileOut struct {
 	Kind        string `json:"kind"`
 	Description string `json:"description,omitempty"`
 	Website     string `json:"website,omitempty"`
+	// The rest is what a profile page shows: who they work with, what
+	// they own that you can see, and how active they have been. The web
+	// read these straight out of the store, which kept them off every
+	// other surface.
+	Orgs     []profileMember `json:"orgs,omitempty"`    // for a user
+	Members  []profileMember `json:"members,omitempty"` // for an org
+	Repos    []profileRepo   `json:"repos"`
+	Activity []activityDay   `json:"activity,omitempty"`
+	// ActivityTotal counts the same window the days cover.
+	ActivityTotal int `json:"activity_total"`
+}
+
+type profileMember struct {
+	Name string `json:"name"`
+	Role string `json:"role,omitempty"`
+}
+
+type profileRepo struct {
+	Path        string `json:"path"`
+	Visibility  string `json:"visibility"`
+	Description string `json:"description,omitempty"`
+	Archived    bool   `json:"archived,omitempty"`
+}
+
+// activityDay is one day's contribution count. Days with nothing are
+// omitted; a client fills the calendar it wants to draw.
+type activityDay struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
+// ActivityWindow is the span a profile reports: the start of the web's
+// 53-week calendar, so every surface shows the same year.
+func ActivityWindow() string {
+	today := time.Now().UTC()
+	end := today.AddDate(0, 0, int(time.Saturday-today.Weekday()))
+	return end.AddDate(0, 0, -53*7+1).Format("2006-01-02")
 }
 
 func emitProfile(c *Ctx, d profileOut) int {
@@ -82,6 +123,18 @@ func emitProfile(c *Ctx, d profileOut) int {
 		}
 		if d.Website != "" {
 			fmt.Fprintf(w, "%s\n", d.Website)
+		}
+		for _, m := range d.Orgs {
+			fmt.Fprintf(w, "org\t%s\t%s\n", m.Name, m.Role)
+		}
+		for _, m := range d.Members {
+			fmt.Fprintf(w, "member\t%s\t%s\n", m.Name, m.Role)
+		}
+		for _, r := range d.Repos {
+			fmt.Fprintf(w, "repo\t%s\t%s\t%s\n", r.Path, r.Visibility, r.Description)
+		}
+		if d.ActivityTotal > 0 {
+			fmt.Fprintf(w, "activity\t%d in the last year\n", d.ActivityTotal)
 		}
 	})
 }
@@ -105,7 +158,71 @@ func runProfileShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitProfile(c, profileOut{name, kind, p.Description, p.Website})
+	d := profileOut{Name: name, Kind: kind, Description: p.Description, Website: p.Website,
+		Repos: []profileRepo{}}
+
+	// Who they work with. Both lists are public on a profile — the web
+	// has always shown them — and neither exposes anything a member
+	// listing would not.
+	if kind == "user" {
+		orgs, err := c.Store.ListOrgsForUser(id)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		for _, o := range orgs {
+			d.Orgs = append(d.Orgs, profileMember{Name: o.Username, Role: o.Role})
+		}
+	} else {
+		members, err := c.Store.OrgMembers(id)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		for _, m := range members {
+			d.Members = append(d.Members, profileMember{Name: m.Username, Role: m.Role})
+		}
+	}
+
+	// Only repositories this caller may read: a private repo must not
+	// surface on a profile any more than it does in a listing.
+	all, err := c.Store.ListReposForOwner(kind, id)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	for _, repo := range all {
+		grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !policy.CanRead(c.User, repo, grant) {
+			continue
+		}
+		d.Repos = append(d.Repos, profileRepo{
+			Path:        repo.Path(),
+			Visibility:  repo.Visibility,
+			Description: gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)),
+			Archived:    repo.Settings.Archived,
+		})
+	}
+
+	var counts map[string]int
+	if kind == "user" {
+		counts, err = c.Store.ActivityByDay(id, ActivityWindow())
+	} else {
+		counts, err = c.Store.OrgActivityByDay(id, ActivityWindow())
+	}
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	days := make([]string, 0, len(counts))
+	for day := range counts {
+		days = append(days, day)
+	}
+	sort.Strings(days)
+	for _, day := range days {
+		d.Activity = append(d.Activity, activityDay{Date: day, Count: counts[day]})
+		d.ActivityTotal += counts[day]
+	}
+	return emitProfile(c, d)
 }
 
 func runProfileSet(c *Ctx, args []string) int {
@@ -127,7 +244,8 @@ func runProfileSet(c *Ctx, args []string) int {
 	if err := c.Store.SetOwnerProfile("user", c.User.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitProfile(c, profileOut{c.User.Username, "user", p.Description, p.Website})
+	return emitProfile(c, profileOut{Name: c.User.Username, Kind: "user",
+		Description: p.Description, Website: p.Website, Repos: []profileRepo{}})
 }
 
 func runOrgProfile(c *Ctx, args []string) int {
@@ -154,5 +272,6 @@ func runOrgProfile(c *Ctx, args []string) int {
 	if err := c.Store.SetOwnerProfile("org", org.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitProfile(c, profileOut{org.Name, "org", p.Description, p.Website})
+	return emitProfile(c, profileOut{Name: org.Name, Kind: "org",
+		Description: p.Description, Website: p.Website, Repos: []profileRepo{}})
 }

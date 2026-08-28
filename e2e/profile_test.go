@@ -25,6 +25,42 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Fatalf("profile show: %s", out)
 	}
 
+	// A profile is the whole page's worth: repositories the caller may
+	// see, org membership, and the activity window — all previously
+	// readable only by the web, which went straight to the store.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/public-tool"); code != 0 {
+		t.Fatal("repo create")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/secret", "--private"); code != 0 {
+		t.Fatal("private repo create")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "org", "create", "toolmakers"); code != 0 {
+		t.Fatal("org create")
+	}
+
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	for _, want := range []string{`"path":"alice/public-tool"`, `"path":"alice/secret"`,
+		`"name":"toolmakers"`, `"activity_total"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("own profile missing %q: %s", want, out)
+		}
+	}
+
+	// A stranger sees the public repository and not the private one.
+	out, _, _ = inst.ssh(t, bobKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, `"path":"alice/public-tool"`) {
+		t.Errorf("stranger cannot see a public repo on a profile: %s", out)
+	}
+	if strings.Contains(out, `"alice/secret"`) {
+		t.Errorf("a private repository leaked onto a profile: %s", out)
+	}
+
+	// An org profile lists its members rather than org memberships.
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "toolmakers", "--json")
+	if !strings.Contains(out, `"kind":"org"`) || !strings.Contains(out, `"name":"alice"`) {
+		t.Errorf("org profile members: %s", out)
+	}
+
 	// Partial update leaves the other field untouched; empty clears.
 	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--description", "'tinkerer'"); code != 0 {
 		t.Fatal("partial set failed")

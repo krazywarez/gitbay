@@ -58,6 +58,23 @@ func TestBlameView(t *testing.T) {
 		t.Errorf("ranged blame leaked lines outside the window: %s", out)
 	}
 
+	// One commit, with its patch — the capability behind a tappable log
+	// entry, which the web read straight from git.
+	out, errOut, code = inst.ssh(t, aliceKey, "", "repo", "commit", "alice/app", "HEAD", "--json")
+	if code != 0 {
+		t.Fatalf("repo commit: %s", errOut)
+	}
+	for _, want := range []string{
+		`"subject":"change line two"`, `"signature"`, `"diff"`, "TWO CHANGED",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("repo commit missing %q: %s", want, out)
+		}
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "commit", "alice/app", "deadbeef"); code == 0 {
+		t.Error("an unknown sha resolved")
+	}
+
 	// Binary files have nothing to attribute, and say so rather than 500.
 	os.WriteFile(filepath.Join(dir, "logo.bin"), []byte{0, 1, 2, 0, 3}, 0o644)
 	mustGit(t, dir, env, "add", ".")
