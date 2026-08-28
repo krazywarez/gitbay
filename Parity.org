@@ -68,7 +68,7 @@ Creating from a fork works anywhere the source can be typed as
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
 | branches and tags           | yes | yes | yes |
-| wiki                        | no  | yes | no  |
+| wiki (read)                 | yes | yes | yes |
 | download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
 | create                      | yes | yes | yes |
@@ -84,11 +84,14 @@ Creating from a fork works anywhere the source can be typed as
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | no  | no  |
 
-Wiki is the one row left where the web can do something no other
-surface can: its handler reads the companion repository directly rather
-than dispatching a command (krz/gitbay#48). Blame, file editing, log at
-a ref, archive and the public listing were all in that state until
-krz/gitbay!99 and !101 gave them commands.
+No row is web-only any more. Blame, file editing, log at a ref,
+archive, the public listing and the wiki were all in that state — a
+handler reading git or the store directly instead of dispatching a
+command — until krz/gitbay!99, !101 and !102 gave them commands.
+
+The wiki row covers reading. Editing a wiki is a push to
+=<repo>.wiki.git= on every surface, including the web, so there is no
+edit row to have parity on.
 
 =n/a= marks a capability deliberately absent from a surface rather than
 missing from it. Archive download is =n/a= on iOS: the read API carries
