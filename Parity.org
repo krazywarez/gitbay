@@ -112,9 +112,14 @@ route stays the way to get one.
 | search repositories           | yes | yes | yes |
 | browse all public repositories| yes | yes | yes |
 | profile page                  | yes | yes | yes |
+| profile about and links       | yes | yes | no  |
 | activity feed                 | yes | yes | yes |
 
 =explore= is the listing without a query; =repo search= is the one with.
+
+About text renders as markdown or org-mode per the =about_format= it
+was stored with. The iOS =Profile= decoder lists its keys explicitly,
+so it ignores =about= and =links= rather than breaking on them.
 
 * Accounts
 
@@ -126,6 +131,11 @@ route stays the way to get one.
 | dashboard aggregate         | yes | yes | yes |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | no  | no  |
+| profile set                 | yes | no  | no  |
+
+=profile set= carries description, website, about and links. Editing a
+profile has always been SSH-only; nothing about it is a credential,
+so this is a gap rather than a rule.
 
 * Organizations
 
