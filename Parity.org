@@ -37,7 +37,7 @@ single row, which read as covered while blame had no command at all.
 | close                  | yes | yes | yes |
 | create                 | yes | yes | yes |
 | create from a fork     | yes | no  | yes |
-| milestone              | yes | yes | no  |
+| milestone              | yes | yes | yes |
 
 Diff-line comments are the one place the web trails: krz/gitbay#44.
 Creating from a fork works anywhere the source can be typed as
@@ -54,7 +54,7 @@ Creating from a fork works anywhere the source can be typed as
 | close and reopen    | yes | yes | yes |
 | labels, assignees   | yes | yes | yes |
 | milestone           | yes | yes | yes |
-| milestone list      | yes | yes | no  |
+| milestone list      | yes | yes | yes |
 
 * Repositories
 
@@ -63,13 +63,13 @@ Creating from a fork works anywhere the source can be typed as
 | browse files                | yes | yes | yes |
 | read a file                 | yes | yes | yes |
 | commit log                  | yes | yes | yes |
-| commit log at a ref         | no  | yes | no  |
+| commit log at a ref         | yes | yes | yes |
 | one commit with its patch   | yes | yes | yes |
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
-| branches and tags           | yes | yes | no  |
+| branches and tags           | yes | yes | yes |
 | wiki                        | no  | yes | no  |
-| download an archive         | no  | yes | no  |
+| download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
 | create                      | yes | yes | yes |
 | pin                         | yes | yes | yes |
@@ -84,21 +84,29 @@ Creating from a fork works anywhere the source can be typed as
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | no  | no  |
 
-Four rows here are web-only because the handler reads git or the store
-directly instead of dispatching a command: wiki (krz/gitbay#48), log at
-a ref, and archive download. Blame and file editing were in the same
-state until krz/gitbay!99 gave them commands.
+Wiki is the one row left where the web can do something no other
+surface can: its handler reads the companion repository directly rather
+than dispatching a command (krz/gitbay#48). Blame, file editing, log at
+a ref, archive and the public listing were all in that state until
+krz/gitbay!99 and !101 gave them commands.
+
+=n/a= marks a capability deliberately absent from a surface rather than
+missing from it. Archive download is =n/a= on iOS: the read API carries
+a command's stdout as a JSON string, so a gzip stream cannot survive it,
+and the app has nowhere useful to put a tarball — the brief rules out
+local git, so there is no clone, checkout or build to feed. The web's
+route stays the way to get one.
 
 * Discovery
 
 | capability                    | cli | web | ios |
 |-------------------------------+-----+-----+-----|
 | search repositories           | yes | yes | yes |
-| browse all public repositories| no  | yes | no  |
+| browse all public repositories| yes | yes | yes |
 | profile page                  | yes | yes | yes |
 | activity feed                 | yes | yes | yes |
 
-=repo search= needs a query, so there is no browse-all outside the web.
+=explore= is the listing without a query; =repo search= is the one with.
 
 * Accounts
 
@@ -138,4 +146,5 @@ instance administration. Deleting or transferring a repository is also
 CLI-only: both want a typed confirmation, not a button.
 
 These are the only rows where a =no= is intended. Everywhere else a
-=no= is work outstanding.
+=no= is work outstanding, and =n/a= means a surface cannot usefully
+carry the capability at all — see the archive note above.
