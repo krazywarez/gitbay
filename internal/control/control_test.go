@@ -54,3 +54,18 @@ func TestLookupLongestMatch(t *testing.T) {
 		t.Errorf("Lookup keys list --json = %v %v %v", cmd.Path, rest, ok)
 	}
 }
+
+// TestBuildJobsIsAReadCommand pins the properties the surfaces depend on:
+// the web build page and a read-scoped API token both need it over GET.
+func TestBuildJobsIsAReadCommand(t *testing.T) {
+	cmd, _, ok := Lookup([]string{"build", "jobs"})
+	if !ok {
+		t.Fatal("build jobs not registered")
+	}
+	if !cmd.ReadOnly {
+		t.Error("build jobs must be ReadOnly; listing jobs changes nothing")
+	}
+	if cmd.SSHOnly {
+		t.Error("build jobs must not be SSHOnly; the web and the app need it")
+	}
+}

@@ -6,7 +6,7 @@
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds" class="setform">
   <label for="job">Run a job now</label>
   <select id="job" name="job">
-    {{range .Jobs}}<option value="{{.}}">{{.}}</option>{{end}}
+    {{range .Jobs}}<option value="{{.Name}}">{{.Name}}{{if .Schedule}} (schedule {{.Schedule}}){{else if .Tags}} (tags {{.Tags}}){{end}}</option>{{end}}
   </select>
   <button type="submit" class="primary">Run</button>
 </form>

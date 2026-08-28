@@ -3,6 +3,7 @@ package httpd
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
@@ -212,4 +213,13 @@ func (s *Server) namedTip(c gitutil.EntryCommit) namedCommit {
 	user, _ := names.account(c.Email)
 	c.Author = names.name(c.Email, c.Author)
 	return namedCommit{EntryCommit: c, User: user}
+}
+
+// webViewer is the account behind a page request, or the zero user when
+// the instance serves the web without accounts.
+func (s *Server) webViewer(r *http.Request) store.User {
+	if s.cfg.Web.Mode != "accounts" {
+		return store.User{}
+	}
+	return s.viewer(r)
 }

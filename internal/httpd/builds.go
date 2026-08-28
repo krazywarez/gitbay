@@ -3,11 +3,25 @@ package httpd
 import (
 	"net/http"
 	"strconv"
-
-	"gitbay.org/gitbay/internal/ci"
-	"gitbay.org/gitbay/internal/gitutil"
-	"gitbay.org/gitbay/internal/store"
 )
+
+// buildView mirrors the build commands' JSON. The templates read these
+// names; nothing here touches the store.
+type buildView struct {
+	Number     int64  `json:"number"`
+	Job        string `json:"job"`
+	Status     string `json:"status"`
+	SHA        string `json:"sha"`
+	Ref        string `json:"ref"`
+	CreatedAt  string `json:"created_at"`
+	FinishedAt string `json:"finished_at"`
+}
+
+type jobView struct {
+	Name     string `json:"name"`
+	Schedule string `json:"schedule"`
+	Tags     string `json:"tags"`
+}
 
 func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
@@ -15,23 +29,20 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "builds"
-	builds, _ := s.st.ListBuilds(p.Repo.ID, 50)
-	// The jobs a trigger can name come from the config on the default
-	// branch, the same file the scheduler reads.
-	var jobs []string
-	if sha, err := gitutil.ResolveRef(p.Dir, "refs/heads/"+p.Repo.DefaultBranch); err == nil {
-		if raw, err := gitutil.ReadBlob(p.Dir, sha, ci.ConfigPath, 1<<16); err == nil {
-			if parsed, err := ci.Parse(raw); err == nil {
-				for _, j := range parsed {
-					jobs = append(jobs, j.Name)
-				}
-			}
-		}
-	}
+	viewer := s.webViewer(r)
+
+	var builds []buildView
+	s.runControlInto(viewer, []string{"build", "list", p.Repo.Path()}, &builds)
+
+	// The jobs a trigger can name. A repo without a CI config has none;
+	// that is not an error for this page.
+	var jobs []jobView
+	s.runControlInto(viewer, []string{"build", "jobs", p.Repo.Path()}, &jobs)
+
 	s.render(w, "builds.html", struct {
 		repoPage
-		Builds   []store.Build
-		Jobs     []string
+		Builds   []buildView
+		Jobs     []jobView
 		CanWrite bool
 		Notice   string
 	}{p, builds, jobs, s.canWriteRepo(r, p.Repo), r.URL.Query().Get("e")})
@@ -43,20 +54,23 @@ func (s *Server) build(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "builds"
-	n, err := strconv.ParseInt(r.PathValue("n"), 10, 64)
-	if err != nil {
+	if _, err := strconv.ParseInt(r.PathValue("n"), 10, 64); err != nil {
 		s.notFound(w, r)
 		return
 	}
-	b, err := s.st.BuildByNumber(p.Repo.ID, n)
-	if err != nil {
+	n := r.PathValue("n")
+	viewer := s.webViewer(r)
+
+	var b buildView
+	if _, ok := s.runControlInto(viewer, []string{"build", "show", p.Repo.Path(), n}, &b); !ok {
 		s.notFound(w, r)
 		return
 	}
-	log, _ := s.st.BuildLog(b.ID)
+	log, _, _ := s.runControl(viewer, []string{"build", "log", p.Repo.Path(), n})
+
 	s.render(w, "build.html", struct {
 		repoPage
-		Build store.Build
+		Build buildView
 		Log   string
-	}{p, b, string(log)})
+	}{p, b, log})
 }

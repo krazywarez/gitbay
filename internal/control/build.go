@@ -24,6 +24,9 @@ func init() {
 	register(Command{Path: []string{"build", "log"},
 		Summary: "print a build's log: build log <owner/name> <n>", ReadOnly: true, Run: runBuildLog})
 
+	register(Command{Path: []string{"build", "jobs"},
+		Summary: "list the jobs a trigger can name: build jobs <owner/name>", ReadOnly: true, Run: runBuildJobs})
+
 	register(Command{Path: []string{"build", "trigger"},
 		Summary: "queue a job now (scheduled or not): build trigger <owner/name> <job>", Run: runBuildTrigger})
 	// Secrets: set over stdin, listed by name only, injected into the
@@ -132,6 +135,63 @@ func runBuildLog(c *Ctx, args []string) int {
 	return protocol.ExitOK
 }
 
+type jobOut struct {
+	Name     string `json:"name"`
+	Schedule string `json:"schedule,omitempty"`
+	Tags     string `json:"tags,omitempty"`
+}
+
+// repoJobs reads the CI config on the default branch — the same file the
+// scheduler reads — and returns its jobs with the sha they came from.
+func repoJobs(c *Ctx, repo store.Repo) ([]ci.Job, string, int) {
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	sha, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch)
+	if err != nil {
+		return nil, "", c.fail(protocol.ExitFailure, "resolving %s: %v", repo.DefaultBranch, err)
+	}
+	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return nil, "", c.fail(protocol.ExitNotFound, "%s has no %s on %s", repo.Path(), ci.ConfigPath, repo.DefaultBranch)
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		return nil, "", c.fail(protocol.ExitUsage, "%v", err)
+	}
+	return jobs, sha, -1
+}
+
+// runBuildJobs answers "what can I trigger?". Without it only a surface
+// that can read the repository's git could offer the choice.
+func runBuildJobs(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: build jobs <owner/name>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	jobs, _, code := repoJobs(c, repo)
+	if code >= 0 {
+		return code
+	}
+	out := make([]jobOut, 0, len(jobs))
+	for _, j := range jobs {
+		out = append(out, jobOut{Name: j.Name, Schedule: j.Schedule, Tags: j.Tags})
+	}
+	return c.emit(out, func(w io.Writer) {
+		for _, j := range out {
+			switch {
+			case j.Schedule != "":
+				fmt.Fprintf(w, "%s\tschedule %s\n", j.Name, j.Schedule)
+			case j.Tags != "":
+				fmt.Fprintf(w, "%s\ttags %s\n", j.Name, j.Tags)
+			default:
+				fmt.Fprintf(w, "%s\ton push\n", j.Name)
+			}
+		}
+	})
+}
+
 func runBuildTrigger(c *Ctx, args []string) int {
 	if len(args) != 2 {
 		return c.fail(protocol.ExitUsage, "usage: build trigger <owner/name> <job>")
@@ -140,18 +200,9 @@ func runBuildTrigger(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
-	sha, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "resolving %s: %v", repo.DefaultBranch, err)
-	}
-	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
-	if err != nil {
-		return c.fail(protocol.ExitNotFound, "%s has no %s on %s", repo.Path(), ci.ConfigPath, repo.DefaultBranch)
-	}
-	jobs, err := ci.Parse(raw)
-	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+	jobs, sha, code := repoJobs(c, repo)
+	if code >= 0 {
+		return code
 	}
 	for _, j := range jobs {
 		if j.Name != args[1] {
