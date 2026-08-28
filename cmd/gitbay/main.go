@@ -17,6 +17,15 @@ import (
 )
 
 func main() {
+	if err := newRoot().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		os.Exit(protocol.ExitUsage)
+	}
+}
+
+// newRoot builds the command tree. Separate from main so the coverage
+// test can walk it.
+func newRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "gitbay",
 		Short:         "CLI-first git forge client",
@@ -40,6 +49,12 @@ func main() {
 			passOpts{server: []string{"dashboard"}}),
 		pass("feed", "activity on repositories you can reach [--limit n] [--cursor c]",
 			passOpts{server: []string{"feed"}}),
+		pass("explore", "public repositories on this instance [--limit n] [--cursor c]",
+			passOpts{server: []string{"explore"}}),
+		group("wiki", "a repository's wiki pages",
+			pass("list", "list pages: [<owner/name>]", passOpts{server: []string{"wiki", "list"}, needsRepo: true}),
+			pass("show", "print a page: [<owner/name>] [<page>]", passOpts{server: []string{"wiki", "show"}, needsRepo: true}),
+		),
 		repoCmd(),
 		issueCmd(),
 		milestoneCmd(),
@@ -57,14 +72,15 @@ func main() {
 		initCmd(),
 		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
 			passOpts{server: []string{"register"}}),
+		pass("audit", "instance audit log (admins): [--limit <n>]", passOpts{server: []string{"audit"}}),
 		manCmd(root),
 	)
-
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "gitbay:", err)
-		os.Exit(protocol.ExitUsage)
-	}
+	return root
 }
+
+// serverPath is the annotation key holding a passthrough command's
+// server-side path, so the tree can be checked against the registry.
+const serverPath = "gitbay.server_path"
 
 // passOpts describes how one CLI command maps onto the server command.
 type passOpts struct {
@@ -81,6 +97,7 @@ func pass(use, short string, o passOpts) *cobra.Command {
 	return &cobra.Command{
 		Use:                use,
 		Short:              short,
+		Annotations:        map[string]string{serverPath: strings.Join(o.server, " ")},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// cobra still owns `forge <cmd> --help`.
@@ -194,6 +211,7 @@ func authCmd() *cobra.Command {
 	}
 	pgpAdd := &cobra.Command{
 		Use: "add", Short: "register an OpenPGP public key (armored, on stdin)",
+		Annotations:        map[string]string{serverPath: "pgp add"},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveTarget()
@@ -245,6 +263,15 @@ func repoCmd() *cobra.Command {
 		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
 		pass("tree", "list a directory: [<path>] [--ref <ref>]", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
 		pass("cat", "read a file: <path> [--ref <ref>]", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
+		pass("blame", "attribute lines to commits: <path> [--ref <ref>] [--from <n>] [--to <n>]",
+			passOpts{server: []string{"repo", "blame"}, needsRepo: true}),
+		pass("commit", "show one commit with its patch: <sha>",
+			passOpts{server: []string{"repo", "commit"}, needsRepo: true}),
+		pass("commit-file", "write a file and commit it: <path> [--ref <ref>] [--message <m>] --file -",
+			passOpts{server: []string{"repo", "commit-file"}, needsRepo: true, stdinOK: true}),
+		pass("refs", "list branches and tags", passOpts{server: []string{"repo", "refs"}, needsRepo: true}),
+		pass("download", "write a tar.gz of a ref to stdout: [--ref <r>] > repo.tar.gz",
+			passOpts{server: []string{"repo", "download"}, needsRepo: true}),
 		pass("pin", "pin a repository to your dashboard", passOpts{server: []string{"repo", "pin"}, needsRepo: true}),
 		pass("unpin", "unpin a repository", passOpts{server: []string{"repo", "unpin"}, needsRepo: true}),
 		pass("archive", "archive a repository (read-only)", passOpts{server: []string{"repo", "archive"}, needsRepo: true}),
@@ -293,6 +320,7 @@ func repoCmd() *cobra.Command {
 			pass("require-approvals", "require N fresh approvals to merge: <n>", passOpts{server: []string{"repo", "settings", "require-approvals"}, needsRepo: true}),
 			pass("require-resolved", "require threads resolved to merge: on|off", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),
 			pass("require-checks", "gate merges on green statuses: ... on|off", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
+			pass("visibility", "set repository visibility: public|private", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
 			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
 			pass("description", "set the repository description: <text>", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
 			pass("website", "set the repository website: <url> ('' clears)", passOpts{server: []string{"repo", "settings", "website"}, needsRepo: true}),
@@ -373,6 +401,7 @@ func importCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "import",
 		Short:              "server-side mirror of a foreign repo: gitbay repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		Annotations:        map[string]string{serverPath: "repo import"},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, a := range args {
