@@ -20,6 +20,19 @@ they are indistinguishable from nonexistent.</p>
 downloads your account bundle, git data is yours by clone, and
 <code>gitbay migrate</code> moves everything to another instance.</p>
 
+<h2>The mobile client</h2>
+<p>The iOS app is a client for an instance you name at sign-in. It has
+no account of its own, no sign-up, and no server of ours behind it: it
+speaks only to that instance, over HTTPS.</p>
+<p>Signing in stores one API token in the device Keychain. Which account
+is active is kept in app preferences; nothing else is retained on the
+device. The app embeds no analytics, no crash reporting, and no
+third-party SDK, so there is nothing to opt out of. Removing the account
+deletes the token from the Keychain.</p>
+<p>Tokens are minted over SSH and can be revoked at any time with
+<code>gitbay auth token revoke</code>, which ends the app's access
+immediately.</p>
+
 <h2>This instance ({{.Host}})</h2>
 {{if .Notice}}{{range paragraphs .Notice}}<p>{{.}}</p>{{end}}
 {{else}}<p class="desc">The operator of this instance has not added
