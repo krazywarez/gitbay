@@ -105,6 +105,14 @@ and the app has nowhere useful to put a tarball — the brief rules out
 local git, so there is no clone, checkout or build to feed. The web's
 route stays the way to get one.
 
+A README or wiki page's org renders per surface: the web through
+go-org, the iOS client through the shared OrgSwift package
+(=krz/org-swift=). OrgSwift is held to orgo's output by the
+=krz/org-conformance= corpus — golden renderings from orgo, itself
+diffed against Emacs =ox-html= — so constructs the iOS client used to
+approximate (tables, footnotes, timestamps, heading tags, nested lists)
+now render the way the reference does. go-org is not yet on the corpus.
+
 * Discovery
 
 | capability                    | cli | web | ios |
