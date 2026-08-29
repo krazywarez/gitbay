@@ -71,6 +71,30 @@ webhook dialer re-checks at connect time so a DNS answer that changes
 after validation still cannot reach private space. Redirects are never
 followed.
 
+* Rendering pushed markup
+
+Rendered markup is attacker-controlled: a README, a wiki page and a
+profile's about text are all whatever someone pushed or typed. The risk
+is not only what the output contains but what the *parser* is willing to
+go and fetch — the filesystem counterpart of the SSRF guard above.
+
+Org is rendered by go-org, whose default configuration resolves
+=#+INCLUDE:= and =#+SETUPFILE:= targets with =os.ReadFile=. Both are
+refused outright (=orgConfig()= in =internal/httpd=): the file is never
+opened and the keyword stays the inert text it already was, so the rest
+of the document renders normally. There is no safe subset to allow
+instead — an absolute path skips go-org's relative-path join, a relative
+one resolves against the daemon's working directory, and the content
+came from a git object rather than a checkout, so there is no directory
+to scope a read to. Markdown is goldmark, which has no include
+mechanism. go-org's parse warnings are discarded rather than logged, so
+pushed content cannot write to the server's log.
+
+Org output is then sanitized (bluemonday UGC policy) because go-org
+passes raw HTML through — export blocks and inline export snippets —
+while goldmark drops it and needs no pass. The policy admits chroma's
+short token classes and nothing else.
+
 * Web responses
 
 Every response carries =Content-Security-Policy= (no scripts, no plugins,
