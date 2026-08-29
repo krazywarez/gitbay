@@ -16,17 +16,17 @@ const maxBodyBytes = 64 << 10
 
 func init() {
 	register(Command{Path: []string{"issue", "create"},
-		Summary:    "open an issue: issue create <owner/name> --title <t> [--body <b> | --file -]",
+		Summary:    "open an issue: issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
 		Summary: "list issues: issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
 		Summary: "show an issue with comments: issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
 	register(Command{Path: []string{"issue", "edit"},
-		Summary:    "edit title or body: issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -]",
+		Summary:    "edit title or body: issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
-		Summary:    "comment: issue comment <owner/name> <n> [--message <m> | --file -]",
+		Summary:    "comment: issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueComment})
 	register(Command{Path: []string{"issue", "close"},
 		Summary: "close an issue: issue close <owner/name> <n>", Run: runIssueClose})
@@ -76,16 +76,31 @@ func bodyFrom(c *Ctx, inline, file string) (string, error) {
 	return inline, nil
 }
 
+// markupFormat normalizes a --format value. Empty means the caller did not ask,
+// which the caller turns into "md" on create or "unchanged" on edit.
+func markupFormat(v string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "":
+		return "", nil
+	case "md", "markdown":
+		return "md", nil
+	case "org", "org-mode":
+		return "org", nil
+	}
+	return "", fmt.Errorf("unknown --format %q (want md or org)", v)
+}
+
 type issueOut struct {
-	Number    int64    `json:"number"`
-	Title     string   `json:"title"`
-	State     string   `json:"state"`
-	Author    string   `json:"author"`
-	Milestone string   `json:"milestone,omitempty"`
-	Labels    []string `json:"labels,omitempty"`
-	Assignees []string `json:"assignees,omitempty"`
-	Body      string   `json:"body,omitempty"`
-	CreatedAt string   `json:"created_at"`
+	Number     int64    `json:"number"`
+	Title      string   `json:"title"`
+	State      string   `json:"state"`
+	Author     string   `json:"author"`
+	Milestone  string   `json:"milestone,omitempty"`
+	Labels     []string `json:"labels,omitempty"`
+	Assignees  []string `json:"assignees,omitempty"`
+	Body       string   `json:"body,omitempty"`
+	BodyFormat string   `json:"body_format,omitempty"`
+	CreatedAt  string   `json:"created_at"`
 }
 
 func issueToOut(i store.Issue, withBody bool) issueOut {
@@ -93,14 +108,21 @@ func issueToOut(i store.Issue, withBody bool) issueOut {
 		Milestone: i.Milestone, Labels: i.Labels, Assignees: i.Assignees, CreatedAt: i.CreatedAt}
 	if withBody {
 		o.Body = i.Body
+		o.BodyFormat = i.BodyFormat
 	}
 	return o
 }
 
 func runIssueCreate(c *Ctx, args []string) int {
-	var path, title, body, file string
+	var path, title, body, file, format string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--format":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--format requires a value")
+			}
+			format = args[i+1]
+			i++
 		case "--title":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "--title requires a value")
@@ -127,7 +149,14 @@ func runIssueCreate(c *Ctx, args []string) int {
 		}
 	}
 	if path == "" || title == "" {
-		return c.fail(protocol.ExitUsage, "usage: issue create <owner/name> --title <t> [--body <b> | --file -]")
+		return c.fail(protocol.ExitUsage, "usage: issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]")
+	}
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fmtName == "" {
+		fmtName = "md"
 	}
 	// Anyone who can read the repo can file an issue.
 	repo, code := resolveRepo(c, path, policy.CanRead)
@@ -141,7 +170,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	n, err := c.Store.CreateIssue(repo.ID, c.User.ID, title, b)
+	n, err := c.Store.CreateIssue(repo.ID, c.User.ID, title, b, fmtName)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -215,13 +244,14 @@ func runIssueShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	type commentOut struct {
-		Author    string `json:"author"`
-		Body      string `json:"body"`
-		CreatedAt string `json:"created_at"`
+		Author     string `json:"author"`
+		Body       string `json:"body"`
+		BodyFormat string `json:"body_format,omitempty"`
+		CreatedAt  string `json:"created_at"`
 	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.CreatedAt})
+		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
 	}
 	d := struct {
 		issueOut
@@ -247,9 +277,15 @@ func runIssueShow(c *Ctx, args []string) int {
 
 func runIssueComment(c *Ctx, args []string) int {
 	var rest []string
-	var message, file string
+	var message, file, format string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--format":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--format requires a value")
+			}
+			format = args[i+1]
+			i++
 		case "--message":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "--message requires a value")
@@ -266,6 +302,13 @@ func runIssueComment(c *Ctx, args []string) int {
 			rest = append(rest, args[i])
 		}
 	}
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fmtName == "" {
+		fmtName = "md"
+	}
 	repo, issue, code := issueRef(c, rest, policy.CanRead)
 	if code >= 0 {
 		return code
@@ -280,7 +323,7 @@ func runIssueComment(c *Ctx, args []string) int {
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
 	}
-	if err := c.Store.AddIssueComment(issue.ID, c.User.ID, body); err != nil {
+	if err := c.Store.AddIssueComment(issue.ID, c.User.ID, body, fmtName); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.commented", fmt.Sprintf(`{"number":%d}`, issue.Number))
@@ -330,15 +373,16 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	})
 }
 
-// editText parses --title/--body/--file - and authorizes: author or write.
-func editText(c *Ctx, args []string, kind string) (rest []string, title, body *string, code int) {
-	var titleV, bodyV, file string
+// editText parses --title/--body/--file -/--format and authorizes: author or
+// write. A nil format means the stored markup format stays as it is.
+func editText(c *Ctx, args []string, kind string) (rest []string, title, body, format *string, code int) {
+	var titleV, bodyV, file, formatV string
 	haveTitle, haveBody := false, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--title", "--body", "--file":
+		case "--title", "--body", "--file", "--format":
 			if i+1 >= len(args) {
-				return nil, nil, nil, c.fail(protocol.ExitUsage, "%s requires a value", args[i])
+				return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%s requires a value", args[i])
 			}
 			switch args[i] {
 			case "--title":
@@ -347,6 +391,8 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body *s
 				bodyV, haveBody = args[i+1], true
 			case "--file":
 				file = args[i+1]
+			case "--format":
+				formatV = args[i+1]
 			}
 			i++
 		default:
@@ -356,27 +402,34 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body *s
 	if file != "" {
 		b, err := bodyFrom(c, "", file)
 		if err != nil {
-			return nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+			return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
 		}
 		bodyV, haveBody = b, true
 	}
-	if !haveTitle && !haveBody {
-		return nil, nil, nil, c.fail(protocol.ExitUsage, "usage: %s edit <owner/name> <n> [--title <t>] [--body <b> | --file -]", kind)
+	fmtName, err := markupFormat(formatV)
+	if err != nil {
+		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if !haveTitle && !haveBody && fmtName == "" {
+		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "usage: %s edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]", kind)
 	}
 	if haveTitle {
 		if strings.TrimSpace(titleV) == "" {
-			return nil, nil, nil, c.fail(protocol.ExitUsage, "--title must not be empty")
+			return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "--title must not be empty")
 		}
 		title = &titleV
 	}
 	if haveBody {
 		body = &bodyV
 	}
-	return rest, title, body, -1
+	if fmtName != "" {
+		format = &fmtName
+	}
+	return rest, title, body, format, -1
 }
 
 func runIssueEdit(c *Ctx, args []string) int {
-	rest, title, body, code := editText(c, args, "issue")
+	rest, title, body, format, code := editText(c, args, "issue")
 	if code >= 0 {
 		return code
 	}
@@ -394,7 +447,7 @@ func runIssueEdit(c *Ctx, args []string) int {
 	if issue.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
 		return c.fail(protocol.ExitDenied, "only the author or users with write access can edit this issue")
 	}
-	if err := c.Store.UpdateIssueText(issue.ID, title, body); err != nil {
+	if err := c.Store.UpdateIssueText(issue.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]any{"number": issue.Number}, func(w io.Writer) {

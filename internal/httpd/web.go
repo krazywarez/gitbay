@@ -571,7 +571,7 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 	}
 	var views []relView
 	for _, rel := range rels {
-		views = append(views, relView{rel, md(rel.Notes)})
+		views = append(views, relView{rel, md(rel.Notes, rel.NotesFormat)})
 	}
 	// Tags without a release yet are what a create form can offer.
 	released := map[string]bool{}
@@ -1049,16 +1049,37 @@ func (r webResolver) UserURL(name string) string {
 	return ""
 }
 
-// ugcFor returns a renderer for user-authored markdown on one repo's pages:
-// mdHTML plus cross-reference and mention autolinking for this viewer.
-func (s *Server) ugcFor(r *http.Request, repo store.Repo) func(string) template.HTML {
+// ugcRenderer renders one user-authored body in the format it was written in.
+// The format travels with the body: it is recorded when the text is written, so
+// changing a preference later cannot re-interpret prose that already exists.
+type ugcRenderer func(raw, format string) template.HTML
+
+// ugcHTML renders a user-authored body. Anything other than "org" is markdown,
+// so a body stored before formats existed — and any row whose column defaulted —
+// renders exactly as it did before.
+//
+// Org goes through renderReadme, the same path READMEs, wiki pages and profile
+// about text take, so it inherits that function's include guard and sanitising
+// rather than growing a second org renderer to keep in step.
+func ugcHTML(raw, format string) template.HTML {
+	if format == "org" {
+		return renderOrg("body.org", []byte(raw), false, func() template.HTML {
+			return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
+		})
+	}
+	return mdHTML(raw)
+}
+
+// ugcFor returns a renderer for user-authored bodies on one repo's pages:
+// ugcHTML plus cross-reference and mention autolinking for this viewer.
+func (s *Server) ugcFor(r *http.Request, repo store.Repo) ugcRenderer {
 	viewer := store.User{}
 	if s.cfg.Web.Mode == "accounts" {
 		viewer = s.viewer(r)
 	}
 	res := webResolver{s, viewer}
-	return func(raw string) template.HTML {
-		h := mdHTML(raw)
+	return func(raw, format string) template.HTML {
+		h := ugcHTML(raw, format)
 		if h == "" {
 			return h
 		}
@@ -1074,10 +1095,10 @@ type renderedComment struct {
 	BodyHTML  template.HTML
 }
 
-func renderComments(cs []store.IssueComment, md func(string) template.HTML) []renderedComment {
+func renderComments(cs []store.IssueComment, ugc ugcRenderer) []renderedComment {
 	var out []renderedComment
 	for _, c := range cs {
-		out = append(out, renderedComment{c.Author, c.CreatedAt, c.Kind, md(c.Body)})
+		out = append(out, renderedComment{c.Author, c.CreatedAt, c.Kind, ugc(c.Body, c.BodyFormat)})
 	}
 	return out
 }
@@ -1121,6 +1142,31 @@ func orgConfig() *org.Configuration {
 
 var errOrgIncludeDisabled = errors.New("org: #+INCLUDE and #+SETUPFILE are disabled")
 
+// renderOrg renders org to sanitized HTML. `contents` asks go-org for its table
+// of contents: a README or wiki page is a document and carries one, an issue
+// comment is a remark and should not sprout one above two headings. `fallback`
+// supplies the plaintext rendering used when the writer fails.
+func renderOrg(name string, raw []byte, contents bool, fallback func() template.HTML) template.HTML {
+	c := orgConfig()
+	if !contents {
+		// DefaultSettings is a fresh map per org.New(), so this is local.
+		c.DefaultSettings["OPTIONS"] = strings.ReplaceAll(c.DefaultSettings["OPTIONS"], "toc:t", "toc:nil")
+	}
+	doc := c.Parse(bytes.NewReader(raw), name)
+	writer := org.NewHTMLWriter()
+	writer.HighlightCodeBlock = func(source, lang string, inline bool, params map[string]string) string {
+		if inline {
+			return "<code>" + template.HTMLEscapeString(source) + "</code>"
+		}
+		return fenceHighlight(source, lang)
+	}
+	out, err := doc.Write(writer)
+	if err != nil {
+		return fallback()
+	}
+	return template.HTML(ugcPolicy.Sanitize(out))
+}
+
 func renderReadme(name string, raw []byte) template.HTML {
 	plain := func() template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(raw)) + "</pre>")
@@ -1136,19 +1182,7 @@ func renderReadme(name string, raw []byte) template.HTML {
 		}
 		return template.HTML(buf.String())
 	case ".org":
-		doc := orgConfig().Parse(bytes.NewReader(raw), name)
-		writer := org.NewHTMLWriter()
-		writer.HighlightCodeBlock = func(source, lang string, inline bool, params map[string]string) string {
-			if inline {
-				return "<code>" + template.HTMLEscapeString(source) + "</code>"
-			}
-			return fenceHighlight(source, lang)
-		}
-		out, err := doc.Write(writer)
-		if err != nil {
-			return plain()
-		}
-		return template.HTML(ugcPolicy.Sanitize(out))
+		return renderOrg(name, raw, true, plain)
 	case ".html", ".htm":
 		return template.HTML(ugcPolicy.Sanitize(string(raw)))
 	default:
@@ -1166,23 +1200,25 @@ type diffThread struct {
 // attachThreads injects review threads under their anchored diff lines;
 // threads whose anchor no longer appears (stale after force-push, or on a
 // context line outside the current diff) are returned separately.
-func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md func(string) template.HTML) ([]diffFile, []diffThread) {
+func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md ugcRenderer) ([]diffFile, []diffThread) {
 	type anchor struct {
 		path string
 		side string
 		line int64
 	}
+	// Diff-line comments have no stored format yet, so they stay markdown.
+	// They are the one user-authored body left without the choice; see #51.
 	threads := map[int64]*diffThread{}
 	anchors := map[int64]anchor{}
 	var order []int64
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
-				Comments: []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body)}}}
+				Comments: []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
 			order = append(order, cm.ID)
 		} else if th, ok := threads[cm.ReplyTo]; ok {
-			th.Comments = append(th.Comments, renderedComment{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body)})
+			th.Comments = append(th.Comments, renderedComment{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")})
 		}
 	}
 	placed := map[int64]bool{}
@@ -1445,7 +1481,7 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		Milestones  []store.Milestone
 		Notice      string
 		LabelColors map[string]template.CSS
-	}{p, iss, md(iss.Body), renderComments(comments, md),
+	}{p, iss, md(iss.Body, iss.BodyFormat), renderComments(comments, md),
 		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
 		milestones, r.URL.Query().Get("e"), s.labelColors(p.Repo.ID)})
 }
@@ -1594,7 +1630,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Unresolved      int
 		Notice          string
 		DetachedThreads []diffThread
-	}{p, m, view, md(m.Body), checks, store.CombinedStatus(checks), renderComments(comments, md),
+	}{p, m, view, md(m.Body, m.BodyFormat), checks, store.CombinedStatus(checks), renderComments(comments, md),
 		reviews, files, stat, commits, s.canEditItem(r, p.Repo, m.Author),
 		s.canWriteRepo(r, p.Repo), unresolved, r.URL.Query().Get("e"), detachedThreads})
 }

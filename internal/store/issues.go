@@ -8,30 +8,32 @@ import (
 )
 
 type Issue struct {
-	ID        int64
-	RepoID    int64
-	Number    int64
-	Author    string
-	Title     string
-	Body      string
-	State     string // open | closed
-	Milestone string
-	CreatedAt string
-	UpdatedAt string
-	Labels    []string
-	Assignees []string
+	ID         int64
+	RepoID     int64
+	Number     int64
+	Author     string
+	Title      string
+	Body       string
+	BodyFormat string // md | org
+	State      string // open | closed
+	Milestone  string
+	CreatedAt  string
+	UpdatedAt  string
+	Labels     []string
+	Assignees  []string
 }
 
 type IssueComment struct {
-	Author    string
-	Body      string
-	CreatedAt string
-	Kind      string // comment | system
+	Author     string
+	Body       string
+	BodyFormat string // md | org
+	CreatedAt  string
+	Kind       string // comment | system
 }
 
 // CreateIssue allocates the per-repo number from the repo counter inside the
 // same transaction as the insert — MAX(number)+1 races.
-func (s *Store) CreateIssue(repoID, authorID int64, title, body string) (int64, error) {
+func (s *Store) CreateIssue(repoID, authorID int64, title, body, format string) (int64, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -45,8 +47,8 @@ func (s *Store) CreateIssue(repoID, authorID int64, title, body string) (int64, 
 		return 0, err
 	}
 	if _, err := tx.Exec(
-		"INSERT INTO issues (repo_id, number, author_id, title, body) VALUES (?, ?, ?, ?, ?)",
-		repoID, n, authorID, title, body); err != nil {
+		"INSERT INTO issues (repo_id, number, author_id, title, body, body_format) VALUES (?, ?, ?, ?, ?, ?)",
+		repoID, n, authorID, title, body, format); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()
@@ -55,12 +57,12 @@ func (s *Store) CreateIssue(repoID, authorID int64, title, body string) (int64, 
 func (s *Store) IssueByNumber(repoID, number int64) (Issue, error) {
 	var i Issue
 	err := s.DB.QueryRow(`
-		SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state,
+		SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.body_format, i.state,
 		       COALESCE(m.title, ''), i.created_at, i.updated_at
 		FROM issues i JOIN users u ON u.id = i.author_id
 		LEFT JOIN milestones m ON m.id = i.milestone_id
 		WHERE i.repo_id = ? AND i.number = ?`, repoID, number).
-		Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt)
+		Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.BodyFormat, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return i, ErrNotFound
 	}
@@ -99,7 +101,7 @@ func (s *Store) issueStrings(issueID int64, query string) ([]string, error) {
 // "all". limit 0 means everything; before (an issue number) starts the
 // page strictly below it, matching the number-descending order.
 func (s *Store) ListIssues(repoID int64, state string, limit int, before int64) ([]Issue, error) {
-	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.state,
+	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.body_format, i.state,
 	             COALESCE(m.title, ''), i.created_at, i.updated_at
 	      FROM issues i JOIN users u ON u.id = i.author_id
 	      LEFT JOIN milestones m ON m.id = i.milestone_id
@@ -126,7 +128,7 @@ func (s *Store) ListIssues(repoID int64, state string, limit int, before int64) 
 	var out []Issue
 	for rows.Next() {
 		var i Issue
-		if err := rows.Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.RepoID, &i.Number, &i.Author, &i.Title, &i.Body, &i.BodyFormat, &i.State, &i.Milestone, &i.CreatedAt, &i.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, i)
@@ -134,14 +136,18 @@ func (s *Store) ListIssues(repoID int64, state string, limit int, before int64) 
 	return out, rows.Err()
 }
 
-// UpdateIssueText edits title and/or body; nil leaves a field unchanged.
-func (s *Store) UpdateIssueText(issueID int64, title, body *string) error {
+// UpdateIssueText edits title, body, and/or markup format; nil leaves a field
+// unchanged.
+func (s *Store) UpdateIssueText(issueID int64, title, body, format *string) error {
 	set, args := []string{}, []any{}
 	if title != nil {
 		set, args = append(set, "title = ?"), append(args, *title)
 	}
 	if body != nil {
 		set, args = append(set, "body = ?"), append(args, *body)
+	}
+	if format != nil {
+		set, args = append(set, "body_format = ?"), append(args, *format)
 	}
 	if len(set) == 0 {
 		return nil
@@ -171,15 +177,15 @@ func (s *Store) SetIssueState(issueID int64, state string) error {
 	return nil
 }
 
-func (s *Store) AddIssueComment(issueID, authorID int64, body string) error {
+func (s *Store) AddIssueComment(issueID, authorID int64, body, format string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(
-		"INSERT INTO issue_comments (issue_id, author_id, body) VALUES (?, ?, ?)",
-		issueID, authorID, body); err != nil {
+		"INSERT INTO issue_comments (issue_id, author_id, body, body_format) VALUES (?, ?, ?, ?)",
+		issueID, authorID, body, format); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(
@@ -192,7 +198,7 @@ func (s *Store) AddIssueComment(issueID, authorID int64, body string) error {
 func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
 		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
-		       c.body, c.created_at, c.kind
+		       c.body, c.body_format, c.created_at, c.kind
 		FROM issue_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.issue_id = ? ORDER BY c.id`, issueID)
 	if err != nil {
@@ -202,7 +208,7 @@ func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt, &c.Kind); err != nil {
+		if err := rows.Scan(&c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

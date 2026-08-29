@@ -227,7 +227,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 				continue
 			}
 			body := migAttribution(src, "issue", bi.Author, bi.CreatedAt, bi.Number) + bi.Body
-			n, err := c.Store.CreateIssue(repo.ID, c.User.ID, bi.Title, body)
+			n, err := c.Store.CreateIssue(repo.ID, c.User.ID, bi.Title, body, "md")
 			if err != nil {
 				return c.fail(protocol.ExitFailure, "%v", err)
 			}
@@ -243,7 +243,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 			}
 			for _, cm := range bi.Comments {
 				c.Store.AddIssueComment(iss.ID, c.User.ID,
-					fmt.Sprintf("> %s, %.10s\n\n%s", cm.Author, cm.CreatedAt, cm.Body))
+					fmt.Sprintf("> %s, %.10s\n\n%s", cm.Author, cm.CreatedAt, cm.Body), "md")
 				comments++
 			}
 			c.Store.SetImportMarker(repo.ID, key, fmt.Sprint(n))
@@ -256,7 +256,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 				continue
 			}
 			body := migAttribution(src, "merge request", bm.Author, bm.CreatedAt, bm.Number) + bm.Body
-			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, "")
+			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, "", "md")
 			if err != nil {
 				return c.fail(protocol.ExitFailure, "%v", err)
 			}
@@ -273,7 +273,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 			}
 			for _, cm := range bm.Comments {
 				c.Store.AddMRComment(mr.ID, c.User.ID,
-					fmt.Sprintf("> %s, %.10s\n\n%s", cm.Author, cm.CreatedAt, cm.Body))
+					fmt.Sprintf("> %s, %.10s\n\n%s", cm.Author, cm.CreatedAt, cm.Body), "md")
 				comments++
 			}
 			c.Store.SetImportMarker(repo.ID, key, fmt.Sprint(n))

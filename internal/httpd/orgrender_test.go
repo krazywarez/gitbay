@@ -112,3 +112,56 @@ func TestOrgRenderingIsUnaffectedByTheIncludeGuard(t *testing.T) {
 		}
 	}
 }
+
+// Bodies — issues, MRs, comments, release notes — render in the format they
+// were written in. The format travels with the text, so anything stored before
+// formats existed still renders as markdown.
+
+func TestUGCHTMLRendersOrgWhenAsked(t *testing.T) {
+	out := string(ugcHTML("* Heading\n\nSome /emphasis/ and =code=.", "org"))
+
+	if !strings.Contains(out, "<em>emphasis</em>") || !strings.Contains(out, "<code>code</code>") {
+		t.Errorf("org body did not render as org:\n%s", out)
+	}
+	if strings.Contains(out, "* Heading") {
+		t.Errorf("org heading left as literal text:\n%s", out)
+	}
+}
+
+func TestUGCHTMLDefaultsToMarkdown(t *testing.T) {
+	// "" is what every row written before the format column existed carries.
+	for _, format := range []string{"", "md"} {
+		out := string(ugcHTML("A **bold** claim.", format))
+		if !strings.Contains(out, "<strong>bold</strong>") {
+			t.Errorf("format %q did not render as markdown:\n%s", format, out)
+		}
+	}
+}
+
+// An org body is not a document, so it should not grow a table of contents the
+// way a README does.
+func TestUGCHTMLOmitsTheTableOfContents(t *testing.T) {
+	body := "* First\n\ntext\n\n* Second\n\nmore\n"
+
+	// The heading anchors themselves are section ids; a link *to* one is the
+	// table of contents, which is what a body must not grow.
+	if out := string(ugcHTML(body, "org")); strings.Contains(out, `href="#headline-1"`) {
+		t.Errorf("body sprouted a table of contents:\n%s", out)
+	}
+	// A README still gets one.
+	if out := string(renderReadme("README.org", []byte(body))); !strings.Contains(out, `href="#headline-1"`) {
+		t.Errorf("README lost its table of contents:\n%s", out)
+	}
+}
+
+// Bodies are the lowest-trust org on the instance: repo content needs push
+// access, but anyone who can comment can write one. The include guard must
+// cover them.
+func TestUGCHTMLOrgCannotReadServerFiles(t *testing.T) {
+	path := secretFile(t)
+	body := "#+INCLUDE: \"" + path + "\" src text\n"
+
+	if out := string(ugcHTML(body, "org")); strings.Contains(out, orgSecret) {
+		t.Fatalf("an org body read a server file:\n%s", out)
+	}
+}

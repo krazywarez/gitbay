@@ -17,6 +17,7 @@ type MR struct {
 	TargetRef    string
 	Title        string
 	Body         string
+	BodyFormat   string // md | org
 	State        string // open | merged | closed | source_gone
 	Milestone    string
 	HeadSHA      string
@@ -33,7 +34,7 @@ type MRReview struct {
 	CreatedAt string
 }
 
-func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, targetRef, title, body, headSHA string) (int64, error) {
+func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, targetRef, title, body, headSHA, format string) (int64, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -47,9 +48,9 @@ func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, target
 		return 0, err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO merge_requests (repo_id, number, author_id, source_repo_id, source_ref, target_ref, title, body, head_sha)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA); err != nil {
+		INSERT INTO merge_requests (repo_id, number, author_id, source_repo_id, source_ref, target_ref, title, body, head_sha, body_format)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA, format); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()
@@ -59,7 +60,7 @@ const mrSelect = `
 	SELECT m.id, m.repo_id, m.number, u.username,
 	       COALESCE(m.source_repo_id, 0),
 	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
-	       m.source_ref, m.target_ref, m.title, m.body, m.state,
+	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state,
 	       COALESCE(ms.title, ''), m.head_sha,
 	       m.merged_base, m.created_at, m.updated_at
 	FROM merge_requests m
@@ -72,7 +73,7 @@ const mrSelect = `
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
-		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase, &m.CreatedAt, &m.UpdatedAt)
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase, &m.CreatedAt, &m.UpdatedAt)
 	return m, err
 }
 
@@ -191,20 +192,25 @@ func (s *Store) MarkSourceGoneForRepo(sourceRepoID int64) error {
 	return err
 }
 
-func (s *Store) AddMRComment(mrID, authorID int64, body string) error {
+func (s *Store) AddMRComment(mrID, authorID int64, body, format string) error {
 	_, err := s.DB.Exec(
-		"INSERT INTO mr_comments (mr_id, author_id, body) VALUES (?, ?, ?)", mrID, authorID, body)
+		"INSERT INTO mr_comments (mr_id, author_id, body, body_format) VALUES (?, ?, ?, ?)",
+		mrID, authorID, body, format)
 	return err
 }
 
-// UpdateMRText edits title and/or body; nil leaves a field unchanged.
-func (s *Store) UpdateMRText(mrID int64, title, body *string) error {
+// UpdateMRText edits title, body, and/or markup format; nil leaves a field
+// unchanged.
+func (s *Store) UpdateMRText(mrID int64, title, body, format *string) error {
 	set, args := []string{}, []any{}
 	if title != nil {
 		set, args = append(set, "title = ?"), append(args, *title)
 	}
 	if body != nil {
 		set, args = append(set, "body = ?"), append(args, *body)
+	}
+	if format != nil {
+		set, args = append(set, "body_format = ?"), append(args, *format)
 	}
 	if len(set) == 0 {
 		return nil
@@ -232,7 +238,7 @@ func (s *Store) AddMRSystemComment(mrID, actorID int64, body string) error {
 func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
 		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
-		       c.body, c.created_at, c.kind
+		       c.body, c.body_format, c.created_at, c.kind
 		FROM mr_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.mr_id = ? ORDER BY c.id`, mrID)
 	if err != nil {
@@ -242,7 +248,7 @@ func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.CreatedAt, &c.Kind); err != nil {
+		if err := rows.Scan(&c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

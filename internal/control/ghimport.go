@@ -184,7 +184,7 @@ func runImportIssues(c *Ctx, args []string) int {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
 				body := attribution(src, it.Number, "pull request", it.User.Login, it.CreatedAt) + it.Body
-				localN, err = c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, pr.Head.Ref, pr.Base.Ref, it.Title, body, pr.Head.SHA)
+				localN, err = c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, pr.Head.Ref, pr.Base.Ref, it.Title, body, pr.Head.SHA, "md")
 				if err != nil {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
@@ -206,7 +206,7 @@ func runImportIssues(c *Ctx, args []string) int {
 				mrs++
 			} else {
 				body := attribution(src, it.Number, "issue", it.User.Login, it.CreatedAt) + it.Body
-				localN, err = c.Store.CreateIssue(repo.ID, c.User.ID, it.Title, body)
+				localN, err = c.Store.CreateIssue(repo.ID, c.User.ID, it.Title, body, "md")
 				if err != nil {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
@@ -276,9 +276,9 @@ func importComments(c *Ctx, g *ghClient, repo store.Repo, from, src string, ghN,
 			body := fmt.Sprintf("> @%s, %s\n\n%s", cm.User.Login, ghDate(cm.CreatedAt), cm.Body)
 			var err error
 			if isPR {
-				err = c.Store.AddMRComment(localMRID, c.User.ID, body)
+				err = c.Store.AddMRComment(localMRID, c.User.ID, body, "md")
 			} else {
-				err = c.Store.AddIssueComment(localIssueID, c.User.ID, body)
+				err = c.Store.AddIssueComment(localIssueID, c.User.ID, body, "md")
 			}
 			if err != nil {
 				return imported, err

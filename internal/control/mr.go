@@ -27,7 +27,7 @@ func init() {
 	register(Command{Path: []string{"repo", "settings", "require-signed"},
 		Summary: "require verified commit signatures: repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
 	register(Command{Path: []string{"mr", "create"},
-		Summary:    "open a merge request: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -]",
+		Summary:    "open a merge request: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
@@ -36,10 +36,10 @@ func init() {
 	register(Command{Path: []string{"mr", "diff"},
 		Summary: "show the diff: mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
 	register(Command{Path: []string{"mr", "edit"},
-		Summary:    "edit title or body: mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -]",
+		Summary:    "edit title or body: mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMREdit})
 	register(Command{Path: []string{"mr", "comment"},
-		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -]",
+		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMRComment})
 	register(Command{Path: []string{"mr", "review"},
 		Summary: "review: mr review <owner/name> <n> --approve|--request-changes|--comment", Run: runMRReview})
@@ -210,10 +210,10 @@ func mrRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool
 func mrHeadRef(n int64) string { return fmt.Sprintf("refs/merge-requests/%d/head", n) }
 
 func runMRCreate(c *Ctx, args []string) int {
-	var path, source, target, title, body, file string
+	var path, source, target, title, body, file, format string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--source", "--target", "--title", "--body", "--file":
+		case "--source", "--target", "--title", "--body", "--file", "--format":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
 			}
@@ -229,6 +229,8 @@ func runMRCreate(c *Ctx, args []string) int {
 				body = v
 			case "--file":
 				file = v
+			case "--format":
+				format = v
 			}
 			i++
 		default:
@@ -240,6 +242,13 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	if path == "" || source == "" || title == "" {
 		return c.fail(protocol.ExitUsage, "usage: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t>")
+	}
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fmtName == "" {
+		fmtName = "md"
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -275,7 +284,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA)
+	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA, fmtName)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -295,16 +304,17 @@ func runMRCreate(c *Ctx, args []string) int {
 }
 
 type mrOut struct {
-	Number    int64  `json:"number"`
-	Title     string `json:"title"`
-	State     string `json:"state"`
-	Author    string `json:"author"`
-	Source    string `json:"source"` // owner/name:branch, or branch, "" if gone
-	TargetRef string `json:"target_ref"`
-	HeadSHA   string `json:"head_sha"`
-	Body      string `json:"body,omitempty"`
-	Milestone string `json:"milestone,omitempty"`
-	CreatedAt string `json:"created_at"`
+	Number     int64  `json:"number"`
+	Title      string `json:"title"`
+	State      string `json:"state"`
+	Author     string `json:"author"`
+	Source     string `json:"source"` // owner/name:branch, or branch, "" if gone
+	TargetRef  string `json:"target_ref"`
+	HeadSHA    string `json:"head_sha"`
+	Body       string `json:"body,omitempty"`
+	BodyFormat string `json:"body_format,omitempty"`
+	Milestone  string `json:"milestone,omitempty"`
+	CreatedAt  string `json:"created_at"`
 }
 
 func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
@@ -321,6 +331,7 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 		CreatedAt: m.CreatedAt}
 	if withBody {
 		o.Body = m.Body
+		o.BodyFormat = m.BodyFormat
 	}
 	return o
 }
@@ -398,9 +409,10 @@ func runMRShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	type commentOut struct {
-		Author    string `json:"author"`
-		Body      string `json:"body"`
-		CreatedAt string `json:"created_at"`
+		Author     string `json:"author"`
+		Body       string `json:"body"`
+		BodyFormat string `json:"body_format,omitempty"`
+		CreatedAt  string `json:"created_at"`
 	}
 	type reviewOut struct {
 		Reviewer string `json:"reviewer"`
@@ -418,7 +430,7 @@ func runMRShow(c *Ctx, args []string) int {
 	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.CreatedAt})
+		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
 	}
 	var rs []reviewOut
 	for _, r := range reviews {
@@ -512,7 +524,7 @@ func runMRDiff(c *Ctx, args []string) int {
 }
 
 func runMREdit(c *Ctx, args []string) int {
-	rest, title, body, code := editText(c, args, "mr")
+	rest, title, body, format, code := editText(c, args, "mr")
 	if code >= 0 {
 		return code
 	}
@@ -530,7 +542,7 @@ func runMREdit(c *Ctx, args []string) int {
 	if mr.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
 		return c.fail(protocol.ExitDenied, "only the author or users with write access can edit this merge request")
 	}
-	if err := c.Store.UpdateMRText(mr.ID, title, body); err != nil {
+	if err := c.Store.UpdateMRText(mr.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
@@ -540,22 +552,32 @@ func runMREdit(c *Ctx, args []string) int {
 
 func runMRComment(c *Ctx, args []string) int {
 	var rest []string
-	var message, file string
+	var message, file, format string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--message", "--file":
+		case "--message", "--file", "--format":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
 			}
-			if args[i] == "--message" {
+			switch args[i] {
+			case "--message":
 				message = args[i+1]
-			} else {
+			case "--file":
 				file = args[i+1]
+			case "--format":
+				format = args[i+1]
 			}
 			i++
 		default:
 			rest = append(rest, args[i])
 		}
+	}
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fmtName == "" {
+		fmtName = "md"
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanRead)
 	if code >= 0 {
@@ -571,7 +593,7 @@ func runMRComment(c *Ctx, args []string) int {
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
 	}
-	if err := c.Store.AddMRComment(mr.ID, c.User.ID, body); err != nil {
+	if err := c.Store.AddMRComment(mr.ID, c.User.ID, body, fmtName); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.commented", fmt.Sprintf(`{"number":%d}`, mr.Number))

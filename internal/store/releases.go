@@ -7,14 +7,15 @@ import (
 )
 
 type Release struct {
-	ID        int64
-	RepoID    int64
-	Tag       string
-	Title     string
-	Notes     string
-	Author    string
-	CreatedAt string
-	Assets    []ReleaseAsset
+	ID          int64
+	RepoID      int64
+	Tag         string
+	Title       string
+	Notes       string
+	NotesFormat string // md | org
+	Author      string
+	CreatedAt   string
+	Assets      []ReleaseAsset
 }
 
 type ReleaseAsset struct {
@@ -25,10 +26,10 @@ type ReleaseAsset struct {
 	UploadedAt string
 }
 
-func (s *Store) CreateRelease(repoID int64, tag, title, notes string, authorID int64) (int64, error) {
+func (s *Store) CreateRelease(repoID int64, tag, title, notes string, authorID int64, format string) (int64, error) {
 	res, err := s.DB.Exec(
-		"INSERT INTO releases (repo_id, tag, title, notes, author_id) VALUES (?, ?, ?, ?, ?)",
-		repoID, tag, title, notes, authorID)
+		"INSERT INTO releases (repo_id, tag, title, notes, author_id, notes_format) VALUES (?, ?, ?, ?, ?, ?)",
+		repoID, tag, title, notes, authorID, format)
 	if err != nil {
 		if isUniqueErr(err) {
 			return 0, fmt.Errorf("a release for tag %q already exists", tag)
@@ -39,7 +40,7 @@ func (s *Store) CreateRelease(repoID int64, tag, title, notes string, authorID i
 }
 
 const releaseSelect = `
-	SELECT r.id, r.repo_id, r.tag, r.title, r.notes, COALESCE(u.username, ''), r.created_at
+	SELECT r.id, r.repo_id, r.tag, r.title, r.notes, r.notes_format, COALESCE(u.username, ''), r.created_at
 	FROM releases r LEFT JOIN users u ON u.id = r.author_id`
 
 func (s *Store) releaseAssets(rel *Release) error {
@@ -60,11 +61,11 @@ func (s *Store) releaseAssets(rel *Release) error {
 	return rows.Err()
 }
 
-// UpdateRelease replaces a release's title and notes.
-func (s *Store) UpdateRelease(repoID int64, tag, title, notes string) error {
+// UpdateRelease replaces a release's title, notes, and markup format.
+func (s *Store) UpdateRelease(repoID int64, tag, title, notes, format string) error {
 	res, err := s.DB.Exec(
-		"UPDATE releases SET title = ?, notes = ? WHERE repo_id = ? AND tag = ?",
-		title, notes, repoID, tag)
+		"UPDATE releases SET title = ?, notes = ?, notes_format = ? WHERE repo_id = ? AND tag = ?",
+		title, notes, format, repoID, tag)
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func (s *Store) UpdateRelease(repoID int64, tag, title, notes string) error {
 func (s *Store) ReleaseByTag(repoID int64, tag string) (Release, error) {
 	var r Release
 	err := s.DB.QueryRow(releaseSelect+" WHERE r.repo_id = ? AND r.tag = ?", repoID, tag).
-		Scan(&r.ID, &r.RepoID, &r.Tag, &r.Title, &r.Notes, &r.Author, &r.CreatedAt)
+		Scan(&r.ID, &r.RepoID, &r.Tag, &r.Title, &r.Notes, &r.NotesFormat, &r.Author, &r.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return r, ErrNotFound
 	}
@@ -97,7 +98,7 @@ func (s *Store) ListReleases(repoID int64) ([]Release, error) {
 	var out []Release
 	for rows.Next() {
 		var r Release
-		if err := rows.Scan(&r.ID, &r.RepoID, &r.Tag, &r.Title, &r.Notes, &r.Author, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.RepoID, &r.Tag, &r.Title, &r.Notes, &r.NotesFormat, &r.Author, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

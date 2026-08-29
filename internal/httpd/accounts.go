@@ -295,7 +295,7 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 		http.Error(w, "title required", http.StatusBadRequest)
 		return
 	}
-	n, err := s.st.CreateIssue(repo.ID, u.ID, title, r.FormValue("body"))
+	n, err := s.st.CreateIssue(repo.ID, u.ID, title, r.FormValue("body"), "md")
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -340,7 +340,7 @@ func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store
 		return
 	}
 	body := r.FormValue("body")
-	if err := s.st.UpdateIssueText(iss.ID, &title, &body); err != nil {
+	if err := s.st.UpdateIssueText(iss.ID, &title, &body, nil); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -381,7 +381,7 @@ func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.Us
 		return
 	}
 	body := r.FormValue("body")
-	if err := s.st.UpdateMRText(m.ID, &title, &body); err != nil {
+	if err := s.st.UpdateMRText(m.ID, &title, &body, nil); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -404,7 +404,7 @@ func (s *Server) issueCommentSubmit(w http.ResponseWriter, r *http.Request, u st
 		http.Error(w, "empty comment", http.StatusBadRequest)
 		return
 	}
-	if err := s.st.AddIssueComment(iss.ID, u.ID, body); err != nil {
+	if err := s.st.AddIssueComment(iss.ID, u.ID, body, "md"); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -428,7 +428,7 @@ func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store
 		http.Error(w, "empty comment", http.StatusBadRequest)
 		return
 	}
-	if err := s.st.AddMRComment(m.ID, u.ID, body); err != nil {
+	if err := s.st.AddMRComment(m.ID, u.ID, body, "md"); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

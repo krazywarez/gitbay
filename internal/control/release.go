@@ -19,10 +19,10 @@ import (
 
 func init() {
 	register(Command{Path: []string{"release", "create"},
-		Summary:    "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
+		Summary:    "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runReleaseCreate})
 	register(Command{Path: []string{"release", "edit"},
-		Summary:    "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]",
+		Summary:    "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
 		Summary: "list releases: release list <owner/name>", ReadOnly: true, Run: runReleaseList})
@@ -68,10 +68,11 @@ func releaseRef(c *Ctx, args []string, perm func(store.User, store.Repo, string)
 }
 
 func runReleaseCreate(c *Ctx, args []string) int {
-	var path, tag, title, notes, file string
+	const usage = "usage: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
+	var path, tag, title, notes, file, format string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--title", "--notes", "--file":
+		case "--title", "--notes", "--file", "--format":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
 			}
@@ -82,6 +83,8 @@ func runReleaseCreate(c *Ctx, args []string) int {
 				notes = args[i+1]
 			case "--file":
 				file = args[i+1]
+			case "--format":
+				format = args[i+1]
 			}
 			i++
 		default:
@@ -90,12 +93,19 @@ func runReleaseCreate(c *Ctx, args []string) int {
 			} else if tag == "" {
 				tag = args[i]
 			} else {
-				return c.fail(protocol.ExitUsage, "usage: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]")
+				return c.fail(protocol.ExitUsage, usage)
 			}
 		}
 	}
 	if path == "" || tag == "" {
-		return c.fail(protocol.ExitUsage, "usage: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -]")
+		return c.fail(protocol.ExitUsage, usage)
+	}
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fmtName == "" {
+		fmtName = "md"
 	}
 	repo, code := resolveRepo(c, path, policy.CanWrite)
 	if code >= 0 {
@@ -115,7 +125,7 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	if title == "" {
 		title = tag
 	}
-	if _, err := c.Store.CreateRelease(repo.ID, tag, title, body, c.User.ID); err != nil {
+	if _, err := c.Store.CreateRelease(repo.ID, tag, title, body, c.User.ID, fmtName); err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "release.created", fmt.Sprintf(`{"tag":%q}`, tag))
@@ -131,18 +141,20 @@ type assetOut struct {
 }
 
 type releaseOut struct {
-	Tag       string     `json:"tag"`
-	Title     string     `json:"title"`
-	Notes     string     `json:"notes,omitempty"`
-	Author    string     `json:"author,omitempty"`
-	CreatedAt string     `json:"created_at"`
-	Assets    []assetOut `json:"assets,omitempty"`
+	Tag         string     `json:"tag"`
+	Title       string     `json:"title"`
+	Notes       string     `json:"notes,omitempty"`
+	NotesFormat string     `json:"notes_format,omitempty"`
+	Author      string     `json:"author,omitempty"`
+	CreatedAt   string     `json:"created_at"`
+	Assets      []assetOut `json:"assets,omitempty"`
 }
 
 func releaseToOut(r store.Release, withNotes bool) releaseOut {
 	o := releaseOut{Tag: r.Tag, Title: r.Title, Author: r.Author, CreatedAt: r.CreatedAt}
 	if withNotes {
 		o.Notes = r.Notes
+		o.NotesFormat = r.NotesFormat
 	}
 	for _, a := range r.Assets {
 		o.Assets = append(o.Assets, assetOut{a.Name, a.Size, a.SHA256})
@@ -151,12 +163,12 @@ func releaseToOut(r store.Release, withNotes bool) releaseOut {
 }
 
 func runReleaseEdit(c *Ctx, args []string) int {
-	const usage = "usage: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -]"
-	var path, tag, title, notes, file string
+	const usage = "usage: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
+	var path, tag, title, notes, file, format string
 	var setTitle, setNotes bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--title", "--notes", "--file":
+		case "--title", "--notes", "--file", "--format":
 			if i+1 >= len(args) {
 				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
 			}
@@ -167,6 +179,8 @@ func runReleaseEdit(c *Ctx, args []string) int {
 				notes, setNotes = args[i+1], true
 			case "--file":
 				file, setNotes = args[i+1], true
+			case "--format":
+				format = args[i+1]
 			}
 			i++
 		default:
@@ -179,7 +193,11 @@ func runReleaseEdit(c *Ctx, args []string) int {
 			}
 		}
 	}
-	if path == "" || tag == "" || (!setTitle && !setNotes) {
+	fmtName, err := markupFormat(format)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if path == "" || tag == "" || (!setTitle && !setNotes && fmtName == "") {
 		return c.fail(protocol.ExitUsage, usage)
 	}
 	repo, code := resolveRepo(c, path, policy.CanWrite)
@@ -205,7 +223,10 @@ func runReleaseEdit(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitUsage, "%v", err)
 		}
 	}
-	if err := c.Store.UpdateRelease(repo.ID, tag, title, body); err != nil {
+	if fmtName == "" {
+		fmtName = rel.NotesFormat
+	}
+	if err := c.Store.UpdateRelease(repo.ID, tag, title, body, fmtName); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]string{"tag": tag, "title": title}, func(w io.Writer) {

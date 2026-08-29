@@ -70,8 +70,11 @@ func TestIssueLifecycleOverBareSSH(t *testing.T) {
 	if code != 0 {
 		t.Fatal("issue show failed")
 	}
+	// A body reports the markup it was written in; "md" is what a body with no
+	// --format carries, and what everything written before formats existed has.
 	wantShow := `{"data":{"assignees":["bob"],"author":"alice","body":"it is broken",` +
-		`"comments":[{"author":"bob","body":"me too","created_at":"TS"}],` +
+		`"body_format":"md",` +
+		`"comments":[{"author":"bob","body":"me too","body_format":"md","created_at":"TS"}],` +
 		`"created_at":"TS","labels":["bug","urgent"],"number":1,"state":"open",` +
 		`"title":"first bug"},"protocol_version":1}`
 	if g := golden(t, out); g != wantShow {
