@@ -2,9 +2,11 @@ package httpd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -1095,6 +1097,30 @@ var ugcPolicy = func() *bluemonday.Policy {
 
 // renderReadme renders a README by extension: markdown, org-mode, and
 // (sanitized) HTML richly; everything else as escaped plaintext.
+// orgConfig is the go-org configuration for rendering untrusted org.
+//
+// go-org's default reads #+INCLUDE: and #+SETUPFILE: targets off disk with
+// os.ReadFile. Everything rendered here is content someone pushed — a README, a
+// wiki page, a profile — so both keywords are refused outright: the file is
+// never opened and the keyword stays the inert text it is. There is no safe
+// subset to allow instead. An absolute path skips go-org's relative-path join,
+// a relative one resolves against the daemon's working directory, and a repo
+// has no directory to scope to anyway because the content came from a git
+// object rather than a checkout.
+//
+// The default logger writes parse warnings to stderr, which would let pushed
+// content write to the server's log; discard them.
+func orgConfig() *org.Configuration {
+	c := org.New()
+	c.ReadFile = func(string) ([]byte, error) {
+		return nil, errOrgIncludeDisabled
+	}
+	c.Log = log.New(io.Discard, "", 0)
+	return c
+}
+
+var errOrgIncludeDisabled = errors.New("org: #+INCLUDE and #+SETUPFILE are disabled")
+
 func renderReadme(name string, raw []byte) template.HTML {
 	plain := func() template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(raw)) + "</pre>")
@@ -1110,7 +1136,7 @@ func renderReadme(name string, raw []byte) template.HTML {
 		}
 		return template.HTML(buf.String())
 	case ".org":
-		doc := org.New().Parse(bytes.NewReader(raw), name)
+		doc := orgConfig().Parse(bytes.NewReader(raw), name)
 		writer := org.NewHTMLWriter()
 		writer.HighlightCodeBlock = func(source, lang string, inline bool, params map[string]string) string {
 			if inline {
