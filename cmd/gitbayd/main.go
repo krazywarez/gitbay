@@ -18,7 +18,6 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
-	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
@@ -120,11 +119,12 @@ func serveCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// First line of every run: the journal then says which commit is
 			// serving, without rebuilding the binary to find out.
-			slog.Info("gitbayd starting", "commit", buildinfo.String())
+			logBuild()
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}
+			warnIfUnmerged(cfg)
 			st, err := openStore(cfg)
 			if err != nil {
 				return err

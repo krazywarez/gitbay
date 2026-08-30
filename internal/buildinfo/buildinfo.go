@@ -3,7 +3,10 @@
 // a hash comparison to infer it.
 package buildinfo
 
-import "runtime/debug"
+import (
+	"runtime/debug"
+	"strings"
+)
 
 // Commit is stamped at link time by the Makefile:
 //
@@ -42,4 +45,12 @@ func String() string {
 		rev = rev[:12]
 	}
 	return rev + modified
+}
+
+// Identified reports whether this build can be traced back to a commit that
+// exists in history. A dirty or missing stamp means it cannot: the tree it was
+// built from was never committed, so nothing can say what is running.
+func Identified() bool {
+	s := String()
+	return s != "unknown" && !strings.HasSuffix(s, "-dirty")
 }

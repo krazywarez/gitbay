@@ -54,3 +54,22 @@ func TestMakefileStampMatchesHEAD(t *testing.T) {
 		t.Errorf("String() = %q, but HEAD is %q", got, want)
 	}
 }
+
+func TestIdentified(t *testing.T) {
+	prev := Commit
+	defer func() { Commit = prev }()
+
+	for _, c := range []struct {
+		stamp string
+		want  bool
+	}{
+		{"b685adf5ab7a", true},
+		{"b685adf5ab7a-dirty", false},
+		{"unknown", false},
+	} {
+		Commit = c.stamp
+		if got := Identified(); got != c.want {
+			t.Errorf("Identified() with stamp %q = %v, want %v", c.stamp, got, c.want)
+		}
+	}
+}

@@ -35,6 +35,12 @@ type Config struct {
 type Server struct {
 	Root    string `toml:"root"`
 	SiteURL string `toml:"site_url"`
+
+	// SourceRepo names the repository this instance develops itself in, as
+	// "owner/name". When set, startup warns if the running build's commit is
+	// not on that repository's default branch. Empty disables the check, which
+	// is right for any instance that does not host its own source.
+	SourceRepo string `toml:"source_repo"`
 }
 
 type SSH struct {
