@@ -38,9 +38,25 @@ func openStore(cfg config.Config) (*store.Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Say so when the schema moves. A restart migrates in silence otherwise,
+	// which makes an unexpected schema version hard to attribute to the deploy
+	// that caused it.
+	before, err := s.Version()
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
 	if err := s.MigrateUp(); err != nil {
 		s.Close()
 		return nil, err
+	}
+	after, err := s.Version()
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	if after != before {
+		slog.Info("schema migrated", "from", before, "to", after)
 	}
 	return s, nil
 }
