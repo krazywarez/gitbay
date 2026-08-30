@@ -79,6 +79,11 @@ curl -s -H "Authorization: Bearer $TOKEN" \
      "https://gitbay.org/api/v1/read?argv=dashboard"
 #+end_src
 
+For an instance admin the response also carries ={"server": {"commit":
+"<sha>"}}=, the build the daemon is running, so the deployed commit is
+readable without the journal. The key is absent for everyone else: the
+exact build a host runs narrows down which known issues apply to it.
+
 ** Cursor pagination
 
 =issue list=, =mr list=, =repo list=, and =feed= accept =--limit <n>=
