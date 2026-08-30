@@ -6,7 +6,7 @@
 #
 # Override the target host with: make deploy HOST=example.org PORT=22
 
-HOST     ?= 155.138.253.199
+HOST     ?= 46.232.248.67
 PORT     ?= 2222
 CLI_DEST ?= /opt/homebrew/bin/gitbay
 
