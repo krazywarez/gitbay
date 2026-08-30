@@ -92,6 +92,10 @@ signing key on principle.
 A profile is what =/{owner}= shows: a one-line description, a website, a
 set of links, long-form about text, the repositories you can see, org
 membership, and a year of activity. Users and orgs have the same fields.
+Repository rows carry the listing metadata too — topics, license,
+default branch, last commit — so a client renders a profile listing the
+way =/{owner}= does. The web dispatches this command rather than
+assembling the page itself.
 
 #+begin_src sh
 gitbay profile show               # your own
