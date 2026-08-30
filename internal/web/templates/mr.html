@@ -94,6 +94,19 @@
     </form>
   </div>
   {{end}}
+  {{if and .CanEdit (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
+  <div class="grp">
+    <h2>Target</h2>
+    <form method="post" action="{{$base}}/retarget" class="actions">
+      <label class="none" for="target">Branch</label>
+      <select id="target" name="target">
+        {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.MR.TargetRef}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+      <button type="submit">Retarget</button>
+    </form>
+    <p class="row none">Retargeting stales existing reviews.</p>
+  </div>
+  {{end}}
   <div class="grp">
     <h2>Reviews</h2>
     {{range .Reviews}}<p class="row"><span class="dot {{if eq .Verdict "approve"}}ok{{else}}pend{{end}}"></span><a href="/{{.Reviewer}}">{{.Reviewer}}</a> {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}</p>

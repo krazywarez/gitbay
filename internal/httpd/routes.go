@@ -149,6 +149,8 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.mrMergeSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/close", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrCloseSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/retarget", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.mrRetargetSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/thread", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrThreadSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/diff-comment", Mutating: true,

@@ -183,6 +183,31 @@ func (s *Store) UpdateMRHead(mrID int64, headSHA string) error {
 	return tx.Commit()
 }
 
+// SetMRTarget retargets a merge request and marks every existing review
+// stale, in one transaction. The base of the diff is derived from the
+// target on every read, so nothing else has to move; an approval,
+// though, was of the diff against the old branch.
+func (s *Store) SetMRTarget(mrID int64, targetRef string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(
+		"UPDATE merge_requests SET target_ref = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+		targetRef, mrID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	if _, err := tx.Exec("UPDATE mr_reviews SET stale = 1 WHERE mr_id = ?", mrID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // MarkSourceGoneForRepo flags every open MR sourced from the repo; called
 // when a fork is deleted. Head refs in the target repos are retained.
 func (s *Store) MarkSourceGoneForRepo(sourceRepoID int64) error {

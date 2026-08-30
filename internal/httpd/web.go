@@ -1656,6 +1656,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	// its own view rather than a fold at the foot of the conversation.
 	// A query parameter keeps this working without JavaScript.
 	unresolved, _ := s.st.UnresolvedThreadCount(m.ID)
+	branches, _ := gitutil.Refs(p.Dir, "heads")
 	view := r.URL.Query().Get("view")
 	if view != "commits" && view != "diff" {
 		view = "conversation"
@@ -1672,13 +1673,14 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		DiffFiles       []diffFile
 		Stat            diffStat
 		Commits         []commitRow
+		Branches        []gitutil.Ref
 		CanEdit         bool
 		CanWrite        bool
 		Unresolved      int
 		Notice          string
 		DetachedThreads []diffThread
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, store.CombinedStatus(checks), renderComments(comments, md),
-		reviews, files, stat, commits, s.canEditItem(r, p.Repo, m.Author),
+		reviews, files, stat, commits, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads})
 }
 

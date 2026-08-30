@@ -13,11 +13,12 @@ import (
 )
 
 type mrShow struct {
-	Number  int64  `json:"number"`
-	State   string `json:"state"`
-	Source  string `json:"source"`
-	HeadSHA string `json:"head_sha"`
-	Reviews []struct {
+	Number    int64  `json:"number"`
+	State     string `json:"state"`
+	Source    string `json:"source"`
+	TargetRef string `json:"target_ref"`
+	HeadSHA   string `json:"head_sha"`
+	Reviews   []struct {
 		Reviewer string `json:"reviewer"`
 		Verdict  string `json:"verdict"`
 		Stale    bool   `json:"stale"`

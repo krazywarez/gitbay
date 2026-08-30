@@ -38,6 +38,8 @@ func init() {
 	register(Command{Path: []string{"mr", "edit"},
 		Summary:    "edit title or body: mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMREdit})
+	register(Command{Path: []string{"mr", "retarget"},
+		Summary: "retarget onto another branch: mr retarget <owner/name> <n> <branch>", Run: runMRRetarget})
 	register(Command{Path: []string{"mr", "comment"},
 		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMRComment})
@@ -547,6 +549,63 @@ func runMREdit(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
 		fmt.Fprintf(w, "edited %s!%d\n", repo.Path(), mr.Number)
+	})
+}
+
+// runMRRetarget moves an open merge request onto another branch of the
+// same repository.
+func runMRRetarget(c *Ctx, args []string) int {
+	if len(args) != 3 {
+		return c.fail(protocol.ExitUsage, "usage: mr retarget <owner/name> <n> <branch>")
+	}
+	repo, mr, code := mrRef(c, args[:2], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if mr.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
+		return c.fail(protocol.ExitDenied, "only the author or users with write access can retarget this merge request")
+	}
+	if mr.State == "merged" || mr.State == "closed" {
+		return c.fail(protocol.ExitUsage, "!%d is %s; only an open merge request can be retargeted", mr.Number, mr.State)
+	}
+	target := args[2]
+	if target == mr.TargetRef {
+		return c.fail(protocol.ExitUsage, "!%d already targets %s", mr.Number, target)
+	}
+	if mr.SourceRepoID == repo.ID && target == mr.SourceRef {
+		return c.fail(protocol.ExitUsage, "%s is the source branch of !%d", target, mr.Number)
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if _, err := gitutil.ResolveRef(dir, "refs/heads/"+target); err != nil {
+		return c.fail(protocol.ExitNotFound, "branch %s not found in %s", target, repo.Path())
+	}
+	// The diff, the commit list and the merge gates all derive their base
+	// from the target on every read, so the only thing to check here is
+	// that a base exists at all: without one there is nothing to show and
+	// nothing to merge.
+	base, err := gitutil.MergeBase(dir, "refs/heads/"+target, mrHeadRef(mr.Number))
+	if err != nil || base == "" {
+		return c.fail(protocol.ExitUsage, "%s shares no history with the head of !%d", target, mr.Number)
+	}
+	old := mr.TargetRef
+	if err := c.Store.SetMRTarget(mr.ID, target); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.AddMRSystemComment(mr.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s", old, target))
+	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
+			notifyBody(c, fmt.Sprintf("retargeted !%d from %s to %s", mr.Number, old, target), "",
+				fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+	}
+	return c.emit(map[string]any{"number": mr.Number, "target_ref": target, "merge_base": base}, func(w io.Writer) {
+		fmt.Fprintf(w, "retargeted %s!%d from %s to %s (base %.10s)\n", repo.Path(), mr.Number, old, target, base)
 	})
 }
 

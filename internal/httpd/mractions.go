@@ -121,6 +121,20 @@ func (s *Server) mrDiffCommentSubmit(w http.ResponseWriter, r *http.Request, u s
 	s.mrDiffRedirect(w, r, msg)
 }
 
+// mrRetargetSubmit moves the merge request onto another branch.
+func (s *Server) mrRetargetSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	target := strings.TrimSpace(r.FormValue("target"))
+	if target == "" {
+		s.mrRedirect(w, r, "pick a branch to retarget onto")
+		return
+	}
+	_, msg, ok := s.runControl(u, mrArgs(r, "retarget", target))
+	if ok {
+		msg = ""
+	}
+	s.mrRedirect(w, r, msg)
+}
+
 // mrThreadSubmit resolves or reopens one review thread.
 func (s *Server) mrThreadSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	verb := "resolve"

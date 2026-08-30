@@ -395,6 +395,7 @@ func mrCmd() *cobra.Command {
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
 		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),
 		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
+		pass("retarget", "retarget onto another branch: <n> <branch>", passOpts{server: []string{"mr", "retarget"}, needsRepo: true}),
 	)
 }
 
