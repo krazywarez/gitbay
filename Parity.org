@@ -39,11 +39,14 @@ browser-only and the iOS build screen unable to say more than the log.
 | close                  | yes | yes | yes |
 | create                 | yes | yes | yes |
 | create from a fork     | yes | no  | yes |
+| retarget               | yes | yes | no  |
 | milestone              | yes | yes | yes |
 | choose body markup     | yes | no  | no  |
 
 Creating from a fork works anywhere the source can be typed as
-=owner/name:branch=; only the web lacks it.
+=owner/name:branch=; only the web lacks it. Retargeting moves an open
+merge request onto another branch of the same repository and stales the
+reviews, since an approval was of the diff against the old branch.
 
 * Issues
 
