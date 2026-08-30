@@ -60,22 +60,25 @@ func (s *Server) checkOrigin(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// renderLogin draws the login page. Mode carries the registration mode so
+// the page can tell a brand-new visitor how to get an account.
+func (s *Server) renderLogin(w http.ResponseWriter, errMsg string) {
+	s.render(w, "login.html", struct {
+		basePage
+		Mode  string // closed | invite | open
+		Error string
+	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, s.cfg.Registration.Mode, errMsg})
+}
+
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		s.render(w, "login.html", struct {
-			basePage
-			Error string
-		}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, ""})
+		s.renderLogin(w, "")
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
-		s.render(w, "login.html", struct {
-			basePage
-			Error string
-		}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()},
-			"that login link is invalid, expired, or already used — mint a new one"})
+		s.renderLogin(w, "that login link is invalid, expired, or already used — mint a new one")
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()

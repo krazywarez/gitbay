@@ -23,6 +23,11 @@ func TestWebSignup(t *testing.T) {
 	if status != 200 || !strings.Contains(body, "invite-only") || !strings.Contains(body, `name="key"`) {
 		t.Fatalf("register form: %d\n%s", status, body)
 	}
+	// The login page tells a brand-new visitor how to get an account.
+	status, body = inst.get(t, "/login")
+	if status != 200 || !strings.Contains(body, `href="/register"`) || !strings.Contains(body, "invite-only") {
+		t.Fatalf("login signup hint: %d\n%s", status, body)
+	}
 
 	// Invite issued over the admin path; redeemed through the browser.
 	inst.admin(t, "admin", "invite", "--email", "erin@example.test")
@@ -75,5 +80,12 @@ func TestWebSignupClosedInstance(t *testing.T) {
 	_, body := inst.get(t, "/")
 	if strings.Contains(body, `href="/register"`) {
 		t.Fatal("closed landing advertises signup")
+	}
+	_, body = inst.get(t, "/login")
+	if strings.Contains(body, `href="/register"`) {
+		t.Fatal("closed login page advertises signup")
+	}
+	if !strings.Contains(body, "not accepting new accounts") {
+		t.Fatalf("closed login page says nothing about accounts:\n%s", body)
 	}
 }

@@ -6,4 +6,13 @@
 with your registered key:</p>
 <pre class="message">ssh git@{{.Host}} web login</pre>
 <p>then open the printed URL within five minutes.</p>
+<h2>New here?</h2>
+{{if eq .Mode "open"}}<p><a href="/register">Create an account</a> — pick a username, paste your SSH
+public key, verify your email. Or from the terminal:</p>
+<pre class="message">ssh git@{{.Host}} register --username you --email you@example.org</pre>
+{{else if eq .Mode "invite"}}<p>This instance is invite-only. With a code from an admin,
+<a href="/register">create an account</a> — pick a username, paste your SSH public key. Or from
+the terminal:</p>
+<pre class="message">ssh git@{{.Host}} register --username you --invite &lt;code&gt;</pre>
+{{else}}<p>This instance is not accepting new accounts.</p>{{end}}
 {{end}}
