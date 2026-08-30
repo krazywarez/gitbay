@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -52,6 +53,12 @@ func runDashboard(c *Ctx, args []string) int {
 		CreatedAt  string `json:"created_at"`
 		FinishedAt string `json:"finished_at,omitempty"`
 	}
+	// serverOut is admin-only. The exact build a host is running narrows down
+	// which known issues apply to it, so it is not everyone's to read; the
+	// person who needs it is the operator.
+	type serverOut struct {
+		Commit string `json:"commit"`
+	}
 	type out struct {
 		Reviews  []dashboardItem `json:"review_queue"`
 		Assigned []dashboardItem `json:"assigned_issues"`
@@ -60,6 +67,7 @@ func runDashboard(c *Ctx, args []string) int {
 		Pinned   []pinnedOut     `json:"pinned"`
 		Activity []feedOut       `json:"recent_activity"`
 		Builds   []buildOut      `json:"builds"`
+		Server   *serverOut      `json:"server,omitempty"`
 	}
 	d := out{
 		Reviews: []dashboardItem{}, Assigned: []dashboardItem{}, MRs: []dashboardItem{},
@@ -127,6 +135,9 @@ func runDashboard(c *Ctx, args []string) int {
 	for _, b := range builds {
 		d.Builds = append(d.Builds, buildOut{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
 	}
+	if c.User.IsAdmin {
+		d.Server = &serverOut{Commit: buildinfo.String()}
+	}
 
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintln(w, "waiting on your review:")
@@ -152,6 +163,9 @@ func runDashboard(c *Ctx, args []string) int {
 		fmt.Fprintln(w, "builds:")
 		for _, b := range d.Builds {
 			fmt.Fprintf(w, "  %s\t%d\t%s\t%s\t%.10s\t%s\n", b.Repo, b.Number, b.Job, b.Status, b.SHA, b.Ref)
+		}
+		if d.Server != nil {
+			fmt.Fprintf(w, "server:\n  build %s\n", d.Server.Commit)
 		}
 	})
 }
