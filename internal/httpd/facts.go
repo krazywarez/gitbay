@@ -1,6 +1,9 @@
 package httpd
 
 import (
+	"fmt"
+	"sort"
+
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 )
@@ -21,11 +24,48 @@ type repoFacts struct {
 type factContributor struct {
 	Name    string
 	User    string // account, when the email is verified here
-	Email   string
+	Email   string // the account's busiest address, when several collapsed
 	Commits int
 }
 
+// Title is the hover text: which address the commits carry, and how many.
+func (c factContributor) Title() string {
+	if c.Commits == 1 {
+		return c.Email + " · 1 commit"
+	}
+	return fmt.Sprintf("%s · %d commits", c.Email, c.Commits)
+}
+
 const maxContributors = 12
+
+// collapseContributors folds the addresses of one account into a single
+// row. .mailmap has already merged whatever the repository claims about
+// its own history; this merges what an account has proven here, which a
+// repository cannot know about. Addresses with no account stay distinct —
+// two people sharing a git name are not one contributor.
+func (s *Server) collapseContributors(cs []gitutil.Contributor) []factContributor {
+	names := s.authorNames()
+	var out []factContributor
+	byUser := map[string]int{}
+	for _, c := range cs {
+		user, known := names.account(c.Email)
+		if known {
+			if i, seen := byUser[user]; seen {
+				out[i].Commits += c.Commits
+				continue
+			}
+			byUser[user] = len(out)
+		}
+		out = append(out, factContributor{
+			Name: names.name(c.Email, c.Name), User: user, Email: c.Email, Commits: c.Commits,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Commits > out[j].Commits })
+	if len(out) > maxContributors {
+		out = out[:maxContributors]
+	}
+	return out
+}
 
 func (s *Server) factsFor(p repoPage) repoFacts {
 	f := repoFacts{
@@ -40,13 +80,7 @@ func (s *Server) factsFor(p repoPage) repoFacts {
 	}
 	f.Languages = gitutil.Languages(p.Dir, p.Ref, langOf)
 
-	names := s.authorNames()
-	for _, c := range gitutil.Contributors(p.Dir, p.Ref, maxContributors) {
-		user, _ := names.account(c.Email)
-		f.Contributors = append(f.Contributors, factContributor{
-			Name: names.name(c.Email, c.Name), User: user, Email: c.Email, Commits: c.Commits,
-		})
-	}
+	f.Contributors = s.collapseContributors(gitutil.Contributors(p.Dir, p.Ref))
 
 	if rels, err := s.st.ListReleases(p.Repo.ID); err == nil && len(rels) > 0 {
 		f.Release = rels[0].Tag

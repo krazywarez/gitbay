@@ -27,9 +27,11 @@ type Contributor struct {
 
 // Contributors summarises authorship reachable from ref, most commits
 // first. Identities are keyed by email, since that is what the forge can
-// tie back to an account.
-func Contributors(dir, ref string, max int) []Contributor {
-	out, err := exec.Command("git", "-C", dir, "log", "--format=%an%x01%ae", ref).Output()
+// tie back to an account, after the repository's own .mailmap has had its
+// say — a bare repo resolves that from HEAD:.mailmap with no config.
+func Contributors(dir, ref string) []Contributor {
+	out, err := exec.Command("git", "-C", dir, "log",
+		"--use-mailmap", "--format=%aN%x01%aE", ref).Output()
 	if err != nil {
 		return nil
 	}
@@ -53,9 +55,6 @@ func Contributors(dir, ref string, max int) []Contributor {
 		list = append(list, *byEmail[e])
 	}
 	sort.SliceStable(list, func(i, j int) bool { return list[i].Commits > list[j].Commits })
-	if max > 0 && len(list) > max {
-		list = list[:max]
-	}
 	return list
 }
 

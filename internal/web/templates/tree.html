@@ -21,7 +21,7 @@
   </p>
   {{with .Facts.Languages}}<p class="langbar" aria-hidden="true">{{range .}}<span class="lang lang-{{slug .Name}}" style="width:{{pct .Percent}}%"></span>{{end}}</p>
   <p class="langs">{{range .}}<span class="lang-name"><span class="dot lang-{{slug .Name}}"></span>{{.Name}} <span class="muted">{{pct .Percent}}%</span></span>{{end}}</p>{{end}}
-  {{with .Facts.Contributors}}<p class="contribs"><span class="label">{{len .}} contributor{{if ne (len .) 1}}s{{end}}</span>{{range .}}{{template "authorname" dict "Name" .Name "User" .User "Email" (printf "%s · %d commits" .Email .Commits)}}{{end}}</p>{{end}}
+  {{with .Facts.Contributors}}<p class="contribs"><span class="label">{{len .}} contributor{{if ne (len .) 1}}s{{end}}</span>{{range .}}{{template "authorname" dict "Name" .Name "User" .User "Email" .Title}}{{end}}</p>{{end}}
 </div>{{end}}
 {{with .Tip}}{{if .SHA}}<div class="tipbar">
   <span class="who">{{template "authorname" dict "Name" .Author "User" .User "Email" .Email}}</span>
