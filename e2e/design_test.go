@@ -43,15 +43,15 @@ func TestReadmeRelativeLinks(t *testing.T) {
 		t.Fatalf("tree: %d", status)
 	}
 	for _, want := range []string{
-		`href="/alice/site/blob/main/docs/guide.md"`,   // relative link
-		`href="/alice/site/blob/main/docs/paper.org"`,  // .html mapped to .org source
-		`src="/alice/site/raw/main/img/logo.png"`,      // relative image via raw
-		`src="https://example.org/pic.png"`,            // remote image untouched
-		`href="https://example.org/x"`,                 // absolute untouched
-		"<table>", "<td>verbose</td>",                  // GFM table renders
-		`<span class="kd">func</span>`, // fenced code highlighted via classes
+		`href="/alice/site/blob/main/docs/guide.md"`,  // relative link
+		`href="/alice/site/blob/main/docs/paper.org"`, // .html mapped to .org source
+		`src="/alice/site/raw/main/img/logo.png"`,     // relative image via raw
+		`src="https://example.org/pic.png"`,           // remote image untouched
+		`href="https://example.org/x"`,                // absolute untouched
+		"<table>", "<td>verbose</td>",                 // GFM table renders
+		`<span class="kd">func</span>`,                         // fenced code highlighted via classes
 		`href="/alice/site/blob/main/README.md">README.md</a>`, // clickable card header
-		`<th scope="col">name</th>`, // file table column headers
+		`<th scope="col">name</th>`,                            // file table column headers
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)

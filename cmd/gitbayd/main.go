@@ -18,15 +18,15 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
-	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/ci"
+	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
-	"gitbay.org/gitbay/internal/mail"
-	"gitbay.org/gitbay/internal/mirror"
-	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
+	"gitbay.org/gitbay/internal/mail"
+	"gitbay.org/gitbay/internal/mirror"
+	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
@@ -178,7 +178,6 @@ func serveCmd() *cobra.Command {
 				// this binary via AuthorizedKeysCommand + forced command.
 				slog.Info("ssh handled by host sshd (ssh.mode = system)")
 			}
-
 
 			web := httpd.New(cfg, st)
 			hs := &http.Server{Addr: cfg.HTTP.Addr, Handler: web.Handler()}

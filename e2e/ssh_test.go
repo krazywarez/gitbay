@@ -54,7 +54,7 @@ func startInstance(t *testing.T) *instance {
 func startInstanceWith(t *testing.T, extra string) *instance {
 	t.Helper()
 	inst := &instance{
-		gitbayd:   buildGitbayd(t),
+		gitbayd:  buildGitbayd(t),
 		root:     t.TempDir(),
 		port:     freePort(t),
 		httpPort: freePort(t),
