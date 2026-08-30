@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gitbay.org/gitbay/internal/buildinfo"
 )
 
 type job struct {
@@ -50,8 +52,16 @@ func main() {
 		poll      = flag.Duration("poll", 5*time.Second, "idle poll interval")
 		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
 		once      = flag.Bool("once", false, "process at most one build, then exit")
+		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
 	flag.Parse()
+	if *version {
+		fmt.Println(buildinfo.String())
+		return
+	}
+	// The runner links internal/store, so it goes stale on changes that never
+	// touch cmd/gitbay-runner. Say which commit is running.
+	log.Printf("gitbay-runner %s", buildinfo.String())
 	r := &runner{
 		remote:    *remote,
 		cloneBase: *cloneBase,

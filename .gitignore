@@ -1,5 +1,6 @@
 /gitbay
 /gitbayd
+/gitbay-runner
 *.db
 /dist/
 CLAUDE.md

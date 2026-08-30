@@ -12,7 +12,12 @@ PORT     ?= 2222
 CLI_DEST ?= /opt/homebrew/bin/gitbay
 
 CROSS   := CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-LDFLAGS := -s -w
+
+# Stamp the commit into every binary so a deployed artifact can say where it
+# came from. The -dirty suffix only appears under ALLOW_DIRTY=1, since
+# preflight otherwise refuses to build an uncommitted tree.
+COMMIT  := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)$(shell [ -n "$$(git status --porcelain 2>/dev/null)" ] && echo -dirty)
+LDFLAGS := -s -w -X gitbay.org/gitbay/internal/buildinfo.Commit=$(COMMIT)
 SERVER_BIN := dist/gitbayd-linux-amd64
 RUNNER_BIN := dist/gitbay-runner-linux-amd64
 

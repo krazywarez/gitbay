@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
+	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
@@ -80,6 +81,7 @@ func main() {
 		hookCmd(),
 		authorizedKeysCmd(),
 		shellCmd(),
+		versionCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -116,6 +118,9 @@ func serveCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "run the ssh, http, and git listeners",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// First line of every run: the journal then says which commit is
+			// serving, without rebuilding the binary to find out.
+			slog.Info("gitbayd starting", "commit", buildinfo.String())
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
