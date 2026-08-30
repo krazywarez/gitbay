@@ -83,23 +83,40 @@ func newRoot() *cobra.Command {
 // serverPath is the annotation key holding a passthrough command's
 // server-side path, so the tree can be checked against the registry.
 const serverPath = "gitbay.server_path"
+const stdinMode = "gitbay.stdin_mode"
 
 // passOpts describes how one CLI command maps onto the server command.
 type passOpts struct {
 	server      []string // server-side command path
 	needsRepo   bool     // prepend inferred owner/name unless given
-	stdinOK     bool     // wire local stdin through (keys add, --file -)
-	alwaysStdin bool     // stdin is the payload (release asset add)
+	stdinOK     bool     // wire local stdin through when --file - asks for it
+	alwaysStdin bool     // stdin is the payload, named by no flag: a bare redirect
 	editor      string   // open $EDITOR for a body when none given
 }
 
 // pass builds a passthrough command. Flags are parsed by the server, which
 // is the single source of truth for them; the CLI stays thin.
+// stdinModeName reports how this command takes stdin, so the coverage test can
+// check that a command reading a bare redirect is not left waiting for a
+// `--file -` that its callers never type.
+func (o passOpts) stdinModeName() string {
+	switch {
+	case o.alwaysStdin:
+		return "always"
+	case o.stdinOK:
+		return "flag"
+	}
+	return "none"
+}
+
 func pass(use, short string, o passOpts) *cobra.Command {
 	return &cobra.Command{
-		Use:                use,
-		Short:              short,
-		Annotations:        map[string]string{serverPath: strings.Join(o.server, " ")},
+		Use:   use,
+		Short: short,
+		Annotations: map[string]string{
+			serverPath: strings.Join(o.server, " "),
+			stdinMode:  o.stdinModeName(),
+		},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// cobra still owns `forge <cmd> --help`.
@@ -201,7 +218,7 @@ func local(use, short string, fn func(args []string) int) *cobra.Command {
 
 func authCmd() *cobra.Command {
 	keysAdd := pass("add", "register an SSH public key (reads the key from stdin or --file -)",
-		passOpts{server: []string{"keys", "add"}, stdinOK: true})
+		passOpts{server: []string{"keys", "add"}, alwaysStdin: true})
 	// keys add always reads stdin on the server; wire it through directly.
 	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
 		t, err := resolveTarget()
@@ -283,7 +300,7 @@ func repoCmd() *cobra.Command {
 		pass("import-issues", "import GitHub issue/PR history: --from <ghowner/ghrepo> [--token-stdin]",
 			passOpts{server: []string{"repo", "import-issues"}, needsRepo: true, stdinOK: true}),
 		group("deploy-key", "repository-bound CI keys",
-			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, stdinOK: true}),
+			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, alwaysStdin: true}),
 			pass("list", "list deploy keys", passOpts{server: []string{"repo", "deploy-key", "list"}, needsRepo: true}),
 			pass("remove", "remove a deploy key: <fingerprint>", passOpts{server: []string{"repo", "deploy-key", "remove"}, needsRepo: true}),
 		),

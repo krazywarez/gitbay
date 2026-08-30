@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 // Build is one CI job execution for one commit.
@@ -81,6 +82,47 @@ func (s *Store) ClaimBuild() (Build, bool, error) {
 		return Build{}, false, err
 	}
 	return b, true, tx.Commit()
+}
+
+// StaleBuildDeadline is how long a claimed build may stay running before the
+// server gives up on it. Comfortably longer than the runner's own -timeout
+// (45m by default), so this only fires when the runner never reported at all —
+// it was killed, restarted, or lost the network mid-build.
+const StaleBuildDeadline = 90 * time.Minute
+
+// ReapStaleBuilds fails every build that has been running past the deadline and
+// returns them, so the caller can resolve their commit statuses. A runner that
+// dies between claiming a build and reporting it otherwise leaves the row
+// claimed forever, and the commit pending forever with it.
+func (s *Store) ReapStaleBuilds() ([]Build, error) {
+	cutoff := time.Now().UTC().Add(-StaleBuildDeadline).Format("2006-01-02T15:04:05Z")
+	rows, err := s.DB.Query(buildSelect+
+		" WHERE status = 'running' AND started_at != '' AND started_at < ?", cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var stale []Build
+	for rows.Next() {
+		b, err := scanBuild(rows)
+		if err != nil {
+			return nil, err
+		}
+		stale = append(stale, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, b := range stale {
+		if err := s.AppendBuildLog(b.ID, []byte(
+			"\nbuild abandoned: the runner never reported an outcome\n")); err != nil {
+			return nil, err
+		}
+		if err := s.FinishBuild(b.ID, "failure"); err != nil {
+			return nil, err
+		}
+	}
+	return stale, nil
 }
 
 // AppendBuildLog adds a chunk to the build's log, dropping bytes past the cap.

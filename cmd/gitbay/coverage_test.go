@@ -55,3 +55,39 @@ func TestEveryCommandIsReachable(t *testing.T) {
 		}
 	}
 }
+
+// Commands whose payload is stdin with no flag naming it: `gitbay keys add <
+// key.pub`, not `--file -`. They must be wired alwaysStdin, because the
+// stdinOK path only forwards stdin when it sees `--file -` in the arguments —
+// so a bare redirect reached the server as an empty body and the command
+// failed on input the SSH API accepts.
+var bareStdin = []string{
+	"keys add",
+	"repo deploy-key add",
+	"repo secret set",
+	"release asset add",
+}
+
+func TestBareRedirectCommandsAlwaysForwardStdin(t *testing.T) {
+	modes := map[string]string{}
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if p := c.Annotations[serverPath]; p != "" {
+			modes[p] = c.Annotations[stdinMode]
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(newRoot())
+
+	for _, path := range bareStdin {
+		switch modes[path] {
+		case "always":
+		case "":
+			t.Errorf("%q is not wired in the CLI", path)
+		default:
+			t.Errorf("%q is wired %s; a bare redirect needs alwaysStdin", path, modes[path])
+		}
+	}
+}
