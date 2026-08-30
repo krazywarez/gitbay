@@ -1,10 +1,6 @@
 package httpd
 
-import (
-	"time"
-
-	"gitbay.org/gitbay/internal/control"
-)
+import "time"
 
 // activityDay is one cell of the graph; Level buckets Count into the five
 // intensity classes the stylesheet colors.
@@ -59,8 +55,3 @@ func activityLevel(n int) int {
 		return 4
 	}
 }
-
-// activitySince is the first day the grid can show, for the query bound.
-// activitySince is control.ActivityWindow: the profile command and the
-// web must report the same year, so the span has one definition.
-func activitySince() string { return control.ActivityWindow() }

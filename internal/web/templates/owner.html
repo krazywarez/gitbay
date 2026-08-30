@@ -5,8 +5,8 @@
 {{if .Profile.Description}}<p class="desc lede">{{.Profile.Description}}</p>{{end}}
 {{if .Profile.Website}}<p class="meta"><a href="{{.Profile.Website}}" rel="nofollow me">{{.Profile.Website}}</a></p>{{end}}
 {{if .Profile.Links}}<p class="meta">{{range $i, $l := .Profile.Links}}{{if $i}} · {{end}}<a href="{{$l.URL}}" rel="nofollow me">{{if $l.Label}}{{$l.Label}}{{else}}{{$l.URL}}{{end}}</a>{{end}}</p>{{end}}
-{{if .Orgs}}<p class="meta">member of {{range .Orgs}}<a class="memberchip" href="/{{.Username}}">{{.Username}}</a> {{end}}</p>{{end}}
-{{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Username}}">{{.Username}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
+{{if .Orgs}}<p class="meta">member of {{range .Orgs}}<a class="memberchip" href="/{{.Name}}">{{.Name}}</a> {{end}}</p>{{end}}
+{{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 </section>
 {{if .AboutHTML}}<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>{{end}}
 <section class="activity">
@@ -29,9 +29,9 @@
 <div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">member</th><th scope="col">role</th><th scope="col"></th></tr>
 {{range .Members}}<tr>
-  <td><a href="/{{.Username}}">{{.Username}}</a></td>
+  <td><a href="/{{.Name}}">{{.Name}}</a></td>
   <td>{{.Role}}</td>
-  <td class="act"><form method="post" action="/{{$org}}"><input type="hidden" name="field" value="member-remove"><input type="hidden" name="user" value="{{.Username}}"><button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/{{$org}}"><input type="hidden" name="field" value="member-remove"><input type="hidden" name="user" value="{{.Name}}"><button type="submit" class="linklike">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 <details class="editbox">

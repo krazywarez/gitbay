@@ -70,6 +70,18 @@ func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg
 // target. Read handlers use it so the web renders exactly what the CLI
 // and the API return, rather than reaching past the registry into git.
 func (s *Server) runControlInto(u store.User, argv []string, target any) (msg string, ok bool) {
+	code, msg := s.dispatchInto(u, argv, target)
+	return msg, code == protocol.ExitOK
+}
+
+// runControlIntoCode is runControlInto for handlers that have to tell
+// "no such thing" from "that failed": a profile page 404s on the first
+// and errors on the second.
+func (s *Server) runControlIntoCode(u store.User, argv []string, target any) (code int, msg string) {
+	return s.dispatchInto(u, argv, target)
+}
+
+func (s *Server) dispatchInto(u store.User, argv []string, target any) (int, string) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -94,14 +106,14 @@ func (s *Server) runControlInto(u store.User, argv []string, target any) (msg st
 		if m == "" {
 			m = strings.TrimSpace(stderr.String())
 		}
-		return m, false
+		return code, m
 	}
 	if len(env.Data) > 0 {
 		if err := json.Unmarshal(env.Data, target); err != nil {
-			return "unreadable response", false
+			return protocol.ExitFailure, "unreadable response"
 		}
 	}
-	return "", true
+	return protocol.ExitOK, ""
 }
 
 // runControlJSON runs a command in JSON mode and returns its data object.

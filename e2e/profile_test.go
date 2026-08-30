@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -44,6 +46,44 @@ func TestOwnerProfiles(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("own profile missing %q: %s", want, out)
 		}
+	}
+
+	// A profile's repository rows carry the listing metadata the web
+	// shows: topics, license, default branch, last commit. Without them
+	// the web had to decorate the rows itself, which is what kept it
+	// reading the store (krz/gitbay#47).
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "topics", "add", "alice/public-tool", "cli", "go"); code != 0 {
+		t.Fatalf("topics add: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/public-tool"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("MIT License\n\nPermission is hereby granted, free of charge\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "add license")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	out, _, _ = inst.ssh(t, bobKey, "", "profile", "show", "alice", "--json")
+	for _, want := range []string{`"cli"`, `"go"`, `"license":"MIT"`, `"default_branch":"main"`, `"updated"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("profile repo row missing %q: %s", want, out)
+		}
+	}
+	// The owner page renders those rows, having dispatched the same
+	// command rather than assembling them from the store again.
+	status, body := inst.get(t, "/alice")
+	if status != 200 {
+		t.Fatalf("owner page: %d", status)
+	}
+	for _, want := range []string{">public-tool<", "?q=cli", "MIT", "updated "} {
+		if !strings.Contains(body, want) {
+			t.Errorf("owner page missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "secret") {
+		t.Fatal("owner page leaks a private repo")
 	}
 
 	// A stranger sees the public repository and not the private one.
@@ -123,7 +163,7 @@ func TestOwnerProfiles(t *testing.T) {
 	}
 	// Org emphasis parsed, not left as literal slashes the way the
 	// markdown renderer would.
-	status, body := inst.get(t, "/alice")
+	_, body = inst.get(t, "/alice")
 	if !strings.Contains(body, "<em>small tools</em>") || strings.Contains(body, "/small tools/") {
 		t.Fatalf("org about not rendered as org: %s", body)
 	}

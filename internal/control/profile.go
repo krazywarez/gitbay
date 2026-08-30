@@ -184,11 +184,19 @@ type profileMember struct {
 	Role string `json:"role,omitempty"`
 }
 
+// profileRepo is one repository as a profile lists it. The listing
+// metadata — topics, license, last commit — is here because a profile is
+// a listing: a client that renders repositories without it is showing
+// less than the web does, which is why the web kept its own copy.
 type profileRepo struct {
-	Path        string `json:"path"`
-	Visibility  string `json:"visibility"`
-	Description string `json:"description,omitempty"`
-	Archived    bool   `json:"archived,omitempty"`
+	Path          string   `json:"path"`
+	Visibility    string   `json:"visibility"`
+	Description   string   `json:"description,omitempty"`
+	DefaultBranch string   `json:"default_branch"`
+	Topics        []string `json:"topics,omitempty"`
+	License       string   `json:"license,omitempty"`
+	Updated       string   `json:"updated,omitempty"`
+	Archived      bool     `json:"archived,omitempty"`
 }
 
 // activityDay is one day's contribution count. Days with nothing are
@@ -293,11 +301,20 @@ func runProfileShow(c *Ctx, args []string) int {
 		if !policy.CanRead(c.User, repo, grant) {
 			continue
 		}
+		dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+		topics, err := c.Store.ListTopics(repo.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 		d.Repos = append(d.Repos, profileRepo{
-			Path:        repo.Path(),
-			Visibility:  repo.Visibility,
-			Description: gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)),
-			Archived:    repo.Settings.Archived,
+			Path:          repo.Path(),
+			Visibility:    repo.Visibility,
+			Description:   gitutil.ReadDescription(dir),
+			DefaultBranch: repo.DefaultBranch,
+			Topics:        topics,
+			License:       DetectLicense(dir, repo.DefaultBranch),
+			Updated:       gitutil.LastCommitDate(dir, repo.DefaultBranch),
+			Archived:      repo.Settings.Archived,
 		})
 	}
 

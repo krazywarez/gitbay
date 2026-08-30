@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -107,6 +108,10 @@ type describedRepo struct {
 	Updated string
 }
 
+// Archived flattens the settings flag so the reporow partial can read the
+// same field name from a describedRepo and from a profile's repo row.
+func (d describedRepo) Archived() bool { return d.Settings.Archived }
+
 func (s *Server) describeAll(repos []store.Repo) []describedRepo {
 	var out []describedRepo
 	for _, r := range repos {
@@ -114,7 +119,7 @@ func (s *Server) describeAll(repos []store.Repo) []describedRepo {
 		d := describedRepo{
 			Repo:    r,
 			Desc:    gitutil.ReadDescription(dir),
-			License: detectLicense(dir, r.DefaultBranch),
+			License: control.DetectLicense(dir, r.DefaultBranch),
 			Updated: gitutil.LastCommitDate(dir, r.DefaultBranch),
 		}
 		d.Topics, _ = s.st.ListTopics(r.ID)
@@ -346,6 +351,47 @@ func crumbs(p repoPage, kind, filePath string) []crumb {
 	return cs
 }
 
+// profileView is profile show's payload, shaped for the templates. The
+// repo rows carry the same names the reporow partial reads, so a profile
+// listing renders identically to explore's.
+type profileView struct {
+	Name        string              `json:"name"`
+	Kind        string              `json:"kind"`
+	Description string              `json:"description"`
+	Website     string              `json:"website"`
+	About       string              `json:"about"`
+	AboutFormat string              `json:"about_format"`
+	Links       []store.ProfileLink `json:"links"`
+	Orgs        []profileMember     `json:"orgs"`
+	Members     []profileMember     `json:"members"`
+	Repos       []profileRepoRow    `json:"repos"`
+	Activity    []struct {
+		Date  string `json:"date"`
+		Count int    `json:"count"`
+	} `json:"activity"`
+}
+
+type profileMember struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+// profileRepoRow is one repository row on a profile. Path arrives as
+// owner/name; OwnerName and Name are split out for the partial.
+type profileRepoRow struct {
+	Path          string   `json:"path"`
+	Visibility    string   `json:"visibility"`
+	Desc          string   `json:"description"`
+	DefaultBranch string   `json:"default_branch"`
+	Topics        []string `json:"topics"`
+	License       string   `json:"license"`
+	Updated       string   `json:"updated"`
+	Archived      bool     `json:"archived"`
+}
+
+func (p profileRepoRow) OwnerName() string { owner, _, _ := strings.Cut(p.Path, "/"); return owner }
+func (p profileRepoRow) Name() string      { _, name, _ := strings.Cut(p.Path, "/"); return name }
+
 // ownerPage renders /{owner} for users and orgs: the repositories the
 // viewer may see, org membership either direction. Owner names are not
 // secret (they are on every commit); repository visibility rules hold.
@@ -356,62 +402,46 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		viewer = s.viewer(r)
 	}
 
-	kind := "user"
-	var ownerID int64
-	var members []store.OrgMember
-	var orgs []store.OrgMember
-	if u, err := s.st.UserByUsername(name); err == nil {
-		ownerID = u.ID
-		orgs, _ = s.st.ListOrgsForUser(u.ID)
-	} else if o, err := s.st.OrgByName(name); err == nil {
-		kind, ownerID = "org", o.ID
-		members, _ = s.st.OrgMembers(o.ID)
-	} else {
+	// Everything on this page — membership, the repositories this viewer
+	// may see, the activity year — comes from profile show, so the page
+	// and the command cannot report different things.
+	var d profileView
+	code, msg := s.runControlIntoCode(viewer, []string{"profile", "show", name}, &d)
+	switch {
+	case code == protocol.ExitNotFound:
 		s.notFound(w, r)
 		return
-	}
-	profile, _ := s.st.OwnerProfile(kind, ownerID)
-
-	all, err := s.st.ListReposForOwner(kind, ownerID)
-	if err != nil {
+	case code != protocol.ExitOK:
+		log.Printf("profile %s: %s", name, msg)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	var visible []store.Repo
-	for _, repo := range all {
-		grant := ""
-		if viewer.ID != 0 {
-			grant, _ = s.st.AccessRole(repo.ID, viewer.ID)
-		}
-		if policy.CanRead(viewer, repo, grant) {
-			visible = append(visible, repo)
-		}
-	}
-	var counts map[string]int
-	if kind == "user" {
-		counts, _ = s.st.ActivityByDay(ownerID, activitySince())
-	} else {
-		counts, _ = s.st.OrgActivityByDay(ownerID, activitySince())
+
+	counts := make(map[string]int, len(d.Activity))
+	for _, day := range d.Activity {
+		counts[day.Date] = day.Count
 	}
 	weeks, activityTotal := activityGrid(counts)
 
-	teams, canAdmin := s.orgAdminView(viewer, kind, name)
+	teams, canAdmin := s.orgAdminView(viewer, d.Kind, name)
+	profile := store.Profile{Description: d.Description, Website: d.Website,
+		About: d.About, AboutFormat: d.AboutFormat, Links: d.Links}
 	s.render(w, "owner.html", struct {
 		basePage
 		Owner         string
 		Kind          string
 		Profile       store.Profile
 		AboutHTML     template.HTML
-		Repos         []describedRepo
-		Members       []store.OrgMember
-		Orgs          []store.OrgMember
+		Repos         []profileRepoRow
+		Members       []profileMember
+		Orgs          []profileMember
 		Activity      []activityWeek
 		ActivityTotal int
 		Teams         []teamView
 		CanAdmin      bool
 		Notice        string
-	}{s.baseFor(viewer), name, kind, profile, aboutHTML(profile),
-		s.describeAll(visible), members, orgs,
+	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
+		d.Repos, d.Members, d.Orgs,
 		weeks, activityTotal, teams, canAdmin, r.URL.Query().Get("e")})
 }
 

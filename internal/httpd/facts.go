@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 )
 
@@ -29,7 +30,7 @@ const maxContributors = 12
 func (s *Server) factsFor(p repoPage) repoFacts {
 	f := repoFacts{
 		Commits: gitutil.CountCommits(p.Dir, p.Ref),
-		License: detectLicense(p.Dir, p.Ref),
+		License: control.DetectLicense(p.Dir, p.Ref),
 	}
 	if heads, err := gitutil.Refs(p.Dir, "heads"); err == nil {
 		f.Branches = len(heads)
