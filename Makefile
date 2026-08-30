@@ -5,6 +5,7 @@
 #   make deploy-runner update the CI runner on HOST (only when cmd/gitbay-runner changed)
 #
 # Override the target host with: make deploy HOST=example.org PORT=22
+# Deploy an uncommitted build on purpose with: ALLOW_DIRTY=1 make deploy
 
 HOST     ?= 46.232.248.67
 PORT     ?= 2222
@@ -25,7 +26,19 @@ test:
 
 # Fail in seconds on an unreachable host or a wedged ssh-agent, rather
 # than hanging on a credential prompt mid-deploy.
+#
+# Also refuse a dirty tree. Every build target compiles the working tree, not
+# HEAD, so uncommitted work ships silently -- and migrations/ is embedded, so a
+# migration file that exists only on disk still migrates the production
+# database on restart. That happened once: 0027 reached gitbay.org inside an
+# unrelated deploy, an hour before it merged. Untracked counts; go:embed does
+# not consult the index.
 preflight:
+	@[ -n "$(ALLOW_DIRTY)" ] || [ -z "$$(git status --porcelain)" ] \
+	  || { echo "working tree is dirty; deploy builds the tree, not HEAD:" >&2; \
+	       git status --short >&2; \
+	       echo "commit first, or ALLOW_DIRTY=1 make deploy to ship it anyway." >&2; \
+	       exit 1; }
 	@echo "==> checking $(HOST):$(PORT)"
 	@ssh -p $(PORT) -o BatchMode=yes -o ConnectTimeout=10 root@$(HOST) true \
 	  || { echo "cannot reach root@$(HOST):$(PORT) without a prompt." >&2; \
