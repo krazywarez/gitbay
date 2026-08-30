@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.0.1 — 2026-08-30
+
+Two CI fixes found by running orgo's release pipeline on this instance.
+
+- A runner killed between claiming a build and reporting it left the build
+  =running= forever, and the commit's =ci/<job>= status pending with it.
+  =runner next= now fails builds past a 90-minute deadline — longer than the
+  runner's own =-timeout= — and resolves their commit status. #53
+- =gitbay keys add= and =gitbay repo deploy-key add= take stdin as a bare
+  =< key.pub=, but only forwarded it when =--file -= appeared in the
+  arguments, so both sent an empty body and rejected input the SSH API
+  accepts. #55
+
+Replace the binary and restart.
+
 * v1.0.0 — 2026-08-26
 
 The web finishes the job #35 set it: reading, reviewing and responding,
