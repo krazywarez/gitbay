@@ -7,7 +7,7 @@
 # Override the target host with: make deploy HOST=example.org PORT=22
 # Deploy an uncommitted build on purpose with: ALLOW_DIRTY=1 make deploy
 
-HOST     ?= 46.232.248.67
+HOST     ?= gitbay.org
 PORT     ?= 2222
 CLI_DEST ?= /opt/homebrew/bin/gitbay
 
