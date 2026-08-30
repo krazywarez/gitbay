@@ -40,6 +40,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | create                 | yes | yes | yes |
 | create from a fork     | yes | no  | yes |
 | milestone              | yes | yes | yes |
+| choose body markup     | yes | no  | no  |
 
 Diff-line comments are the one place the web trails: krz/gitbay#44.
 Creating from a fork works anywhere the source can be typed as
@@ -57,6 +58,15 @@ Creating from a fork works anywhere the source can be typed as
 | labels, assignees   | yes | yes | yes |
 | milestone           | yes | yes | yes |
 | milestone list      | yes | yes | yes |
+| choose body markup  | yes | no  | no  |
+
+Issue, MR and release bodies, and their comments, carry the markup they
+were written in — =--format md|org= on create, comment and edit, stored
+alongside the text so changing a preference later cannot reinterpret
+prose that already exists. Every surface *renders* the stored format;
+the =no= above is the absence of a picker on the web form and in the iOS
+composer, both of which write markdown. Diff-line comments have no
+format column and are always markdown.
 
 * Repositories
 
