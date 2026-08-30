@@ -50,6 +50,11 @@ contradiction; =--no-host-checks= skips port/path probes.
   keys, ACME cache all live here.
 - =site_url= (required) — canonical =https://host=; drives ACME, clone
   URLs, mail links.
+- =source_repo= (optional, =owner/name=) — the repository this instance
+  develops itself in. Startup warns when the running build's commit is
+  not on that repository's default branch, which is how a binary built
+  from an unmerged branch stops being invisible. Leave it unset unless
+  the instance hosts its own source.
 
 ** [ssh]
 - =mode= — =embedded= | =system= (above).
