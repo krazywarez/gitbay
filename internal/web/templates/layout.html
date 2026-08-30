@@ -114,10 +114,10 @@
 {{define "authorname"}}{{if .User}}<a class="authorlink" href="/{{.User}}" title="{{.Email}}">{{.Name}}</a>{{else}}<span title="{{.Email}}">{{.Name}}</span>{{end}}{{end}}
 
 {{/* difffiles renders a parsed diff: one foldable section per file, with
-     line-number gutters and review threads inline. Base and Can are the
-     MR's comment endpoint and the viewer's write permission; the commit
-     page passes neither and gets the same diff without thread controls. */}}
-{{define "difffiles"}}{{$base := .Base}}{{$can := .Can}}
+     line-number gutters and review threads inline. Base is the MR's
+     endpoint and Viewer the signed-in account; the commit page passes
+     neither and gets the same diff without review controls. */}}
+{{define "difffiles"}}{{$base := .Base}}{{$viewer := .Viewer}}
 {{range .Files}}<details class="difffold"{{if .Open}} open{{end}}>
   <summary>
     <span class="fpath">{{if eq .Status "renamed"}}<span class="was">{{.OldPath}} →</span> {{end}}{{.Path}}</span>
@@ -128,11 +128,34 @@
   {{else}}<div class="tablewrap"><table class="difftable">
   {{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
   {{else if eq .Class "meta"}}<tr class="dmeta"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
-  {{else}}<tr class="{{.Class}}"><td class="ln">{{if .OldLine}}{{.OldLine}}{{end}}</td><td class="ln">{{if .NewLine}}{{.NewLine}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
-  {{end}}{{range .Threads}}<tr class="threadrow"><td colspan="3"><div class="thread{{if .Resolved}} resolved{{end}}">{{if .Resolved}}<p class="threadstate">resolved by {{.Resolved}}</p>{{end}}{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}{{template "threadact" dict "ID" .ID "Resolved" .Resolved "Base" $base "Can" $can}}</div></td></tr>
+  {{else}}<tr class="{{.Class}}"><td class="ln">{{if .OldLine}}{{if eq .Class "del"}}{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer}}{{else}}{{.OldLine}}{{end}}{{end}}</td><td class="ln">{{if .NewLine}}{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
+  {{if .Compose}}<tr class="threadrow"><td colspan="3"><form id="compose" method="post" action="{{$base}}/diff-comment" class="thread composing">
+    <input type="hidden" name="path" value="{{.Path}}">
+    <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
+    <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
+    <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
+    <p><button type="submit">Comment</button> <a href="{{$base}}?view=diff">Cancel</a></p>
+  </form></td></tr>
+  {{end}}{{end}}{{range .Threads}}<tr class="threadrow"><td colspan="3">{{template "thread" dict "T" . "Base" $base "Viewer" $viewer "Class" ""}}</td></tr>
   {{end}}{{end}}
   </table></div>{{end}}
 </details>
 {{end}}{{end}}
 
-{{define "threadact"}}{{if .Can}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{.ID}}"><button type="submit" name="action" value="{{if .Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if .Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}{{end}}
+{{/* cmtln turns a line number into the link that opens the comment form
+     on that line. No JavaScript: the anchor travels in the query. */}}
+{{define "cmtln"}}{{if and .Viewer .Base}}<a class="cmt" title="Comment on this line" href="{{.Base}}?view=diff&amp;cpath={{.Path}}&amp;cline={{.N}}&amp;cside={{.Side}}#compose">{{.N}}</a>{{else}}{{.N}}{{end}}{{end}}
+
+{{/* thread renders one review thread with its reply and resolve controls.
+     Class carries "stale" for threads whose anchor is gone. */}}
+{{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if .Class}} {{.Class}}{{end}}">
+{{if or $t.Resolved (and .Class $t.Stale)}}<p class="threadstate">{{if and .Class $t.Stale}}stale{{end}}{{if $t.Resolved}}{{if and .Class $t.Stale}} · {{end}}resolved by {{$t.Resolved}}{{end}}</p>{{end}}
+{{range $t.Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}
+{{if .Viewer}}<details class="threadreply"><summary>Reply</summary>
+<form method="post" action="{{.Base}}/diff-comment">
+  <input type="hidden" name="reply" value="{{$t.ID}}">
+  <p><textarea name="body" aria-label="Reply to thread {{$t.ID}}" rows="2" placeholder="Reply as {{.Viewer}}"></textarea></p>
+  <p><button type="submit">Reply</button></p>
+</form></details>{{end}}
+{{if $t.CanResolve}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{$t.ID}}"><button type="submit" name="action" value="{{if $t.Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if $t.Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}
+</div>{{end}}

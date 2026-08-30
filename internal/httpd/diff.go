@@ -22,6 +22,7 @@ type diffLine struct {
 	NewLine int64         // line number in the new file (0 when absent)
 	OldLine int64         // line number in the old file (0 when absent)
 	Threads []diffThread
+	Compose bool // render the new-thread form under this line
 }
 
 // diffFile is one file's worth of a unified diff: the header lines are

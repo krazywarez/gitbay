@@ -30,6 +30,19 @@ func (s *Server) mrRedirect(w http.ResponseWriter, r *http.Request, msg string) 
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
+// mrDiffRedirect returns to the diff view, where the thread controls are.
+func (s *Server) mrDiffRedirect(w http.ResponseWriter, r *http.Request, msg string) {
+	dest := fmt.Sprintf("/%s/%s/mrs/%s?view=diff",
+		r.PathValue("owner"), r.PathValue("repo"), r.PathValue("n"))
+	if msg != "" {
+		if len(msg) > 300 {
+			msg = msg[:300]
+		}
+		dest += "&e=" + url.QueryEscape(msg)
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
 // mrArgs builds "<verb> owner/name <n>" for the mr command family.
 func mrArgs(r *http.Request, verb string, extra ...string) []string {
 	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
@@ -71,6 +84,41 @@ func (s *Server) mrCloseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		msg = ""
 	}
 	s.mrRedirect(w, r, msg)
+}
+
+// mrDiffCommentSubmit opens a review thread on a diff line, or replies to
+// one. The body goes in on stdin: it is user prose, and argv is visible in
+// /proc.
+func (s *Server) mrDiffCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	body := strings.TrimSpace(r.FormValue("body"))
+	if body == "" {
+		s.mrDiffRedirect(w, r, "empty comment")
+		return
+	}
+	var extra []string
+	if reply := strings.TrimSpace(r.FormValue("reply")); reply != "" {
+		if _, err := strconv.ParseInt(reply, 10, 64); err != nil {
+			s.mrDiffRedirect(w, r, "bad thread id")
+			return
+		}
+		extra = []string{"--reply", reply}
+	} else {
+		path := strings.TrimSpace(r.FormValue("path"))
+		line := strings.TrimSpace(r.FormValue("line"))
+		if n, err := strconv.ParseInt(line, 10, 64); path == "" || err != nil || n < 1 {
+			s.mrDiffRedirect(w, r, "pick a line to comment on")
+			return
+		}
+		extra = []string{"--path", path, "--line", line}
+		if r.FormValue("side") == "old" {
+			extra = append(extra, "--old")
+		}
+	}
+	msg, ok := s.runControlStdin(u, mrArgs(r, "diff-comment", append(extra, "--file", "-")...), body)
+	if ok {
+		msg = ""
+	}
+	s.mrDiffRedirect(w, r, msg)
 }
 
 // mrThreadSubmit resolves or reopens one review thread.

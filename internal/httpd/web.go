@@ -13,6 +13,7 @@ import (
 	"gitbay.org/gitbay/internal/policy"
 	"html/template"
 	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -1191,16 +1192,30 @@ func renderReadme(name string, raw []byte) template.HTML {
 }
 
 type diffThread struct {
-	ID       int64
-	Resolved string
-	Stale    bool
-	Comments []renderedComment
+	ID         int64
+	Resolved   string
+	Stale      bool
+	CanResolve bool
+	Comments   []renderedComment
+}
+
+// reviewRights decides which thread controls a viewer sees. mr resolve
+// admits the thread author, the MR author, or anyone with write, so the
+// page needs all three to render the button truthfully.
+type reviewRights struct {
+	Viewer   string
+	MRAuthor string
+	Write    bool
+}
+
+func (r reviewRights) canResolve(threadAuthor string) bool {
+	return r.Viewer != "" && (r.Write || r.Viewer == r.MRAuthor || r.Viewer == threadAuthor)
 }
 
 // attachThreads injects review threads under their anchored diff lines;
 // threads whose anchor no longer appears (stale after force-push, or on a
 // context line outside the current diff) are returned separately.
-func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md ugcRenderer) ([]diffFile, []diffThread) {
+func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md ugcRenderer, rights reviewRights) ([]diffFile, []diffThread) {
 	type anchor struct {
 		path string
 		side string
@@ -1214,7 +1229,8 @@ func attachThreads(files []diffFile, comments []store.DiffComment, headSHA strin
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
-				Comments: []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")}}}
+				CanResolve: rights.canResolve(cm.Author),
+				Comments:   []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
 			order = append(order, cm.ID)
 		} else if th, ok := threads[cm.ReplyTo]; ok {
@@ -1250,6 +1266,32 @@ func attachThreads(files []diffFile, comments []store.DiffComment, headSHA strin
 		}
 	}
 	return files, unplaced
+}
+
+// markCompose opens the new-thread form under one diff line. There is no
+// JavaScript, so "comment on this line" is a plain GET carrying the
+// anchor and the page renders the form where the reader asked for it.
+func markCompose(files []diffFile, q url.Values) {
+	path := q.Get("cpath")
+	line, _ := strconv.ParseInt(q.Get("cline"), 10, 64)
+	if path == "" || line < 1 {
+		return
+	}
+	old := q.Get("cside") == "old"
+	for f := range files {
+		for i := range files[f].Lines {
+			ln := &files[f].Lines[i]
+			if ln.Path != path {
+				continue
+			}
+			if (old && ln.Class == "del" && ln.OldLine == line) ||
+				(!old && ln.Class != "del" && ln.NewLine == line) {
+				ln.Compose = true
+				files[f].Open = true
+				return
+			}
+		}
+	}
 }
 
 type sigView struct {
@@ -1577,8 +1619,13 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	md := s.ugcFor(r, p.Repo)
+	canWrite := s.canWriteRepo(r, p.Repo)
 	var detachedThreads []diffThread
-	files, detachedThreads = attachThreads(files, diffComments, m.HeadSHA, md)
+	files, detachedThreads = attachThreads(files, diffComments, m.HeadSHA, md,
+		reviewRights{Viewer: p.Viewer, MRAuthor: m.Author, Write: canWrite})
+	if p.Viewer != "" {
+		markCompose(files, r.URL.Query())
+	}
 	stat := statOf(files)
 	// The commits this MR carries: base..head, the same range as the diff.
 	type commitRow struct {
@@ -1632,7 +1679,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		DetachedThreads []diffThread
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, store.CombinedStatus(checks), renderComments(comments, md),
 		reviews, files, stat, commits, s.canEditItem(r, p.Repo, m.Author),
-		s.canWriteRepo(r, p.Repo), unresolved, r.URL.Query().Get("e"), detachedThreads})
+		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

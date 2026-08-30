@@ -9,5 +9,5 @@
   {{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
 </div>
 <pre class="message">{{.Message}}</pre>
-{{template "difffiles" dict "Files" .DiffFiles "Base" "" "Can" false}}
+{{template "difffiles" dict "Files" .DiffFiles "Base" "" "Viewer" ""}}
 {{end}}

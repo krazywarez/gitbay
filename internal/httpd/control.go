@@ -41,10 +41,10 @@ func (s *Server) runControl(u store.User, argv []string) (out string, msg string
 }
 
 // runControlStdin is runControl for the handful of commands whose input
-// arrives on stdin. Public keys are the only such input the web accepts:
-// they are not secret, and pasting one into a browser is how people who
-// have not set up the CLI get their first key registered. Secrets, tokens
-// and mirror credentials remain SSHOnly and are refused by the dispatcher.
+// arrives on stdin: public keys, and review comment bodies. Neither is
+// secret, and both are prose or paste rather than a flag value. Secrets,
+// tokens and mirror credentials remain SSHOnly and are refused by the
+// dispatcher.
 func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg string, ok bool) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{

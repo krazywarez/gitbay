@@ -35,7 +35,7 @@
 </article>{{end}}
 {{end}}
 {{if .DetachedThreads}}<h2>Threads on earlier revisions</h2>
-{{range .DetachedThreads}}<div class="thread stale"><p class="threadstate">{{if .Stale}}stale{{end}}{{if .Resolved}}{{if .Stale}} · {{end}}resolved by {{.Resolved}}{{end}}</p>{{range .Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}{{template "threadact" dict "ID" .ID "Resolved" .Resolved "Base" $base "Can" $.CanWrite}}</div>{{end}}{{end}}
+{{range .DetachedThreads}}{{template "thread" dict "T" . "Base" $base "Viewer" $.Viewer "Class" "stale"}}{{end}}{{end}}
 {{if .Viewer}}
 <form method="post" action="{{$base}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
@@ -61,7 +61,7 @@
 
 {{else}}
 <p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span></p>
-{{template "difffiles" dict "Files" .DiffFiles "Base" $base "Can" .CanWrite}}
+{{template "difffiles" dict "Files" .DiffFiles "Base" $base "Viewer" .Viewer}}
 {{end}}
 
 </div>

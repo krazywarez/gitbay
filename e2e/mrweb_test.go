@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -213,4 +214,120 @@ func TestMRWebCreate(t *testing.T) {
 	if show.State != "open" || show.Source != "topic" {
 		t.Fatalf("created MR wrong: %+v", show)
 	}
+}
+
+// TestMRWebDiffThreads opens a review thread on a diff line and replies to
+// it from the browser. The CLI's view of the threads afterwards is what
+// proves the page dispatched mr diff-comment rather than writing its own
+// rows.
+func TestMRWebDiffThreads(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/lib"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/lib"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {\n}\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "feat")
+	os.WriteFile(filepath.Join(dir, "main.go"),
+		[]byte("package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "add greeting")
+	mustGit(t, dir, env, "push", "-q", "origin", "feat")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/lib",
+		"--source", "feat", "--target", "main", "--title", "'greeting'"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+
+	mrURL := inst.base() + "/alice/lib/mrs/1"
+	alice := inst.login(t, aliceKey)
+
+	// The gutter carries the handle, and following it renders the form
+	// anchored to that line. There is no JavaScript, so the anchor has to
+	// survive a round trip in the query.
+	_, body := browserGet(t, alice, mrURL+"?view=diff")
+	if !strings.Contains(body, "cpath=main.go&amp;cline=6&amp;cside=new") {
+		t.Fatalf("no comment handle in the diff gutter:\n%s", body)
+	}
+	_, body = browserGet(t, alice, mrURL+"?view=diff&cpath=main.go&cline=6&cside=new")
+	if !strings.Contains(body, `id="compose"`) || !strings.Contains(body, `name="line" value="6"`) {
+		t.Fatalf("compose form not rendered:\n%s", body)
+	}
+
+	if status, _ := browserPost(t, alice, mrURL+"/diff-comment", url.Values{
+		"path": {"main.go"}, "line": {"6"}, "side": {"new"},
+		"body": {"use log instead of fmt"}}); status != 200 {
+		t.Fatalf("open thread: %d", status)
+	}
+	threads := inst.mrThreads(t, aliceKey, "alice/lib", "1")
+	if len(threads) != 1 || threads[0].Path != "main.go" || threads[0].Line != 6 {
+		t.Fatalf("thread not anchored: %+v", threads)
+	}
+	if len(threads[0].Comments) != 1 || threads[0].Comments[0].Body != "use log instead of fmt" {
+		t.Fatalf("comment body not stored: %+v", threads[0].Comments)
+	}
+
+	// The rendered thread offers reply and resolve to its author.
+	_, body = browserGet(t, alice, mrURL+"?view=diff")
+	if !strings.Contains(body, `name="reply" value="`+strconv.FormatInt(threads[0].ID, 10)+`"`) {
+		t.Fatalf("no reply form on the thread:\n%s", body)
+	}
+	if !strings.Contains(body, `value="resolve"`) {
+		t.Fatalf("no resolve control on the thread:\n%s", body)
+	}
+
+	if status, _ := browserPost(t, alice, mrURL+"/diff-comment", url.Values{
+		"reply": {strconv.FormatInt(threads[0].ID, 10)}, "body": {"agreed, switching"}}); status != 200 {
+		t.Fatalf("reply: %d", status)
+	}
+	threads = inst.mrThreads(t, aliceKey, "alice/lib", "1")
+	if len(threads) != 1 || len(threads[0].Comments) != 2 ||
+		threads[0].Comments[1].Body != "agreed, switching" {
+		t.Fatalf("reply not on the thread: %+v", threads)
+	}
+
+	// An empty body is refused, and says so on the page it returns to.
+	_, body = browserPost(t, alice, mrURL+"/diff-comment", url.Values{
+		"reply": {strconv.FormatInt(threads[0].ID, 10)}, "body": {"  "}})
+	if !strings.Contains(body, "empty comment") {
+		t.Fatalf("empty reply not refused:\n%s", body)
+	}
+}
+
+// mrThread is one review thread as mr threads --json reports it.
+type mrThread struct {
+	ID       int64  `json:"id"`
+	Path     string `json:"path"`
+	Side     string `json:"side"`
+	Line     int64  `json:"line"`
+	Comments []struct {
+		Author string `json:"author"`
+		Body   string `json:"body"`
+	} `json:"comments"`
+}
+
+// mrThreads reads the review threads on a merge request over SSH.
+func (i *instance) mrThreads(t *testing.T, key, repo, n string) []mrThread {
+	t.Helper()
+	out, errOut, code := i.ssh(t, key, "", "mr", "threads", repo, n, "--json")
+	if code != 0 {
+		t.Fatalf("mr threads: %s", errOut)
+	}
+	var env struct {
+		Data []mrThread `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("mr threads json: %v", err)
+	}
+	return env.Data
 }
