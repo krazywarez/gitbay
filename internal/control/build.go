@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/gitutil"
@@ -436,4 +438,58 @@ func runRunnerDone(c *Ctx, args []string) int {
 	return c.emit(map[string]any{"build": b.Number, "status": args[1]}, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d %s\n", b.Number, args[1])
 	})
+}
+
+// QueueBranchBuilds reads .gitbay/ci.yml at sha and creates one pending
+// build per push job, with a pending commit status the runner resolves.
+// A broken config surfaces as a failed "ci/config" status, not silence.
+//
+// Both paths that move a branch call this: post-receive for a push, and
+// the merge path for a merge, which updates the ref directly and so never
+// reaches a hook.
+func QueueBranchBuilds(
+	st *store.Store, root, siteURL string,
+	repo store.Repo, userID int64, branch, sha string, now time.Time,
+) {
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return // no CI config at this commit
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		st.SetCommitStatus(repo.ID, sha, "ci/config", "failure", err.Error(), "", userID)
+		return
+	}
+	var schedules []store.Schedule
+	for _, j := range jobs {
+		// Tag jobs run on matching tag pushes only.
+		if j.Tags != "" {
+			continue
+		}
+		// Scheduled jobs run on their cron, not on push; a default-branch
+		// push (re)registers them.
+		if j.Schedule != "" {
+			if branch == repo.DefaultBranch {
+				schedules = append(schedules, store.Schedule{
+					RepoID: repo.ID, Job: j.Name, Cron: j.Schedule,
+					NextRun: ci.NextRun(j.Schedule, now),
+				})
+			}
+			continue
+		}
+		steps, _ := json.Marshal(j.Steps)
+		n, err := st.CreateBuild(repo.ID, j.Name, sha, branch, string(steps))
+		if err != nil {
+			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
+			continue
+		}
+		url := fmt.Sprintf("%s/%s/builds/%d", siteURL, repo.Path(), n)
+		st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "queued", url, userID)
+	}
+	if branch == repo.DefaultBranch {
+		if err := st.SyncSchedules(repo.ID, schedules); err != nil {
+			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
+		}
+	}
 }

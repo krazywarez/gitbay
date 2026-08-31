@@ -241,52 +241,12 @@ func (s *Server) postReceive(req Request) {
 	}
 }
 
-// queueBuilds reads .gitbay/ci.yml at the pushed commit and creates one
-// pending build per job, with a pending commit status the runner resolves.
-// A broken config surfaces as a failed "ci/config" status, not silence.
+// queueBuilds queues the push jobs for a branch update. The work is
+// shared with the merge path, which moves a ref without reaching a hook.
 func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) {
-	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
-	if err != nil {
-		return // no CI config at this commit
-	}
-	jobs, err := ci.Parse(raw)
-	if err != nil {
-		s.st.SetCommitStatus(repo.ID, sha, "ci/config", "failure", err.Error(), "", userID)
-		return
-	}
-	now := time.Now()
-	var schedules []store.Schedule
-	for _, j := range jobs {
-		// Tag jobs run on matching tag pushes only.
-		if j.Tags != "" {
-			continue
-		}
-		// Scheduled jobs run on their cron, not on push; a default-branch
-		// push (re)registers them.
-		if j.Schedule != "" {
-			if branch == repo.DefaultBranch {
-				schedules = append(schedules, store.Schedule{
-					RepoID: repo.ID, Job: j.Name, Cron: j.Schedule,
-					NextRun: ci.NextRun(j.Schedule, now),
-				})
-			}
-			continue
-		}
-		steps, _ := json.Marshal(j.Steps)
-		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, branch, string(steps))
-		if err != nil {
-			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
-			continue
-		}
-		url := fmt.Sprintf("%s/%s/builds/%d", s.cfg.Server.SiteURL, repo.Path(), n)
-		s.st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "queued", url, userID)
-	}
-	if branch == repo.DefaultBranch {
-		if err := s.st.SyncSchedules(repo.ID, schedules); err != nil {
-			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
-		}
-	}
+	control.QueueBranchBuilds(
+		s.st, s.cfg.Server.Root, s.cfg.Server.SiteURL,
+		repo, userID, branch, sha, time.Now())
 }
 
 // queueTagBuilds runs the jobs whose tag pattern matches a pushed tag.

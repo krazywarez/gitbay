@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
@@ -1024,6 +1025,14 @@ func runMRMerge(c *Ctx, args []string) int {
 		ProcessMRDescription(c.Store, repo, mr, c.User.ID)
 		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
 	}
+	// A merge moves the ref directly, so it never reaches post-receive and
+	// none of the ref-update work fires on its own. The event webhooks
+	// subscribe to, and the branch's CI jobs, happen here instead.
+	c.Store.RecordEvent(repo.ID, c.User.ID, "push", fmt.Sprintf(
+		`{"ref":%q,"old":%q,"new":%q,"forced":false,"deleted":false}`,
+		targetRef, targetSHA, newSHA))
+	QueueBranchBuilds(c.Store, c.Cfg.Server.Root, c.Cfg.Server.SiteURL,
+		repo, c.User.ID, mr.TargetRef, newSHA, time.Now())
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
