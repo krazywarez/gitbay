@@ -4,6 +4,24 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.3.0 — 2026-08-31
+
+A runner took every repository's work, which decided where you could run
+one.
+
+- =runner next= takes optional =owner/name= arguments and =gitbay-runner=
+  takes =-repos=, so a runner claims builds only for the repositories it
+  names. Naming none is the old behaviour, so an existing runner is
+  unaffected. This is what makes a runner outside the server practical: one
+  on a machine that should build a single project no longer picks up a
+  build belonging to someone else, which with open registration need not be
+  anyone the operator knows. The scoping is what the runner asks for rather
+  than an ACL the server holds over it — a runner account is admin by
+  necessity, so the boundary is the operator choosing how to start it. #66
+
+Replace the binary and restart. Runners want the new binary too, though an
+old one keeps working unscoped.
+
 * v1.2.1 — 2026-08-31
 
 Merging landed commits without running anything.
