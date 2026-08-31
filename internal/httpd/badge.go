@@ -62,28 +62,55 @@ func badgeSVG(label, state string) string {
 
 // buildBadge answers GET /{owner}/{repo}/badge/build.svg[?job=name].
 func (s *Server) buildBadge(w http.ResponseWriter, r *http.Request) {
-	repo, ok := s.publicRepo(r.PathValue("owner"), strings.TrimSuffix(r.PathValue("repo"), ".git"))
+	label, state, ok := s.badgeState(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
+	badgeHeaders(w, "image/svg+xml; charset=utf-8")
+	fmt.Fprint(w, badgeSVG(label, state))
+}
+
+// buildBadgePNG answers GET /{owner}/{repo}/badge/build.png[?job=name], for
+// readers that cannot decode SVG.
+func (s *Server) buildBadgePNG(w http.ResponseWriter, r *http.Request) {
+	label, state, ok := s.badgeState(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	out, err := badgePNG(label, state)
+	if err != nil {
+		http.Error(w, "badge unavailable", http.StatusInternalServerError)
+		return
+	}
+	badgeHeaders(w, "image/png")
+	w.Write(out)
+}
+
+// badgeState resolves the repo and its latest build. Private repositories
+// report not ok — a badge must not leak that a repo exists.
+func (s *Server) badgeState(r *http.Request) (label, state string, ok bool) {
+	repo, ok := s.publicRepo(r.PathValue("owner"), strings.TrimSuffix(r.PathValue("repo"), ".git"))
+	if !ok {
+		return "", "", false
+	}
 	job := r.URL.Query().Get("job")
-	label := "build"
+	label = "build"
 	if job != "" {
 		label = job
 	}
-	state := "unknown"
+	state = "unknown"
 	if b, err := s.st.LatestBuild(repo.ID, job); err == nil {
 		state = b.Status
 	}
-	writeBadge(w, label, state)
+	return label, state, true
 }
 
-func writeBadge(w http.ResponseWriter, label, state string) {
-	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+func badgeHeaders(w http.ResponseWriter, contentType string) {
+	w.Header().Set("Content-Type", contentType)
 	// Badges are read by other people's caches; keep them briefly fresh
 	// rather than pinned to a stale result.
 	w.Header().Set("Cache-Control", "max-age=60, must-revalidate")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	fmt.Fprint(w, badgeSVG(label, state))
 }

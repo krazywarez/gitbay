@@ -59,6 +59,7 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases", Handler: s.releases},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/builds", Handler: s.builds},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/badge/build.svg", Handler: s.buildBadge},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/badge/build.png", Handler: s.buildBadgePNG},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/builds/{n}", Handler: s.build},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases/download/{tag}/{name}", Handler: s.releaseAsset},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/raw/{ref}/{path...}", Handler: s.raw},
