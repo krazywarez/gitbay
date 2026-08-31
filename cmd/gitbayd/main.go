@@ -18,9 +18,11 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
+	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/deps"
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
@@ -165,6 +167,9 @@ func serveCmd() *cobra.Command {
 				RepoDir: func(owner, name string) string {
 					return control.RepoDir(cfg.Server.Root, owner, name)
 				}}).Run(whCtx)
+			go deps.New(st, cfg, func(owner, name string) string {
+				return control.RepoDir(cfg.Server.Root, owner, name)
+			}, buildinfo.String()).Run(whCtx)
 
 			errCh := make(chan error, 3)
 			if cfg.SSH.Mode == "embedded" {

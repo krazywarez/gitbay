@@ -91,6 +91,18 @@
   <button type="submit">Protect</button>
 </form>
 
+<h2>Dependencies</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="deps">
+  <label for="deps">Check for updates</label>
+  <input type="checkbox" id="deps" name="deps" value="on"{{if .DepsEnabled}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<p class="meta">Compares the manifests on <code>{{.Repo.DefaultBranch}}</code> against
+proxy.golang.org, npm, crates.io, and PyPI once a day, and tracks what is behind
+in an issue. Checking a private repository tells those registries what it
+depends on.</p>
+
 <h2>Lifecycle</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="archive">

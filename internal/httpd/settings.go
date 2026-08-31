@@ -17,9 +17,10 @@ import (
 
 type settingsPage struct {
 	repoPage
-	Topics   []string
-	Branches []gitutil.Ref
-	Notice   string
+	Topics      []string
+	Branches    []gitutil.Ref
+	DepsEnabled bool
+	Notice      string
 }
 
 func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -34,9 +35,11 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.Us
 	p.Tab = "settings"
 	topics, _ := s.st.ListTopics(repo.ID)
 	branches, _ := gitutil.Refs(p.Dir, "heads")
+	_, depsErr := s.st.DepCheckFor(repo.ID)
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
-		Notice: r.URL.Query().Get("e"),
+		DepsEnabled: depsErr == nil,
+		Notice:      r.URL.Query().Get("e"),
 	})
 }
 
@@ -79,6 +82,12 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "protect", repo, v("branch")}
 	case "unprotect":
 		argv = []string{"repo", "settings", "unprotect", repo, v("branch")}
+	case "deps":
+		verb := "disable"
+		if v("deps") == "on" {
+			verb = "enable"
+		}
+		argv = []string{"repo", "deps", verb, repo}
 	case "archive":
 		verb := "archive"
 		if v("archive") != "on" {

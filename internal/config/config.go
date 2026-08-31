@@ -26,6 +26,7 @@ type Config struct {
 	Limits       Limits       `toml:"limits"`
 	Mail         Mail         `toml:"mail"`
 	Mirrors      Mirrors      `toml:"mirrors"`
+	Deps         Deps         `toml:"deps"`
 	// GoImport maps vanity Go module paths to repositories, e.g.
 	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
 	// under a mapped path get a go-import meta tag.
@@ -114,6 +115,13 @@ type Mirrors struct {
 	PullIntervalMinutes int `toml:"pull_interval_minutes"`
 }
 
+// Deps configures the dependency-update sweep. It runs only for repos that
+// have opted in with `repo deps enable`, because checking a private repo
+// tells a public registry what it depends on.
+type Deps struct {
+	CheckIntervalHours int `toml:"check_interval_hours"`
+}
+
 type Limits struct {
 	MaxPackBytes    int64 `toml:"max_pack_bytes"`
 	MaxBlobBytes    int64 `toml:"max_blob_bytes"`
@@ -144,6 +152,7 @@ func Default() Config {
 		},
 		GitDaemon: GitDaemon{Port: 9418},
 		Mirrors:   Mirrors{PullIntervalMinutes: 15},
+		Deps:      Deps{CheckIntervalHours: 24},
 		Limits: Limits{
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,
