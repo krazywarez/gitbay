@@ -183,3 +183,26 @@ func stripTags(s string) string {
 	}
 	return strings.ReplaceAll(b.String(), "&#34;", `"`)
 }
+
+// An added line whose own text begins with a dash — a Markdown bullet, a
+// docstring list — keeps it. Deriving the highlighting source from the raw
+// line means stripping the marker, and stripping "+" then "-" takes the
+// content's dash along with it.
+func TestParseDiffKeepsDashAfterMarker(t *testing.T) {
+	files := parseDiff(`diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,3 @@
+ - one
++- two
+ - three
+`)
+	for _, l := range files[0].Lines {
+		if l.Class != "add" {
+			continue
+		}
+		if text := stripTags(string(l.Code)); text != l.Content {
+			t.Errorf("added line %q highlighted as %q", l.Content, text)
+		}
+	}
+}

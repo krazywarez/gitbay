@@ -192,11 +192,14 @@ func highlightFile(f *diffFile) {
 }
 
 // sideText joins one side of a hunk: context plus the given change class.
+// Content, not Text: the marker is already off it. Taking it off Text here
+// meant stripping "+" and then "-", which ate the dash of an added line that
+// begins with one.
 func sideText(hunk []diffLine, class string) string {
 	var b strings.Builder
 	for _, l := range hunk {
 		if l.Class == "ctx" || l.Class == class {
-			b.WriteString(strings.TrimPrefix(strings.TrimPrefix(l.Text, "+"), "-"))
+			b.WriteString(l.Content)
 			b.WriteByte('\n')
 		}
 	}
