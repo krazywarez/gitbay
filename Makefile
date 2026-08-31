@@ -26,8 +26,11 @@ RUNNER_BIN := dist/gitbay-runner-linux-amd64
 help:
 	@sed -n 's/^#   //p' $(MAKEFILE_LIST)
 
+# The e2e suite runs 400-700s against go's 600s per-package default, so a
+# loaded machine turns a passing tree into a goroutine dump that reads as
+# an unrelated failure. A real hang still fails, just later.
 test:
-	go test ./... -count=1
+	go test ./... -count=1 -timeout 30m
 
 # Fail in seconds on an unreachable host or a wedged ssh-agent, rather
 # than hanging on a credential prompt mid-deploy.
