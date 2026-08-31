@@ -19,6 +19,11 @@ packages:
   - ufw
   - unattended-upgrades
   - fail2ban
+  # The CI runner shares this host and the suite drives them; without them
+  # the LFS and signature tests skip themselves and CI goes green having
+  # tested less.
+  - git-lfs
+  - gnupg
 
 write_files:
   # Admin sshd on 2222. Ubuntu 24.04 socket-activates sshd, so the port
