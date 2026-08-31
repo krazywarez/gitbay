@@ -211,6 +211,23 @@ v1 runs steps directly on the host — no containers — so treat the
 runner machine as executing whatever your users push. Install the
 toolchains your builds need on it.
 
+A runner claims the oldest pending build in the queue, whichever
+repository it belongs to. =-repos= narrows that to named repositories,
+which is what makes a runner outside the server practical — one on a
+machine that should build a single project, or that holds credentials for
+one deployment, no longer picks up a build belonging to someone else. With
+open registration that someone need not be anyone you know.
+
+#+begin_src sh
+gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
+  -workdir /var/lib/gitbay-runner/work
+#+end_src
+
+Naming no repositories is the old behaviour and stays the right choice for
+the runner on the server itself. The scoping is what the runner asks for,
+not an ACL the server holds over it: a runner account is admin by
+necessity, so the boundary is you choosing how to start it.
+
 Instance admin on the runner account only authorizes the claim/report
 protocol; it grants no repo access. A build that pushes back — a pages
 deploy, an archive publish, an automated MR branch — needs an explicit
