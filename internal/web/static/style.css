@@ -591,7 +591,10 @@ form.setform {
   padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--faint);
 }
-form.setform label { min-width: 12rem; color: var(--muted); font-size: var(--fs-2); }
+/* the label absorbs the free space, so a row whose control does not
+   stretch — a checkbox, a number — still finishes at the same right edge
+   as the rows whose input fills the line */
+form.setform label { min-width: 12rem; margin-right: auto; color: var(--muted); font-size: var(--fs-2); }
 form.setform input[type="text"], form.setform select { flex: 1 1 16rem; }
 form.setform input[type="number"] { width: 5rem; }
 ul.protlist { list-style: none; padding: 0; margin: var(--sp-2) 0; }
@@ -1196,16 +1199,40 @@ select {
 input:hover, textarea:hover, select:hover { border-color: var(--muted); }
 /* the global :focus-visible ring covers these; only the border moves */
 input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-input[type="radio"], input[type="checkbox"] { accent-color: var(--fill); }
+input[type="radio"] { accent-color: var(--fill); }
 label:has(> input[type="radio"]), label:has(> input[type="checkbox"]),
 label:has(> select) { display: inline-flex; align-items: center; gap: var(--sp-2); }
 
-/* Shape carries the meaning on these two and nothing else does: a circle
-   takes one answer, a square takes any number. It survives colour being
-   removed — greyscale, high contrast, colour blindness — so the native
-   shapes stay and only the colour joins the system. Drawing them by hand
-   would align the corners at the cost of the one cue that always works. */
-input[type="radio"], input[type="checkbox"] { accent-color: var(--fill); }
+/* A radio keeps the native control: a circle takes one answer, a square
+   takes any number, and that shape is the cue that survives greyscale,
+   high contrast and colour blindness. The checkbox is drawn instead,
+   because at the size the OS renders it it reads as an afterthought
+   beside the button it shares a row with. The square is kept square —
+   the size changes, the cue does not. */
+input[type="checkbox"] {
+  appearance: none;
+  flex: none;
+  /* the height of a text input, a select and a button, so a settings row
+     ends in one column of controls rather than a button and a speck */
+  width: 2.5rem;
+  height: 2.5rem;
+  /* an empty box has nothing but its border to announce it, so the border
+     is --muted rather than the --line the sized controls can afford */
+  border: 1px solid var(--muted);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  cursor: pointer;
+}
+input[type="checkbox"]:not(:checked):hover { border-color: var(--fg); }
+input[type="checkbox"]:checked {
+  background: var(--fill);
+  border-color: var(--fill);
+  /* the mark sits on the blue ground, so it is white in both schemes */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1 5l3.4 3.4L11 1.4' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 1.2rem;
+}
 
 /* a segmented control for a small, mutually exclusive set: real radios
    underneath, so arrow keys and screen readers behave as they always did */
