@@ -194,7 +194,11 @@ func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 	}
 	author, err := w.St.UserByUsername(store.BotUsername)
 	if err != nil {
-		return fmt.Errorf("loading %s: %w", store.BotUsername, err)
+		// Migration 0028 leaves the account uncreated when the name was
+		// already taken, which is the one case worth spelling out: the
+		// feature is stuck until an operator frees the name.
+		return fmt.Errorf("no %s account to author the issue (the name was taken when this instance upgraded): %w",
+			store.BotUsername, err)
 	}
 	number, err := w.St.CreateIssue(repo.ID, author.ID, IssueTitle, body, "md")
 	if err != nil {

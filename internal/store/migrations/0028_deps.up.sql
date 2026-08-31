@@ -22,4 +22,12 @@ CREATE TABLE dep_reports (
 
 -- The account dependency issues are authored by. Keyless and mailless: it
 -- authors, it never authenticates.
-INSERT INTO users (username, is_admin) VALUES ('gitbay-bot', 0);
+--
+-- The name was not reserved before this migration, so an instance upgrading
+-- from v1.0.x may already have a user or an org holding it. Claim it only if
+-- it is free: a daemon that will not start is a far worse outcome than a
+-- dependency check that reports why it cannot open an issue.
+INSERT INTO users (username, is_admin)
+SELECT 'gitbay-bot', 0
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'gitbay-bot')
+  AND NOT EXISTS (SELECT 1 FROM orgs WHERE name = 'gitbay-bot');
