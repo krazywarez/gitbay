@@ -107,7 +107,9 @@ gitbay status list <owner/name> <sha> --json    # {"combined": "...", "statuses"
 One row per (commit, context): re-reporting updates in place. States:
 =pending=, =success=, =failure=, =error=; the combined state is the
 worst of them. Statuses appear on commit pages, MR pages, and
-=mr show=. With =repo settings require-checks <repo> on=, merging
+=mr show=, each with =updated_at=; a =ci/<job>= status also carries
+=duration=, read from the build behind it, once that build has
+finished. With =repo settings require-checks <repo> on=, merging
 requires the MR head to carry statuses and all of them green. Each
 report also emits a =status= event to webhooks.
 
