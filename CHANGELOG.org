@@ -4,6 +4,32 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.2.0 — 2026-08-31
+
+A merge request said what its state was and almost nothing about when it
+got there. It now keeps time.
+
+- Reviews and checks carry the moment they last said something, on the
+  merge request page and in =mr show=. A =ci/<job>= check also reports how
+  long its build ran, so the timing of a run is readable without opening
+  it. Checks posted through =status set= have no build and report only the
+  time. !137
+- A merged or closed merge request names who resolved it and when. The
+  header stated "X wants to merge" whatever the state; it now says "X
+  merged A into main on <date>", or "closed this without merging", and
+  drops the claim entirely for a row that carries no stamp rather than
+  inventing a time.
+- =mr show= gains =merged_at=/=merged_by= and =closed_at=/=closed_by=, a
+  =created_at= per review, and =updated_at= plus =duration= per check, in
+  both JSON and text. Additive: nothing existing changed shape.
+- The iOS client renders all of it as of krz/gitbay-ios!37.
+
+Replace the binary and restart. Migration 0029 adds four columns to
+=merge_requests= and backfills the merge stamp for merge requests already
+merged, reading the =mr.merged= events. A merge with no such event to read
+— an import, or a row older than its events — keeps no stamp, and every
+surface says nothing about when it happened rather than guessing.
+
 * v1.1.0 — 2026-08-31
 
 Every release until now answered questions. This one notices something
