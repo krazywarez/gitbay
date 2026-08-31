@@ -13,7 +13,7 @@ import (
 // registry must be reachable by typing it, or the CLI is not the
 // complete interface the design claims.
 var notInCLI = map[string]string{
-	"help":                  "cobra provides its own",
+	"help":                  "cobra owns `gitbay help`; the registry's is reached by `<cmd> --help`",
 	"runner next":           "the CI runner's wire protocol, not for humans",
 	"runner done":           "the CI runner's wire protocol, not for humans",
 	"runner log":            "the CI runner's wire protocol, not for humans",

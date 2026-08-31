@@ -16,11 +16,14 @@ import (
 
 func init() {
 	register(Command{Path: []string{"profile", "show"},
-		Summary: "show a user's or org's profile: profile show [name]", ReadOnly: true, Run: runProfileShow})
+		Summary: "show a user's or org's profile",
+		Usage:   "profile show [name]", ReadOnly: true, Run: runProfileShow})
 	register(Command{Path: []string{"profile", "set"},
-		Summary: "set your profile: profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]... ('' clears)", ReadsStdin: true, Run: runProfileSet})
+		Summary: "set your profile",
+		Usage:   "profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]... ('' clears)", ReadsStdin: true, Run: runProfileSet})
 	register(Command{Path: []string{"org", "profile"},
-		Summary: "show or set an org's profile: org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...", ReadsStdin: true, Run: runOrgProfile})
+		Summary: "show or set an org's profile",
+		Usage:   "org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...", ReadsStdin: true, Run: runOrgProfile})
 }
 
 // maxProfileLinks caps the free-form link list. A profile is a header,

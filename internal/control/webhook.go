@@ -14,15 +14,20 @@ import (
 
 func init() {
 	register(Command{Path: []string{"webhook", "add"},
-		Summary: "add a webhook: webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]", Run: runWebhookAdd})
+		Summary: "add a webhook",
+		Usage:   "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]", Run: runWebhookAdd})
 	register(Command{Path: []string{"webhook", "list"},
-		Summary: "list webhooks: webhook list <owner/name>", ReadOnly: true, Run: runWebhookList})
+		Summary: "list webhooks",
+		Usage:   "webhook list <owner/name>", ReadOnly: true, Run: runWebhookList})
 	register(Command{Path: []string{"webhook", "remove"},
-		Summary: "remove a webhook: webhook remove <owner/name> <id>", Run: runWebhookRemove})
+		Summary: "remove a webhook",
+		Usage:   "webhook remove <owner/name> <id>", Run: runWebhookRemove})
 	register(Command{Path: []string{"webhook", "deliveries"},
-		Summary: "recent deliveries: webhook deliveries <owner/name> [--limit n]", ReadOnly: true, Run: runWebhookDeliveries})
+		Summary: "recent deliveries",
+		Usage:   "webhook deliveries <owner/name> [--limit n]", ReadOnly: true, Run: runWebhookDeliveries})
 	register(Command{Path: []string{"webhook", "redeliver"},
-		Summary: "queue a delivery again: webhook redeliver <owner/name> <delivery-id>", Run: runWebhookRedeliver})
+		Summary: "queue a delivery again",
+		Usage:   "webhook redeliver <owner/name> <delivery-id>", Run: runWebhookRedeliver})
 }
 
 func runWebhookAdd(c *Ctx, args []string) int {

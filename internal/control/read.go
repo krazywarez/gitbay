@@ -18,25 +18,29 @@ import (
 func init() {
 	register(Command{
 		Path:     []string{"repo", "tree"},
-		Summary:  "list a directory: repo tree <owner/name> [<path>] [--ref <ref>]",
+		Summary:  "list a directory",
+		Usage:    "repo tree <owner/name> [<path>] [--ref <ref>]",
 		ReadOnly: true,
 		Run:      runRepoTree,
 	})
 	register(Command{
 		Path:     []string{"repo", "cat"},
-		Summary:  "read a file: repo cat <owner/name> <path> [--ref <ref>]",
+		Summary:  "read a file",
+		Usage:    "repo cat <owner/name> <path> [--ref <ref>]",
 		ReadOnly: true,
 		Run:      runRepoCat,
 	})
 	register(Command{
 		Path:     []string{"repo", "blame"},
-		Summary:  "attribute lines to commits: repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]",
+		Summary:  "attribute lines to commits",
+		Usage:    "repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]",
 		ReadOnly: true,
 		Run:      runRepoBlame,
 	})
 	register(Command{
 		Path:     []string{"repo", "refs"},
-		Summary:  "list branches and tags: repo refs <owner/name>",
+		Summary:  "list branches and tags",
+		Usage:    "repo refs <owner/name>",
 		ReadOnly: true,
 		Run:      runRepoRefs,
 	})

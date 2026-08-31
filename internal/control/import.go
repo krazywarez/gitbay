@@ -17,7 +17,8 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "import"},
-		Summary:    "server-side mirror of a foreign repository: repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		Summary:    "server-side mirror of a foreign repository",
+		Usage:      "repo import <owner/name> --from <url> [--private] [--token-stdin]",
 		ReadsStdin: true, Run: runRepoImport})
 }
 

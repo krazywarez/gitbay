@@ -15,11 +15,14 @@ func init() {
 	// public registry what the repository depends on, which is the owner's
 	// disclosure to make, not the instance's.
 	register(Command{Path: []string{"repo", "deps", "enable"},
-		Summary: "check dependencies for updates: repo deps enable <owner/name>", Run: runDepsEnable})
+		Summary: "check dependencies for updates",
+		Usage:   "repo deps enable <owner/name>", Run: runDepsEnable})
 	register(Command{Path: []string{"repo", "deps", "disable"},
-		Summary: "stop checking dependencies: repo deps disable <owner/name>", Run: runDepsDisable})
+		Summary: "stop checking dependencies",
+		Usage:   "repo deps disable <owner/name>", Run: runDepsDisable})
 	register(Command{Path: []string{"repo", "deps", "status"},
-		Summary: "show dependency check state: repo deps status <owner/name>", ReadOnly: true, Run: runDepsStatus})
+		Summary: "show dependency check state",
+		Usage:   "repo deps status <owner/name>", ReadOnly: true, Run: runDepsStatus})
 }
 
 func runDepsEnable(c *Ctx, args []string) int {

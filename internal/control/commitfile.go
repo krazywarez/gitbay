@@ -12,8 +12,9 @@ import (
 
 func init() {
 	register(Command{
-		Path: []string{"repo", "commit-file"},
-		Summary: "write a file and commit it: repo commit-file <owner/name> <path> " +
+		Path:    []string{"repo", "commit-file"},
+		Summary: "write a file and commit it",
+		Usage: "repo commit-file <owner/name> <path> " +
 			"--ref <branch> [--message <m>] [--file -]",
 		ReadsStdin: true,
 		Run:        runCommitFile,

@@ -18,37 +18,48 @@ import (
 
 func init() {
 	register(Command{Path: []string{"build", "list"},
-		Summary: "list recent builds: build list <owner/name>", ReadOnly: true, Run: runBuildList})
+		Summary: "list recent builds",
+		Usage:   "build list <owner/name>", ReadOnly: true, Run: runBuildList})
 	register(Command{Path: []string{"build", "show"},
-		Summary: "show one build: build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
+		Summary: "show one build",
+		Usage:   "build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
 	register(Command{Path: []string{"build", "log"},
-		Summary: "print a build's log: build log <owner/name> <n>", ReadOnly: true, Run: runBuildLog})
+		Summary: "print a build's log",
+		Usage:   "build log <owner/name> <n>", ReadOnly: true, Run: runBuildLog})
 
 	register(Command{Path: []string{"build", "jobs"},
-		Summary: "list the jobs a trigger can name: build jobs <owner/name>", ReadOnly: true, Run: runBuildJobs})
+		Summary: "list the jobs a trigger can name",
+		Usage:   "build jobs <owner/name>", ReadOnly: true, Run: runBuildJobs})
 
 	register(Command{Path: []string{"build", "trigger"},
-		Summary: "queue a job now (scheduled or not): build trigger <owner/name> <job>", Run: runBuildTrigger})
+		Summary: "queue a job now (scheduled or not)",
+		Usage:   "build trigger <owner/name> <job>", Run: runBuildTrigger})
 	// Secrets: set over stdin, listed by name only, injected into the
 	// repo's builds as environment variables. Same discipline as mirror
 	// tokens — the value never appears in argv, logs, or output.
 	register(Command{Path: []string{"repo", "secret", "set"},
-		Summary:    "set a build secret: repo secret set <owner/name> <NAME> (value on stdin)",
+		Summary:    "set a build secret",
+		Usage:      "repo secret set <owner/name> <NAME> (value on stdin)",
 		ReadsStdin: true, SSHOnly: true, Run: runSecretSet})
 	register(Command{Path: []string{"repo", "secret", "remove"},
-		Summary: "remove a build secret: repo secret remove <owner/name> <NAME>", Run: runSecretRemove})
+		Summary: "remove a build secret",
+		Usage:   "repo secret remove <owner/name> <NAME>", Run: runSecretRemove})
 	register(Command{Path: []string{"repo", "secret", "list"},
-		Summary: "list build secret names: repo secret list <owner/name>", ReadOnly: true, Run: runSecretList})
+		Summary: "list build secret names",
+		Usage:   "repo secret list <owner/name>", ReadOnly: true, Run: runSecretList})
 
 	// Runner commands: the claim/report loop for gitbay-runner. Admin-only —
 	// a runner executes arbitrary repo code, so handing out jobs is the
 	// instance operator's call.
 	register(Command{Path: []string{"runner", "next"},
-		Summary: "claim the oldest pending build (runner protocol)", SSHOnly: true, Run: runRunnerNext})
+		Summary: "claim the oldest pending build (runner protocol)",
+		Usage:   "runner next", SSHOnly: true, Run: runRunnerNext})
 	register(Command{Path: []string{"runner", "log"},
-		Summary: "append a build's log from stdin: runner log <build-id>", SSHOnly: true, ReadsStdin: true, Run: runRunnerLog})
+		Summary: "append a build's log from stdin",
+		Usage:   "runner log <build-id>", SSHOnly: true, ReadsStdin: true, Run: runRunnerLog})
 	register(Command{Path: []string{"runner", "done"},
-		Summary: "finish a build: runner done <build-id> success|failure", SSHOnly: true, Run: runRunnerDone})
+		Summary: "finish a build",
+		Usage:   "runner done <build-id> success|failure", SSHOnly: true, Run: runRunnerDone})
 }
 
 type buildOut struct {

@@ -15,24 +15,28 @@ func init() {
 	register(Command{
 		Path:     []string{"whoami"},
 		Summary:  "show the authenticated account",
+		Usage:    "whoami",
 		ReadOnly: true,
 		Run:      runWhoami,
 	})
 	register(Command{
 		Path:     []string{"keys", "list"},
 		Summary:  "list registered SSH keys",
+		Usage:    "keys list",
 		ReadOnly: true,
 		Run:      runKeysList,
 	})
 	register(Command{
 		Path:       []string{"keys", "add"},
-		Summary:    "register an SSH public key (authorized_keys format on stdin) [--scope full|git]",
+		Summary:    "register an SSH public key (authorized_keys format)",
+		Usage:      "keys add [--scope full|git] < key.pub",
 		ReadsStdin: true,
 		Run:        runKeysAdd,
 	})
 	register(Command{
 		Path:    []string{"keys", "remove"},
 		Summary: "remove an SSH key by fingerprint",
+		Usage:   "keys remove <fingerprint>",
 		Run:     runKeysRemove,
 	})
 }

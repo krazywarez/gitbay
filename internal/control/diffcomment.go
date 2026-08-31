@@ -16,14 +16,18 @@ import (
 
 func init() {
 	register(Command{Path: []string{"mr", "diff-comment"},
-		Summary:    "comment on a diff line: mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--reply <id>] [--message <m> | --file -]",
+		Summary:    "comment on a diff line",
+		Usage:      "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--reply <id>] [--message <m> | --file -]",
 		ReadsStdin: true, Run: runDiffComment})
 	register(Command{Path: []string{"mr", "threads"},
-		Summary: "review threads on an MR: mr threads <owner/name> <n>", ReadOnly: true, Run: runMRThreads})
+		Summary: "review threads on an MR",
+		Usage:   "mr threads <owner/name> <n>", ReadOnly: true, Run: runMRThreads})
 	register(Command{Path: []string{"mr", "resolve"},
-		Summary: "resolve a review thread: mr resolve <owner/name> <n> <thread-id>", Run: runMRResolve})
+		Summary: "resolve a review thread",
+		Usage:   "mr resolve <owner/name> <n> <thread-id>", Run: runMRResolve})
 	register(Command{Path: []string{"mr", "unresolve"},
-		Summary: "reopen a review thread: mr unresolve <owner/name> <n> <thread-id>", Run: runMRUnresolve})
+		Summary: "reopen a review thread",
+		Usage:   "mr unresolve <owner/name> <n> <thread-id>", Run: runMRUnresolve})
 }
 
 func runDiffComment(c *Ctx, args []string) int {

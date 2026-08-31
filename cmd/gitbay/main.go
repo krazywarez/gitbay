@@ -119,16 +119,28 @@ func pass(use, short string, o passOpts) *cobra.Command {
 		},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// cobra still owns `forge <cmd> --help`.
+			// The registry is the only place flags are written down, so
+			// --help asks the server rather than reprinting the one-line
+			// summary cobra holds.
 			for _, a := range args {
 				if a == "--help" || a == "-h" {
-					return cmd.Help()
+					os.Exit(runServerHelp(o))
 				}
 			}
 			os.Exit(runPass(o, args))
 			return nil
 		},
 	}
+}
+
+// runServerHelp prints the registry's usage for one command.
+func runServerHelp(o passOpts) int {
+	t, err := resolveTarget()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitFailure
+	}
+	return runSSH(t, append([]string{"help"}, o.server...), strings.NewReader(""))
 }
 
 func runPass(o passOpts, args []string) int {

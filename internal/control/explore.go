@@ -12,7 +12,8 @@ import (
 func init() {
 	register(Command{
 		Path:     []string{"explore"},
-		Summary:  "list public repositories: explore [--limit <n>] [--cursor <c>]",
+		Summary:  "list public repositories",
+		Usage:    "explore [--limit <n>] [--cursor <c>]",
 		ReadOnly: true,
 		Run:      runExplore,
 	})
@@ -20,7 +21,8 @@ func init() {
 		Path: []string{"repo", "download"},
 		// Not "repo archive": that name is taken by the read-only flag,
 		// and renaming it would break every script that sets it.
-		Summary:  "write a tar.gz of a ref to stdout: repo download <owner/name> [--ref <r>] > repo.tar.gz",
+		Summary:  "write a tar.gz of a ref to stdout",
+		Usage:    "repo download <owner/name> [--ref <r>] > repo.tar.gz",
 		ReadOnly: true,
 		Run:      runRepoDownload,
 	})

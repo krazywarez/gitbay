@@ -13,10 +13,12 @@ import (
 
 func init() {
 	register(Command{Path: []string{"status", "set"},
-		Summary: "report a commit status (CI): status set <owner/name> <sha> --context <c> --state pending|success|failure|error [--description <d>] [--url <u>]",
+		Summary: "report a commit status (CI)",
+		Usage:   "status set <owner/name> <sha> --context <c> --state pending|success|failure|error [--description <d>] [--url <u>]",
 		Run:     runStatusSet})
 	register(Command{Path: []string{"status", "list"},
-		Summary: "statuses on a commit: status list <owner/name> <sha>", ReadOnly: true, Run: runStatusList})
+		Summary: "statuses on a commit",
+		Usage:   "status list <owner/name> <sha>", ReadOnly: true, Run: runStatusList})
 }
 
 var validStatusState = map[string]bool{"pending": true, "success": true, "failure": true, "error": true}

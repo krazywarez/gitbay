@@ -16,26 +16,35 @@ const maxBodyBytes = 64 << 10
 
 func init() {
 	register(Command{Path: []string{"issue", "create"},
-		Summary:    "open an issue: issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
+		Summary:    "open an issue",
+		Usage:      "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
-		Summary: "list issues: issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
+		Summary: "list issues",
+		Usage:   "issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
-		Summary: "show an issue with comments: issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
+		Summary: "show an issue with comments",
+		Usage:   "issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
 	register(Command{Path: []string{"issue", "edit"},
-		Summary:    "edit title or body: issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
+		Summary:    "edit title or body",
+		Usage:      "issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
-		Summary:    "comment: issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Summary:    "comment",
+		Usage:      "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runIssueComment})
 	register(Command{Path: []string{"issue", "close"},
-		Summary: "close an issue: issue close <owner/name> <n>", Run: runIssueClose})
+		Summary: "close an issue",
+		Usage:   "issue close <owner/name> <n>", Run: runIssueClose})
 	register(Command{Path: []string{"issue", "reopen"},
-		Summary: "reopen an issue: issue reopen <owner/name> <n>", Run: runIssueReopen})
+		Summary: "reopen an issue",
+		Usage:   "issue reopen <owner/name> <n>", Run: runIssueReopen})
 	register(Command{Path: []string{"issue", "label"},
-		Summary: "labels: issue label <owner/name> <n> [--add <l>]... [--remove <l>]...", Run: runIssueLabel})
+		Summary: "labels",
+		Usage:   "issue label <owner/name> <n> [--add <l>]... [--remove <l>]...", Run: runIssueLabel})
 	register(Command{Path: []string{"issue", "assign"},
-		Summary: "assignees: issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runIssueAssign})
+		Summary: "assignees",
+		Usage:   "issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runIssueAssign})
 }
 
 // issueArgs parses "<owner/name> <n>" plus flags handled by the caller.

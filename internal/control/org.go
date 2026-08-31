@@ -14,21 +14,29 @@ import (
 
 func init() {
 	register(Command{Path: []string{"org", "create"},
-		Summary: "create an organization (you become its first admin): org create <name>", Run: runOrgCreate})
+		Summary: "create an organization (you become its first admin)",
+		Usage:   "org create <name>", Run: runOrgCreate})
 	register(Command{Path: []string{"org", "list"},
-		Summary: "list organizations you belong to", ReadOnly: true, Run: runOrgList})
+		Summary: "list organizations you belong to",
+		Usage:   "org list", ReadOnly: true, Run: runOrgList})
 	register(Command{Path: []string{"org", "show"},
-		Summary: "show an organization and its members: org show <name>", ReadOnly: true, Run: runOrgShow})
+		Summary: "show an organization and its members",
+		Usage:   "org show <name>", ReadOnly: true, Run: runOrgShow})
 	register(Command{Path: []string{"org", "rename"},
-		Summary: "rename an organization: org rename <old> <new> (clone URLs change)", Run: runOrgRename})
+		Summary: "rename an organization",
+		Usage:   "org rename <old> <new> (clone URLs change)", Run: runOrgRename})
 	register(Command{Path: []string{"org", "delete"},
-		Summary: "delete an empty organization: org delete <name> --yes", Run: runOrgDelete})
+		Summary: "delete an empty organization",
+		Usage:   "org delete <name> --yes", Run: runOrgDelete})
 	register(Command{Path: []string{"org", "members", "add"},
-		Summary: "add or update a member: org members add <org> <user> [--role member|admin]", Run: runOrgMembersAdd})
+		Summary: "add or update a member",
+		Usage:   "org members add <org> <user> [--role member|admin]", Run: runOrgMembersAdd})
 	register(Command{Path: []string{"org", "members", "remove"},
-		Summary: "remove a member: org members remove <org> <user>", Run: runOrgMembersRemove})
+		Summary: "remove a member",
+		Usage:   "org members remove <org> <user>", Run: runOrgMembersRemove})
 	register(Command{Path: []string{"org", "members", "list"},
-		Summary: "list members: org members list <org>", ReadOnly: true, Run: runOrgMembersList})
+		Summary: "list members",
+		Usage:   "org members list <org>", ReadOnly: true, Run: runOrgMembersList})
 }
 
 // orgAdmin loads an org and requires the caller to be one of its admins.

@@ -19,15 +19,18 @@ import (
 func init() {
 	register(Command{Path: []string{"register"},
 		Summary: "create an account (only meaningful for unregistered keys)",
+		Usage:   "register --username <name> [--email <address> | --invite <code>]",
 		Run: func(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitUsage,
 				"this SSH key already belongs to %s. To register a new account, connect with the key it should use:\n  ssh -F /dev/null -i <newkey> git@<host> register ...",
 				c.User.Username)
 		}})
 	register(Command{Path: []string{"email", "add"},
-		Summary: "add an address and mail a verification code: email add <address>", Run: runEmailAdd})
+		Summary: "add an address and mail a verification code",
+		Usage:   "email add <address>", Run: runEmailAdd})
 	register(Command{Path: []string{"email", "verify"},
-		Summary: "confirm a verification code: email verify <code>", Run: runEmailVerify})
+		Summary: "confirm a verification code",
+		Usage:   "email verify <code>", Run: runEmailVerify})
 }
 
 func siteHost(cfg config.Config) string {

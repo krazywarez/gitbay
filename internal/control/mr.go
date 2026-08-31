@@ -17,38 +17,53 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "fork"},
-		Summary: "fork a repository under your account: repo fork <owner/name> [--name <n>]", Run: runRepoFork})
+		Summary: "fork a repository under your account",
+		Usage:   "repo fork <owner/name> [--name <n>]", Run: runRepoFork})
 	register(Command{Path: []string{"repo", "settings", "require-approvals"},
-		Summary: "require N fresh approvals to merge: repo settings require-approvals <owner/name> <n> (0 = off)", Run: runRequireApprovals})
+		Summary: "require N fresh approvals to merge",
+		Usage:   "repo settings require-approvals <owner/name> <n> (0 = off)", Run: runRequireApprovals})
 	register(Command{Path: []string{"repo", "settings", "require-resolved"},
-		Summary: "require all review threads resolved to merge: repo settings require-resolved <owner/name> on|off", Run: runRequireResolved})
+		Summary: "require all review threads resolved to merge",
+		Usage:   "repo settings require-resolved <owner/name> on|off", Run: runRequireResolved})
 	register(Command{Path: []string{"repo", "settings", "require-checks"},
-		Summary: "gate merges on green statuses: repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
+		Summary: "gate merges on green statuses",
+		Usage:   "repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
 	register(Command{Path: []string{"repo", "settings", "require-signed"},
-		Summary: "require verified commit signatures: repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
+		Summary: "require verified commit signatures",
+		Usage:   "repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
 	register(Command{Path: []string{"mr", "create"},
-		Summary:    "open a merge request: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org]",
+		Summary:    "open a merge request",
+		Usage:      "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
-		Summary: "list merge requests: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
+		Summary: "list merge requests",
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
-		Summary: "show a merge request: mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
+		Summary: "show a merge request",
+		Usage:   "mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
 	register(Command{Path: []string{"mr", "diff"},
-		Summary: "show the diff: mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
+		Summary: "show the diff",
+		Usage:   "mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
 	register(Command{Path: []string{"mr", "edit"},
-		Summary:    "edit title or body: mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
+		Summary:    "edit title or body",
+		Usage:      "mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMREdit})
 	register(Command{Path: []string{"mr", "retarget"},
-		Summary: "retarget onto another branch: mr retarget <owner/name> <n> <branch>", Run: runMRRetarget})
+		Summary: "retarget onto another branch",
+		Usage:   "mr retarget <owner/name> <n> <branch>", Run: runMRRetarget})
 	register(Command{Path: []string{"mr", "comment"},
-		Summary:    "comment: mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Summary:    "comment",
+		Usage:      "mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runMRComment})
 	register(Command{Path: []string{"mr", "review"},
-		Summary: "review: mr review <owner/name> <n> --approve|--request-changes|--comment", Run: runMRReview})
+		Summary: "review",
+		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment", Run: runMRReview})
 	register(Command{Path: []string{"mr", "merge"},
-		Summary: "merge: mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
+		Summary: "merge",
+		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
 	register(Command{Path: []string{"mr", "close"},
-		Summary: "close without merging: mr close <owner/name> <n>", Run: runMRClose})
+		Summary: "close without merging",
+		Usage:   "mr close <owner/name> <n>", Run: runMRClose})
 }
 
 func runRepoFork(c *Ctx, args []string) int {

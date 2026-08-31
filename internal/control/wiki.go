@@ -17,13 +17,15 @@ import (
 func init() {
 	register(Command{
 		Path:     []string{"wiki", "list"},
-		Summary:  "list a repository's wiki pages: wiki list <owner/name>",
+		Summary:  "list a repository's wiki pages",
+		Usage:    "wiki list <owner/name>",
 		ReadOnly: true,
 		Run:      runWikiList,
 	})
 	register(Command{
 		Path:     []string{"wiki", "show"},
-		Summary:  "print a wiki page: wiki show <owner/name> [<page>]",
+		Summary:  "print a wiki page",
+		Usage:    "wiki show <owner/name> [<page>]",
 		ReadOnly: true,
 		Run:      runWikiShow,
 	})

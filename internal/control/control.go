@@ -9,6 +9,7 @@ import (
 	"io"
 	"reflect"
 	"slices"
+	"strings"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/protocol"
@@ -36,8 +37,12 @@ type Ctx struct {
 }
 
 type Command struct {
-	Path       []string // e.g. ["keys", "add"]
+	Path []string // e.g. ["keys", "add"]
+	// Summary is one line of prose: what the command does, no argument
+	// syntax. Usage is the argument syntax, opening with the command path.
+	// help renders them separately, so neither may carry the other's job.
 	Summary    string
+	Usage      string
 	ReadsStdin bool
 	ReadOnly   bool // safe for read-scoped API tokens
 	SSHOnly    bool // refused over the HTTP API (credential minting)
@@ -161,13 +166,44 @@ func init() {
 	register(Command{
 		Path:     []string{"help"},
 		Summary:  "list available commands",
+		Usage:    "help [<prefix>...]",
 		ReadOnly: true,
-		Run: func(c *Ctx, args []string) int {
-			for _, cmd := range registry {
-				fmt.Fprintf(c.Stdout, "%-24s %s\n", joinPath(cmd.Path), cmd.Summary)
+		Run:      runHelp,
+	})
+}
+
+// helpEntry is one row of the registry as help reports it.
+type helpEntry struct {
+	Path    string `json:"path"`
+	Summary string `json:"summary"`
+	Usage   string `json:"usage"`
+}
+
+// runHelp lists the registry, sorted, so a noun's commands sit together.
+// A prefix narrows the listing and adds each command's argument syntax —
+// the only place flags are written down. The unfiltered listing stays one
+// line per command.
+func runHelp(c *Ctx, args []string) int {
+	prefix := joinPath(args)
+	var matched []helpEntry
+	for _, cmd := range registry {
+		p := joinPath(cmd.Path)
+		if prefix != "" && p != prefix && !strings.HasPrefix(p, prefix+" ") {
+			continue
+		}
+		matched = append(matched, helpEntry{Path: p, Summary: cmd.Summary, Usage: cmd.Usage})
+	}
+	if len(matched) == 0 {
+		return c.fail(protocol.ExitNotFound, "no command matches %q; try: help", prefix)
+	}
+	slices.SortFunc(matched, func(a, b helpEntry) int { return strings.Compare(a.Path, b.Path) })
+	return c.emit(matched, func(w io.Writer) {
+		for _, e := range matched {
+			fmt.Fprintf(w, "%-24s %s\n", e.Path, e.Summary)
+			if prefix != "" {
+				fmt.Fprintf(w, "  %s\n", e.Usage)
 			}
-			return protocol.ExitOK
-		},
+		}
 	})
 }
 

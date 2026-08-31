@@ -1,6 +1,10 @@
 package control
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -84,5 +88,78 @@ func TestMRDedupKeyCannotCollideWithASHA(t *testing.T) {
 	}
 	if mrRefKey(24) == mrRefKey(25) {
 		t.Error("different merge requests share a dedup key")
+	}
+}
+
+// TestEveryCommandDocumentsItsUsage is what makes `help <prefix>` and
+// `gitbay <cmd> --help` worth typing: both render Usage, so a command that
+// omits it documents nothing. Usage opens with the command path so the
+// printed line can be typed as-is, and the summary must not carry the
+// argument syntax it used to.
+func TestEveryCommandDocumentsItsUsage(t *testing.T) {
+	for _, cmd := range Commands() {
+		path := strings.Join(cmd.Path, " ")
+		if cmd.Usage == "" {
+			t.Errorf("command %q has no Usage", path)
+			continue
+		}
+		if cmd.Usage != path && !strings.HasPrefix(cmd.Usage, path+" ") {
+			t.Errorf("command %q has Usage %q, which does not open with the command path", path, cmd.Usage)
+		}
+		if strings.Contains(cmd.Summary, ": "+path) {
+			t.Errorf("command %q still carries its usage in the summary: %q", path, cmd.Summary)
+		}
+	}
+}
+
+// TestHelpPrefixNarrowsAndShowsFlags covers the reason the command exists:
+// before this, reading one command's flags meant reading all of them.
+func TestHelpPrefixNarrowsAndShowsFlags(t *testing.T) {
+	var buf bytes.Buffer
+	c := &Ctx{Stdout: &buf, Stderr: io.Discard}
+	if code := runHelp(c, []string{"issue"}); code != protocol.ExitOK {
+		t.Fatalf("help issue exited %d", code)
+	}
+	out := buf.String()
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.HasPrefix(line, "  ") {
+			continue // the indented usage line
+		}
+		if !strings.HasPrefix(line, "issue ") {
+			t.Errorf("help issue listed an unrelated command: %q", line)
+		}
+	}
+	if !strings.Contains(out, "--state open|closed|all") {
+		t.Error("help issue did not print issue list's flags")
+	}
+}
+
+func TestHelpUnknownPrefixIsNotFound(t *testing.T) {
+	var buf bytes.Buffer
+	c := &Ctx{Stdout: &buf, Stderr: io.Discard}
+	if code := runHelp(c, []string{"nope"}); code != protocol.ExitNotFound {
+		t.Errorf("help nope exited %d, want %d", code, protocol.ExitNotFound)
+	}
+}
+
+// TestHelpListsEveryCommandSorted pins the unfiltered listing: one row per
+// registered command, ordered so a noun's commands sit together.
+func TestHelpListsEveryCommandSorted(t *testing.T) {
+	var buf bytes.Buffer
+	c := &Ctx{Stdout: &buf, Stderr: io.Discard, JSON: true}
+	if code := runHelp(c, nil); code != protocol.ExitOK {
+		t.Fatalf("help exited %d", code)
+	}
+	var env struct {
+		Data []helpEntry `json:"data"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("help --json: %v", err)
+	}
+	if len(env.Data) != len(Commands()) {
+		t.Errorf("help listed %d commands, registry has %d", len(env.Data), len(Commands()))
+	}
+	if !slices.IsSortedFunc(env.Data, func(a, b helpEntry) int { return strings.Compare(a.Path, b.Path) }) {
+		t.Error("help output is not sorted by path")
 	}
 }

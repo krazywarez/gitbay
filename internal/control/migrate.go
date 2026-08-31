@@ -13,10 +13,12 @@ import (
 
 func init() {
 	register(Command{Path: []string{"account", "export"},
-		Summary:  "write your account bundle (profile, repos, issues, MRs) as JSON to stdout",
+		Summary:  "write your account bundle (profile, repos, issues, MRs) as JSON",
+		Usage:    "account export > bundle.json",
 		ReadOnly: true, Run: runAccountExport})
 	register(Command{Path: []string{"account", "import-bundle"},
-		Summary:    "replay an account bundle from stdin (see gitbay migrate)",
+		Summary:    "replay an account bundle (see gitbay migrate)",
+		Usage:      "account import-bundle [--source <host>] < bundle.json",
 		ReadsStdin: true, Run: runAccountImportBundle})
 }
 

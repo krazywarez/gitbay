@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -96,10 +98,40 @@ func TestJSONAPI(t *testing.T) {
 		t.Fatalf("unknown command: %d", status)
 	}
 
-	// Raw-output commands (no envelope) are wrapped.
-	status, body = inst.apiCall(t, token, []string{"help"}, "")
-	if status != 200 || !strings.Contains(body["output"].(string), "repo create") {
+	// Raw-output commands (no envelope) are wrapped. Reading a file is the
+	// cheapest raw output, so give the repo one commit to read from.
+	work := t.TempDir()
+	aliceEnv := inst.gitEnv(aliceKey)
+	mustGit(t, work, aliceEnv, "clone", inst.sshURL("alice/proj"), "proj")
+	dir := filepath.Join(work, "proj")
+	if err := os.WriteFile(filepath.Join(dir, "README"), []byte("plain text, not json\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, dir, aliceEnv, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, aliceEnv, "add", "README")
+	mustGit(t, dir, aliceEnv, "commit", "-q", "-m", "init")
+	mustGit(t, dir, aliceEnv, "push", "-q", "origin", "main")
+
+	// A tarball is not an envelope, so it comes back under "output".
+	status, body = inst.apiCall(t, token, []string{"repo", "download", "alice/proj"}, "")
+	raw, isRaw := body["output"].(string)
+	if status != 200 || !isRaw || raw == "" {
+		t.Fatalf("repo download via API: %d %v", status, body)
+	}
+
+	// help answers with the registry as data, so a consumer can read one
+	// command's arguments without scraping the whole listing.
+	status, body = inst.apiCall(t, token, []string{"help", "issue", "create"}, "")
+	if status != 200 {
 		t.Fatalf("help via API: %d %v", status, body)
+	}
+	rows, ok := body["data"].([]any)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("help issue create: %v", body)
+	}
+	row := rows[0].(map[string]any)
+	if row["path"] != "issue create" || !strings.Contains(row["usage"].(string), "--title") {
+		t.Fatalf("help issue create row: %v", row)
 	}
 
 	// Git transport is refused by name.

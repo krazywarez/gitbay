@@ -79,7 +79,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	status := statusForExit(code)
 
 	// Commands normally emit exactly one JSON envelope; inject exit_code.
-	// A few (mr diff, help) write raw text instead — wrap those.
+	// A few (mr diff, repo download) write raw bytes instead — wrap those.
 	var body map[string]any
 	if err := json.Unmarshal(stdout.Bytes(), &body); err != nil || body == nil {
 		body = map[string]any{

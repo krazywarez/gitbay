@@ -14,12 +14,15 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "deploy-key", "add"},
-		Summary:    "bind a read-only (or --rw) key to one repository: repo deploy-key add <owner/name> [--rw] < key.pub",
+		Summary:    "bind a read-only (or --rw) key to one repository",
+		Usage:      "repo deploy-key add <owner/name> [--rw] < key.pub",
 		ReadsStdin: true, Run: runDeployKeyAdd})
 	register(Command{Path: []string{"repo", "deploy-key", "list"},
-		Summary: "list deploy keys: repo deploy-key list <owner/name>", ReadOnly: true, Run: runDeployKeyList})
+		Summary: "list deploy keys",
+		Usage:   "repo deploy-key list <owner/name>", ReadOnly: true, Run: runDeployKeyList})
 	register(Command{Path: []string{"repo", "deploy-key", "remove"},
-		Summary: "remove a deploy key: repo deploy-key remove <owner/name> <fingerprint>", Run: runDeployKeyRemove})
+		Summary: "remove a deploy key",
+		Usage:   "repo deploy-key remove <owner/name> <fingerprint>", Run: runDeployKeyRemove})
 }
 
 func runDeployKeyAdd(c *Ctx, args []string) int {

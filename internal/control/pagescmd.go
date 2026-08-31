@@ -20,13 +20,17 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "domain", "add"},
-		Summary: "claim a custom pages domain (verify with a DNS TXT record): repo domain add <owner/name> <domain>", Run: runDomainAdd})
+		Summary: "claim a custom pages domain (verify with a DNS TXT record)",
+		Usage:   "repo domain add <owner/name> <domain>", Run: runDomainAdd})
 	register(Command{Path: []string{"repo", "domain", "verify"},
-		Summary: "check the DNS challenge and activate a claim: repo domain verify <owner/name> <domain>", Run: runDomainVerify})
+		Summary: "check the DNS challenge and activate a claim",
+		Usage:   "repo domain verify <owner/name> <domain>", Run: runDomainVerify})
 	register(Command{Path: []string{"repo", "domain", "remove"},
-		Summary: "remove a custom pages domain: repo domain remove <owner/name> <domain>", Run: runDomainRemove})
+		Summary: "remove a custom pages domain",
+		Usage:   "repo domain remove <owner/name> <domain>", Run: runDomainRemove})
 	register(Command{Path: []string{"repo", "domain", "list"},
-		Summary: "list custom pages domains: repo domain list <owner/name>", ReadOnly: true, Run: runDomainList})
+		Summary: "list custom pages domains",
+		Usage:   "repo domain list <owner/name>", ReadOnly: true, Run: runDomainList})
 }
 
 // challengeLabel prefixes the domain for the ownership TXT record.

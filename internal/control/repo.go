@@ -25,53 +25,77 @@ func HooksDir(root string) string { return filepath.Join(root, "hooks") }
 
 func init() {
 	register(Command{Path: []string{"repo", "create"},
-		Summary: "create a repository: repo create <owner/name> [--private]", Run: runRepoCreate})
+		Summary: "create a repository",
+		Usage:   "repo create <owner/name> [--private]", Run: runRepoCreate})
 	register(Command{Path: []string{"repo", "list"},
-		Summary: "list repositories you own or can access: repo list [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runRepoList})
+		Summary: "list repositories you own or can access",
+		Usage:   "repo list [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runRepoList})
 	register(Command{Path: []string{"repo", "show"},
-		Summary: "show repository details: repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
+		Summary: "show repository details",
+		Usage:   "repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
 	register(Command{Path: []string{"repo", "transfer"},
-		Summary: "move a repository to another owner: repo transfer <owner/name> <new-owner> (clone URLs change)", Run: runRepoTransfer})
+		Summary: "move a repository to another owner",
+		Usage:   "repo transfer <owner/name> <new-owner> (clone URLs change)", Run: runRepoTransfer})
 	register(Command{Path: []string{"repo", "delete"},
-		Summary: "delete a repository: repo delete <owner/name> --yes", Run: runRepoDelete})
+		Summary: "delete a repository",
+		Usage:   "repo delete <owner/name> --yes", Run: runRepoDelete})
 	register(Command{Path: []string{"repo", "access", "grant"},
-		Summary: "grant access: repo access grant <owner/name> <user> read|write|admin", Run: runAccessGrant})
+		Summary: "grant access",
+		Usage:   "repo access grant <owner/name> <user> read|write|admin", Run: runAccessGrant})
 	register(Command{Path: []string{"repo", "access", "revoke"},
-		Summary: "revoke access: repo access revoke <owner/name> <user>", Run: runAccessRevoke})
+		Summary: "revoke access",
+		Usage:   "repo access revoke <owner/name> <user>", Run: runAccessRevoke})
 	register(Command{Path: []string{"repo", "access", "list"},
-		Summary: "list access grants: repo access list <owner/name>", ReadOnly: true, Run: runAccessList})
+		Summary: "list access grants",
+		Usage:   "repo access list <owner/name>", ReadOnly: true, Run: runAccessList})
 	register(Command{Path: []string{"repo", "settings", "show"},
-		Summary: "show settings: repo settings show <owner/name>", ReadOnly: true, Run: runSettingsShow})
+		Summary: "show settings",
+		Usage:   "repo settings show <owner/name>", ReadOnly: true, Run: runSettingsShow})
 	register(Command{Path: []string{"repo", "settings", "protect"},
-		Summary: "protect a branch: repo settings protect <owner/name> <branch>", Run: runProtect})
+		Summary: "protect a branch",
+		Usage:   "repo settings protect <owner/name> <branch>", Run: runProtect})
 	register(Command{Path: []string{"repo", "settings", "unprotect"},
-		Summary: "unprotect a branch: repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
+		Summary: "unprotect a branch",
+		Usage:   "repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
 	register(Command{Path: []string{"repo", "settings", "description"},
-		Summary: "set the repository description: repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
+		Summary: "set the repository description",
+		Usage:   "repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
 	register(Command{Path: []string{"repo", "settings", "visibility"},
-		Summary: "set repository visibility: repo settings visibility <owner/name> public|private", Run: runSetVisibility})
+		Summary: "set repository visibility",
+		Usage:   "repo settings visibility <owner/name> public|private", Run: runSetVisibility})
 	register(Command{Path: []string{"repo", "settings", "website"},
-		Summary: "set the repository website: repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
+		Summary: "set the repository website",
+		Usage:   "repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
-		Summary: "expose over git://: repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
+		Summary: "expose over git://",
+		Usage:   "repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
 	register(Command{Path: []string{"repo", "archive"},
-		Summary: "archive a repository (read-only: pushes and issue/MR writes refused): repo archive <owner/name>", Run: runArchive})
+		Summary: "archive a repository (read-only: pushes and issue/MR writes refused)",
+		Usage:   "repo archive <owner/name>", Run: runArchive})
 	register(Command{Path: []string{"repo", "unarchive"},
-		Summary: "unarchive a repository: repo unarchive <owner/name>", Run: runUnarchive})
+		Summary: "unarchive a repository",
+		Usage:   "repo unarchive <owner/name>", Run: runUnarchive})
 	register(Command{Path: []string{"repo", "topics"},
-		Summary: "list topics: repo topics <owner/name>", ReadOnly: true, Run: runTopicsList})
+		Summary: "list topics",
+		Usage:   "repo topics <owner/name>", ReadOnly: true, Run: runTopicsList})
 	register(Command{Path: []string{"repo", "topics", "add"},
-		Summary: "add topics: repo topics add <owner/name> <topic>...", Run: runTopicsAdd})
+		Summary: "add topics",
+		Usage:   "repo topics add <owner/name> <topic>...", Run: runTopicsAdd})
 	register(Command{Path: []string{"repo", "topics", "remove"},
-		Summary: "remove topics: repo topics remove <owner/name> <topic>...", Run: runTopicsRemove})
+		Summary: "remove topics",
+		Usage:   "repo topics remove <owner/name> <topic>...", Run: runTopicsRemove})
 	register(Command{Path: []string{"repo", "search"},
-		Summary: "find repositories by name, description, or topic: repo search <query>", ReadOnly: true, Run: runRepoSearch})
+		Summary: "find repositories by name, description, or topic",
+		Usage:   "repo search <query>", ReadOnly: true, Run: runRepoSearch})
 	register(Command{Path: []string{"repo", "grep"},
-		Summary: "search file contents: repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
+		Summary: "search file contents",
+		Usage:   "repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
 	register(Command{Path: []string{"repo", "pin"},
-		Summary: "pin a repository to your dashboard: repo pin <owner/name>", Run: runRepoPin})
+		Summary: "pin a repository to your dashboard",
+		Usage:   "repo pin <owner/name>", Run: runRepoPin})
 	register(Command{Path: []string{"repo", "unpin"},
-		Summary: "unpin a repository: repo unpin <owner/name>", Run: runRepoUnpin})
+		Summary: "unpin a repository",
+		Usage:   "repo unpin <owner/name>", Run: runRepoUnpin})
 }
 
 const (

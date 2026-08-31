@@ -16,9 +16,11 @@ import (
 func init() {
 	register(Command{Path: []string{"dashboard"},
 		Summary:  "one read for the account dashboard: review queue, assigned and open work, pins, activity, builds",
+		Usage:    "dashboard",
 		ReadOnly: true, Run: runDashboard})
 	register(Command{Path: []string{"feed"},
-		Summary:  "activity on repositories you can reach: feed [--limit <n>] [--cursor <c>]",
+		Summary:  "activity on repositories you can reach",
+		Usage:    "feed [--limit <n>] [--cursor <c>]",
 		ReadOnly: true, Run: runFeed})
 }
 

@@ -16,14 +16,18 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "mirror", "add"},
-		Summary:    "mirror to or from a remote: repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
+		Summary:    "mirror to or from a remote",
+		Usage:      "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
 		ReadsStdin: true, SSHOnly: true, Run: runMirrorAdd})
 	register(Command{Path: []string{"repo", "mirror", "list"},
-		Summary: "list mirrors with sync status: repo mirror list <owner/name>", ReadOnly: true, Run: runMirrorList})
+		Summary: "list mirrors with sync status",
+		Usage:   "repo mirror list <owner/name>", ReadOnly: true, Run: runMirrorList})
 	register(Command{Path: []string{"repo", "mirror", "remove"},
-		Summary: "remove a mirror: repo mirror remove <owner/name> <id>", Run: runMirrorRemove})
+		Summary: "remove a mirror",
+		Usage:   "repo mirror remove <owner/name> <id>", Run: runMirrorRemove})
 	register(Command{Path: []string{"repo", "mirror", "sync"},
-		Summary: "schedule an immediate sync: repo mirror sync <owner/name>", Run: runMirrorSync})
+		Summary: "schedule an immediate sync",
+		Usage:   "repo mirror sync <owner/name>", Run: runMirrorSync})
 }
 
 func runMirrorAdd(c *Ctx, args []string) int {

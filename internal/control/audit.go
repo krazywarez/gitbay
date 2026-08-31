@@ -10,7 +10,8 @@ import (
 
 func init() {
 	register(Command{Path: []string{"audit"},
-		Summary: "instance audit log (admins): audit [--limit <n>]", ReadOnly: true, SSHOnly: true, Run: runAudit})
+		Summary: "instance audit log (admins)",
+		Usage:   "audit [--limit <n>]", ReadOnly: true, SSHOnly: true, Run: runAudit})
 }
 
 func runAudit(c *Ctx, args []string) int {

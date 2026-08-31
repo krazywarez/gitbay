@@ -13,7 +13,8 @@ func newStoredToken() (token, hash string, err error) { return store.NewToken() 
 
 func init() {
 	register(Command{Path: []string{"web", "login"},
-		Summary: "mint a one-time browser login URL", Run: runWebLogin})
+		Summary: "mint a one-time browser login URL",
+		Usage:   "web login", Run: runWebLogin})
 }
 
 func runWebLogin(c *Ctx, args []string) int {

@@ -14,23 +14,32 @@ import (
 
 func init() {
 	register(Command{Path: []string{"org", "team", "create"},
-		Summary: "create a team: org team create <org> <team>", Run: runTeamCreate})
+		Summary: "create a team",
+		Usage:   "org team create <org> <team>", Run: runTeamCreate})
 	register(Command{Path: []string{"org", "team", "delete"},
-		Summary: "delete a team (its grants with it): org team delete <org> <team>", Run: runTeamDelete})
+		Summary: "delete a team (its grants with it)",
+		Usage:   "org team delete <org> <team>", Run: runTeamDelete})
 	register(Command{Path: []string{"org", "team", "list"},
-		Summary: "list an org's teams: org team list <org>", ReadOnly: true, Run: runTeamList})
+		Summary: "list an org's teams",
+		Usage:   "org team list <org>", ReadOnly: true, Run: runTeamList})
 	register(Command{Path: []string{"org", "team", "show"},
-		Summary: "show a team's members and grants: org team show <org> <team>", ReadOnly: true, Run: runTeamShow})
+		Summary: "show a team's members and grants",
+		Usage:   "org team show <org> <team>", ReadOnly: true, Run: runTeamShow})
 	register(Command{Path: []string{"org", "team", "add"},
-		Summary: "add org members to a team: org team add <org> <team> <user>...", Run: runTeamAdd})
+		Summary: "add org members to a team",
+		Usage:   "org team add <org> <team> <user>...", Run: runTeamAdd})
 	register(Command{Path: []string{"org", "team", "remove"},
-		Summary: "remove members from a team: org team remove <org> <team> <user>...", Run: runTeamRemove})
+		Summary: "remove members from a team",
+		Usage:   "org team remove <org> <team> <user>...", Run: runTeamRemove})
 	register(Command{Path: []string{"org", "team", "grant"},
-		Summary: "grant a team a role on an org repo: org team grant <org> <team> <owner/name> read|write|admin", Run: runTeamGrant})
+		Summary: "grant a team a role on an org repo",
+		Usage:   "org team grant <org> <team> <owner/name> read|write|admin", Run: runTeamGrant})
 	register(Command{Path: []string{"org", "team", "revoke"},
-		Summary: "revoke a team's grant: org team revoke <org> <team> <owner/name>", Run: runTeamRevoke})
+		Summary: "revoke a team's grant",
+		Usage:   "org team revoke <org> <team> <owner/name>", Run: runTeamRevoke})
 	register(Command{Path: []string{"org", "settings", "members-role"},
-		Summary: "role plain membership implies on every org repo: org settings members-role <org> write|read|none (default write)", Run: runOrgMembersRole})
+		Summary: "role plain membership implies on every org repo",
+		Usage:   "org settings members-role <org> write|read|none (default write)", Run: runOrgMembersRole})
 }
 
 // orgAdminRef resolves an org and requires the caller to admin it.

@@ -19,25 +19,33 @@ import (
 
 func init() {
 	register(Command{Path: []string{"release", "create"},
-		Summary:    "create a release on a tag: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Summary:    "create a release on a tag",
+		Usage:      "release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runReleaseCreate})
 	register(Command{Path: []string{"release", "edit"},
-		Summary:    "update a release's title and notes: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Summary:    "update a release's title and notes",
+		Usage:      "release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
 		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
-		Summary: "list releases: release list <owner/name>", ReadOnly: true, Run: runReleaseList})
+		Summary: "list releases",
+		Usage:   "release list <owner/name>", ReadOnly: true, Run: runReleaseList})
 	register(Command{Path: []string{"release", "show"},
-		Summary: "show a release with assets: release show <owner/name> <tag>", ReadOnly: true, Run: runReleaseShow})
+		Summary: "show a release with assets",
+		Usage:   "release show <owner/name> <tag>", ReadOnly: true, Run: runReleaseShow})
 	register(Command{Path: []string{"release", "delete"},
-		Summary: "delete a release and its assets: release delete <owner/name> <tag> --yes", Run: runReleaseDelete})
+		Summary: "delete a release and its assets",
+		Usage:   "release delete <owner/name> <tag> --yes", Run: runReleaseDelete})
 	register(Command{Path: []string{"release", "asset", "add"},
-		Summary:    "upload an asset from stdin: release asset add <owner/name> <tag> <filename> < file",
+		Summary:    "upload an asset from stdin",
+		Usage:      "release asset add <owner/name> <tag> <filename> < file",
 		ReadsStdin: true, Run: runAssetAdd})
 	register(Command{Path: []string{"release", "asset", "get"},
-		Summary:  "write an asset to stdout: release asset get <owner/name> <tag> <filename> > file",
+		Summary:  "write an asset to stdout",
+		Usage:    "release asset get <owner/name> <tag> <filename> > file",
 		ReadOnly: true, Run: runAssetGet})
 	register(Command{Path: []string{"release", "asset", "remove"},
-		Summary: "remove an asset: release asset remove <owner/name> <tag> <filename>", Run: runAssetRemove})
+		Summary: "remove an asset",
+		Usage:   "release asset remove <owner/name> <tag> <filename>", Run: runAssetRemove})
 }
 
 var assetNamePat = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$`)

@@ -16,19 +16,26 @@ import (
 
 func init() {
 	register(Command{Path: []string{"milestone", "create"},
-		Summary: "create a milestone: milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]", Run: runMilestoneCreate})
+		Summary: "create a milestone",
+		Usage:   "milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]", Run: runMilestoneCreate})
 	register(Command{Path: []string{"milestone", "list"},
-		Summary: "list milestones with progress: milestone list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runMilestoneList})
+		Summary: "list milestones with progress",
+		Usage:   "milestone list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runMilestoneList})
 	register(Command{Path: []string{"milestone", "close"},
-		Summary: "close a milestone: milestone close <owner/name> <title>", Run: runMilestoneClose})
+		Summary: "close a milestone",
+		Usage:   "milestone close <owner/name> <title>", Run: runMilestoneClose})
 	register(Command{Path: []string{"milestone", "reopen"},
-		Summary: "reopen a milestone: milestone reopen <owner/name> <title>", Run: runMilestoneReopen})
+		Summary: "reopen a milestone",
+		Usage:   "milestone reopen <owner/name> <title>", Run: runMilestoneReopen})
 	register(Command{Path: []string{"issue", "milestone"},
-		Summary: "set or clear an issue's milestone: issue milestone <owner/name> <n> <title|none>", Run: runIssueMilestone})
+		Summary: "set or clear an issue's milestone",
+		Usage:   "issue milestone <owner/name> <n> <title|none>", Run: runIssueMilestone})
 	register(Command{Path: []string{"mr", "milestone"},
-		Summary: "set or clear an MR's milestone: mr milestone <owner/name> <n> <title|none>", Run: runMRMilestone})
+		Summary: "set or clear an MR's milestone",
+		Usage:   "mr milestone <owner/name> <n> <title|none>", Run: runMRMilestone})
 	register(Command{Path: []string{"issue", "templates"},
-		Summary: "list issue templates (.gitbay/issue-template*.md): issue templates <owner/name>", ReadOnly: true, Run: runIssueTemplates})
+		Summary: "list issue templates (.gitbay/issue-template*.md)",
+		Usage:   "issue templates <owner/name>", ReadOnly: true, Run: runIssueTemplates})
 }
 
 var duePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)

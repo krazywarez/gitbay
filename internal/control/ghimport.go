@@ -20,7 +20,8 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "import-issues"},
-		Summary:    "import GitHub issue and PR history: repo import-issues <owner/name> --from <ghowner/ghrepo> [--token-stdin] [--api-base <url>]",
+		Summary:    "import GitHub issue and PR history",
+		Usage:      "repo import-issues <owner/name> --from <ghowner/ghrepo> [--token-stdin] [--api-base <url>]",
 		ReadsStdin: true, Run: runImportIssues})
 }
 

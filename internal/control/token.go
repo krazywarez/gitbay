@@ -14,12 +14,15 @@ import (
 
 func init() {
 	register(Command{Path: []string{"token", "create"},
-		Summary: "mint an API token (shown once): token create --name <n> [--scope full|read] [--ttl 30d|720h]",
+		Summary: "mint an API token (shown once)",
+		Usage:   "token create --name <n> [--scope full|read] [--ttl 30d|720h]",
 		SSHOnly: true, Run: runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
-		Summary: "list API tokens", ReadOnly: true, SSHOnly: true, Run: runTokenList})
+		Summary: "list API tokens",
+		Usage:   "token list", ReadOnly: true, SSHOnly: true, Run: runTokenList})
 	register(Command{Path: []string{"token", "revoke"},
-		Summary: "revoke an API token by name: token revoke <name>",
+		Summary: "revoke an API token by name",
+		Usage:   "token revoke <name>",
 		SSHOnly: true, Run: runTokenRevoke})
 }
 
