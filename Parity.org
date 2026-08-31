@@ -142,12 +142,20 @@ now render the way the reference does. go-org is not yet on the corpus.
 | profile page                  | yes | yes | yes |
 | profile about and links       | yes | yes | no  |
 | activity feed                 | yes | yes | yes |
+| command reference             | yes | no  | n/a |
 
 =explore= is the listing without a query; =repo search= is the one with.
 
 About text renders as markdown or org-mode per the =about_format= it
 was stored with. The iOS =Profile= decoder lists its keys explicitly,
 so it ignores =about= and =links= rather than breaking on them.
+
+=help= lists the command registry. Bare it is an index, one line per
+command, sorted. With a prefix (=help mr=) it adds each command's
+argument syntax, which is the only place flags are written down;
+=gitbay <cmd> --help= asks the server for the same thing, and =--json=
+returns ={path, summary, usage}=. No web page renders it, and a native
+client has no use for one (krz/gitbay#57).
 
 * Accounts
 
