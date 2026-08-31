@@ -4,6 +4,20 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.2.1 — 2026-08-31
+
+Merging landed commits without running anything.
+
+- A merge moves the target ref with a direct ref update, so it never
+  reached post-receive and none of the ref-update work fired: no =push=
+  event for webhooks to subscribe to, and no builds. Pushing a commit to a
+  branch ran the whole =.gitbay/ci.yml=; merging the identical commit ran
+  nothing. Both now happen in the merge path, with the build queueing
+  shared between it and post-receive rather than living in one of them.
+  #65
+
+Replace the binary and restart.
+
 * v1.2.0 — 2026-08-31
 
 A merge request said what its state was and almost nothing about when it
