@@ -7,11 +7,11 @@ jobs:
       - go vet ./...
   # The suite drives real git, ssh, sshd and gpg. Several tests skip
   # themselves when a tool is absent, so the prerequisites are asserted
-  # first: a green check that quietly tested less is worse than a red one.
+  # first, all of them in one step so one run names everything to install.
+  # A green check that quietly tested less is worse than a red one.
   # The 20m is under the runner's own 30m limit, so go times out first and
   # says which test hung instead of the runner killing it blind.
   test:
     steps:
-      - for t in git git-lfs gpg; do command -v $t >/dev/null || { echo "missing $t"; exit 1; }; done
-      - test -x /usr/sbin/sshd || { echo "missing /usr/sbin/sshd"; exit 1; }
+      - missing=""; for t in git git-lfs gpg; do command -v "$t" >/dev/null || missing="$missing $t"; done; test -x /usr/sbin/sshd || missing="$missing sshd"; test -z "$missing" || { echo "runner is missing:$missing"; exit 1; }
       - go test ./... -count=1 -timeout 20m
