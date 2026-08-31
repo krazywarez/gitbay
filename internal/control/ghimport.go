@@ -35,6 +35,7 @@ type ghIssue struct {
 	Body        string                  `json:"body"`
 	State       string                  `json:"state"`
 	CreatedAt   string                  `json:"created_at"`
+	ClosedAt    string                  `json:"closed_at"`
 	User        ghUser                  `json:"user"`
 	Labels      []struct{ Name string } `json:"labels"`
 	PullRequest *struct{}               `json:"pull_request"`
@@ -194,9 +195,9 @@ func runImportIssues(c *Ctx, args []string) int {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
 				if pr.MergedAt != "" {
-					c.Store.MarkMerged(mr.ID, pr.Base.SHA)
+					c.Store.MarkMerged(mr.ID, pr.Base.SHA, 0, pr.MergedAt)
 				} else {
-					c.Store.SetMRState(mr.ID, "closed")
+					c.Store.MarkClosed(mr.ID, 0, it.ClosedAt)
 				}
 				// Point the MR head ref at the PR head when the mirror
 				// already holds the objects (refs/pull backups).

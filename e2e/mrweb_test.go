@@ -133,8 +133,23 @@ func TestMRWebReviewLoop(t *testing.T) {
 	if status, _ := browserPost(t, alice, mrURL+"/merge", url.Values{"strategy": {"auto"}}); status != 200 {
 		t.Fatalf("merge post: %d", status)
 	}
-	if st := inst.mrShow(t, aliceKey, "alice/lib", "1").State; st != "merged" {
-		t.Fatalf("MR state after web merge: %s", st)
+	merged := inst.mrShow(t, aliceKey, "alice/lib", "1")
+	if merged.State != "merged" {
+		t.Fatalf("MR state after web merge: %s", merged.State)
+	}
+	// Who merged it and when, so the page can stop saying alice wants to.
+	if merged.MergedBy != "alice" || merged.MergedAt == "" {
+		t.Fatalf("merge not attributed: %+v", merged)
+	}
+	if merged.Reviews[0].CreatedAt == "" {
+		t.Fatalf("review carries no timestamp: %+v", merged.Reviews[0])
+	}
+	_, body = browserGet(t, alice, mrURL)
+	if strings.Contains(body, "wants to merge") {
+		t.Fatalf("merged MR still wants to merge:\n%s", body)
+	}
+	if !strings.Contains(body, ">alice</a> merged") {
+		t.Fatalf("merged MR does not name the merger:\n%s", body)
 	}
 	mustGit(t, dir, env, "pull", "-q", "origin", "main")
 	if _, err := os.Stat(filepath.Join(dir, "feature.txt")); err != nil {

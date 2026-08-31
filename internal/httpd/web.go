@@ -1632,7 +1632,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	comments, _ := s.st.ListMRComments(m.ID)
 	reviews, _ := s.st.ListMRReviews(m.ID)
-	checks, _ := s.st.ListCommitStatuses(p.Repo.ID, m.HeadSHA)
+	checks, combined, _ := s.st.ChecksForCommit(p.Repo.ID, m.HeadSHA)
 	diffComments, _ := s.st.ListDiffComments(m.ID)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
@@ -1696,7 +1696,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		MR              store.MR
 		View            string
 		BodyHTML        template.HTML
-		Checks          []store.CommitStatus
+		Checks          []store.Check
 		Combined        string
 		Comments        []renderedComment
 		Reviews         []store.MRReview
@@ -1709,7 +1709,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Unresolved      int
 		Notice          string
 		DetachedThreads []diffThread
-	}{p, m, view, md(m.Body, m.BodyFormat), checks, store.CombinedStatus(checks), renderComments(comments, md),
+	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviews, files, stat, commits, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads})
 }

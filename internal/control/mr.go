@@ -332,6 +332,10 @@ type mrOut struct {
 	BodyFormat string `json:"body_format,omitempty"`
 	Milestone  string `json:"milestone,omitempty"`
 	CreatedAt  string `json:"created_at"`
+	MergedAt   string `json:"merged_at,omitempty"`
+	MergedBy   string `json:"merged_by,omitempty"`
+	ClosedAt   string `json:"closed_at,omitempty"`
+	ClosedBy   string `json:"closed_by,omitempty"`
 }
 
 func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
@@ -345,7 +349,8 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 	}
 	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Author: m.Author,
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
-		CreatedAt: m.CreatedAt}
+		CreatedAt: m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
+		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy}
 	if withBody {
 		o.Body = m.Body
 		o.BodyFormat = m.BodyFormat
@@ -401,6 +406,15 @@ func runMRList(c *Ctx, args []string) int {
 	})
 }
 
+// byWhom renders " by <user>", or nothing when the actor is unknown — an
+// imported merge request carries a time but no local account.
+func byWhom(user string) string {
+	if user == "" {
+		return ""
+	}
+	return " by " + user
+}
+
 func runMRShow(c *Ctx, args []string) int {
 	repo, mr, code := mrRef(c, args, policy.CanRead)
 	if code >= 0 {
@@ -417,7 +431,7 @@ func runMRShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	statuses, err := c.Store.ListCommitStatuses(repo.ID, mr.HeadSHA)
+	statuses, combined, err := c.Store.ChecksForCommit(repo.ID, mr.HeadSHA)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -432,18 +446,25 @@ func runMRShow(c *Ctx, args []string) int {
 		CreatedAt  string `json:"created_at"`
 	}
 	type reviewOut struct {
-		Reviewer string `json:"reviewer"`
-		Verdict  string `json:"verdict"`
-		Stale    bool   `json:"stale"`
+		Reviewer  string `json:"reviewer"`
+		Verdict   string `json:"verdict"`
+		Stale     bool   `json:"stale"`
+		CreatedAt string `json:"created_at"`
 	}
 	type checkOut struct {
-		Context string `json:"context"`
-		State   string `json:"state"`
-		URL     string `json:"url,omitempty"`
+		Context   string `json:"context"`
+		State     string `json:"state"`
+		URL       string `json:"url,omitempty"`
+		UpdatedAt string `json:"updated_at"`
+		Duration  string `json:"duration,omitempty"` // CI checks only, once finished
 	}
 	var checks []checkOut
 	for _, st := range statuses {
-		checks = append(checks, checkOut{st.Context, st.State, st.TargetURL})
+		out := checkOut{Context: st.Context, State: st.State, URL: st.TargetURL, UpdatedAt: st.UpdatedAt}
+		if st.Duration > 0 {
+			out.Duration = st.Duration.String()
+		}
+		checks = append(checks, out)
 	}
 	var cs []commentOut
 	for _, cm := range comments {
@@ -451,7 +472,7 @@ func runMRShow(c *Ctx, args []string) int {
 	}
 	var rs []reviewOut
 	for _, r := range reviews {
-		rs = append(rs, reviewOut{r.Reviewer, r.Verdict, r.Stale})
+		rs = append(rs, reviewOut{r.Reviewer, r.Verdict, r.Stale, r.CreatedAt})
 	}
 	// The commits this MR carries: base..head, the diff's range.
 	type commitOut struct {
@@ -487,9 +508,15 @@ func runMRShow(c *Ctx, args []string) int {
 		Commits           []commitOut  `json:"commits,omitempty"`
 		Comments          []commentOut `json:"comments,omitempty"`
 		Reviews           []reviewOut  `json:"reviews,omitempty"`
-	}{mrToOut(repo, mr, true), checks, store.CombinedStatus(statuses), unresolved, commits, cs, rs}
+	}{mrToOut(repo, mr, true), checks, combined, unresolved, commits, cs, rs}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
+		if d.MergedAt != "" {
+			fmt.Fprintf(w, "merged %s%s\n", d.MergedAt, byWhom(d.MergedBy))
+		}
+		if d.ClosedAt != "" {
+			fmt.Fprintf(w, "closed %s%s\n", d.ClosedAt, byWhom(d.ClosedBy))
+		}
 		if d.Body != "" {
 			fmt.Fprintf(w, "\n%s\n", d.Body)
 		}
@@ -497,7 +524,11 @@ func runMRShow(c *Ctx, args []string) int {
 			fmt.Fprintf(w, "commit: %.10s %s\n", cm.SHA, cm.Subject)
 		}
 		for _, x := range checks {
-			fmt.Fprintf(w, "check: %s %s\n", x.Context, x.State)
+			dur := ""
+			if x.Duration != "" {
+				dur = " in " + x.Duration
+			}
+			fmt.Fprintf(w, "check: %s %s at %s%s\n", x.Context, x.State, x.UpdatedAt, dur)
 		}
 		if d.UnresolvedThreads > 0 {
 			fmt.Fprintf(w, "unresolved threads: %d\n", d.UnresolvedThreads)
@@ -507,7 +538,7 @@ func runMRShow(c *Ctx, args []string) int {
 			if r.Stale {
 				stale = " (stale)"
 			}
-			fmt.Fprintf(w, "review: %s %s%s\n", r.Reviewer, r.Verdict, stale)
+			fmt.Fprintf(w, "review: %s %s%s at %s\n", r.Reviewer, r.Verdict, stale, r.CreatedAt)
 		}
 		for _, cm := range cs {
 			fmt.Fprintf(w, "\n--- %s at %s\n%s\n", cm.Author, cm.CreatedAt, cm.Body)
@@ -980,7 +1011,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	if err := gitutil.UpdateRefCAS(dir, targetRef, newSHA, targetSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "target branch moved during merge; retry: %v", err)
 	}
-	if err := c.Store.MarkMerged(mr.ID, targetSHA); err != nil {
+	if err := c.Store.MarkMerged(mr.ID, targetSHA, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
@@ -1131,7 +1162,7 @@ func runMRClose(c *Ctx, args []string) int {
 	if mr.State == "merged" || mr.State == "closed" {
 		return c.fail(protocol.ExitUsage, "MR !%d is already %s", mr.Number, mr.State)
 	}
-	if err := c.Store.SetMRState(mr.ID, "closed"); err != nil {
+	if err := c.Store.MarkClosed(mr.ID, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]any{"number": mr.Number, "state": "closed"}, func(w io.Writer) {

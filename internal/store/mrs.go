@@ -22,6 +22,10 @@ type MR struct {
 	Milestone    string
 	HeadSHA      string
 	MergedBase   string // target tip at merge time; base for historical diffs
+	MergedAt     string // "" unless merged
+	MergedBy     string // "" when unknown (imports) or the account is gone
+	ClosedAt     string // "" unless closed without merging
+	ClosedBy     string
 	CreatedAt    string
 	UpdatedAt    string
 }
@@ -62,9 +66,12 @@ const mrSelect = `
 	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
 	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state,
 	       COALESCE(ms.title, ''), m.head_sha,
-	       m.merged_base, m.created_at, m.updated_at
+	       m.merged_base, m.merged_at, COALESCE(mu.username, ''),
+	       m.closed_at, COALESCE(cu.username, ''), m.created_at, m.updated_at
 	FROM merge_requests m
 	JOIN users u ON u.id = m.author_id
+	LEFT JOIN users mu ON mu.id = m.merged_by
+	LEFT JOIN users cu ON cu.id = m.closed_by
 	LEFT JOIN repos sr ON sr.id = m.source_repo_id
 	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id
 	LEFT JOIN orgs so  ON sr.owner_kind = 'org'  AND so.id = sr.owner_id
@@ -73,7 +80,8 @@ const mrSelect = `
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
-		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase, &m.CreatedAt, &m.UpdatedAt)
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase,
+		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.CreatedAt, &m.UpdatedAt)
 	return m, err
 }
 
@@ -142,17 +150,40 @@ func (s *Store) OpenMRsBySource(sourceRepoID int64, sourceRef string) ([]MR, err
 }
 
 // MarkMerged records the merge along with the target tip it landed on, so
-// the MR's diff stays reconstructable after fast-forwards.
-func (s *Store) MarkMerged(mrID int64, baseSHA string) error {
+// the MR's diff stays reconstructable after fast-forwards. actorID 0 and an
+// empty at leave the merger unknown and stamp the current time, which is
+// what an import that carries neither can say.
+func (s *Store) MarkMerged(mrID int64, baseSHA string, actorID int64, at string) error {
 	_, err := s.DB.Exec(
-		"UPDATE merge_requests SET state = 'merged', merged_base = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-		baseSHA, mrID)
+		`UPDATE merge_requests SET state = 'merged', merged_base = ?,
+			merged_at = COALESCE(NULLIF(?, ''), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+			merged_by = NULLIF(?, 0),
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
+		baseSHA, at, actorID, mrID)
 	return err
 }
 
+// MarkClosed is MarkMerged's counterpart for a merge request closed without
+// merging.
+func (s *Store) MarkClosed(mrID, actorID int64, at string) error {
+	_, err := s.DB.Exec(
+		`UPDATE merge_requests SET state = 'closed',
+			closed_at = COALESCE(NULLIF(?, ''), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+			closed_by = NULLIF(?, 0),
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
+		at, actorID, mrID)
+	return err
+}
+
+// SetMRState moves an MR between states that carry no resolution stamp.
+// Returning to open (a source branch that came back) clears one.
 func (s *Store) SetMRState(mrID int64, state string) error {
+	stamp := ""
+	if state == "open" || state == "source_gone" {
+		stamp = ", merged_at = '', merged_by = NULL, closed_at = '', closed_by = NULL"
+	}
 	res, err := s.DB.Exec(
-		"UPDATE merge_requests SET state = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+		"UPDATE merge_requests SET state = ?"+stamp+", updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
 		state, mrID)
 	if err != nil {
 		return err

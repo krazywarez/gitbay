@@ -206,3 +206,41 @@ func (s *Store) LatestBuild(repoID int64, job string) (Build, error) {
 	}
 	return b, err
 }
+
+// BuildsForCommit returns the newest build per job for one commit. A merge
+// request's checks are ci/<job> statuses; this is where their timing comes
+// from, in one query rather than one per check.
+func (s *Store) BuildsForCommit(repoID int64, sha string) (map[string]Build, error) {
+	rows, err := s.DB.Query(buildSelect+" WHERE repo_id = ? AND sha = ? ORDER BY number ASC", repoID, sha)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]Build{}
+	for rows.Next() {
+		b, err := scanBuild(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[b.Job] = b // ascending: the last row for a job wins
+	}
+	return out, rows.Err()
+}
+
+// Elapsed reports how long a build ran. Zero until it has both a start and
+// a finish, which is every state but success and failure.
+func (b Build) Elapsed() time.Duration {
+	const layout = "2006-01-02T15:04:05Z"
+	start, err := time.Parse(layout, b.StartedAt)
+	if err != nil {
+		return 0
+	}
+	end, err := time.Parse(layout, b.FinishedAt)
+	if err != nil {
+		return 0
+	}
+	if d := end.Sub(start); d > 0 {
+		return d.Round(time.Second)
+	}
+	return 0
+}

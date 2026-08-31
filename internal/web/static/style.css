@@ -1492,6 +1492,10 @@ p.filefacts { color: var(--muted); font-size: var(--fs-1); margin: 0 0 var(--sp-
 .aside .row { display: flex; align-items: center; gap: var(--sp-2); margin: 0 0 var(--sp-1); flex-wrap: wrap; }
 .aside .row:last-child { margin-bottom: 0; }
 .aside .none { color: var(--muted); }
+/* a row's second line: when it happened, under what it happened to. The
+   extra gap keeps the pair reading as one entry. */
+.aside .row .sub { flex-basis: 100%; color: var(--muted); font-size: var(--fs-0); }
+.aside .row:has(.sub) { margin-bottom: var(--sp-2); }
 .aside .dot { width: 0.45rem; height: 0.45rem; flex: none; border-radius: 50%; background: var(--muted); }
 .aside .dot.ok { background: var(--ok); }
 .aside .dot.bad { background: var(--bad); }

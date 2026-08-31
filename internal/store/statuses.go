@@ -1,6 +1,9 @@
 package store
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 type CommitStatus struct {
 	Context     string
@@ -105,4 +108,42 @@ func CombinedStatus(statuses []CommitStatus) string {
 		}
 	}
 	return combined
+}
+
+// Check is a commit status paired with the build behind it. Only ci/<job>
+// statuses have one; anything posted through `status set` reports just the
+// state and when it last changed.
+type Check struct {
+	CommitStatus
+	Build    int64         // build number, 0 when the check is not CI's
+	Duration time.Duration // 0 until that build has finished
+}
+
+// ChecksForCommit lists a commit's checks with their timing, and reduces
+// them to one combined state. Two queries at most, whatever the surface.
+func (s *Store) ChecksForCommit(repoID int64, sha string) ([]Check, string, error) {
+	statuses, err := s.ListCommitStatuses(repoID, sha)
+	if err != nil {
+		return nil, "", err
+	}
+	var builds map[string]Build
+	for _, st := range statuses {
+		if strings.HasPrefix(st.Context, "ci/") {
+			if builds, err = s.BuildsForCommit(repoID, sha); err != nil {
+				return nil, "", err
+			}
+			break
+		}
+	}
+	checks := make([]Check, 0, len(statuses))
+	for _, st := range statuses {
+		c := Check{CommitStatus: st}
+		if job, ok := strings.CutPrefix(st.Context, "ci/"); ok {
+			if b, ok := builds[job]; ok {
+				c.Build, c.Duration = b.Number, b.Elapsed()
+			}
+		}
+		checks = append(checks, c)
+	}
+	return checks, CombinedStatus(statuses), nil
 }

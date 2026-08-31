@@ -18,10 +18,15 @@ type mrShow struct {
 	Source    string `json:"source"`
 	TargetRef string `json:"target_ref"`
 	HeadSHA   string `json:"head_sha"`
+	MergedAt  string `json:"merged_at"`
+	MergedBy  string `json:"merged_by"`
+	ClosedAt  string `json:"closed_at"`
+	ClosedBy  string `json:"closed_by"`
 	Reviews   []struct {
-		Reviewer string `json:"reviewer"`
-		Verdict  string `json:"verdict"`
-		Stale    bool   `json:"stale"`
+		Reviewer  string `json:"reviewer"`
+		Verdict   string `json:"verdict"`
+		Stale     bool   `json:"stale"`
+		CreatedAt string `json:"created_at"`
 	} `json:"reviews"`
 }
 
