@@ -4,6 +4,48 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.1.0 — 2026-08-31
+
+Every release until now answered questions. This one notices something
+on its own: that a repository's dependencies have moved, and says so
+without being asked.
+
+- Dependency update checks, opt-in per repository. A daemon worker reads
+  the manifests on the default branch, asks the ecosystem's registry what
+  the current release is, and maintains one issue per repository — opened
+  when something falls behind, rewritten when the set changes, closed once
+  nothing is behind. No package manager runs, so it needs no CI runner and
+  no configuration beyond turning it on. #58
+  - =go.mod= against proxy.golang.org, =package.json= with
+    =package-lock.json= against npm, =Cargo.toml= with =Cargo.lock=
+    against crates.io, =requirements.txt= and =pyproject.toml= against
+    PyPI. A lockfile wins where both exist. A requirement naming a set
+    rather than a release — a range, a wildcard, a git or path source — is
+    skipped, since a range that already admits the newest release is not
+    news.
+  - =repo deps enable|disable|status=, a toggle on the repository settings
+    page, and the same three over the JSON API.
+  - Off by default, because checking a private repository tells a public
+    registry what it depends on. That is the owner's disclosure to make.
+    =[deps] check_interval_hours= sets the cadence, default 24.
+  - The issue is authored by a =gitbay-bot= account, so the existing
+    notification mail reaches the repository's owner rather than excluding
+    them as the actor. Its table is padded to its columns, which a
+    renderer ignores and a mail client needs. #61
+- =help= takes a prefix — =help mr= narrows the registry to one noun — and
+  every command now documents its arguments, so the server answers "what
+  are the flags" instead of being guessed at. #57
+- Web: settings rows end in one column of controls, checkboxes drawn at
+  the height of the inputs and buttons they sit beside #59; an added line
+  keeps its leading dash in the diff; a contributor's several verified
+  addresses collapse to one row #56.
+
+Replace the binary and restart. Migration 0028 adds two tables and, when
+the name is free, the =gitbay-bot= account. An instance already using that
+name for a user or an org keeps what it has: the account is not created,
+and dependency checks report that as the reason they cannot open an issue
+rather than the migration failing and the daemon not starting. #64
+
 * v1.0.1 — 2026-08-30
 
 Two CI fixes found by running orgo's release pipeline on this instance.
