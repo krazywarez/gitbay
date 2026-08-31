@@ -32,7 +32,7 @@ func TestReapStaleBuilds(t *testing.T) {
 
 	// Claim both, then age only the first past the deadline.
 	for range 2 {
-		if _, ok, err := s.ClaimBuild(); err != nil || !ok {
+		if _, ok, err := s.ClaimBuild(nil); err != nil || !ok {
 			t.Fatalf("claim: %v ok=%v", err, ok)
 		}
 	}
@@ -116,5 +116,53 @@ func TestBuildsForCommitTiming(t *testing.T) {
 	// A build that never finished has no duration to report.
 	if d := byJob["lint"].Elapsed(); d != 0 {
 		t.Fatalf("unfinished build reported %s", d)
+	}
+}
+
+// A runner that names repositories claims only their builds, so a runner on a
+// machine that should not execute every repository's steps does not pick one
+// up by being first to ask.
+func TestClaimBuildScopedToRepos(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine, err := s.CreateRepo("user", uid, "site", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := s.CreateRepo("user", uid, "stranger", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Queued first, so an unscoped claim would take it.
+	if _, err := s.CreateBuild(theirs, "evil", "abc123", "main", `["true"]`); err != nil {
+		t.Fatal(err)
+	}
+	wanted, err := s.CreateBuild(mine, "deploy", "def456", "main", `["true"]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, ok, err := s.ClaimBuild([]int64{mine})
+	if err != nil || !ok {
+		t.Fatalf("claim: %v ok=%v", err, ok)
+	}
+	if b.RepoID != mine || b.Number != wanted {
+		t.Fatalf("claimed repo %d build %d, want repo %d build %d",
+			b.RepoID, b.Number, mine, wanted)
+	}
+
+	// Nothing left for that scope, even though another repo's build is pending.
+	if _, ok, err := s.ClaimBuild([]int64{mine}); err != nil || ok {
+		t.Fatalf("second scoped claim: err=%v ok=%v, want no build", err, ok)
+	}
+	// An unscoped runner still takes it.
+	if b, ok, err := s.ClaimBuild(nil); err != nil || !ok || b.RepoID != theirs {
+		t.Fatalf("unscoped claim: err=%v ok=%v repo=%d", err, ok, b.RepoID)
 	}
 }

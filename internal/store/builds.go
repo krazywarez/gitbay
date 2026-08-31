@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -59,14 +60,28 @@ func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 }
 
 // ClaimBuild atomically hands the oldest pending build to a runner.
-func (s *Store) ClaimBuild() (Build, bool, error) {
+// ClaimBuild takes the oldest pending build and marks it running. A
+// non-empty repoIDs restricts the claim to those repositories, which is how
+// a runner on a machine that should not execute every repository's steps
+// limits what it picks up.
+func (s *Store) ClaimBuild(repoIDs []int64) (Build, bool, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return Build{}, false, err
 	}
 	defer tx.Rollback()
+	query := "SELECT id FROM builds WHERE status = 'pending' ORDER BY id LIMIT 1"
+	args := []any{}
+	if len(repoIDs) > 0 {
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(repoIDs)), ",")
+		query = "SELECT id FROM builds WHERE status = 'pending' AND repo_id IN (" +
+			marks + ") ORDER BY id LIMIT 1"
+		for _, id := range repoIDs {
+			args = append(args, id)
+		}
+	}
 	var id int64
-	err = tx.QueryRow("SELECT id FROM builds WHERE status = 'pending' ORDER BY id LIMIT 1").Scan(&id)
+	err = tx.QueryRow(query, args...).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Build{}, false, nil
 	}

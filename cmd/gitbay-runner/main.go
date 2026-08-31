@@ -41,6 +41,10 @@ type runner struct {
 	cloneBase string // e.g. ssh://git@gitbay.org
 	workdir   string
 	timeout   time.Duration
+	// repos limits which repositories this runner claims builds for. Empty
+	// means any, which is what a runner on the server itself wants; a runner
+	// somewhere that should not execute every repository's steps names them.
+	repos []string
 }
 
 func main() {
@@ -51,6 +55,7 @@ func main() {
 		workdir   = flag.String("workdir", filepath.Join(os.TempDir(), "gitbay-runner"), "build workspace root")
 		poll      = flag.Duration("poll", 5*time.Second, "idle poll interval")
 		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
+		repos     = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
 		once      = flag.Bool("once", false, "process at most one build, then exit")
 		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
@@ -70,6 +75,11 @@ func main() {
 	}
 	if *sshOpts != "" {
 		r.sshOpts = strings.Fields(*sshOpts)
+	}
+	for _, name := range strings.Split(*repos, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			r.repos = append(r.repos, name)
+		}
 	}
 	if r.cloneBase == "" {
 		r.cloneBase = "ssh://" + *remote
@@ -94,7 +104,7 @@ func main() {
 // step claims and executes at most one build. ran reports whether there was
 // one, so the caller knows when to idle.
 func (r *runner) step() (bool, error) {
-	out, err := r.ssh(nil, "runner", "next", "--json")
+	out, err := r.ssh(nil, append([]string{"runner", "next"}, append(r.repos, "--json")...)...)
 	if err != nil {
 		return false, fmt.Errorf("claiming build: %w (%s)", err, out)
 	}

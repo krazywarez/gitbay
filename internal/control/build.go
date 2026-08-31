@@ -55,7 +55,7 @@ func init() {
 	// instance operator's call.
 	register(Command{Path: []string{"runner", "next"},
 		Summary: "claim the oldest pending build (runner protocol)",
-		Usage:   "runner next", SSHOnly: true, Run: runRunnerNext})
+		Usage:   "runner next [<owner/name>...]", SSHOnly: true, Run: runRunnerNext})
 	register(Command{Path: []string{"runner", "log"},
 		Summary: "append a build's log from stdin",
 		Usage:   "runner log <build-id>", SSHOnly: true, ReadsStdin: true, Run: runRunnerLog})
@@ -329,7 +329,18 @@ func runRunnerNext(c *Ctx, args []string) int {
 				"build abandoned", url, c.User.ID)
 		}
 	}
-	b, ok, err := c.Store.ClaimBuild()
+	// A runner may limit itself to named repositories. The operator chooses
+	// what a given runner executes by how they start it; this is scoping the
+	// runner asks for, not an ACL the server holds over it.
+	var repoIDs []int64
+	for _, arg := range args {
+		repo, code := resolveRepo(c, arg, policy.CanRead)
+		if code >= 0 {
+			return code
+		}
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	b, ok, err := c.Store.ClaimBuild(repoIDs)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
