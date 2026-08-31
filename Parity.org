@@ -98,6 +98,8 @@ format column and are always markdown.
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
+| dependency checks on/off    | yes | yes | no  |
+| dependency status           | yes | no  | no  |
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | no  | no  |
 
@@ -105,6 +107,12 @@ No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a
 handler reading git or the store directly instead of dispatching a
 command — until krz/gitbay!99, !101 and !102 gave them commands.
+
+Dependency checks are off until a repository's admin turns them on: the
+check tells a public registry what the repository depends on. =repo deps
+status= lists what is behind and has no web view because the report
+itself is an issue the worker opens, rewrites and closes, which every
+surface already reads.
 
 The wiki row covers reading. Editing a wiki is a push to
 =<repo>.wiki.git= on every surface, including the web, so there is no
