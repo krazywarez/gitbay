@@ -67,13 +67,28 @@ write_files:
       set -eu
       disk=$(df -P /var/lib/gitbay | awk 'NR==2{print $5}')
       svc=$(systemctl is-active gitbayd || true)
-      # Days until the ACME cert expires, if autocert cached one.
-      cert=/var/lib/gitbay/autocert
+      # Soonest ACME cert expiry. Reporting whichever name sorted first said
+      # nothing about the one actually about to lapse, and the cache is under
+      # acme/, so this read autocert/ and reported n/a forever.
+      cert=/var/lib/gitbay/acme
       exp="n/a"
+      days=""
       if [ -d "$cert" ]; then
-        f=$(ls -1 "$cert" 2>/dev/null | grep -v acme_account | head -1 || true)
-        if [ -n "$f" ]; then
-          exp=$(openssl x509 -enddate -noout -in "$cert/$f" 2>/dev/null | cut -d= -f2 || echo n/a)
+        soonest=""
+        for f in "$cert"/*; do
+          [ -f "$f" ] || continue
+          case "${f##*/}" in acme_account*) continue ;; esac
+          end=$(openssl x509 -enddate -noout -in "$f" 2>/dev/null | cut -d= -f2 || true)
+          [ -n "$end" ] || continue
+          secs=$(date -u -d "$end" +%s 2>/dev/null || true)
+          [ -n "$secs" ] || continue
+          if [ -z "$soonest" ] || [ "$secs" -lt "$soonest" ]; then
+            soonest="$secs"
+            exp="$end"
+          fi
+        done
+        if [ -n "$soonest" ]; then
+          days=$(( (soonest - $(date -u +%s)) / 86400 ))
         fi
       fi
       alert=""
@@ -84,9 +99,12 @@ write_files:
       if [ "$pct" -ge 85 ]; then
         alert="${alert}disk ${disk}; "
       fi
+      if [ -n "$days" ] && [ "$days" -lt 21 ]; then
+        alert="${alert}cert expires in ${days}d; "
+      fi
       # journald always gets the reading, so an unset webhook cannot make a
       # sick host look like a quiet one.
-      echo "disk=$disk service=$svc cert_expires=$exp"
+      echo "disk=$disk service=$svc cert_expires=$exp${days:+ cert_days=$days}"
       url_file=/etc/gitbay/monitor.url
       if [ -f "$url_file" ]; then
         body=$(printf '{"disk":"%s","service":"%s","cert_expires":"%s","alert":"%s"}' "$disk" "$svc" "$exp" "$alert")
