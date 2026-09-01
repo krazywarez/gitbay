@@ -215,6 +215,8 @@ write_files:
       # Nightly consistent backup; keeps the last 7 locally.
       # To ship offsite, add an rclone/s3 upload of $out here.
       set -eu
+      # The archive carries the database, so it gets the database's mode.
+      umask 027
       dir=/var/backups/gitbay
       out="$dir/gitbay-$(date -u +%Y%m%d-%H%M%S).tar.gz"
       /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --out "$out"
@@ -229,8 +231,11 @@ write_files:
     content: |
       #!/bin/sh
       set -eu
+      # The archive is the whole database, so it gets the database's mode.
+      umask 027
       dir=/var/backups/gitbay/db
       mkdir -p "$dir"
+      chmod 0750 "$dir"
       out="$dir/gitbay-db-$(date -u +%Y%m%d-%H%M%S).tar.gz"
       /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --db-only --out "$out"
       ls -1t "$dir"/gitbay-db-*.tar.gz | tail -n +49 | xargs -r rm --
