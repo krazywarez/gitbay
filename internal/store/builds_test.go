@@ -166,3 +166,49 @@ func TestClaimBuildScopedToRepos(t *testing.T) {
 		t.Fatalf("unscoped claim: err=%v ok=%v repo=%d", err, ok, b.RepoID)
 	}
 }
+
+// A log that stops at the cap reads exactly like a build that died mid-step,
+// which is what sent people hunting for a test failure that was never there.
+// It says so instead, once.
+func TestBuildLogSaysWhenItTruncates(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
+		t.Fatal(err)
+	}
+	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chunk := make([]byte, 256<<10)
+	for i := range chunk {
+		chunk[i] = 'x'
+	}
+	// Well past the cap, so plenty of appends land after it.
+	for written := 0; written < MaxBuildLog+(4*len(chunk)); written += len(chunk) {
+		if err := s.AppendBuildLog(id, chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	log, err := s.BuildLog(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(log), "log truncated"); n != 1 {
+		t.Errorf("truncation notice appears %d times, want exactly 1", n)
+	}
+	if !strings.HasSuffix(string(log), string(truncNotice)) {
+		t.Error("notice is not at the end of the log")
+	}
+	if len(log) > MaxBuildLog+len(truncNotice)+len(chunk) {
+		t.Errorf("log grew to %d, past the cap plus one chunk", len(log))
+	}
+}

@@ -385,18 +385,26 @@ func runRunnerLog(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "bad build id %q", args[0])
 	}
-	// Stream stdin into the log in chunks so long builds appear live.
+	// Stream stdin into the log in chunks so long builds appear live. An
+	// append that fails drops its chunk and the loop keeps draining: ending
+	// the session here breaks the runner's pipe, and a broken pipe is how a
+	// transient SQLITE_BUSY used to fail the build the log belonged to.
 	buf := make([]byte, 64<<10)
+	dropped := 0
 	for {
 		n, rerr := c.Stdin.Read(buf)
 		if n > 0 {
 			if err := c.Store.AppendBuildLog(id, buf[:n]); err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
+				dropped++
+				slog.Warn("appending build log", "build", id, "err", err)
 			}
 		}
 		if rerr != nil {
 			break
 		}
+	}
+	if dropped > 0 {
+		slog.Warn("build log incomplete", "build", id, "dropped_chunks", dropped)
 	}
 	return c.emit(map[string]string{"log": "ok"}, func(w io.Writer) {})
 }

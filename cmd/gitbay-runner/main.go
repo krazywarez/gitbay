@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"gitbay.org/gitbay/internal/buildinfo"
@@ -130,6 +131,36 @@ func (r *runner) step() (bool, error) {
 	return true, nil
 }
 
+// logSink forwards a build's output to the server and swallows any error
+// doing so. os/exec surfaces a write failure on a step's stdout through
+// cmd.Wait(), so a sink that can fail is a sink that can fail the build it
+// was only recording — a restart or a dropped session used to turn a green
+// suite red, with the explaining line written to the same dead pipe. Losing
+// log lines is the acceptable failure here; losing the build is not.
+type logSink struct {
+	mu sync.Mutex
+	w  io.Writer // nil once a write has failed
+}
+
+func (s *logSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.w != nil {
+		if _, err := s.w.Write(p); err != nil {
+			s.w = nil
+		}
+	}
+	return len(p), nil
+}
+
+// broken reports whether the stream was lost, so a build can say its log is
+// incomplete rather than appear to have simply stopped.
+func (s *logSink) broken() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w == nil
+}
+
 // run clones, checks out, and executes the steps, streaming output to the
 // server. Returns whether every step succeeded.
 func (r *runner) run(j job) bool {
@@ -138,18 +169,22 @@ func (r *runner) run(j job) bool {
 
 	// One long-lived `runner log` session receives the whole stream.
 	logCmd := exec.Command("ssh", append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
-	sink, err := logCmd.StdinPipe()
+	pipe, err := logCmd.StdinPipe()
 	if err != nil {
 		log.Printf("build %d: log pipe: %v", j.ID, err)
 		return false
 	}
+	sink := &logSink{w: pipe}
 	logCmd.Stdout, logCmd.Stderr = io.Discard, io.Discard
 	if err := logCmd.Start(); err != nil {
 		log.Printf("build %d: log stream: %v", j.ID, err)
 		return false
 	}
 	defer func() {
-		sink.Close()
+		if sink.broken() {
+			log.Printf("build %d: log stream lost; stored log is incomplete", j.ID)
+		}
+		pipe.Close()
 		logCmd.Wait()
 	}()
 

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +25,12 @@ type Build struct {
 
 // MaxBuildLog caps a build's stored log; appends past it are dropped.
 const MaxBuildLog = 2 << 20
+
+// truncNotice is appended once when a log first hits the cap. A log that
+// simply stops is indistinguishable from a build that died mid-step, which
+// is the reading that sent people hunting for a nonexistent test failure.
+var truncNotice = []byte("\n[log truncated: reached the " +
+	strconv.Itoa(MaxBuildLog>>20) + " MiB cap; earlier output is above]\n")
 
 // CreateBuild allocates the per-repo build number in the same transaction
 // as the insert, like issue and MR numbers.
@@ -142,9 +149,21 @@ func (s *Store) ReapStaleBuilds() ([]Build, error) {
 
 // AppendBuildLog adds a chunk to the build's log, dropping bytes past the cap.
 func (s *Store) AppendBuildLog(id int64, chunk []byte) error {
-	_, err := s.DB.Exec(`
+	res, err := s.DB.Exec(`
 		UPDATE builds SET log = log || ?
 		WHERE id = ? AND length(log) < ?`, chunk, id, MaxBuildLog)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
+	}
+	// Over the cap. The bounds match exactly once: appending the notice puts
+	// the log past the upper bound, so later chunks fall through silently.
+	_, err = s.DB.Exec(`
+		UPDATE builds SET log = log || ?
+		WHERE id = ? AND length(log) >= ? AND length(log) < ?`,
+		truncNotice, id, MaxBuildLog, MaxBuildLog+len(truncNotice))
 	return err
 }
 
