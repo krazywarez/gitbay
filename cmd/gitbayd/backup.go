@@ -27,12 +27,19 @@ import (
 // rows pointing at objects the archive never captured.
 func backupCmd() *cobra.Command {
 	var out string
+	var dbOnly bool
 	cmd := &cobra.Command{
 		Use:   "backup",
 		Short: "write a consistent backup archive (database snapshot first, then repositories)",
 		Long: `Writes a tar.gz of the server root: a consistent SQLite snapshot,
 all repositories, and the SSH host keys. Transient state (hook socket,
 regenerated hook scripts, askpass helper, WAL files) is excluded.
+
+--db-only writes the database snapshot alone. It is seconds and megabytes
+rather than minutes and gigabytes, which is what makes a frequent schedule
+affordable, and the database is the copy of issues, merge requests and
+comments that exists nowhere else. Repositories are not in such an archive,
+so it supplements a full backup and does not replace one.
 
 Restore: extract into an empty directory, point server.root at it, start
 gitbayd. Host keys are preserved, so clients keep their known_hosts entries.`,
@@ -44,14 +51,15 @@ gitbayd. Host keys are preserved, so clients keep their known_hosts entries.`,
 			if out == "" {
 				out = fmt.Sprintf("gitbay-backup-%s.tar.gz", time.Now().UTC().Format("20060102-150405"))
 			}
-			return runBackup(cfg, out)
+			return runBackup(cfg, out, dbOnly)
 		},
 	}
 	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz)")
+	cmd.Flags().BoolVar(&dbOnly, "db-only", false, "archive the database snapshot alone, without repositories")
 	return cmd
 }
 
-func runBackup(cfg config.Config, out string) error {
+func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	st, err := openStore(cfg)
 	if err != nil {
 		return err
@@ -79,42 +87,45 @@ func runBackup(cfg config.Config, out string) error {
 	}
 
 	// 2. Everything under the root except transient or regenerated state.
+	// Skipped entirely for --db-only.
 	skip := map[string]bool{
 		"gitbay.db": true, "gitbay.db-wal": true, "gitbay.db-shm": true,
 		"hook.sock": true, "askpass.sh": true, "hooks": true,
 	}
 	repoCount := 0
 	root := cfg.Server.Root
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
-			return nil
-		}
-		if top, _, _ := strings.Cut(rel, string(filepath.Separator)); skip[top] {
+	if !dbOnly {
+		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			if rel == "." {
+				return nil
+			}
+			if top, _, _ := strings.Cut(rel, string(filepath.Separator)); skip[top] {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !d.Type().IsRegular() && !d.IsDir() {
+				return nil // sockets, symlinks
+			}
 			if d.IsDir() {
-				return filepath.SkipDir
+				if strings.HasSuffix(rel, ".git") {
+					repoCount++
+				}
+				return nil // directories are implied by member paths
 			}
-			return nil
+			return addFile(tw, path, filepath.ToSlash(rel))
+		})
+		if err != nil {
+			return err
 		}
-		if !d.Type().IsRegular() && !d.IsDir() {
-			return nil // sockets, symlinks
-		}
-		if d.IsDir() {
-			if strings.HasSuffix(rel, ".git") {
-				repoCount++
-			}
-			return nil // directories are implied by member paths
-		}
-		return addFile(tw, path, filepath.ToSlash(rel))
-	})
-	if err != nil {
-		return err
 	}
 	if err := tw.Close(); err != nil {
 		return err
@@ -127,6 +138,10 @@ func runBackup(cfg config.Config, out string) error {
 	}
 
 	info, _ := os.Stat(out)
+	if dbOnly {
+		fmt.Printf("wrote %s (database only, %.1f MB)\n", out, float64(info.Size())/1e6)
+		return nil
+	}
 	fmt.Printf("wrote %s (%d repositories, %.1f MB)\n", out, repoCount, float64(info.Size())/1e6)
 	return nil
 }

@@ -15,3 +15,11 @@ jobs:
     steps:
       - missing=""; for t in git git-lfs gpg; do command -v "$t" >/dev/null || missing="$missing $t"; done; test -x /usr/sbin/sshd || missing="$missing sshd"; test -z "$missing" || { echo "runner is missing:$missing"; exit 1; }
       - go test ./... -count=1 -timeout 20m
+  # Vulnerability scanning, separate from test so a newly published advisory
+  # against unchanged code does not mask a real test failure. It fails the
+  # build on purpose: an advisory that only lands in a report nobody reads is
+  # the state this replaced. @latest matches deploy/audit.sh, so a run scans
+  # against the database as it is today, not as it was at commit time.
+  vuln:
+    steps:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...

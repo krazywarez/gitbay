@@ -4,8 +4,10 @@ package store
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +36,16 @@ func Open(path string) (*Store, error) {
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, err
+	}
+	// SQLite creates the file 0666&~umask, so it lands 0644 by default. The
+	// directory above it is the real boundary, but the file holds token
+	// hashes, addresses and private repo names and has no business being
+	// world-readable on its own.
+	if path != ":memory:" {
+		if err := os.Chmod(path, 0o640); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			db.Close()
+			return nil, err
+		}
 	}
 	return &Store{DB: db}, nil
 }

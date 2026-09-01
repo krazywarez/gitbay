@@ -57,16 +57,14 @@ write_files:
       maxretry = 5
       bantime  = 1h
 
-  # Heartbeat: post disk/service/cert status to a webhook if one is set in
-  # /etc/gitbay/monitor.url. Silent when the file is absent.
+  # Heartbeat: disk/service/cert status to journald every run, and to a
+  # webhook as well if one is set in /etc/gitbay/monitor.url. Exits non-zero
+  # on an alert so the unit shows up in systemctl --failed.
   - path: /usr/local/bin/gitbay-monitor.sh
     permissions: "0755"
     content: |
       #!/bin/sh
       set -eu
-      url_file=/etc/gitbay/monitor.url
-      [ -f "$url_file" ] || exit 0
-      url=$(cat "$url_file")
       disk=$(df -P /var/lib/gitbay | awk 'NR==2{print $5}')
       svc=$(systemctl is-active gitbayd || true)
       # Days until the ACME cert expires, if autocert cached one.
@@ -74,14 +72,32 @@ write_files:
       exp="n/a"
       if [ -d "$cert" ]; then
         f=$(ls -1 "$cert" 2>/dev/null | grep -v acme_account | head -1 || true)
-        [ -n "$f" ] && exp=$(openssl x509 -enddate -noout -in "$cert/$f" 2>/dev/null | cut -d= -f2 || echo n/a)
+        if [ -n "$f" ]; then
+          exp=$(openssl x509 -enddate -noout -in "$cert/$f" 2>/dev/null | cut -d= -f2 || echo n/a)
+        fi
       fi
       alert=""
-      [ "$svc" != "active" ] && alert="gitbayd is $svc; "
+      if [ "$svc" != "active" ]; then
+        alert="gitbayd is $svc; "
+      fi
       pct=$(echo "$disk" | tr -d '%')
-      [ "$pct" -ge 85 ] && alert="${alert}disk ${disk}; "
-      body=$(printf '{"disk":"%s","service":"%s","cert_expires":"%s","alert":"%s"}' "$disk" "$svc" "$exp" "$alert")
-      curl -fsS -m 10 -H 'Content-Type: application/json' -d "$body" "$url" >/dev/null 2>&1 || true
+      if [ "$pct" -ge 85 ]; then
+        alert="${alert}disk ${disk}; "
+      fi
+      # journald always gets the reading, so an unset webhook cannot make a
+      # sick host look like a quiet one.
+      echo "disk=$disk service=$svc cert_expires=$exp"
+      url_file=/etc/gitbay/monitor.url
+      if [ -f "$url_file" ]; then
+        body=$(printf '{"disk":"%s","service":"%s","cert_expires":"%s","alert":"%s"}' "$disk" "$svc" "$exp" "$alert")
+        if ! curl -fsS -m 10 -H 'Content-Type: application/json' -d "$body" "$(cat "$url_file")" >/dev/null; then
+          echo "monitor webhook post failed" >&2
+        fi
+      fi
+      if [ -n "$alert" ]; then
+        echo "$alert" >&2
+        exit 1
+      fi
 
   - path: /etc/systemd/system/gitbay-monitor.service
     content: |
@@ -186,6 +202,41 @@ write_files:
       /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --out "$out"
       ls -1t "$dir"/gitbay-*.tar.gz | tail -n +8 | xargs -r rm --
 
+  # Hourly database-only snapshot. The nightly full backup below is the one
+  # that can rebuild the host; this one exists because the database holds
+  # issues, merge requests and comments, which unlike the repositories have
+  # no second copy anywhere. 48 of them is two days at a few MB each.
+  - path: /usr/local/bin/gitbay-db-backup.sh
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      dir=/var/backups/gitbay/db
+      mkdir -p "$dir"
+      out="$dir/gitbay-db-$(date -u +%Y%m%d-%H%M%S).tar.gz"
+      /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --db-only --out "$out"
+      ls -1t "$dir"/gitbay-db-*.tar.gz | tail -n +49 | xargs -r rm --
+
+  - path: /etc/systemd/system/gitbay-db-backup.service
+    content: |
+      [Unit]
+      Description=gitbay hourly database backup
+      [Service]
+      Type=oneshot
+      User=gitbay
+      ExecStart=/usr/local/bin/gitbay-db-backup.sh
+
+  - path: /etc/systemd/system/gitbay-db-backup.timer
+    content: |
+      [Unit]
+      Description=gitbay hourly database backup
+      [Timer]
+      OnCalendar=*-*-* *:20:00 UTC
+      RandomizedDelaySec=5m
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
   - path: /etc/systemd/system/gitbay-backup.service
     content: |
       [Unit]
@@ -237,6 +288,6 @@ runcmd:
   - ufw --force enable
   - systemctl daemon-reload
   - systemctl restart ssh.socket || systemctl restart ssh
-  - systemctl enable gitbayd gitbay-backup.timer gitbay-gc.timer gitbay-monitor.timer
-  - systemctl start gitbay-backup.timer gitbay-gc.timer gitbay-monitor.timer
+  - systemctl enable gitbayd gitbay-backup.timer gitbay-db-backup.timer gitbay-gc.timer gitbay-monitor.timer
+  - systemctl start gitbay-backup.timer gitbay-db-backup.timer gitbay-gc.timer gitbay-monitor.timer
   - systemctl enable --now unattended-upgrades fail2ban

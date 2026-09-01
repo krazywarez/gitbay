@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -94,5 +95,23 @@ func TestForeignKeysEnforced(t *testing.T) {
 	_, err := s.DB.Exec("INSERT INTO ssh_keys (user_id, fingerprint, algo, blob) VALUES (999, 'SHA256:zzz', 'ed25519', x'00')")
 	if err == nil {
 		t.Fatal("insert with dangling user_id succeeded; foreign keys are off")
+	}
+}
+
+// The database file carries token hashes, addresses and private repo names.
+// The directory above it is the real boundary; this is the second one.
+func TestDatabaseFileIsNotWorldReadable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gitbay.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := fi.Mode().Perm(); mode&0o007 != 0 {
+		t.Errorf("database mode %04o is other-readable", mode)
 	}
 }
