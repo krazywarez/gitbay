@@ -186,6 +186,29 @@ Restore: extract into an empty directory, point =server.root= at it,
 start gitbayd. Host keys are preserved, so clients keep their
 known_hosts entries; hooks regenerate at startup.
 
+** Schedule and recovery point
+
+Two timers, because the two halves of the data have different exposure.
+
+- =gitbay-backup.timer=, nightly. The full archive above, last 7 kept.
+- =gitbay-db-backup.timer=, hourly. =admin backup --db-only=, which
+  writes the SQLite snapshot alone, last 48 kept. A few MB against the
+  full archive's hundreds, which is what makes the frequency affordable.
+
+The split follows what a loss would actually cost. Repositories are git,
+so a mirror or any clone is a second copy; the database is the only copy
+of issues, merge requests, comments and review state. So the recovery
+point is about an hour for the data that exists nowhere else, and a day
+for the data that does.
+
+Continuous replication (litestream and similar) was considered and not
+adopted. It would take the database's recovery point to seconds, but the
+repositories would still be on the nightly archive, so a restore could
+produce a database referencing commits the repository backup does not
+have. Consistency between the two halves is worth more here than latency
+on one of them. Revisit if repository replication becomes continuous
+too.
+
 * Upgrades
 
 Replace the binary, restart the unit. Migrations apply automatically and
