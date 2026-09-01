@@ -69,8 +69,8 @@ func TestAdminBackup(t *testing.T) {
 	if outB, err := exec.Command("tar", "-xzf", archive, "-C", root2).CombinedOutput(); err != nil {
 		t.Fatalf("extract: %v\n%s", err, outB)
 	}
-	port2 := freePort(t)
-	httpPort2 := freePort(t)
+	ports := freePorts(t, 2)
+	port2, httpPort2 := ports[0], ports[1]
 	config2 := filepath.Join(root2, "config.toml")
 	cfg := fmt.Sprintf(`
 [server]

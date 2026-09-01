@@ -22,8 +22,8 @@ func TestACMEServe(t *testing.T) {
 	inst.proc.Process.Kill()
 	inst.proc.Wait()
 
-	httpsPort := freePort(t)
-	acmeHTTPPort := freePort(t)
+	ports := freePorts(t, 2)
+	httpsPort, acmeHTTPPort := ports[0], ports[1]
 	cfg := fmt.Sprintf(`
 [server]
 root = %q

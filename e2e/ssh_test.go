@@ -36,14 +36,36 @@ func buildGitbayd(t *testing.T) string {
 	return bin
 }
 
+// freePorts reserves n distinct ports. A port is chosen by binding :0 and
+// reading back what the kernel assigned, so every listener has to stay open
+// until all of them are picked — closing one before picking the next lets
+// the kernel hand out the same port again, and the instance that asked for
+// three then fails to bind its second listener.
+//
+// Still a narrowing rather than a guarantee: another process can take a port
+// between the close here and the bind in gitbayd. Distinctness within one
+// instance is the part that is ours.
+func freePorts(t *testing.T, n int) []int {
+	t.Helper()
+	lns := make([]net.Listener, 0, n)
+	ports := make([]int, 0, n)
+	for i := 0; i < n; i++ {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		lns = append(lns, ln)
+		ports = append(ports, ln.Addr().(*net.TCPAddr).Port)
+	}
+	for _, ln := range lns {
+		ln.Close()
+	}
+	return ports
+}
+
 func freePort(t *testing.T) int {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port
+	return freePorts(t, 1)[0]
 }
 
 func startInstance(t *testing.T) *instance {
@@ -53,12 +75,13 @@ func startInstance(t *testing.T) *instance {
 // startInstanceWith appends extra TOML to the instance config.
 func startInstanceWith(t *testing.T, extra string) *instance {
 	t.Helper()
+	ports := freePorts(t, 3)
 	inst := &instance{
 		gitbayd:  buildGitbayd(t),
 		root:     t.TempDir(),
-		port:     freePort(t),
-		httpPort: freePort(t),
-		gitPort:  freePort(t),
+		port:     ports[0],
+		httpPort: ports[1],
+		gitPort:  ports[2],
 		sshDir:   t.TempDir(),
 	}
 	inst.config = filepath.Join(inst.root, "config.toml")
@@ -242,5 +265,21 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 	_, errOut, code = inst.ssh(t, aliceKey, "", "keys", "remove", "'no such fingerprint'")
 	if code != 3 {
 		t.Fatalf("keys remove with spaced arg: exit %d (want 3), stderr %q", code, errOut)
+	}
+}
+
+// freePort used to close its listener before returning, so the kernel was
+// free to hand the same port to the next call. An instance asks for three in
+// a row and then fails to bind its second listener, which surfaces as an
+// unrelated test timing out on "gitbayd did not start listening".
+func TestFreePortsAreDistinct(t *testing.T) {
+	for round := 0; round < 50; round++ {
+		seen := map[int]bool{}
+		for _, p := range freePorts(t, 8) {
+			if seen[p] {
+				t.Fatalf("round %d: port %d issued twice in one request", round, p)
+			}
+			seen[p] = true
+		}
 	}
 }
