@@ -202,6 +202,25 @@ per minute — successful auths never count and clear the slate.
 =limits.max_pack_bytes= is enforced as =receive.maxInputSize= on every
 push.
 
+* Queues
+
+Every background worker keeps a backlog and a failure state. An instance
+admin reads them all in one place:
+
+#+begin_src sh
+gitbay dashboard --json | jq .queues   # webhooks, mail, mirrors, builds, deps
+#+end_src
+
+Per worker: pending, retrying (pending with a failed attempt) and
+dead-lettered counts with the oldest pending age, and the retrying or
+failed rows themselves, capped at twenty each. Builds list what is
+running and since when; mirrors list the ones whose last sync failed;
+dependency checks list the ones whose last check errored. Non-admins get
+no =queues= key at all.
+
+In accounts mode the same read renders at =/admin=, linked from the rail
+for admins. Anyone else gets a 404 there.
+
 * Maintenance
 
 #+begin_src sh
