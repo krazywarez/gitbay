@@ -231,6 +231,7 @@ gitbayd admin stats [--json]         # counts, database size, per-repo disk
 ssh git@<host> admin stats [--json]  # the same, from an admin session
 gitbayd admin gc [--repo owner/name] # git gc: repack and prune; per-repo sizes
 gitbayd admin gc --aggressive        # thorough repack; slow, rarely needed
+gitbayd admin gc --lfs               # also drop LFS objects no pointer names (older than a day)
 #+end_src
 
 =deploy/cloud-init.yaml= ships a =gitbay-gc.timer= that runs =admin gc=
@@ -242,6 +243,7 @@ import is worthwhile.
 
 #+begin_src sh
 gitbayd admin backup --out /var/backups/gitbay/backup.tar.gz
+gitbayd admin backup --verify /var/backups/gitbay/backup.tar.gz   # read it back
 #+end_src
 
 One archive: a consistent SQLite snapshot (taken *before* the
@@ -249,6 +251,11 @@ repositories are read, so the database never references objects the
 archive missed), every repository, and the SSH host keys. Excluded:
 hook socket, regenerated hook scripts, WAL files. Safe to run against a
 live daemon.
+
+=--verify= reads an archive back: the snapshot must pass SQLite's
+integrity check, and every repository the snapshot names must be in the
+archive. A database-only archive is checked for integrity and says so.
+Exit is non-zero on damage or a missing repository.
 
 Restore: extract into an empty directory, point =server.root= at it,
 start gitbayd. Host keys are preserved, so clients keep their
@@ -319,6 +326,12 @@ the runner on the server itself. The scoping is what the runner asks for,
 not an ACL the server holds over it: a runner account is admin by
 necessity, so the boundary is you choosing how to start it.
 
+=gitbay dashboard= and =ssh git@<host> admin runners= list every account
+that has polled as a runner: when it last polled, the =-repos= scope it
+asked for, and the build it holds. A build a runner claimed and never
+reported is failed by the scheduler's minute tick, whether or not any
+runner is still alive.
+
 Instance admin on the runner account only authorizes the claim/report
 protocol; it grants no repo access. A build that pushes back — a pages
 deploy, an archive publish, an automated MR branch — needs an explicit
@@ -374,10 +387,17 @@ trusts and refuses to do. Operational checklist:
 - *Admin sshd (2222)* is throttled by =MaxStartups=/=MaxAuthTries= and
   watched by =fail2ban=; gitbayd's own port 22 is throttled by
   =limits.ssh_auth_rate= (auth failures per IP per minute).
-- *Monitoring.* =gitbay-monitor.timer= posts disk/service/cert status
-  hourly to the webhook URL in =/etc/gitbay/monitor.url= (create the
-  file to enable; absent = silent). Alerts fire on a stopped service or
-  disk ≥ 85%.
+- *Monitoring.* =gitbay-monitor.timer= writes a reading hourly to
+journald and, when =/etc/gitbay/monitor.url= exists, posts it to that
+webhook: disk, service, the daemon's own =/healthz= answer, certificate
+expiry, and the age of the newest full backup and database snapshot.
+It exits non-zero on an alert so the unit shows in =systemctl
+--failed=: a stopped service, =/healthz= not answering =ok=, disk ≥ 85%,
+a certificate under 21 days, a full backup over 25 hours old, or a
+database snapshot over 2 hours old.
+
+=GET /healthz= is unauthenticated and cache-free: whether the database
+answers and which commit serves, 503 when it does not.
 - *Database.* =gitbay.db= and its WAL live under =/var/lib/gitbay= (mode
   0750, owned by =gitbay=). The nightly archive plus provider snapshots
   are the recovery path; for tighter RPO, add continuous replication
