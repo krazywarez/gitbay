@@ -91,9 +91,36 @@ write_files:
           days=$(( (soonest - $(date -u +%s)) / 86400 ))
         fi
       fi
+      # Backups are timers, and a timer failing quietly is the most
+      # damaging silent failure this host has. Age of the newest full
+      # archive and the newest database snapshot, in hours.
+      now=$(date -u +%s)
+      age_h() {
+        f=$(ls -t "$1"/*.tar.gz 2>/dev/null | head -1)
+        [ -n "$f" ] || { echo ""; return; }
+        echo $(( (now - $(stat -c %Y "$f")) / 3600 ))
+      }
+      full_age=$(age_h /var/backups/gitbay)
+      db_age=$(age_h /var/backups/gitbay/db)
+      # The daemon's own word, from inside the process.
+      site=$(sed -n 's/^site_url *= *"\(.*\)"/\1/p' /etc/gitbay/config.toml | head -1)
+      health="n/a"
+      if [ -n "$site" ]; then
+        health=$(curl -fsS -m 10 "$site/healthz" 2>/dev/null | grep -o '"ok":[a-z]*' | head -1 | cut -d: -f2)
+        [ -n "$health" ] || health="unreachable"
+      fi
       alert=""
       if [ "$svc" != "active" ]; then
         alert="gitbayd is $svc; "
+      fi
+      if [ "$health" != "true" ]; then
+        alert="${alert}healthz $health; "
+      fi
+      if [ -z "$full_age" ] || [ "$full_age" -ge 25 ]; then
+        alert="${alert}full backup ${full_age:-missing}h old; "
+      fi
+      if [ -z "$db_age" ] || [ "$db_age" -ge 2 ]; then
+        alert="${alert}db snapshot ${db_age:-missing}h old; "
       fi
       pct=$(echo "$disk" | tr -d '%')
       if [ "$pct" -ge 85 ]; then
@@ -104,10 +131,10 @@ write_files:
       fi
       # journald always gets the reading, so an unset webhook cannot make a
       # sick host look like a quiet one.
-      echo "disk=$disk service=$svc cert_expires=$exp${days:+ cert_days=$days}"
+      echo "disk=$disk service=$svc healthz=$health cert_expires=$exp${days:+ cert_days=$days} full_backup_h=${full_age:-missing} db_snapshot_h=${db_age:-missing}"
       url_file=/etc/gitbay/monitor.url
       if [ -f "$url_file" ]; then
-        body=$(printf '{"disk":"%s","service":"%s","cert_expires":"%s","alert":"%s"}' "$disk" "$svc" "$exp" "$alert")
+        body=$(printf '{"disk":"%s","service":"%s","healthz":"%s","cert_expires":"%s","full_backup_h":"%s","db_snapshot_h":"%s","alert":"%s"}' "$disk" "$svc" "$health" "$exp" "${full_age:-missing}" "${db_age:-missing}" "$alert")
         if ! curl -fsS -m 10 -H 'Content-Type: application/json' -d "$body" "$(cat "$url_file")" >/dev/null; then
           echo "monitor webhook post failed" >&2
         fi
