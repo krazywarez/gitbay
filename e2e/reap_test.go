@@ -139,3 +139,16 @@ func TestAdminRunners(t *testing.T) {
 		t.Fatalf("host runners:\n%s", out)
 	}
 }
+
+// /healthz is unauthenticated, cache-free, and says which build serves.
+func TestHealthz(t *testing.T) {
+	inst := startInstance(t)
+	status, body := inst.get(t, "/healthz")
+	if status != 200 || !strings.Contains(body, `"ok":true`) || !strings.Contains(body, `"commit":"`) {
+		t.Fatalf("healthz: %d %s", status, body)
+	}
+	// The name is reserved: no account can shadow the route.
+	if _, errOut, code := inst.ssh(t, inst.newKey(t, "x"), "", "register", "--username", "healthz"); code == 0 {
+		t.Fatalf("healthz registered as a username: %s", errOut)
+	}
+}

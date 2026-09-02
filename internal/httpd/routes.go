@@ -38,6 +38,7 @@ func (s *Server) Routes() []Route {
 	routes = append(routes,
 		Route{Method: "GET", Pattern: "/{$}", Handler: s.index},
 		Route{Method: "GET", Pattern: "/explore", Handler: s.explore},
+		Route{Method: "GET", Pattern: "/healthz", Handler: s.healthz},
 		Route{Method: "GET", Pattern: "/privacy", Handler: s.privacy},
 		Route{Method: "GET", Pattern: "/static/style.css", Handler: s.stylesheet},
 		// Literal per-file routes: a {name} wildcard is ambiguous against
