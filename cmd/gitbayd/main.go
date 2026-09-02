@@ -327,10 +327,13 @@ func adminCmd() *cobra.Command {
 		hostCmd("visibility <owner/name> public|private", "set a repository's visibility", "admin", "repo", "visibility"),
 		hostCmd("delete <owner/name> --yes", "delete a repository", "admin", "repo", "delete"),
 	)
+	configCmd := &cobra.Command{Use: "config", Short: "the configuration in effect"}
+	configCmd.AddCommand(configShowCmd())
 	admin.AddCommand(
 		userCmd,
 		emailCmd,
 		repoCmd,
+		configCmd,
 		hostCmd("invite --email <address>", "issue a registration invite and email its code", "admin", "invite"),
 		hostCmd("stats [--json]", "instance statistics: counts and per-repository disk usage", "admin", "stats"),
 		hostCmd("audit [--limit n] [--json]", "print the security audit log, newest first", "audit"),

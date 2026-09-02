@@ -555,3 +555,16 @@ func TestAdminQueuesDashboard(t *testing.T) {
 		t.Fatal("admin rail lacks /admin")
 	}
 }
+
+func TestAdminConfigShow(t *testing.T) {
+	inst := startInstanceWith(t, "[mail]\nsmtp_host = \"127.0.0.1:1\"\nfrom = \"forge@example.test\"\nsmtp_pass = \"hunter2\"\n")
+	out := inst.admin(t, "admin", "config", "show")
+	for _, want := range []string{"[server]", "site_url", "ssh_auth_rate = 10", "pull_interval_minutes = 15", "[mail]", `smtp_pass = "<redacted>"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("config show lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "hunter2") {
+		t.Fatalf("config show printed the SMTP password:\n%s", out)
+	}
+}
