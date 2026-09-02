@@ -91,6 +91,7 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.logout)},
 			Route{Method: "GET", Pattern: "/new", Handler: s.requireUser(s.newRepoForm)},
 			Route{Method: "GET", Pattern: "/settings", Handler: s.requireUser(s.accountForm)},
+			Route{Method: "GET", Pattern: "/admin", Handler: s.requireUser(s.adminPage)},
 			Route{Method: "POST", Pattern: "/{owner}", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.orgSubmit))},
 			Route{Method: "POST", Pattern: "/settings", Mutating: true,

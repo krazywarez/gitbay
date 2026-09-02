@@ -41,6 +41,7 @@ type basePage struct {
 	Site   string
 	Host   string
 	Viewer string
+	Admin  bool // the viewer is an instance admin: the rail shows /admin
 	Rail   rail
 }
 
@@ -61,6 +62,7 @@ func (s *Server) baseFor(viewer store.User) basePage {
 		return b
 	}
 	b.Viewer = viewer.Username
+	b.Admin = viewer.IsAdmin
 	b.Rail = s.railFor(viewer)
 	return b
 }

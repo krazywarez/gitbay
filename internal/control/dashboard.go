@@ -70,6 +70,9 @@ func runDashboard(c *Ctx, args []string) int {
 		Activity []feedOut       `json:"recent_activity"`
 		Builds   []buildOut      `json:"builds"`
 		Server   *serverOut      `json:"server,omitempty"`
+		// Queues is admin-only: every background worker's backlog and
+		// failures, the operator's view of what is stuck.
+		Queues *store.Queues `json:"queues,omitempty"`
 	}
 	d := out{
 		Reviews: []dashboardItem{}, Assigned: []dashboardItem{}, MRs: []dashboardItem{},
@@ -139,6 +142,11 @@ func runDashboard(c *Ctx, args []string) int {
 	}
 	if c.User.IsAdmin {
 		d.Server = &serverOut{Commit: buildinfo.String()}
+		q, err := c.Store.QueueStatus()
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		d.Queues = &q
 	}
 
 	return c.emit(d, func(w io.Writer) {
@@ -168,6 +176,29 @@ func runDashboard(c *Ctx, args []string) int {
 		}
 		if d.Server != nil {
 			fmt.Fprintf(w, "server:\n  build %s\n", d.Server.Commit)
+		}
+		if q := d.Queues; q != nil {
+			fmt.Fprintln(w, "queues:")
+			fmt.Fprintf(w, "  webhooks\tpending %d\tretrying %d\tfailed %d\n", q.Webhooks.Pending, q.Webhooks.Retrying, q.Webhooks.Failed)
+			for _, it := range q.Webhooks.Items {
+				fmt.Fprintf(w, "    %s\t%s\tattempts %d\t%s\n", it.Repo, it.URL, it.Attempts, it.LastError)
+			}
+			fmt.Fprintf(w, "  mail\tpending %d\tretrying %d\tfailed %d\n", q.Mail.Pending, q.Mail.Retrying, q.Mail.Failed)
+			for _, it := range q.Mail.Items {
+				fmt.Fprintf(w, "    %s\t%s\tattempts %d\t%s\n", it.Recipient, it.Subject, it.Attempts, it.LastError)
+			}
+			fmt.Fprintf(w, "  mirrors\tdirty %d\terrors %d\n", q.Mirrors.Dirty, q.Mirrors.Errors)
+			for _, it := range q.Mirrors.Items {
+				fmt.Fprintf(w, "    %s\t%s\t%s\t%s\n", it.Repo, it.Direction, it.URL, it.LastError)
+			}
+			fmt.Fprintf(w, "  builds\tpending %d\trunning %d\n", q.Builds.Pending, q.Builds.Running)
+			for _, it := range q.Builds.Items {
+				fmt.Fprintf(w, "    %s\t%d\t%s\tsince %s\n", it.Repo, it.Number, it.Job, it.StartedAt)
+			}
+			fmt.Fprintf(w, "  deps\terrors %d\n", q.Deps.Errors)
+			for _, it := range q.Deps.Items {
+				fmt.Fprintf(w, "    %s\t%s\n", it.Repo, it.LastError)
+			}
 		}
 	})
 }

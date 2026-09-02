@@ -1,0 +1,44 @@
+{{define "title"}}admin · {{.Site}}{{end}}
+{{define "content"}}
+<h1>Admin</h1>
+<p class="meta">Server build {{.Commit}}. Every background worker's backlog, the same read as <code>gitbay dashboard --json</code> for an admin.</p>
+
+{{with .Queues.Webhooks}}
+<h2>Webhook deliveries <span class="count">{{.Pending}}</span></h2>
+<p class="meta">{{.Pending}} pending · {{.Retrying}} retrying · {{.Failed}} dead-lettered{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr><th>Repository</th><th>URL</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
+{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td>{{.URL}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}dead-lettered {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{if .Status}}{{.Status}} {{end}}{{.LastError}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">Nothing retrying or dead-lettered</p>{{end}}
+{{end}}
+
+{{with .Queues.Mail}}
+<h2>Mail <span class="count">{{.Pending}}</span></h2>
+<p class="meta">{{.Pending}} pending · {{.Retrying}} retrying · {{.Failed}} failed{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr><th>Recipient</th><th>Subject</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
+{{range .Items}}<tr><td>{{.Recipient}}</td><td>{{.Subject}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}failed {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{.LastError}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">Nothing retrying or failed</p>{{end}}
+{{end}}
+
+{{with .Queues.Mirrors}}
+<h2>Mirrors <span class="count">{{.Errors}}</span></h2>
+<p class="meta">{{.Dirty}} waiting for a sync · {{.Errors}} with a failed last sync</p>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr><th>Repository</th><th>Direction</th><th>URL</th><th>Last sync</th><th>Error</th></tr></thead><tbody>
+{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td>{{.Direction}}</td><td>{{.URL}}</td><td>{{if .LastSync}}{{when .LastSync}}{{else}}never{{end}}</td><td>{{.LastError}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">Every mirror's last sync succeeded</p>{{end}}
+{{end}}
+
+{{with .Queues.Builds}}
+<h2>Builds <span class="count">{{.Pending}}</span></h2>
+<p class="meta">{{.Pending}} pending · {{.Running}} running{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr><th>Repository</th><th>Build</th><th>Job</th><th>Running since</th></tr></thead><tbody>
+{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td><a href="/{{.Repo}}/builds/{{.Number}}">#{{.Number}}</a></td><td>{{.Job}}</td><td>{{when .StartedAt}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">No build running</p>{{end}}
+{{end}}
+
+{{with .Queues.Deps}}
+<h2>Dependency checks <span class="count">{{.Errors}}</span></h2>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr><th>Repository</th><th>Last check</th><th>Error</th></tr></thead><tbody>
+{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td>{{if .LastCheck}}{{when .LastCheck}}{{else}}never{{end}}</td><td>{{.LastError}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">No check has failed</p>{{end}}
+{{end}}
+{{end}}

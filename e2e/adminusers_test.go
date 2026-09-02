@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type adminUserRow struct {
@@ -449,5 +450,108 @@ func TestAuditFilters(t *testing.T) {
 	if out := inst.admin(t, "admin", "audit", "--actor", "bob", "--json"); !strings.Contains(out, `"protocol_version"`) ||
 		!strings.Contains(out, "bob/app") || strings.Contains(out, "alice/app") {
 		t.Fatalf("host audit --json --actor:\n%s", out)
+	}
+}
+
+func TestAdminQueuesDashboard(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n[webhooks]\nallow_local = true\n")
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	// A webhook whose receiver keeps failing, and a CI job with no runner:
+	// one delivery retrying, one build pending.
+	hook := startHookReceiver(t)
+	hook.failNext = 100
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "webhook", "add", "alice/app", "http://"+hook.addr+"/hook"); code != 0 {
+		t.Fatalf("webhook add: %s", errOut)
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs:\n  ok:\n    steps:\n      - echo fine\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "ci")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	type queues struct {
+		Webhooks struct {
+			Pending  int64 `json:"pending"`
+			Retrying int64 `json:"retrying"`
+			Items    []struct {
+				Repo      string `json:"repo"`
+				Attempts  int64  `json:"attempts"`
+				LastError string `json:"last_error"`
+			} `json:"items"`
+		} `json:"webhooks"`
+		Builds struct {
+			Pending       int64  `json:"pending"`
+			OldestPending string `json:"oldest_pending"`
+		} `json:"builds"`
+		Mail struct {
+			Pending int64 `json:"pending"`
+		} `json:"mail"`
+	}
+	dashboard := func(key string) (*queues, string) {
+		t.Helper()
+		out, errOut, code := inst.ssh(t, key, "", "dashboard", "--json")
+		if code != 0 {
+			t.Fatalf("dashboard: exit %d %s", code, errOut)
+		}
+		var env struct {
+			Data struct {
+				Queues *queues `json:"queues"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(out), &env); err != nil {
+			t.Fatalf("dashboard json: %v\n%s", err, out)
+		}
+		return env.Data.Queues, out
+	}
+	if q, out := dashboard(aliceKey); q != nil {
+		t.Fatalf("non-admin dashboard carries queues:\n%s", out)
+	}
+	var q *queues
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		q, _ = dashboard(rootKey)
+		if q != nil && q.Webhooks.Retrying >= 1 && q.Builds.Pending >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("queues never showed the retrying delivery and pending build: %+v", q)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if q.Builds.OldestPending == "" || q.Mail.Pending != 0 {
+		t.Fatalf("queue facts: %+v", q)
+	}
+	if len(q.Webhooks.Items) == 0 || q.Webhooks.Items[0].Repo != "alice/app" || q.Webhooks.Items[0].Attempts == 0 || q.Webhooks.Items[0].LastError == "" {
+		t.Fatalf("retrying item: %+v", q.Webhooks.Items)
+	}
+
+	// The web page dispatches the same read; non-admins get a 404 and no
+	// rail link.
+	alice := inst.login(t, aliceKey)
+	if status, body := browserGet(t, alice, inst.base()+"/admin"); status != 404 || strings.Contains(body, "Webhook deliveries") {
+		t.Fatalf("non-admin /admin: %d", status)
+	}
+	if _, body := browserGet(t, alice, inst.base()+"/"); strings.Contains(body, `href="/admin"`) {
+		t.Fatal("non-admin rail links to /admin")
+	}
+	root := inst.login(t, rootKey)
+	status, body := browserGet(t, root, inst.base()+"/admin")
+	if status != 200 || !strings.Contains(body, "Webhook deliveries") || !strings.Contains(body, "alice/app") ||
+		!strings.Contains(body, "retrying") || !strings.Contains(body, "1 pending") {
+		t.Fatalf("/admin: %d\n%s", status, body)
+	}
+	if _, body := browserGet(t, root, inst.base()+"/"); !strings.Contains(body, `href="/admin"`) {
+		t.Fatal("admin rail lacks /admin")
 	}
 }

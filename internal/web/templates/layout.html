@@ -41,6 +41,7 @@
   </div>
   <ul class="raillist railpinned">
     {{if .Viewer}}<li><a {{if eq (str . "Tab") "account"}}aria-current="page" {{end}}href="/settings">Settings</a></li>{{end}}
+    {{if .Admin}}<li><a {{if eq (str . "Tab") "admin"}}aria-current="page" {{end}}href="/admin">Admin</a></li>{{end}}
   </ul>
   <div class="railfoot">
     {{if .Viewer}}<a class="railuser" href="/{{.Viewer}}"><span class="avatar">{{initial .Viewer}}</span><span class="uname">{{.Viewer}}</span></a>
