@@ -82,6 +82,13 @@ func newRoot() *cobra.Command {
 				pass("promote", "make an account an instance admin: <username>", passOpts{server: []string{"admin", "user", "promote"}}),
 				pass("demote", "remove instance admin (never the last one): <username>", passOpts{server: []string{"admin", "user", "demote"}}),
 			),
+			group("repo", "any repository, for moderation (audited)",
+				pass("list", "every repository with size and last push: [--owner o] [--visibility v] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "repo", "list"}}),
+				pass("archive", "archive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "archive"}}),
+				pass("unarchive", "unarchive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "unarchive"}}),
+				pass("visibility", "set visibility: <owner/name> public|private", passOpts{server: []string{"admin", "repo", "visibility"}}),
+				pass("delete", "delete a repository: <owner/name> --yes", passOpts{server: []string{"admin", "repo", "delete"}}),
+			),
 		),
 		manCmd(root),
 	)

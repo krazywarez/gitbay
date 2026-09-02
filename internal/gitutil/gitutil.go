@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -209,4 +210,19 @@ func WriteDescription(dir, desc string) error {
 		desc = desc[:256]
 	}
 	return os.WriteFile(filepath.Join(dir, "description"), []byte(desc+"\n"), 0o644)
+}
+
+// DirSize sums file sizes under dir; unreadable entries count as zero.
+func DirSize(dir string) int64 {
+	var total int64
+	filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if fi, err := d.Info(); err == nil {
+			total += fi.Size()
+		}
+		return nil
+	})
+	return total
 }

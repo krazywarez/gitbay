@@ -421,6 +421,12 @@ func runRepoDelete(c *Ctx, args []string) int {
 	if !yes {
 		return c.fail(protocol.ExitUsage, "repo delete is permanent; re-run with --yes")
 	}
+	return deleteRepo(c, repo)
+}
+
+// deleteRepo removes a repository the caller has already been cleared to
+// delete: the database row, then the directory and its wiki companion.
+func deleteRepo(c *Ctx, repo store.Repo) int {
 	// Open MRs sourced from this repo keep working (targets own the
 	// objects) but must show that the source is gone.
 	if err := c.Store.MarkSourceGoneForRepo(repo.ID); err != nil {
@@ -574,24 +580,30 @@ func runSetVisibility(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	if repo.Visibility == args[1] {
-		return c.emit(map[string]string{"visibility": args[1]}, func(w io.Writer) {
-			fmt.Fprintf(w, "%s is already %s\n", repo.Path(), args[1])
+	return setRepoVisibility(c, repo, args[1])
+}
+
+// setRepoVisibility applies a visibility change the caller has already
+// been cleared to make.
+func setRepoVisibility(c *Ctx, repo store.Repo, visibility string) int {
+	if repo.Visibility == visibility {
+		return c.emit(map[string]string{"visibility": visibility}, func(w io.Writer) {
+			fmt.Fprintf(w, "%s is already %s\n", repo.Path(), visibility)
 		})
 	}
-	if err := c.Store.SetRepoVisibility(repo.ID, args[1]); err != nil {
+	if err := c.Store.SetRepoVisibility(repo.ID, visibility); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	// Going private takes the repository off every anonymous surface, so
 	// git:// exposure cannot outlive the change.
-	if args[1] == "private" && repo.Settings.GitDaemon {
+	if visibility == "private" && repo.Settings.GitDaemon {
 		s := repo.Settings
 		s.GitDaemon = false
 		c.Store.SetRepoSettings(repo.ID, s)
 	}
-	c.Store.Audit(c.User.ID, "repo.visibility", map[string]any{"repo": repo.ID, "visibility": args[1]})
-	return c.emit(map[string]string{"visibility": args[1]}, func(w io.Writer) {
-		fmt.Fprintf(w, "%s is now %s\n", repo.Path(), args[1])
+	c.Store.Audit(c.User.ID, "repo.visibility", map[string]any{"repo": repo.ID, "visibility": visibility})
+	return c.emit(map[string]string{"visibility": visibility}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s is now %s\n", repo.Path(), visibility)
 	})
 }
 
@@ -632,6 +644,16 @@ func setArchived(c *Ctx, args []string, archived bool) int {
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
 		return code
+	}
+	return archiveRepo(c, repo, archived)
+}
+
+// archiveRepo flips the archived flag on a repository the caller has
+// already been cleared to manage.
+func archiveRepo(c *Ctx, repo store.Repo, archived bool) int {
+	verb := "archive"
+	if !archived {
+		verb = "unarchive"
 	}
 	if repo.Settings.Archived == archived {
 		return c.fail(protocol.ExitUsage, "%s is already %sd", repo.Path(), verb)

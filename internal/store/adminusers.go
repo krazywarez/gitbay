@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -130,4 +131,63 @@ func (s *Store) SetUserAdmin(userID int64, admin bool) error {
 		return ErrNotFound
 	}
 	return tx.Commit()
+}
+
+// AdminRepo is one repository as the instance admin lists it. LastPush is
+// the newest push event, "" when nothing has been pushed.
+type AdminRepo struct {
+	Path       string // owner/name, the keyset cursor
+	OwnerName  string
+	Name       string
+	Visibility string
+	Archived   bool
+	CreatedAt  string
+	LastPush   string
+}
+
+// ListReposAdmin lists repositories across every owner, by path. owner and
+// visibility narrow the set when non-empty; after is the path keyset
+// cursor; limit 0 means no cap.
+func (s *Store) ListReposAdmin(owner, visibility string, limit int, after string) ([]AdminRepo, error) {
+	q := `SELECT COALESCE(u.username, o.name) || '/' || r.name, COALESCE(u.username, o.name), r.name,
+		r.visibility, r.settings_json, r.created_at,
+		COALESCE((SELECT MAX(created_at) FROM events WHERE repo_id = r.id AND kind = 'push'), '')
+		FROM repos r
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		WHERE COALESCE(u.username, o.name) || '/' || r.name > ?`
+	args := []any{after}
+	if owner != "" {
+		q += " AND COALESCE(u.username, o.name) = ?"
+		args = append(args, owner)
+	}
+	if visibility != "" {
+		q += " AND r.visibility = ?"
+		args = append(args, visibility)
+	}
+	q += " ORDER BY 1"
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
+	rows, err := s.DB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AdminRepo
+	for rows.Next() {
+		var r AdminRepo
+		var settingsJSON string
+		if err := rows.Scan(&r.Path, &r.OwnerName, &r.Name, &r.Visibility, &settingsJSON, &r.CreatedAt, &r.LastPush); err != nil {
+			return nil, err
+		}
+		var st RepoSettings
+		if err := json.Unmarshal([]byte(settingsJSON), &st); err != nil {
+			return nil, fmt.Errorf("repo %s settings: %w", r.Path, err)
+		}
+		r.Archived = st.Archived
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }

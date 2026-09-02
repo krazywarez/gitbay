@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -28,6 +29,26 @@ func init() {
 		Summary: "remove instance admin from an account (never the last one)",
 		Usage:   "admin user demote <username>",
 		SSHOnly: true, Run: runAdminUserDemote})
+	register(Command{Path: []string{"admin", "repo", "list"},
+		Summary:  "list every repository with size and last push (instance admins)",
+		Usage:    "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
+		ReadOnly: true, SSHOnly: true, Run: runAdminRepoList})
+	register(Command{Path: []string{"admin", "repo", "archive"},
+		Summary: "archive any repository (instance admins; audited)",
+		Usage:   "admin repo archive <owner/name>",
+		SSHOnly: true, Run: runAdminRepoArchive})
+	register(Command{Path: []string{"admin", "repo", "unarchive"},
+		Summary: "unarchive any repository (instance admins; audited)",
+		Usage:   "admin repo unarchive <owner/name>",
+		SSHOnly: true, Run: runAdminRepoUnarchive})
+	register(Command{Path: []string{"admin", "repo", "visibility"},
+		Summary: "set any repository's visibility (instance admins; audited)",
+		Usage:   "admin repo visibility <owner/name> public|private",
+		SSHOnly: true, Run: runAdminRepoVisibility})
+	register(Command{Path: []string{"admin", "repo", "delete"},
+		Summary: "delete any repository (instance admins; audited)",
+		Usage:   "admin repo delete <owner/name> --yes",
+		SSHOnly: true, Run: runAdminRepoDelete})
 }
 
 // requireInstanceAdmin gates the admin noun. -1 means proceed.
@@ -288,4 +309,142 @@ func setAdmin(c *Ctx, args []string, admin bool) int {
 	return c.emit(map[string]any{"user": u.Username, "admin": admin}, func(w io.Writer) {
 		fmt.Fprintf(w, "%sd %s\n", verb, u.Username)
 	})
+}
+
+// adminRepo loads a repository for an admin override. Instance admin
+// carries no implicit read right, so policy is not consulted; the only
+// refusal is a path that does not exist. Every caller audits what it does.
+func adminRepo(c *Ctx, path string) (store.Repo, int) {
+	if code := requireInstanceAdmin(c); code >= 0 {
+		return store.Repo{}, code
+	}
+	repo, err := c.Store.RepoByPath(path)
+	if errors.Is(err, store.ErrNotFound) {
+		return repo, c.fail(protocol.ExitNotFound, "repository %s not found", path)
+	} else if err != nil {
+		return repo, c.fail(protocol.ExitFailure, "loading repository: %v", err)
+	}
+	return repo, -1
+}
+
+func runAdminRepoList(c *Ctx, args []string) int {
+	if code := requireInstanceAdmin(c); code >= 0 {
+		return code
+	}
+	args, p, code := parsePageFlags(c, args, "admin-repo", false)
+	if code >= 0 {
+		return code
+	}
+	var owner, visibility string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--owner":
+			if i+1 >= len(args) {
+				return c.fail(protocol.ExitUsage, "--owner requires a value")
+			}
+			owner = args[i+1]
+			i++
+		case "--visibility":
+			if i+1 >= len(args) || (args[i+1] != "public" && args[i+1] != "private") {
+				return c.fail(protocol.ExitUsage, "--visibility requires public|private")
+			}
+			visibility = args[i+1]
+			i++
+		default:
+			return c.fail(protocol.ExitUsage, "usage: admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]")
+		}
+	}
+	repos, err := c.Store.ListReposAdmin(owner, visibility, p.queryLimit(), p.key)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	repos, next := trimPage(p, repos, "admin-repo", func(r store.AdminRepo) string { return r.Path })
+	type out struct {
+		Path       string `json:"path"`
+		Visibility string `json:"visibility"`
+		Archived   bool   `json:"archived,omitempty"`
+		CreatedAt  string `json:"created_at"`
+		LastPush   string `json:"last_push,omitempty"`
+		Bytes      int64  `json:"bytes"`
+	}
+	var ds []out
+	for _, r := range repos {
+		size := gitutil.DirSize(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
+		ds = append(ds, out{r.Path, r.Visibility, r.Archived, r.CreatedAt, r.LastPush, size})
+	}
+	return c.emitPage(p, ds, next, func(w io.Writer) {
+		for _, d := range ds {
+			mark := ""
+			if d.Archived {
+				mark = "\t[archived]"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s%s\n", d.Path, d.Visibility, d.Bytes, d.CreatedAt, d.LastPush, mark)
+		}
+	})
+}
+
+func runAdminRepoArchive(c *Ctx, args []string) int   { return adminArchive(c, args, true) }
+func runAdminRepoUnarchive(c *Ctx, args []string) int { return adminArchive(c, args, false) }
+
+func adminArchive(c *Ctx, args []string, archived bool) int {
+	verb := "archive"
+	if !archived {
+		verb = "unarchive"
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: admin repo %s <owner/name>", verb)
+	}
+	repo, code := adminRepo(c, args[0])
+	if code >= 0 {
+		return code
+	}
+	if code := archiveRepo(c, repo, archived); code != protocol.ExitOK {
+		return code
+	}
+	c.Store.Audit(c.User.ID, "admin repo."+verb, map[string]any{"repo": repo.Path()})
+	return protocol.ExitOK
+}
+
+func runAdminRepoVisibility(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "public" && args[1] != "private") {
+		return c.fail(protocol.ExitUsage, "usage: admin repo visibility <owner/name> public|private")
+	}
+	repo, code := adminRepo(c, args[0])
+	if code >= 0 {
+		return code
+	}
+	if code := setRepoVisibility(c, repo, args[1]); code != protocol.ExitOK {
+		return code
+	}
+	c.Store.Audit(c.User.ID, "admin repo.visibility", map[string]any{"repo": repo.Path(), "visibility": args[1]})
+	return protocol.ExitOK
+}
+
+func runAdminRepoDelete(c *Ctx, args []string) int {
+	var path string
+	var yes bool
+	for _, a := range args {
+		if a == "--yes" {
+			yes = true
+		} else if path == "" {
+			path = a
+		} else {
+			return c.fail(protocol.ExitUsage, "usage: admin repo delete <owner/name> --yes")
+		}
+	}
+	if path == "" {
+		return c.fail(protocol.ExitUsage, "usage: admin repo delete <owner/name> --yes")
+	}
+	repo, code := adminRepo(c, path)
+	if code >= 0 {
+		return code
+	}
+	if !yes {
+		return c.fail(protocol.ExitUsage, "admin repo delete is permanent; re-run with --yes")
+	}
+	if code := deleteRepo(c, repo); code != protocol.ExitOK {
+		return code
+	}
+	c.Store.Audit(c.User.ID, "admin repo.delete", map[string]any{"repo": repo.Path()})
+	return protocol.ExitOK
 }

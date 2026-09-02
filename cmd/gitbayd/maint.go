@@ -3,16 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -47,7 +46,7 @@ func gcCmd() *cobra.Command {
 			var before, after int64
 			for _, r := range repos {
 				dir := control.RepoDir(cfg.Server.Root, r.OwnerName, r.Name)
-				b := duDir(dir)
+				b := gitutil.DirSize(dir)
 				gcArgs := []string{"-C", dir, "gc", "--quiet"}
 				if aggressive {
 					gcArgs = append(gcArgs, "--aggressive")
@@ -56,7 +55,7 @@ func gcCmd() *cobra.Command {
 					fmt.Fprintf(os.Stderr, "%s: gc failed: %v\n%s", r.Path(), err, out)
 					continue
 				}
-				a := duDir(dir)
+				a := gitutil.DirSize(dir)
 				before, after = before+b, after+a
 				fmt.Printf("%s\t%s -> %s\n", r.Path(), human(b), human(a))
 			}
@@ -100,7 +99,7 @@ func statsCmd() *cobra.Command {
 			var disks []repoDisk
 			var totalDisk int64
 			for _, r := range repos {
-				b := duDir(control.RepoDir(cfg.Server.Root, r.OwnerName, r.Name))
+				b := gitutil.DirSize(control.RepoDir(cfg.Server.Root, r.OwnerName, r.Name))
 				disks = append(disks, repoDisk{r.Path(), b})
 				totalDisk += b
 			}
@@ -128,21 +127,6 @@ func statsCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output")
 	return cmd
-}
-
-// duDir sums file sizes under dir; errors count as zero.
-func duDir(dir string) int64 {
-	var total int64
-	filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
-		}
-		if fi, err := d.Info(); err == nil {
-			total += fi.Size()
-		}
-		return nil
-	})
-	return total
 }
 
 func human(b int64) string {

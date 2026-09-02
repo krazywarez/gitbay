@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -219,5 +221,113 @@ func TestAdminPromoteDemote(t *testing.T) {
 	}
 	if out := inst.admin(t, "admin", "audit"); !strings.Contains(out, "admin user.promoted") {
 		t.Fatalf("host promote not audited:\n%s", out)
+	}
+}
+
+func TestAdminRepoModeration(t *testing.T) {
+	inst := startInstance(t)
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	for _, args := range [][]string{{"repo", "create", "alice/app"}, {"repo", "create", "alice/secret", "--private"}} {
+		if _, _, code := inst.ssh(t, aliceKey, "", args...); code != 0 {
+			t.Fatalf("%v failed", args)
+		}
+	}
+	// A push, so last_push has something to report.
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "a")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	// Instance admin carries no read right: the private repo still 404s.
+	if _, _, code := inst.ssh(t, rootKey, "", "repo", "show", "alice/secret"); code != 3 {
+		t.Fatalf("admin read a private repo: exit %d", code)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "repo", "list"); code != 4 {
+		t.Fatal("non-admin listed repos")
+	}
+
+	type row struct {
+		Path       string `json:"path"`
+		Visibility string `json:"visibility"`
+		Archived   bool   `json:"archived"`
+		LastPush   string `json:"last_push"`
+		Bytes      int64  `json:"bytes"`
+	}
+	list := func(args ...string) []row {
+		t.Helper()
+		out, errOut, code := inst.ssh(t, rootKey, "", append([]string{"admin", "repo", "list", "--json"}, args...)...)
+		if code != 0 {
+			t.Fatalf("admin repo list %v: exit %d %s", args, code, errOut)
+		}
+		var env struct {
+			Data []row `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(out), &env); err != nil {
+			t.Fatalf("list: %v\n%s", err, out)
+		}
+		return env.Data
+	}
+	rows := list()
+	if len(rows) != 2 || rows[0].Path != "alice/app" || rows[1].Path != "alice/secret" || rows[1].Visibility != "private" {
+		t.Fatalf("list: %+v", rows)
+	}
+	if rows[0].LastPush == "" || rows[1].LastPush != "" || rows[0].Bytes == 0 {
+		t.Fatalf("push and size facts: %+v", rows)
+	}
+	if rows := list("--visibility", "private"); len(rows) != 1 || rows[0].Path != "alice/secret" {
+		t.Fatalf("--visibility: %+v", rows)
+	}
+	if rows := list("--owner", "root"); len(rows) != 0 {
+		t.Fatalf("--owner root: %+v", rows)
+	}
+
+	// Archive, then visibility: the private repo becomes readable to
+	// everyone once public, admin included.
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "archive", "alice/app"); code != 0 {
+		t.Fatal("admin archive failed")
+	}
+	if rows := list(); !rows[0].Archived {
+		t.Fatalf("not archived: %+v", rows)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "unarchive", "alice/app"); code != 0 {
+		t.Fatal("admin unarchive failed")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "visibility", "alice/secret", "public"); code != 0 {
+		t.Fatal("admin visibility failed")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "repo", "show", "alice/secret"); code != 0 {
+		t.Fatal("repo still hidden after going public")
+	}
+
+	// Delete wants the typed confirmation and then removes it from the
+	// owner's view too.
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "delete", "alice/app"); code != 2 {
+		t.Fatal("delete without --yes accepted")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "delete", "alice/app", "--yes"); code != 0 {
+		t.Fatal("admin delete failed")
+	}
+	if out, _, _ := inst.ssh(t, aliceKey, "", "repo", "list"); strings.Contains(out, "alice/app") {
+		t.Fatalf("deleted repo still listed:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "repo", "delete", "nobody/none", "--yes"); code != 3 {
+		t.Fatal("unknown repo should be not found")
+	}
+
+	// Every override is in the audit log under its own action, on top of
+	// the generic cmd row.
+	out, _, _ := inst.ssh(t, rootKey, "", "audit", "--json")
+	for _, want := range []string{"admin repo.archive", "admin repo.unarchive", "admin repo.visibility", "admin repo.delete"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("audit lacks %q:\n%s", want, out)
+		}
 	}
 }
