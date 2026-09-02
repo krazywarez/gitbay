@@ -383,7 +383,9 @@ against the default branch instead of on push. A default-branch push
 registers or updates the schedule. A job with =tags: "v*"= runs when a
 matching tag is pushed — and only then; =schedule= and =tags= are
 mutually exclusive. =build trigger <owner/name> <job>= queues any job
-immediately.
+immediately, and =build cancel <owner/name> <n>= withdraws one, queued
+or running: a running build stops at the runner within seconds and the
+log says who cancelled it. Both need write access.
 
 * Large files (LFS)
 
