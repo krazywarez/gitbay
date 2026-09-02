@@ -333,6 +333,12 @@ approvals required, a =CODEOWNERS= file on the target branch (root or
 =.gitbay/=) additionally demands an approval from an owner of every
 owned changed file — gitignore-style patterns, last match wins.
 
+A merge request whose target is another open merge request's source
+branch is stacked on it: =mr create= says so, =mr show= carries
+=stacked_on= and =stacked=, and merging the lower one retargets the
+upper onto =main= with its reviews kept. See [[Stacked-MRs][Stacked
+merge requests]].
+
 Review threads anchor to diff lines:
 
 #+begin_src sh

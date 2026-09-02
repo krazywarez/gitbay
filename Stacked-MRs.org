@@ -1,0 +1,130 @@
+#+title: Stacked merge requests
+
+Two or more merge requests where each targets the source branch of the
+one below it, down to =main=. Review and merge them one layer at a time;
+the forge moves what is above onto =main= as each layer lands.
+
+* What a stack is
+
+#+begin_example
+  main ─── A (feat-a)   !159  feat-a → main
+             └── B (feat-b)   !160  feat-b → feat-a     stacked on !159
+                   └── C (feat-c)   !161  feat-c → feat-b     stacked on !160
+#+end_example
+
+The rule is one sentence: =B= is stacked on =A= when =B='s target branch
+is =A='s source branch, both are open, and both are in the same
+repository. Nothing is stored and no flag exists. The stack is a fact
+about branches that the forge reads whenever it shows a merge request,
+so it is never out of date and cannot be forgotten to be set.
+
+* Why
+
+- Keep working on a change that depends on one still in review, instead
+  of waiting for it to merge or carrying both in one branch.
+- Each merge request holds one reviewable change. The diff of =B= is
+  =B='s commits only, not =A='s underneath it.
+- Reviews and checks sit on the layer they were made on and stay there
+  when the layer below merges.
+
+* The workflow is branches
+
+There is no stack command. Branch from the branch below, push, and open
+the merge request against it:
+
+#+begin_src sh
+git checkout -b feat-a main    && ...commit... && git push -u origin feat-a
+gitbay mr create --source feat-a --target main   --title "A"
+git checkout -b feat-b feat-a  && ...commit... && git push -u origin feat-b
+gitbay mr create --source feat-b --target feat-a --title "B"
+#+end_src
+
+The second =mr create= answers with a line the first did not:
+
+#+begin_example
+created krz/gitbay!160 (feat-b -> feat-a)
+stacked on !159 A
+#+end_example
+
+=mr show= carries =stacked_on= (the merge request below) and =stacked=
+(the ones above); =mr list= rows carry =stacked_on=; the merge request
+page says "Stacked on !159" in the header and "Builds on this: !161"
+below it.
+
+Changing a lower layer is a rebase you do yourself. Amend =feat-a=,
+then =git rebase feat-a= on =feat-b= and each layer above, and
+force-push them. A force-push stales the reviews on that layer, the
+same as on any merge request. The server never rewrites your commits:
+it holds no signing key, and a rebase it performed would land commits
+nobody signed.
+
+* Merging
+
+Merge from the bottom. When =A= merges, every merge request stacked on
+it is retargeted onto what =A= merged into, with a system comment:
+
+#+begin_example
+retargeted from feat-a to main: !159 merged
+#+end_example
+
+Reviews on the retargeted merge request are kept. After a fast-forward
+or a merge commit, =A='s commits are on =main=, so =B='s diff against
+=main= is the diff its reviewers approved; there is nothing to stale.
+
+That is also why a stack constrains the strategy. A squash or rebase
+merge of =A= puts different commits on =main= than the ones =B= builds
+on, and =B='s diff would carry =A='s changes a second time. So while
+anything is stacked on a merge request, =--strategy squash= and
+=--strategy rebase= are refused:
+
+#+begin_example
+!159 is stacked on by !160; a squash merge rewrites the commits they
+build on. Merge with --strategy ff or merge, or merge the stack into
+feat-a first
+#+end_example
+
+The second option is real: merging =B= into =feat-a= while =A= is open
+is allowed and collapses =B= into =A=, whose head moves as on any push
+to its branch. Closing =A= without merging leaves the stack alone; its
+branch still exists and =B= still targets it.
+
+Merge gates apply per layer as on any merge request: required
+approvals, resolved threads, green checks, and =require_signed_commits=,
+which under a stack already forces fast-forward.
+
+* Where it works
+
+- CLI and bare SSH: everything above.
+- Web: the header shows the stack both ways. Creating a merge request
+  against a branch that is another's source works from the form; the
+  stack appears once it exists.
+- iOS: renders the retarget comment; no stack view yet.
+- Same repository only. A fork's branch is not something another merge
+  request can target, so a stack cannot cross a fork.
+
+See [[Parity][Parity]] for the row.
+
+* A stack that merged
+
+The six merge requests that shipped v1.6.0 were the first stack merged
+on gitbay.org, one commit each, on 2026-09-02:
+
+| MR   | source          | target          |
+|------+-----------------+-----------------|
+| !159 | stack-1-reaper  | main            |
+| !160 | stack-2-runners | stack-1-reaper  |
+| !161 | stack-3-healthz | stack-2-runners |
+| !162 | stack-4-monitor | stack-3-healthz |
+| !163 | stack-5-lfs     | stack-4-monitor |
+| !164 | stack-6-verify  | stack-5-lfs     |
+
+Each was merged with =mr merge --strategy ff= in that order. After each
+one, the next reported =target_ref: main= and no =stacked_on=, with the
+comment naming the merge — =retargeted from stack-1-reaper to main:
+!159 merged= on !160, and so on up to !164. No =mr retarget= was typed.
+=main= ended with the six commits in order on top of the commit that
+had added stacking.
+
+One thing the run exposed: each fast-forward queued the commit's CI jobs
+again on =main=, although the same commit had just passed them on its
+branch. That is [[https://gitbay.org/krz/gitbay/issues/90][#90]].
