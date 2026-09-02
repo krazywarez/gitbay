@@ -204,3 +204,43 @@ func TestGCLFSOrphans(t *testing.T) {
 		t.Fatalf("after gc: kept=%v orphan=%v young=%v", exists(kept), exists(orphan), exists(young))
 	}
 }
+
+// backup --verify reads an archive back and says whether a restore would
+// have what the database expects.
+func TestBackupVerify(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/keep"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	full := filepath.Join(t.TempDir(), "full.tar.gz")
+	inst.admin(t, "admin", "backup", "--out", full)
+	if out := inst.admin(t, "admin", "backup", "--verify", full); !strings.Contains(out, "integrity ok, 1 repositories in the database, 1 in the archive") {
+		t.Fatalf("verify full:\n%s", out)
+	}
+	dbOnly := filepath.Join(t.TempDir(), "db.tar.gz")
+	inst.admin(t, "admin", "backup", "--db-only", "--out", dbOnly)
+	if out := inst.admin(t, "admin", "backup", "--verify", dbOnly); !strings.Contains(out, "database only; integrity ok, 1 repositories in the database") {
+		t.Fatalf("verify db-only:\n%s", out)
+	}
+	// A truncated archive is named as damaged, not reported healthy.
+	raw, _ := os.ReadFile(full)
+	cut := filepath.Join(t.TempDir(), "cut.tar.gz")
+	os.WriteFile(cut, raw[:len(raw)/2], 0o644)
+	if out := inst.forgedAdminErr(t, "admin", "backup", "--verify", cut); !strings.Contains(out, "damaged") && !strings.Contains(out, "unexpected EOF") {
+		t.Fatalf("verify truncated:\n%s", out)
+	}
+	// A repository the database names but the archive lacks fails it.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/late"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	late := filepath.Join(t.TempDir(), "late.tar.gz")
+	inst.admin(t, "admin", "backup", "--out", late)
+	os.RemoveAll(filepath.Join(inst.root, "repos", "alice", "late.git"))
+	stale := filepath.Join(t.TempDir(), "stale.tar.gz")
+	inst.admin(t, "admin", "backup", "--out", stale)
+	if out := inst.forgedAdminErr(t, "admin", "backup", "--verify", stale); !strings.Contains(out, "not in the archive: alice/late") {
+		t.Fatalf("verify missing repo:\n%s", out)
+	}
+}
