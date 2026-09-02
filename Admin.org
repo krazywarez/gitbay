@@ -122,6 +122,14 @@ be public (the module path itself confirms it exists).
 
 * Users, email, invites
 
+Every =gitbayd admin= subcommand except =backup=, =gc= and the one-shot
+backfills is a wrapper that dispatches the registry command of the same
+name as the host: an admin context with no account behind it, so its
+audit rows carry no actor and =source: host=. The same commands run in an
+instance admin's SSH session (=ssh git@<host> admin ...=) and write the
+same rows with the key fingerprint as source. One implementation, two
+credentials.
+
 #+begin_src sh
 gitbayd admin user create alice --key alice.pub --email a@example.org --verified [--admin]
 gitbayd admin email verify alice a@example.org   # admin assertion, no SMTP needed
@@ -193,6 +201,7 @@ push.
 
 #+begin_src sh
 gitbayd admin stats [--json]         # counts, database size, per-repo disk
+ssh git@<host> admin stats [--json]  # the same, from an admin session
 gitbayd admin gc [--repo owner/name] # git gc: repack and prune; per-repo sizes
 gitbayd admin gc --aggressive        # thorough repack; slow, rarely needed
 #+end_src
