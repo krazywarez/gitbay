@@ -399,3 +399,55 @@ func TestAdminHostAndSSHAreOneSurface(t *testing.T) {
 		}
 	}
 }
+
+func TestAuditFilters(t *testing.T) {
+	inst := startInstance(t)
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	for _, c := range [][]string{{aliceKey, "alice/app"}, {bobKey, "bob/app"}} {
+		if _, _, code := inst.ssh(t, c[0], "", "repo", "create", c[1]); code != 0 {
+			t.Fatalf("repo create %s failed", c[1])
+		}
+	}
+	audit := func(args ...string) string {
+		t.Helper()
+		out, errOut, code := inst.ssh(t, rootKey, "", append([]string{"audit"}, args...)...)
+		if code != 0 {
+			t.Fatalf("audit %v: exit %d %s", args, code, errOut)
+		}
+		return out
+	}
+	if out := audit("--actor", "alice"); !strings.Contains(out, "alice/app") || strings.Contains(out, "bob/app") || strings.Contains(out, "user.created") {
+		t.Fatalf("--actor alice:\n%s", out)
+	}
+	if out := audit("--actor", "-"); !strings.Contains(out, "admin user.created") || strings.Contains(out, "repo create") {
+		t.Fatalf("--actor -:\n%s", out)
+	}
+	if out := audit("--action", "'cmd repo'"); strings.Count(out, "\n") != 2 || strings.Contains(out, "user.created") {
+		t.Fatalf("--action prefix:\n%s", out)
+	}
+	if out := audit("--action", "'cmd repo'", "--limit", "1"); strings.Count(out, "\n") != 1 {
+		t.Fatalf("--limit with filter:\n%s", out)
+	}
+	if out := audit("--since", "1h"); !strings.Contains(out, "alice/app") {
+		t.Fatalf("--since 1h:\n%s", out)
+	}
+	if out := audit("--since", "2099-01-01"); strings.TrimSpace(out) != "" {
+		t.Fatalf("--since in the future returned rows:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "audit", "--since", "yesterday"); code != 2 {
+		t.Fatal("bad --since accepted")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "audit", "--actor"); code != 2 {
+		t.Fatal("dangling flag accepted")
+	}
+	// The host-local command takes the same flags and --json.
+	if out := inst.admin(t, "admin", "audit", "--actor", "bob", "--json"); !strings.Contains(out, `"protocol_version"`) ||
+		!strings.Contains(out, "bob/app") || strings.Contains(out, "alice/app") {
+		t.Fatalf("host audit --json --actor:\n%s", out)
+	}
+}

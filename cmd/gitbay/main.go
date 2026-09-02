@@ -74,7 +74,7 @@ func newRoot() *cobra.Command {
 		initCmd(),
 		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
 			passOpts{server: []string{"register"}}),
-		pass("audit", "instance audit log (admins): [--limit <n>]", passOpts{server: []string{"audit"}}),
+		pass("audit", "instance audit log (admins): [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]", passOpts{server: []string{"audit"}}),
 		group("admin", "instance administration (admins)",
 			group("user", "accounts on this instance",
 				pass("list", "list accounts: [--state active|pending|disabled|admin] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "user", "list"}}),

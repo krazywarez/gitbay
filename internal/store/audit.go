@@ -26,11 +26,39 @@ type AuditEntry struct {
 	CreatedAt string `json:"created_at"`
 }
 
-func (s *Store) AuditEntries(limit int) ([]AuditEntry, error) {
-	rows, err := s.DB.Query(`
-		SELECT a.id, COALESCE(u.username, ''), a.action, a.data_json, a.created_at
-		FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
-		ORDER BY a.id DESC LIMIT ?`, limit)
+// AuditFilter narrows AuditEntries. Actor is a username, or "-" for rows
+// with no actor (host commands, auth failures). ActionPrefix matches the
+// start of the action. Since is an ISO timestamp in the log's own format.
+type AuditFilter struct {
+	Actor        string
+	ActionPrefix string
+	Since        string
+	Limit        int
+}
+
+func (s *Store) AuditEntries(f AuditFilter) ([]AuditEntry, error) {
+	q := `SELECT a.id, COALESCE(u.username, ''), a.action, a.data_json, a.created_at
+		FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id WHERE 1 = 1`
+	var args []any
+	switch f.Actor {
+	case "":
+	case "-":
+		q += " AND a.actor_id IS NULL"
+	default:
+		q += " AND u.username = ?"
+		args = append(args, f.Actor)
+	}
+	if f.ActionPrefix != "" {
+		q += " AND substr(a.action, 1, length(?)) = ?"
+		args = append(args, f.ActionPrefix, f.ActionPrefix)
+	}
+	if f.Since != "" {
+		q += " AND a.created_at >= ?"
+		args = append(args, f.Since)
+	}
+	q += " ORDER BY a.id DESC LIMIT ?"
+	args = append(args, f.Limit)
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
