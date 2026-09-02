@@ -71,9 +71,9 @@ deploy-runner: preflight
 	@echo "==> building $(RUNNER_BIN)"
 	$(CROSS) go build -trimpath -ldflags='$(LDFLAGS)' -o $(RUNNER_BIN) ./cmd/gitbay-runner
 	@echo "==> pushing runner to $(HOST)"
-	rsync --partial --inplace -z -e "ssh -p $(PORT)" $(RUNNER_BIN) root@$(HOST):/usr/local/bin/gitbay-runner.new
+	./deploy/copy.sh $(HOST) $(PORT) $(RUNNER_BIN) /usr/local/bin/gitbay-runner.new
 	ssh -p $(PORT) root@$(HOST) 'mkdir -p /etc/systemd/system/gitbay-runner.service.d'
-	rsync -z -e "ssh -p $(PORT)" deploy/gitbay-runner.override.conf root@$(HOST):/etc/systemd/system/gitbay-runner.service.d/override.conf
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner.override.conf /etc/systemd/system/gitbay-runner.service.d/override.conf
 	ssh -p $(PORT) root@$(HOST) 'set -eu; \
 	  chmod 755 /usr/local/bin/gitbay-runner.new; \
 	  mv /usr/local/bin/gitbay-runner.new /usr/local/bin/gitbay-runner; \
