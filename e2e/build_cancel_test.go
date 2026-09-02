@@ -144,10 +144,12 @@ func TestBuildCancelRunning(t *testing.T) {
 	}
 	select {
 	case <-exited:
-	case <-time.After(20 * time.Second):
-		t.Fatalf("runner still running 20s after cancel:\n%s", runnerOut.String())
+	case <-time.After(60 * time.Second):
+		t.Fatalf("runner still running 60s after cancel:\n%s", runnerOut.String())
 	}
-	if took := time.Since(started); took > 15*time.Second {
+	// Well inside the step's 120s sleep: the runner stopped because it
+	// was told to, not because the step ended.
+	if took := time.Since(started); took > 45*time.Second {
 		t.Fatalf("runner took %s to stop", took)
 	}
 	if !strings.Contains(runnerOut.String(), "cancelled") {

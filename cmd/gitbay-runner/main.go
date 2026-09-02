@@ -186,12 +186,45 @@ func (r *runner) run(j job) bool {
 	logExited := make(chan struct{})
 	go func() {
 		defer close(logExited)
-		if err := logCmd.Wait(); err != nil {
-			if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 3 {
-				close(cancelled)
-			}
+		err := logCmd.Wait()
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 3 {
+			close(cancelled)
+			return
+		}
+		if err != nil {
+			log.Printf("build %d: log session ended: %v", j.ID, err)
 		}
 	}()
+	// runStep starts cmd and waits for it, the cancel signal, or the
+	// deadline. Every phase goes through it, so a cancel during the clone
+	// lands as fast as one during a step.
+	runStep := func(cmd *exec.Cmd, deadline time.Time) (bool, string) {
+		select {
+		case <-cancelled:
+			return false, "cancelled"
+		default:
+		}
+		if err := cmd.Start(); err != nil {
+			return false, fmt.Sprintf("start: %v", err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case err := <-done:
+			if err != nil {
+				return false, fmt.Sprintf("step failed: %v", err)
+			}
+			return true, ""
+		case <-cancelled:
+			cmd.Process.Kill()
+			<-done
+			return false, "cancelled"
+		case <-time.After(time.Until(deadline)):
+			cmd.Process.Kill()
+			<-done
+			return false, fmt.Sprintf("build timed out after %s", r.timeout)
+		}
+	}
 	defer func() {
 		select {
 		case <-cancelled:
@@ -207,6 +240,7 @@ func (r *runner) run(j job) bool {
 
 	gitSSH := strings.TrimSpace("ssh " + strings.Join(r.sshOpts, " "))
 	cloneURL := r.cloneBase + "/" + j.Repo + ".git"
+	deadline := time.Now().Add(r.timeout)
 	fmt.Fprintf(sink, "$ git clone %s (%.10s)\n", cloneURL, j.SHA)
 	for _, args := range [][]string{
 		{"clone", "-q", cloneURL, dir},
@@ -215,13 +249,12 @@ func (r *runner) run(j job) bool {
 		cmd := exec.Command("git", args...)
 		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND="+gitSSH, "GIT_TERMINAL_PROMPT=0")
 		cmd.Stdout, cmd.Stderr = sink, sink
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(sink, "git %s: %v\n", args[0], err)
+		if ok, why := runStep(cmd, deadline); !ok {
+			fmt.Fprintf(sink, "git %s: %s\n", args[0], why)
 			return false
 		}
 	}
 
-	deadline := time.Now().Add(r.timeout)
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
 		cmd := exec.Command("sh", "-c", step)
@@ -232,25 +265,8 @@ func (r *runner) run(j job) bool {
 			cmd.Env = append(cmd.Env, name+"="+value)
 		}
 		cmd.Stdout, cmd.Stderr = sink, sink
-		if err := cmd.Start(); err != nil {
-			fmt.Fprintf(sink, "start: %v\n", err)
-			return false
-		}
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case err := <-done:
-			if err != nil {
-				fmt.Fprintf(sink, "step failed: %v\n", err)
-				return false
-			}
-		case <-cancelled:
-			cmd.Process.Kill()
-			<-done
-			return false
-		case <-time.After(time.Until(deadline)):
-			cmd.Process.Kill()
-			fmt.Fprintf(sink, "build timed out after %s\n", r.timeout)
+		if ok, why := runStep(cmd, deadline); !ok {
+			fmt.Fprintf(sink, "%s\n", why)
 			return false
 		}
 	}
