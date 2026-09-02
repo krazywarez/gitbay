@@ -510,8 +510,9 @@ func QueueBranchBuilds(
 	}
 	// A build is a fact about a commit, not a ref: a job has no branch
 	// filter, so a commit that already passed a job on another branch has
-	// nothing left to prove when a fast-forward lands it here. A failed or
-	// abandoned build does not count; that commit runs again.
+	// nothing left to prove when a fast-forward lands it here, and one
+	// still queued or running there will say soon enough. A failed,
+	// abandoned or cancelled build does not count; that commit runs again.
 	built, err := st.BuildsForCommit(repo.ID, sha)
 	if err != nil {
 		built = nil
@@ -522,7 +523,7 @@ func QueueBranchBuilds(
 		if j.Tags != "" {
 			continue
 		}
-		if b, ok := built[j.Name]; ok && b.Status == "success" {
+		if b, ok := built[j.Name]; ok && (b.Status == "success" || b.Status == "pending" || b.Status == "running") {
 			continue
 		}
 		// Scheduled jobs run on their cron, not on push; a default-branch

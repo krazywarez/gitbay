@@ -57,6 +57,25 @@ func TestFastForwardMergeSkipsBuiltCommit(t *testing.T) {
 		t.Fatalf("statuses on the merged commit changed:\n%s", status)
 	}
 
+	// A branch merged before its build has run: the queued build will
+	// say, so the merge queues nothing either.
+	mustGit(t, dir, env, "checkout", "-q", "-b", "early")
+	os.WriteFile(filepath.Join(dir, "g.txt"), []byte("y\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "early change")
+	mustGit(t, dir, env, "push", "-q", "origin", "early")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/app", "--source", "early", "--target", "main", "--title", "early"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+	before = strings.Count(inst.buildList(t, aliceKey), "\n")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "2", "--strategy", "ff"); code != 0 {
+		t.Fatalf("mr merge early: %s", errOut)
+	}
+	if after := strings.Count(inst.buildList(t, aliceKey), "\n"); after != before {
+		t.Fatalf("a merge before the branch build ran queued a second build:\n%s", inst.buildList(t, aliceKey))
+	}
+	inst.runnerOnce(t, runnerKey) // the branch's queued build, now the only one
+
 	// A branch whose build fails is built again when it lands.
 	mustGit(t, dir, env, "checkout", "-q", "-b", "bad")
 	os.WriteFile(filepath.Join(dir, "fail.txt"), []byte("x\n"), 0o644)
@@ -72,7 +91,7 @@ func TestFastForwardMergeSkipsBuiltCommit(t *testing.T) {
 		t.Fatalf("mr create: %s", errOut)
 	}
 	before = strings.Count(inst.buildList(t, aliceKey), "\n")
-	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "2", "--strategy", "ff"); code != 0 {
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "3", "--strategy", "ff"); code != 0 {
 		t.Fatalf("mr merge bad: %s", errOut)
 	}
 	if after := strings.Count(inst.buildList(t, aliceKey), "\n"); after != before+1 {
