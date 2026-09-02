@@ -22,6 +22,8 @@ type SSHKey struct {
 	Algo        string
 	Blob        []byte
 	Scope       string
+	CreatedAt   string
+	LastUsedAt  string // "" when the key has never authenticated
 }
 
 // ErrDuplicateKey carries the exact user-facing message from the spec. It
@@ -254,7 +256,8 @@ func (s *Store) SSHKeyByFingerprint(fingerprint string) (SSHKey, error) {
 
 func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	rows, err := s.DB.Query(
-		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE user_id = ? ORDER BY id",
+		`SELECT id, user_id, fingerprint, algo, blob, scope, created_at, COALESCE(last_used_at, '')
+		 FROM ssh_keys WHERE user_id = ? ORDER BY id`,
 		userID)
 	if err != nil {
 		return nil, err
@@ -263,7 +266,7 @@ func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	var keys []SSHKey
 	for rows.Next() {
 		var k SSHKey
-		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope); err != nil {
+		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.CreatedAt, &k.LastUsedAt); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)
