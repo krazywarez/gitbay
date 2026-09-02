@@ -149,8 +149,8 @@ auth failures/throttling. Secrets never appear — they travel on stdin,
 never in argv.
 
 #+begin_src sh
-gitbayd admin audit [--limit n]      # host-local
-ssh git@<host> audit [--limit n]     # instance admins, SSH only
+gitbayd admin audit [--actor u|-] [--action prefix] [--since 24h|7d|date] [--limit n] [--json]
+ssh git@<host> audit ...             # the same, from an admin session (SSH only)
 ssh git@<host> admin user list [--state active|pending|disabled|admin]
 ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions
 ssh git@<host> admin user promote <name>   # grant instance admin
@@ -164,6 +164,11 @@ gitbayd admin user delete <name> --yes  # only for accounts anchoring nothing:
                                      #   issues/MRs/comments/reviews, or is an
                                      #   org's only admin
 #+end_src
+
+=--actor= takes a username, or =-= for rows with no actor: host commands
+and auth failures. =--action= is a prefix, so =cmd repo= catches every
+repository command and =admin= every host or admin-session action.
+=--since= is a duration back from now (=30m=, =24h=, =7d=) or a date.
 
 =admin user list= pages by username (=--limit=, =--cursor=) and carries
 each account's state and =last_seen=, the newest use of any of its SSH
