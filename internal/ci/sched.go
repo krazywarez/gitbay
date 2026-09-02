@@ -57,9 +57,11 @@ func (s *Scheduler) Run(ctx context.Context) {
 	}
 }
 
-// RunDue queues every due scheduled build and advances its next_run. Split
-// from the ticker for tests.
+// RunDue queues every due scheduled build and advances its next_run, and
+// fails any build a runner claimed and never reported. Split from the
+// ticker for tests.
 func (s *Scheduler) RunDue(now time.Time) {
+	s.reapStale()
 	due, err := s.St.DueSchedules(isoNow(now))
 	if err != nil {
 		slog.Error("scheduler: listing due builds", "err", err)
@@ -106,5 +108,26 @@ func (s *Scheduler) RunDue(now time.Time) {
 		}
 		url := fmt.Sprintf("%s/%s/builds/%d", s.SiteURL, repo.Path(), n)
 		s.St.SetCommitStatus(repo.ID, sha, "ci/"+job.Name, "pending", "scheduled", url, 0)
+	}
+}
+
+// reapStale resolves builds running past the deadline, so a runner that
+// died mid-build leaves neither a build running nor a commit pending
+// forever. It runs on the tick rather than on the next runner claim, so it
+// does not need a runner to be alive.
+func (s *Scheduler) reapStale() {
+	stale, err := s.St.ReapStaleBuilds()
+	if err != nil {
+		slog.Error("scheduler: reaping stale builds", "err", err)
+		return
+	}
+	for _, b := range stale {
+		repo, err := s.St.RepoByID(b.RepoID)
+		if err != nil {
+			continue
+		}
+		url := fmt.Sprintf("%s/%s/builds/%d", s.SiteURL, repo.Path(), b.Number)
+		s.St.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "failure", "build abandoned", url, 0)
+		slog.Warn("build abandoned", "repo", repo.Path(), "build", b.Number, "job", b.Job)
 	}
 }

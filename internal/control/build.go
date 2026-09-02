@@ -314,21 +314,6 @@ func runRunnerNext(c *Ctx, args []string) int {
 	if code := requireRunner(c); code >= 0 {
 		return code
 	}
-	// Resolve anything a previous runner claimed and never reported, so a
-	// killed runner does not leave a build running and a commit pending forever.
-	if stale, err := c.Store.ReapStaleBuilds(); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	} else {
-		for _, sb := range stale {
-			repo, err := c.Store.RepoByID(sb.RepoID)
-			if err != nil {
-				continue
-			}
-			url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), sb.Number)
-			c.Store.SetCommitStatus(repo.ID, sb.SHA, "ci/"+sb.Job, "failure",
-				"build abandoned", url, c.User.ID)
-		}
-	}
 	// A runner may limit itself to named repositories. The operator chooses
 	// what a given runner executes by how they start it; this is scoping the
 	// runner asks for, not an ACL the server holds over it.

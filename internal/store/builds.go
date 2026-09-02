@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -112,12 +113,23 @@ func (s *Store) ClaimBuild(repoIDs []int64) (Build, bool, error) {
 // it was killed, restarted, or lost the network mid-build.
 const StaleBuildDeadline = 90 * time.Minute
 
+// staleBuildDeadline is StaleBuildDeadline unless GITBAY_STALE_BUILD_DEADLINE
+// shortens it, which tests do.
+func staleBuildDeadline() time.Duration {
+	if v := os.Getenv("GITBAY_STALE_BUILD_DEADLINE"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+	}
+	return StaleBuildDeadline
+}
+
 // ReapStaleBuilds fails every build that has been running past the deadline and
 // returns them, so the caller can resolve their commit statuses. A runner that
 // dies between claiming a build and reporting it otherwise leaves the row
 // claimed forever, and the commit pending forever with it.
 func (s *Store) ReapStaleBuilds() ([]Build, error) {
-	cutoff := time.Now().UTC().Add(-StaleBuildDeadline).Format("2006-01-02T15:04:05Z")
+	cutoff := time.Now().UTC().Add(-staleBuildDeadline()).Format("2006-01-02T15:04:05Z")
 	rows, err := s.DB.Query(buildSelect+
 		" WHERE status = 'running' AND started_at != '' AND started_at < ?", cutoff)
 	if err != nil {
