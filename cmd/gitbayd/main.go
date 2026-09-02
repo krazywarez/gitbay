@@ -336,6 +336,7 @@ func adminCmd() *cobra.Command {
 		configCmd,
 		hostCmd("invite --email <address>", "issue a registration invite and email its code", "admin", "invite"),
 		hostCmd("stats [--json]", "instance statistics: counts and per-repository disk usage", "admin", "stats"),
+		hostCmd("runners [--json]", "runner accounts: last poll, scope, the build each holds", "admin", "runners"),
 		hostCmd("audit [--limit n] [--json]", "print the security audit log, newest first", "audit"),
 		backupCmd(),
 		gcCmd(),

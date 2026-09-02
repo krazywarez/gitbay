@@ -329,6 +329,8 @@ func runRunnerNext(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	// The poll itself is the runner's heartbeat: admin runners reads it.
+	c.Store.TouchRunner(c.User.ID, strings.Join(args, ","), b.ID)
 	if !ok {
 		return c.emit(map[string]any{}, func(w io.Writer) { fmt.Fprintln(w, "no pending builds") })
 	}
@@ -412,6 +414,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if err := c.Store.FinishBuild(id, args[1]); err != nil {
 		return c.fail(protocol.ExitFailure, "finishing build %d: %v", id, err)
 	}
+	c.Store.RunnerDone(c.User.ID)
 	repo, err := c.Store.RepoByID(b.RepoID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,5 +77,65 @@ func TestStaleBuildReapedWithoutRunner(t *testing.T) {
 	}
 	if out, _, _ := inst.ssh(t, aliceKey, "", "build", "log", "alice/app", "1"); !strings.Contains(out, "build abandoned") {
 		t.Fatalf("log lacks the abandonment note:\n%s", out)
+	}
+}
+
+func TestAdminRunners(t *testing.T) {
+	inst := startInstance(t)
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	runnerKey := inst.newKey(t, "ci")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "runners"); code != 4 {
+		t.Fatal("non-admin listed runners")
+	}
+	if out, _, code := inst.ssh(t, rootKey, "", "admin", "runners", "--json"); code != 0 || strings.TrimSpace(out) != `{"protocol_version":1,"data":[]}` {
+		t.Fatalf("no runners yet: exit %d %s", code, out)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	// An idle poll registers the runner with its scope.
+	if _, _, code := inst.ssh(t, runnerKey, "", "runner", "next", "alice/app"); code != 0 {
+		t.Fatal("runner next failed")
+	}
+	out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners")
+	if !strings.HasPrefix(out, "ci\t") || !strings.Contains(out, "\talice/app\tidle") {
+		t.Fatalf("idle runner row:\n%s", out)
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs:\n  ok:\n    steps:\n      - echo fine\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "ci")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	out, _, code := inst.ssh(t, runnerKey, "", "runner", "next", "--json")
+	if code != 0 || !strings.Contains(out, `"job":"ok"`) {
+		t.Fatalf("claim: %s", out)
+	}
+	var claim struct {
+		Data struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	json.Unmarshal([]byte(out), &claim)
+	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners"); !strings.Contains(out, "\tany\talice/app #1 ok since ") {
+		t.Fatalf("holding runner row:\n%s", out)
+	}
+	if _, _, code := inst.ssh(t, runnerKey, "", "runner", "done", fmt.Sprint(claim.Data.ID), "success"); code != 0 {
+		t.Fatal("runner done failed")
+	}
+	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners"); !strings.Contains(out, "\tany\tidle") {
+		t.Fatalf("runner still holds a build after done:\n%s", out)
+	}
+	// Host-local, the same read.
+	if out := inst.admin(t, "admin", "runners", "--json"); !strings.Contains(out, `"username":"ci"`) {
+		t.Fatalf("host runners:\n%s", out)
 	}
 }

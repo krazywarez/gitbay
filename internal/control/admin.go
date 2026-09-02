@@ -29,6 +29,10 @@ func init() {
 		Summary: "remove instance admin from an account (never the last one)",
 		Usage:   "admin user demote <username>",
 		SSHOnly: true, Run: runAdminUserDemote})
+	register(Command{Path: []string{"admin", "runners"},
+		Summary:  "runner accounts: last poll, scope, the build each holds (instance admins)",
+		Usage:    "admin runners",
+		ReadOnly: true, SSHOnly: true, Run: runAdminRunners})
 	register(Command{Path: []string{"admin", "repo", "list"},
 		Summary:  "list every repository with size and last push (instance admins)",
 		Usage:    "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
@@ -448,4 +452,30 @@ func runAdminRepoDelete(c *Ctx, args []string) int {
 	}
 	c.Store.Audit(c.User.ID, "admin repo.delete", map[string]any{"repo": repo.Path()})
 	return protocol.ExitOK
+}
+
+func runAdminRunners(c *Ctx, args []string) int {
+	if code := requireInstanceAdmin(c); code >= 0 {
+		return code
+	}
+	if len(args) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: admin runners")
+	}
+	runners, err := c.Store.ListRunners()
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(runners, func(w io.Writer) {
+		for _, r := range runners {
+			scope := r.Scope
+			if scope == "" {
+				scope = "any"
+			}
+			held := "idle"
+			if r.BuildNumber != 0 {
+				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Username, r.LastSeen, scope, held)
+		}
+	})
 }
