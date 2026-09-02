@@ -169,6 +169,21 @@ Demotion is refused when it would leave no admin, over SSH and on the
 host alike, so the host-local =promote= is the way back in when the only
 admin key is lost.
 
+Instance admin carries no right on anyone's repository: policy does not
+consult it, and a private repository still answers not-found to an
+admin. Moderation goes through explicit overrides that skip the access
+check and write their own audit row:
+
+#+begin_src sh
+ssh git@<host> admin repo list [--owner o] [--visibility public|private]  # size, last push
+ssh git@<host> admin repo archive|unarchive <owner/name>
+ssh git@<host> admin repo visibility <owner/name> public|private
+ssh git@<host> admin repo delete <owner/name> --yes
+#+end_src
+
+Each lands in the audit log as =admin repo.<action>= naming the
+repository, on top of the =cmd= row every mutating command gets.
+
 =limits.ssh_auth_rate= (10) throttles per-IP authentication *failures*
 per minute — successful auths never count and clear the slate.
 =limits.max_pack_bytes= is enforced as =receive.maxInputSize= on every
