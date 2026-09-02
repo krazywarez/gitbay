@@ -105,7 +105,7 @@ func TestBuildCancelRunning(t *testing.T) {
 	mustGit(t, work, env, "clone", inst.sshURL("alice/slow"), "w")
 	dir := filepath.Join(work, "w")
 	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs:\n  slow:\n    steps:\n      - echo starting\n      - sleep 120\n      - echo never\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte("jobs:\n  slow:\n    steps:\n      - echo starting\n      - sleep 120 & wait\n      - echo never\n"), 0o644)
 	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "slow")
@@ -117,6 +117,8 @@ func TestBuildCancelRunning(t *testing.T) {
 	}
 
 	// A real runner, in the background, claims the build and sits in sleep.
+	// The step forks sleep as a child of the shell, the way dash runs
+	// every command, so the cancel must reach past the shell to end it.
 	opts := fmt.Sprintf("-p %d -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=%s -o BatchMode=yes",
 		inst.port, runnerKey, filepath.Join(inst.sshDir, "known_hosts"))
 	runner := exec.Command(inst.runner, "-once", "-remote", "git@127.0.0.1", "-ssh-opts", opts,

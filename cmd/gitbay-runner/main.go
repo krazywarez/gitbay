@@ -204,11 +204,22 @@ func (r *runner) run(j job) bool {
 			return false, "cancelled"
 		default:
 		}
+		ownProcessGroup(cmd)
 		if err := cmd.Start(); err != nil {
 			return false, fmt.Sprintf("start: %v", err)
 		}
 		done := make(chan error, 1)
 		go func() { done <- cmd.Wait() }()
+		// After a kill, Wait returns once every holder of the log pipe is
+		// gone; the group kill makes that prompt, and the cap makes sure a
+		// straggler cannot hold the build open.
+		reap := func() {
+			killTree(cmd)
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+			}
+		}
 		select {
 		case err := <-done:
 			if err != nil {
@@ -216,12 +227,10 @@ func (r *runner) run(j job) bool {
 			}
 			return true, ""
 		case <-cancelled:
-			cmd.Process.Kill()
-			<-done
+			reap()
 			return false, "cancelled"
 		case <-time.After(time.Until(deadline)):
-			cmd.Process.Kill()
-			<-done
+			reap()
 			return false, fmt.Sprintf("build timed out after %s", r.timeout)
 		}
 	}
