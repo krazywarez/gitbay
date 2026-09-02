@@ -187,6 +187,11 @@ func runRepoCreate(c *Ctx, args []string) int {
 		}
 		ownerKind, ownerID = "org", org.ID
 	}
+	if ownerKind == "user" {
+		if code := checkRepoQuota(c); code >= 0 {
+			return code
+		}
+	}
 	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

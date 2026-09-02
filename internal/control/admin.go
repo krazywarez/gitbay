@@ -184,6 +184,8 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		PGPKeys     []pgpOut   `json:"pgp_keys"`
 		Orgs        []orgOut   `json:"orgs"`
 		Repos       int64      `json:"repos"`
+		RepoLimit   int64      `json:"repo_limit"` // 0 unlimited
+		ByteLimit   int64      `json:"byte_limit"` // 0 unlimited
 		APITokens   []tokenOut `json:"api_tokens"`
 		WebSessions int64      `json:"web_sessions"`
 	}
@@ -221,6 +223,8 @@ func runAdminUserShow(c *Ctx, args []string) int {
 	if d.Repos, err = c.Store.OwnedRepoCount(u.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	d.RepoLimit = RepoLimit(c.Store, limitsOf(c), u.ID)
+	d.ByteLimit = ByteLimit(c.Store, limitsOf(c), u.ID)
 	tokens, err := c.Store.ListAPITokens(u.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

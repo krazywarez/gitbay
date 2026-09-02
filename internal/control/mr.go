@@ -97,6 +97,9 @@ func runRepoFork(c *Ctx, args []string) int {
 	if err := policy.ValidateName(name); err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	if code := checkRepoQuota(c); code >= 0 {
+		return code
+	}
 	id, err := c.Store.CreateRepo("user", c.User.ID, name, src.Visibility)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -81,6 +82,16 @@ type Web struct {
 
 type Registration struct {
 	Mode string `toml:"mode"` // closed | invite | open
+	// PendingExpiry is how long a self-registered account may stay
+	// unverified before it is removed, as a duration ("168h"). Empty
+	// keeps such accounts forever.
+	PendingExpiry string `toml:"pending_expiry"`
+}
+
+// PendingExpiryDuration parses PendingExpiry; zero means never.
+func (r Registration) PendingExpiryDuration() time.Duration {
+	d, _ := time.ParseDuration(r.PendingExpiry)
+	return d
 }
 
 // LFS stores large-file objects content-addressed under Root (default
@@ -131,6 +142,11 @@ type Limits struct {
 	// APIRate is sustained JSON-API requests per minute per caller; writes
 	// draw on a tenth of it. 0 uses the default.
 	APIRate int `toml:"api_rate"`
+	// Per-account quotas on what a user owns directly (organizations are
+	// not capped). 0 means unlimited; admin user limits overrides per
+	// account.
+	MaxReposPerUser int   `toml:"max_repos_per_user"`
+	MaxBytesPerUser int64 `toml:"max_bytes_per_user"`
 }
 
 type Mail struct {
@@ -207,6 +223,14 @@ func (c Config) Validate() error {
 	}
 	if err := oneOf("ssh.mode", c.SSH.Mode, "embedded", "system"); err != nil {
 		errs = append(errs, err)
+	}
+	if c.Registration.PendingExpiry != "" {
+		if d, err := time.ParseDuration(c.Registration.PendingExpiry); err != nil || d <= 0 {
+			errs = append(errs, fmt.Errorf("registration.pending_expiry %q must be a positive duration such as 168h", c.Registration.PendingExpiry))
+		}
+	}
+	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 {
+		errs = append(errs, errors.New("limits.max_repos_per_user and max_bytes_per_user must not be negative"))
 	}
 	if c.SSH.Port < 1 || c.SSH.Port > 65535 {
 		errs = append(errs, fmt.Errorf("ssh.port %d out of range", c.SSH.Port))

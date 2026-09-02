@@ -86,6 +86,7 @@ func newRoot() *cobra.Command {
 				pass("disable", "suspend an account: <username>", passOpts{server: []string{"admin", "user", "disable"}}),
 				pass("enable", "restore a suspended account: <username>", passOpts{server: []string{"admin", "user", "enable"}}),
 				pass("delete", "delete an account that anchors nothing: <username> --yes", passOpts{server: []string{"admin", "user", "delete"}}),
+				pass("limits", "show or set repository and storage caps: <username> [--repos n|default] [--bytes n|default]", passOpts{server: []string{"admin", "user", "limits"}}),
 			),
 			group("email", "addresses on any account",
 				pass("verify", "mark an address verified by admin assertion: <username> <address>", passOpts{server: []string{"admin", "email", "verify"}}),

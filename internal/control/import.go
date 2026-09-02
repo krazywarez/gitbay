@@ -81,6 +81,11 @@ func runRepoImport(c *Ctx, args []string) int {
 		}
 		ownerKind, ownerID = "org", org.ID
 	}
+	if ownerKind == "user" {
+		if code := checkRepoQuota(c); code >= 0 {
+			return code
+		}
+	}
 
 	// Scheme allowlist. file:// (and anything else local) would read the
 	// server's filesystem; ssh:// would use the server's own keys.

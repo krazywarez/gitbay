@@ -161,6 +161,9 @@ func serveCmd() *cobra.Command {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
 			}
 			go mirror.New(st, cfg).Run(whCtx)
+			if d := cfg.Registration.PendingExpiryDuration(); d > 0 {
+				go reapPending(whCtx, st, d)
+			}
 			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL,
 				RepoDir: func(owner, name string) string {
 					return control.RepoDir(cfg.Server.Root, owner, name)
@@ -316,6 +319,7 @@ func adminCmd() *cobra.Command {
 		hostCmd("delete <username> --yes", "delete an account that anchors nothing (keys, emails, and sessions go with it)", "admin", "user", "delete"),
 		hostCmd("promote <username>", "make an account an instance admin", "admin", "user", "promote"),
 		hostCmd("demote <username>", "remove instance admin from an account (never the last one)", "admin", "user", "demote"),
+		hostCmd("limits <username> [--repos n|default] [--bytes n|default]", "show or set repository and storage caps", "admin", "user", "limits"),
 	)
 	emailCmd := &cobra.Command{Use: "email", Short: "manage user emails"}
 	emailCmd.AddCommand(hostCmd("verify <username> <address>", "mark an email verified by admin assertion", "admin", "email", "verify"))
@@ -443,5 +447,31 @@ func hostUserCreateCmd() *cobra.Command {
 			}
 			return runAsHost([]string{"admin", "user", "create"}, rest, stdin)
 		},
+	}
+}
+
+// reapPending removes self-registered accounts still unverified after
+// maxAge, hourly and once at start. GITBAY_REAP_TICK shortens the
+// interval for tests.
+func reapPending(ctx context.Context, st *store.Store, maxAge time.Duration) {
+	tick := time.Hour
+	if v := os.Getenv("GITBAY_REAP_TICK"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			tick = d
+		}
+	}
+	t := time.NewTicker(tick)
+	defer t.Stop()
+	for {
+		if removed, err := st.ReapPendingUsers(maxAge); err != nil {
+			slog.Error("reaping pending accounts", "err", err)
+		} else if len(removed) > 0 {
+			slog.Info("removed unverified accounts", "users", removed)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
 	}
 }

@@ -349,7 +349,23 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		hookd.EnvRepoID + "=" + strconv.FormatInt(repo.ID, 10),
 		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, cfg.Limits.MaxPackBytes); err != nil {
+	// A storage quota on the owner rides the same mechanism as the pack
+	// cap: the pack may be no larger than what the owner has left.
+	maxPack := cfg.Limits.MaxPackBytes
+	if write && repo.OwnerKind == "user" {
+		if limit := control.ByteLimit(st, control.QuotaConfig(cfg), repo.OwnerID); limit > 0 {
+			used := control.OwnedBytes(st, cfg.Server.Root, repo.OwnerID)
+			left := limit - used
+			if left <= 0 {
+				fmt.Fprintf(stderr, "%s's storage quota is used up (%d of %d bytes); delete something, or ask an admin to raise the limit\n", repo.OwnerName, used, limit)
+				return protocol.ExitDenied
+			}
+			if maxPack == 0 || left < maxPack {
+				maxPack = left
+			}
+		}
+	}
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK
