@@ -309,7 +309,8 @@ func adminCmd() *cobra.Command {
 		Short: "host-local administration",
 	}
 	userCmd := &cobra.Command{Use: "user", Short: "manage users"}
-	userCmd.AddCommand(adminUserCreateCmd(), adminUserDisableCmd(), adminUserEnableCmd(), adminUserDeleteCmd())
+	userCmd.AddCommand(adminUserCreateCmd(), adminUserDisableCmd(), adminUserEnableCmd(), adminUserDeleteCmd(),
+		adminUserPromoteCmd(), adminUserDemoteCmd())
 	emailCmd := &cobra.Command{Use: "email", Short: "manage user emails"}
 	emailCmd.AddCommand(adminEmailVerifyCmd())
 	admin.AddCommand(

@@ -20,6 +20,14 @@ func init() {
 		Summary:  "show an account: keys, emails, orgs, tokens, sessions (instance admins)",
 		Usage:    "admin user show <username>",
 		ReadOnly: true, SSHOnly: true, Run: runAdminUserShow})
+	register(Command{Path: []string{"admin", "user", "promote"},
+		Summary: "make an account an instance admin",
+		Usage:   "admin user promote <username>",
+		SSHOnly: true, Run: runAdminUserPromote})
+	register(Command{Path: []string{"admin", "user", "demote"},
+		Summary: "remove instance admin from an account (never the last one)",
+		Usage:   "admin user demote <username>",
+		SSHOnly: true, Run: runAdminUserDemote})
 }
 
 // requireInstanceAdmin gates the admin noun. -1 means proceed.
@@ -241,5 +249,43 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			}
 			fmt.Fprintf(w, "  %s\t%s\t%s\n", t.Name, t.Scope, strings.TrimSpace(used))
 		}
+	})
+}
+
+func runAdminUserPromote(c *Ctx, args []string) int { return setAdmin(c, args, true) }
+func runAdminUserDemote(c *Ctx, args []string) int  { return setAdmin(c, args, false) }
+
+func setAdmin(c *Ctx, args []string, admin bool) int {
+	if code := requireInstanceAdmin(c); code >= 0 {
+		return code
+	}
+	verb := "demote"
+	if admin {
+		verb = "promote"
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: admin user %s <username>", verb)
+	}
+	u, err := c.Store.UserByUsername(args[0])
+	if errors.Is(err, store.ErrNotFound) {
+		return c.fail(protocol.ExitNotFound, "no user %q", args[0])
+	} else if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if u.IsAdmin == admin {
+		return c.fail(protocol.ExitUsage, "%s is already %s", u.Username, map[bool]string{true: "an admin", false: "not an admin"}[admin])
+	}
+	if admin && (u.Pending || u.Disabled) {
+		return c.fail(protocol.ExitUsage, "%s is %s; only an active account can be an admin", u.Username,
+			map[bool]string{true: "disabled", false: "pending"}[u.Disabled])
+	}
+	if err := c.Store.SetUserAdmin(u.ID, admin); err != nil {
+		if errors.Is(err, store.ErrLastAdmin) {
+			return c.fail(protocol.ExitUsage, "%v", err)
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]any{"user": u.Username, "admin": admin}, func(w io.Writer) {
+		fmt.Fprintf(w, "%sd %s\n", verb, u.Username)
 	})
 }

@@ -166,3 +166,58 @@ func TestAdminUserListAndShow(t *testing.T) {
 		t.Fatalf("plain show:\n%s", out)
 	}
 }
+
+func TestAdminPromoteDemote(t *testing.T) {
+	inst := startInstance(t)
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	inst.admin(t, "admin", "user", "disable", "bob")
+
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "user", "promote", "alice"); code != 4 {
+		t.Fatalf("non-admin promoted: exit %d", code)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "promote", "nobody"); code != 3 {
+		t.Fatalf("unknown user: exit %d", code)
+	}
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "promote", "bob"); code != 2 || !strings.Contains(errOut, "disabled") {
+		t.Fatalf("disabled account promoted: exit %d %s", code, errOut)
+	}
+	// The only admin cannot step down.
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "demote", "root"); code != 2 || !strings.Contains(errOut, "only instance admin") {
+		t.Fatalf("last admin demoted: exit %d %s", code, errOut)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "promote", "alice"); code != 0 {
+		t.Fatal("promote failed")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "promote", "alice"); code != 2 {
+		t.Fatal("promoting an admin should be a usage error")
+	}
+	if out, _, code := inst.ssh(t, aliceKey, "", "audit"); code != 0 || !strings.Contains(out, "cmd admin user promote") {
+		t.Fatalf("promoted account cannot read the audit log, or the promotion is not in it: exit %d\n%s", code, out)
+	}
+	// With two admins, either may demote the other; then the survivor is stuck.
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "user", "demote", "root"); code != 0 {
+		t.Fatal("demote failed")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "audit"); code != 4 {
+		t.Fatal("demoted account still admin")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "user", "demote", "alice"); code != 2 {
+		t.Fatal("last admin demoted")
+	}
+	// Host-local recovery: the operator restores root without an admin key.
+	if out := inst.forgedAdminErr(t, "admin", "user", "demote", "alice"); !strings.Contains(out, "only instance admin") {
+		t.Fatalf("host demote of last admin: %s", out)
+	}
+	inst.admin(t, "admin", "user", "promote", "root")
+	if _, _, code := inst.ssh(t, rootKey, "", "audit"); code != 0 {
+		t.Fatal("host promote did not take")
+	}
+	if out := inst.admin(t, "admin", "audit"); !strings.Contains(out, "admin user.promoted") {
+		t.Fatalf("host promote not audited:\n%s", out)
+	}
+}

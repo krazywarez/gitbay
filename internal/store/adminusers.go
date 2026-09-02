@@ -100,3 +100,34 @@ func (s *Store) WebSessionCount(userID int64) (int64, error) {
 		userID, fmtTime(time.Now())).Scan(&n)
 	return n, err
 }
+
+// ErrLastAdmin refuses the demotion that would leave the instance with no
+// admin at all.
+var ErrLastAdmin = errors.New("that is the only instance admin; promote someone else first")
+
+// SetUserAdmin grants or removes instance admin. Removing it from the last
+// admin is refused inside the same transaction that counts them.
+func (s *Store) SetUserAdmin(userID int64, admin bool) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if !admin {
+		var others int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM users WHERE is_admin = 1 AND id != ?", userID).Scan(&others); err != nil {
+			return err
+		}
+		if others == 0 {
+			return ErrLastAdmin
+		}
+	}
+	res, err := tx.Exec("UPDATE users SET is_admin = ? WHERE id = ?", boolInt(admin), userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return tx.Commit()
+}

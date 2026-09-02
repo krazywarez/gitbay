@@ -79,6 +79,8 @@ func newRoot() *cobra.Command {
 			group("user", "accounts on this instance",
 				pass("list", "list accounts: [--state active|pending|disabled|admin] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "user", "list"}}),
 				pass("show", "show an account: <username>", passOpts{server: []string{"admin", "user", "show"}}),
+				pass("promote", "make an account an instance admin: <username>", passOpts{server: []string{"admin", "user", "promote"}}),
+				pass("demote", "remove instance admin (never the last one): <username>", passOpts{server: []string{"admin", "user", "demote"}}),
 			),
 		),
 		manCmd(root),

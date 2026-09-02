@@ -77,6 +77,32 @@ func adminUserEnableCmd() *cobra.Command {
 		})
 }
 
+// adminUserPromoteCmd is the recovery path when no admin key is reachable:
+// it needs the host, not an admin session.
+func adminUserPromoteCmd() *cobra.Command {
+	return withUser("promote", "make an account an instance admin",
+		func(st *store.Store, u store.User) error {
+			if err := st.SetUserAdmin(u.ID, true); err != nil {
+				return err
+			}
+			st.Audit(0, "admin user.promoted", map[string]any{"user": u.Username})
+			fmt.Printf("promoted %s\n", u.Username)
+			return nil
+		})
+}
+
+func adminUserDemoteCmd() *cobra.Command {
+	return withUser("demote", "remove instance admin from an account (never the last one)",
+		func(st *store.Store, u store.User) error {
+			if err := st.SetUserAdmin(u.ID, false); err != nil {
+				return err
+			}
+			st.Audit(0, "admin user.demoted", map[string]any{"user": u.Username})
+			fmt.Printf("demoted %s\n", u.Username)
+			return nil
+		})
+}
+
 // adminMigrateCommitRefsCmd is a one-shot backfill: legacy commit-reference
 // comments (author-attributed, bare sha) become system messages with a
 // linked sha. Idempotent.
