@@ -45,6 +45,7 @@ func newRoot() *cobra.Command {
 			pass("log", "a build's log: <owner/name> <n>", passOpts{server: []string{"build", "log"}, needsRepo: true}),
 			pass("jobs", "list the jobs a trigger can name", passOpts{server: []string{"build", "jobs"}, needsRepo: true}),
 			pass("trigger", "queue a job now: <job>", passOpts{server: []string{"build", "trigger"}, needsRepo: true}),
+			pass("cancel", "withdraw a queued build: <n>", passOpts{server: []string{"build", "cancel"}, needsRepo: true}),
 		),
 		pass("dashboard", "one read for the account dashboard: pinned repos, open MRs, assigned issues, recent builds",
 			passOpts{server: []string{"dashboard"}}),

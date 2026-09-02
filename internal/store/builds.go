@@ -290,3 +290,29 @@ func (b Build) Elapsed() time.Duration {
 	}
 	return 0
 }
+
+// CancelBuild withdraws a build that no runner has claimed. A running
+// build is the runner's to finish; cancelling it here would leave the
+// runner reporting on a row that says otherwise.
+func (s *Store) CancelBuild(id int64) error {
+	res, err := s.DB.Exec(`UPDATE builds SET status = 'cancelled',
+		finished_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND status = 'pending'`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SuccessBuildFor finds a passed build of the commit for the job, on any
+// ref: what a cancelled duplicate can point back at.
+func (s *Store) SuccessBuildFor(repoID int64, sha, job string) (Build, bool, error) {
+	b, err := scanBuild(s.DB.QueryRow(buildSelect+
+		" WHERE repo_id = ? AND sha = ? AND job = ? AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, sha, job))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Build{}, false, nil
+	}
+	return b, err == nil, err
+}

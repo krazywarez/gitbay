@@ -13,11 +13,12 @@ import (
 
 // badgeColors are the shield fills per build state.
 var badgeColors = map[string]string{
-	"success": "#2da44e",
-	"failure": "#cf222e",
-	"running": "#bf8700",
-	"pending": "#bf8700",
-	"unknown": "#6b7280",
+	"success":   "#2da44e",
+	"failure":   "#cf222e",
+	"running":   "#bf8700",
+	"pending":   "#bf8700",
+	"cancelled": "#6b7280",
+	"unknown":   "#6b7280",
 }
 
 // badgeWidth approximates Verdana 11px advance so the pill fits its text

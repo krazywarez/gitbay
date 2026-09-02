@@ -33,6 +33,9 @@ func init() {
 		Summary: "list the jobs a trigger can name",
 		Usage:   "build jobs <owner/name>", ReadOnly: true, Run: runBuildJobs})
 
+	register(Command{Path: []string{"build", "cancel"},
+		Summary: "withdraw a queued build before a runner claims it",
+		Usage:   "build cancel <owner/name> <n>", Run: runBuildCancel})
 	register(Command{Path: []string{"build", "trigger"},
 		Summary: "queue a job now (scheduled or not)",
 		Usage:   "build trigger <owner/name> <job>", Run: runBuildTrigger})
@@ -510,4 +513,40 @@ func QueueBranchBuilds(
 			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
 		}
 	}
+}
+
+func runBuildCancel(c *Ctx, args []string) int {
+	repo, b, code := buildRef(c, args)
+	if code >= 0 {
+		return code
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if !policy.CanWrite(c.User, repo, grant) {
+		return c.fail(protocol.ExitDenied, "cancelling a build needs write access to %s", repo.Path())
+	}
+	if b.Status != "pending" {
+		return c.fail(protocol.ExitUsage, "build %d is %s; only a queued build can be cancelled", b.Number, b.Status)
+	}
+	if err := c.Store.CancelBuild(b.ID); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf("cancelled by %s before a runner claimed it\n", c.User.Username)))
+	// The queued status replaced whatever the commit had for this job. If
+	// the commit passed the job on another ref, that result stands again;
+	// otherwise the context says it was withdrawn.
+	if prev, ok, err := c.Store.SuccessBuildFor(repo.ID, b.SHA, b.Job); err == nil && ok {
+		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), prev.Number)
+		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "success",
+			fmt.Sprintf("passed in build %d on %s", prev.Number, prev.Ref), url, c.User.ID)
+	} else {
+		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)
+		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "error", "cancelled", url, c.User.ID)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+	return c.emit(map[string]any{"number": b.Number, "job": b.Job, "status": "cancelled"}, func(w io.Writer) {
+		fmt.Fprintf(w, "cancelled %s build %d (%s)\n", repo.Path(), b.Number, b.Job)
+	})
 }
