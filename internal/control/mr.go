@@ -316,8 +316,17 @@ func runMRCreate(c *Ctx, args []string) int {
 		notifyUsers(c, targets, mrSubject(repo, n, title),
 			notifyBody(c, fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target), b, fmt.Sprintf("%s/mrs/%d", repo.Path(), n)))
 	}
-	return c.emit(map[string]any{"number": n, "head_sha": headSHA}, func(w io.Writer) {
+	out := map[string]any{"number": n, "head_sha": headSHA}
+	var parent *stackRef
+	if p, ok, err := c.Store.OpenMRBySource(repo.ID, target); err == nil && ok {
+		parent = &stackRef{p.Number, p.Title}
+		out["stacked_on"] = parent
+	}
+	return c.emit(out, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s!%d (%s -> %s)\n", repo.Path(), n, source, target)
+		if parent != nil {
+			fmt.Fprintf(w, "stacked on !%d %s\n", parent.Number, parent.Title)
+		}
 	})
 }
 
@@ -332,11 +341,45 @@ type mrOut struct {
 	Body       string `json:"body,omitempty"`
 	BodyFormat string `json:"body_format,omitempty"`
 	Milestone  string `json:"milestone,omitempty"`
-	CreatedAt  string `json:"created_at"`
-	MergedAt   string `json:"merged_at,omitempty"`
-	MergedBy   string `json:"merged_by,omitempty"`
-	ClosedAt   string `json:"closed_at,omitempty"`
-	ClosedBy   string `json:"closed_by,omitempty"`
+	// StackedOn is the open merge request whose source branch this one
+	// targets; Stacked are the open ones targeting this one's source.
+	StackedOn *stackRef  `json:"stacked_on,omitempty"`
+	Stacked   []stackRef `json:"stacked,omitempty"`
+	CreatedAt string     `json:"created_at"`
+	MergedAt  string     `json:"merged_at,omitempty"`
+	MergedBy  string     `json:"merged_by,omitempty"`
+	ClosedAt  string     `json:"closed_at,omitempty"`
+	ClosedBy  string     `json:"closed_by,omitempty"`
+}
+
+type stackRef struct {
+	Number int64  `json:"number"`
+	Title  string `json:"title"`
+}
+
+// stackOf derives the stack around m: the open merge request whose source
+// branch m targets, and the open ones targeting m's source. Both only
+// within m's repository; a fork's branch is not a target anything can
+// stack on.
+func stackOf(c *Ctx, repo store.Repo, m store.MR) (*stackRef, []stackRef) {
+	if m.State != "open" {
+		return nil, nil
+	}
+	var parent *stackRef
+	if p, ok, err := c.Store.OpenMRBySource(repo.ID, m.TargetRef); err == nil && ok && p.ID != m.ID {
+		parent = &stackRef{p.Number, p.Title}
+	}
+	var children []stackRef
+	if m.SourceRepoID == repo.ID {
+		if kids, err := c.Store.OpenMRsByTarget(repo.ID, m.SourceRef); err == nil {
+			for _, k := range kids {
+				if k.ID != m.ID {
+					children = append(children, stackRef{k.Number, k.Title})
+				}
+			}
+		}
+	}
+	return parent, children
 }
 
 func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
@@ -398,11 +441,17 @@ func runMRList(c *Ctx, args []string) int {
 	})
 	var ds []mrOut
 	for _, m := range mrs {
-		ds = append(ds, mrToOut(repo, m, false))
+		o := mrToOut(repo, m, false)
+		o.StackedOn, _ = stackOf(c, repo, m)
+		ds = append(ds, o)
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s\n", d.Number, d.State, d.Title, d.Source, d.TargetRef)
+			stacked := ""
+			if d.StackedOn != nil {
+				stacked = fmt.Sprintf("\tstacked on !%d", d.StackedOn.Number)
+			}
+			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s%s\n", d.Number, d.State, d.Title, d.Source, d.TargetRef, stacked)
 		}
 	})
 }
@@ -510,8 +559,15 @@ func runMRShow(c *Ctx, args []string) int {
 		Comments          []commentOut `json:"comments,omitempty"`
 		Reviews           []reviewOut  `json:"reviews,omitempty"`
 	}{mrToOut(repo, mr, true), checks, combined, unresolved, commits, cs, rs}
+	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
+		if d.StackedOn != nil {
+			fmt.Fprintf(w, "stacked on !%d %s\n", d.StackedOn.Number, d.StackedOn.Title)
+		}
+		for _, k := range d.Stacked {
+			fmt.Fprintf(w, "stacked: !%d %s\n", k.Number, k.Title)
+		}
 		if d.MergedAt != "" {
 			fmt.Fprintf(w, "merged %s%s\n", d.MergedAt, byWhom(d.MergedBy))
 		}
@@ -1007,6 +1063,25 @@ func runMRMerge(c *Ctx, args []string) int {
 		newSHA = onto
 	}
 
+	// A stacked merge request's diff is against this branch. After a
+	// fast-forward or merge commit the same commits are on the target and
+	// its diff is unchanged there; after a squash or rebase they are not,
+	// and the stack would carry this merge request's changes a second
+	// time. Refuse rather than leave the stack wrong.
+	var stack []store.MR
+	if mr.SourceRepoID == repo.ID {
+		stack, _ = c.Store.OpenMRsByTarget(repo.ID, mr.SourceRef)
+	}
+	if len(stack) > 0 && (strategy == "squash" || strategy == "rebase") {
+		var nums []string
+		for _, k := range stack {
+			nums = append(nums, fmt.Sprintf("!%d", k.Number))
+		}
+		return c.fail(protocol.ExitUsage,
+			"%s is stacked on by %s; a %s merge rewrites the commits they build on. Merge with --strategy ff or merge, or merge the stack into %s first",
+			fmt.Sprintf("!%d", mr.Number), strings.Join(nums, ", "), strategy, mr.SourceRef)
+	}
+
 	// CAS so a concurrent push between our read and this write fails the
 	// merge instead of silently discarding the push.
 	if err := gitutil.UpdateRefCAS(dir, targetRef, newSHA, targetSHA); err != nil {
@@ -1016,6 +1091,20 @@ func runMRMerge(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
+	// The stack moves up: whatever targeted this branch now targets what
+	// it merged into, reviews intact, since that diff is the one they
+	// were of.
+	for _, k := range stack {
+		if err := c.Store.RetargetKeepingReviews(k.ID, mr.TargetRef); err != nil {
+			continue
+		}
+		c.Store.AddMRSystemComment(k.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s: !%d merged", mr.SourceRef, mr.TargetRef, mr.Number))
+		if parts, err := c.Store.MRParticipants(k.ID); err == nil {
+			notifyUsers(c, parts, mrSubject(repo, k.Number, k.Title),
+				notifyBody(c, fmt.Sprintf("retargeted !%d from %s to %s: !%d merged", k.Number, mr.SourceRef, mr.TargetRef, mr.Number), "",
+					fmt.Sprintf("%s/mrs/%d", repo.Path(), k.Number)))
+		}
+	}
 	// Merges bypass receive-pack, so the commit-message issue actions
 	// (closes #N, references) run here for the newly landed commits. The
 	// description is scanned after them, so a commit wins the attribution

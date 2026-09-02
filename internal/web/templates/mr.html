@@ -15,6 +15,8 @@
 {{else}}
   <a href="/{{.MR.Author}}">{{.MR.Author}}</a> wants to merge {{template "mrrange" .MR}}
 {{end}}</p>
+{{with field . "StackedOn"}}<p class="meta">Stacked on <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">!{{.Number}} {{.Title}}</a>: merges into its branch until that lands, then onto its target.</p>{{end}}
+{{with field . "Stacked"}}<p class="meta">Builds on this: {{range $i, $k := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$k.Number}}">!{{$k.Number}} {{$k.Title}}</a>{{end}}. Merging with squash or rebase is refused while they are open.</p>{{end}}
 
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 

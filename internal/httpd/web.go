@@ -1691,6 +1691,17 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	if view != "commits" && view != "diff" {
 		view = "conversation"
 	}
+	// The stack around an open merge request, for the header.
+	var stackedOn *store.MR
+	var stacked []store.MR
+	if m.State == "open" {
+		if parent, ok, err := s.st.OpenMRBySource(p.Repo.ID, m.TargetRef); err == nil && ok && parent.ID != m.ID {
+			stackedOn = &parent
+		}
+		if m.SourceRepoID == p.Repo.ID {
+			stacked, _ = s.st.OpenMRsByTarget(p.Repo.ID, m.SourceRef)
+		}
+	}
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -1709,9 +1720,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Unresolved      int
 		Notice          string
 		DetachedThreads []diffThread
+		StackedOn       *store.MR
+		Stacked         []store.MR
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviews, files, stat, commits, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads})
+		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads, stackedOn, stacked})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
