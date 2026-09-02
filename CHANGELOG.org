@@ -4,6 +4,80 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.6.0 — 2026-09-02
+
+The v1.4.0 admin surface answered questions about accounts. This one
+answers questions about the machinery: which runner is alive, what is
+stuck, whether last night's backup exists, and it lets an operator stop
+a build instead of waiting it out.
+
+- A build a runner claimed and never reported is failed by the
+  scheduler's minute tick, with no runner involved. It used to happen
+  only when some runner polled again, so a dead sole runner left its
+  builds running forever. =GITBAY_STALE_BUILD_DEADLINE= shortens the
+  deadline for tests. #75
+- Runners are visible. Migration 0030 adds =runner_seen=: one row per
+  runner account with its last poll, the =-repos= scope it asked for,
+  and the build it holds. =admin runners= lists them, over SSH and on
+  the host. #76
+- =GET /healthz=: whether the database answers and which commit serves,
+  no auth, no repository data, 503 when the database does not answer.
+  =healthz= joins the reserved names. #77
+- The host monitor's hourly reading carries the age of the newest full
+  backup and database snapshot, alerting at 25 and 2 hours, and the
+  daemon's own =/healthz= answer read through =site_url=. Both ride the
+  journald line and the webhook body. #78
+- =admin stats= reports =lfs_bytes=. =admin gc --lfs= scans every
+  repository's objects for LFS pointers and removes stored objects none
+  names, keeping anything younger than a day since git lfs uploads
+  before it pushes. #79
+- =admin backup --verify <archive>= reads an archive back: SQLite's
+  integrity check on the snapshot, and the repositories it names against
+  the archive's. A database-only archive says so. Damage or a missing
+  repository exits non-zero. #80
+- A commit that already passed a job on another branch is not built
+  again when a fast-forward lands it. Merging the six-layer v1.6.0 stack
+  had queued eighteen jobs for commits that had each just gone green.
+  Failed or abandoned builds still re-queue. #90
+- =build cancel <owner/name> <n>= withdraws a queued build or ends a
+  running one. For a running build the server closes the runner's log
+  session, the runner kills the step within seconds, and its late report
+  changes nothing. The commit status goes back to the passed result from
+  another build of the same commit when one exists, else reads
+  =cancelled=. Needs write access.
+- Deploys copy with =rsync --partial=, so a transfer the host's load
+  stalled resumes, and =make deploy-runner= installs a systemd drop-in
+  (=Nice=10=, =CPUWeight=30=, =IOWeight=30=) so a build never starves the
+  host's sshd again.
+
+Replace both binaries and restart: =make deploy= for the daemon, then
+=make deploy-runner= for the runner, which carries its half of running-
+build cancellation and installs the drop-in. Migration 0030 adds the
+=runner_seen= table on start. The monitor change ships in
+=deploy/cloud-init.yaml=; an existing host takes it by hand.
+
+* v1.5.0 — 2026-09-02
+
+Merge requests stack.
+
+- A merge request whose target is the source branch of another open
+  merge request in the same repository is stacked on it. Nothing is
+  stored and no flag exists; the forge reads the stack from the
+  branches. =mr create= says =stacked on !A= when it applies, =mr show=
+  carries =stacked_on= and =stacked=, =mr list= rows carry =stacked_on=,
+  and the page says both directions in the header. #87
+- When the lower merge request merges, everything stacked on it is
+  retargeted onto what it merged into, with a system comment naming the
+  merge and its reviews kept: after a fast-forward or merge commit the
+  diff against the new target is the diff they were of. A squash or
+  rebase merge under a stack is refused, naming the stack, since it
+  would rewrite the commits the stack builds on.
+- The first stack merged on gitbay.org was the six merge requests of
+  v1.6.0, bottom-up, with no =mr retarget= typed. The wiki's
+  Stacked-MRs page walks through it.
+
+Replace the binary and restart. No migration.
+
 * v1.4.0 — 2026-09-01
 
 Until now the instance had one operator surface: root on the host. Every
