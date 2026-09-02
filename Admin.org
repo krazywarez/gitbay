@@ -44,6 +44,9 @@ the unit's =AmbientCapabilities=CAP_NET_BIND_SERVICE= covers ports
 
 =/etc/gitbay/config.toml=. =check-config= validates and names every
 contradiction; =--no-host-checks= skips port/path probes.
+=gitbayd admin config show= prints the configuration in effect as TOML,
+every default filled in and =smtp_pass= redacted. A file that fails
+validation still prints, followed by the contradiction.
 
 ** [server]
 - =root= (default =/var/lib/gitbay=) — repositories, database, host
