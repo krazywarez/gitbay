@@ -498,6 +498,10 @@ func usesTokenStdin(args []string) bool {
 func webCmd() *cobra.Command {
 	return group("web", "browser session",
 		pass("login", "mint a one-time browser login URL over ssh", passOpts{server: []string{"web", "login"}}),
+		group("sessions", "your browser sessions",
+			pass("list", "list your browser sessions", passOpts{server: []string{"web", "sessions", "list"}}),
+			pass("revoke", "end a browser session: <id>|--all", passOpts{server: []string{"web", "sessions", "revoke"}}),
+		),
 	)
 }
 

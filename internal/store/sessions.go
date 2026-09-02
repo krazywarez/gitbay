@@ -79,3 +79,53 @@ func (s *Store) DeleteWebSession(hash string) error {
 	_, err := s.DB.Exec("DELETE FROM web_sessions WHERE token_hash = ?", hash)
 	return err
 }
+
+// WebSession is one browser session as its owner lists it. ID is the first
+// twelve hex digits of the stored token hash: enough to name it, and a
+// hash of the cookie rather than the cookie.
+type WebSession struct {
+	ID        string `json:"id"`
+	CreatedAt string `json:"created_at"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+// ListWebSessions lists the user's unexpired browser sessions, newest first.
+func (s *Store) ListWebSessions(userID int64) ([]WebSession, error) {
+	rows, err := s.DB.Query(`SELECT substr(token_hash, 1, 12), created_at, expires_at
+		FROM web_sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC`,
+		userID, fmtTime(time.Now()))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []WebSession
+	for rows.Next() {
+		var ws WebSession
+		if err := rows.Scan(&ws.ID, &ws.CreatedAt, &ws.ExpiresAt); err != nil {
+			return nil, err
+		}
+		out = append(out, ws)
+	}
+	return out, rows.Err()
+}
+
+// RevokeWebSession ends one of the user's sessions by its listed id.
+func (s *Store) RevokeWebSession(userID int64, id string) error {
+	res, err := s.DB.Exec("DELETE FROM web_sessions WHERE user_id = ? AND substr(token_hash, 1, 12) = ?", userID, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RevokeAllWebSessions ends every browser session the user has.
+func (s *Store) RevokeAllWebSessions(userID int64) (int64, error) {
+	res, err := s.DB.Exec("DELETE FROM web_sessions WHERE user_id = ?", userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
