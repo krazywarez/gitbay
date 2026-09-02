@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.6.1 — 2026-09-02
+
+A cancel reaches a build in its clone.
+
+- The runner honoured a cancel only in its step loop; a build cancelled
+  during its clone or checkout ran git to completion first, which on a
+  loaded host was long enough for the v1.6.0 test to fail on the CI
+  host while passing locally. One =runStep= now drives the clone, the
+  checkout and each step with the cancel signal and the deadline, and
+  checks the signal before starting at all. The runner logs how its log
+  session ended when that was not a cancel.
+
+Replace the runner: =make deploy-runner=. The daemon is unchanged from
+v1.6.0.
+
 * v1.6.0 — 2026-09-02
 
 The v1.4.0 admin surface answered questions about accounts. This one
