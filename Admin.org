@@ -143,6 +143,8 @@ never in argv.
 #+begin_src sh
 gitbayd admin audit [--limit n]      # host-local
 ssh git@<host> audit [--limit n]     # instance admins, SSH only
+ssh git@<host> admin user list [--state active|pending|disabled|admin]
+ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions
 gitbayd admin user disable <name>    # suspend: SSH, web, API all refused;
 gitbayd admin user enable <name>     #   sessions dropped, nothing deleted
 gitbayd admin user delete <name> --yes  # only for accounts anchoring nothing:
@@ -151,6 +153,13 @@ gitbayd admin user delete <name> --yes  # only for accounts anchoring nothing:
                                      #   issues/MRs/comments/reviews, or is an
                                      #   org's only admin
 #+end_src
+
+=admin user list= pages by username (=--limit=, =--cursor=) and carries
+each account's state and =last_seen=, the newest use of any of its SSH
+keys or API tokens. =admin user show= adds the keys with their last use,
+each address with how it was verified, PGP keys, org roles, the owned
+repository count, API token names, and live browser sessions. Both are
+SSH-only and refused to non-admins, like =audit=.
 
 =limits.ssh_auth_rate= (10) throttles per-IP authentication *failures*
 per minute — successful auths never count and clear the slate.
