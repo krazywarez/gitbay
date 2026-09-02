@@ -44,6 +44,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | retarget               | yes | yes | no  |
 | milestone              | yes | yes | yes |
 | choose body markup     | yes | no  | no  |
+| stacked merge requests | yes | yes | no  |
 
 Reviews and checks carry the time they last said something, and a
 =ci/<job>= check carries how long its build ran, so a merge request
@@ -53,6 +54,14 @@ request names who resolved it and when; a row without that stamp — a
 =migrate= import, or one merged before krz/gitbay!137 with no
 =mr.merged= event to backfill from — says neither rather than
 inventing a time.
+
+A merge request whose target is another open merge request's source
+branch is stacked on it: =mr show= and the page say so both ways, and
+when the lower one merges, everything stacked on it is retargeted onto
+what it merged into with its reviews kept. A squash or rebase merge is
+refused while anything is stacked on the merge request, since it would
+rewrite the commits the stack builds on. The iOS client renders the
+retarget but has no stack view yet.
 
 Creating from a fork works anywhere the source can be typed as
 =owner/name:branch=; only the web lacks it. Retargeting moves an open
