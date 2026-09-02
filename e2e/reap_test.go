@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -150,5 +152,55 @@ func TestHealthz(t *testing.T) {
 	// The name is reserved: no account can shadow the route.
 	if _, errOut, code := inst.ssh(t, inst.newKey(t, "x"), "", "register", "--username", "healthz"); code == 0 {
 		t.Fatalf("healthz registered as a username: %s", errOut)
+	}
+}
+
+// gc --lfs removes objects no pointer names, keeps referenced ones, and
+// leaves anything young enough to be an upload ahead of its push.
+func TestGCLFSOrphans(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/big"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	put := func(content string, age time.Duration) string {
+		t.Helper()
+		sum := sha256.Sum256([]byte(content))
+		oid := hex.EncodeToString(sum[:])
+		path := filepath.Join(inst.root, "lfs", oid[:2], oid[2:4], oid)
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, []byte(content), 0o644)
+		os.Chtimes(path, time.Now().Add(-age), time.Now().Add(-age))
+		return oid
+	}
+	kept := put("referenced payload", 48*time.Hour)
+	orphan := put("nobody points here", 48*time.Hour)
+	young := put("just uploaded", time.Minute)
+
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/big"), "w")
+	dir := filepath.Join(work, "w")
+	pointer := fmt.Sprintf("version https://git-lfs.github.com/spec/v1\noid sha256:%s\nsize %d\n", kept, len("referenced payload"))
+	os.WriteFile(filepath.Join(dir, "data.bin"), []byte(pointer), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "pointer")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	if out := inst.admin(t, "admin", "stats", "--json"); !strings.Contains(out, `"lfs_bytes":`) || strings.Contains(out, `"lfs_bytes":0`) {
+		t.Fatalf("stats lfs bytes:\n%s", out)
+	}
+	out := inst.admin(t, "admin", "gc", "--lfs")
+	if !strings.Contains(out, "lfs\t1 referenced, removed 1 orphans") {
+		t.Fatalf("gc --lfs:\n%s", out)
+	}
+	exists := func(oid string) bool {
+		_, err := os.Stat(filepath.Join(inst.root, "lfs", oid[:2], oid[2:4], oid))
+		return err == nil
+	}
+	if !exists(kept) || exists(orphan) || !exists(young) {
+		t.Fatalf("after gc: kept=%v orphan=%v young=%v", exists(kept), exists(orphan), exists(young))
 	}
 }

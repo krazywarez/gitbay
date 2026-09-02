@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -172,4 +173,57 @@ func NewSecret() string {
 	buf := make([]byte, 32)
 	rand.Read(buf)
 	return hex.EncodeToString(buf)
+}
+
+// Orphans lists objects in the store that no repository references and
+// that are older than minAge: an object uploaded ahead of the push that
+// will reference it is not an orphan yet. referenced holds the object ids
+// every repository's pointers name.
+func (s LocalStore) Orphans(referenced map[string]bool, minAge time.Duration) ([]Orphan, error) {
+	cutoff := time.Now().Add(-minAge)
+	var out []Orphan
+	err := filepath.WalkDir(s.Root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		oid := d.Name()
+		if !OIDPat.MatchString(oid) || referenced[oid] {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			return nil
+		}
+		out = append(out, Orphan{OID: oid, Size: info.Size()})
+		return nil
+	})
+	return out, err
+}
+
+// Orphan is one unreferenced object.
+type Orphan struct {
+	OID  string
+	Size int64
+}
+
+// Size sums every object in the store.
+func (s LocalStore) Size() int64 {
+	var total int64
+	filepath.WalkDir(s.Root, func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if fi, err := d.Info(); err == nil {
+				total += fi.Size()
+			}
+		}
+		return nil
+	})
+	return total
+}
+
+// RootFor is the store root a configuration implies.
+func RootFor(lfsRoot, serverRoot string) string {
+	if lfsRoot != "" {
+		return lfsRoot
+	}
+	return filepath.Join(serverRoot, "lfs")
 }

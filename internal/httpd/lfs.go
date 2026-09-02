@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,11 +20,7 @@ import (
 const lfsMediaType = "application/vnd.git-lfs+json"
 
 func (s *Server) lfsStore() lfs.BlobStore {
-	root := s.cfg.LFS.Root
-	if root == "" {
-		root = filepath.Join(s.cfg.Server.Root, "lfs")
-	}
-	return lfs.LocalStore{Root: root}
+	return lfs.LocalStore{Root: lfs.RootFor(s.cfg.LFS.Root, s.cfg.Server.Root)}
 }
 
 func (s *Server) lfsMaxObject() int64 {

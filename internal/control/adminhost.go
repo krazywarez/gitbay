@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/lfs"
 	"gitbay.org/gitbay/internal/mail"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -301,9 +302,11 @@ func runAdminStats(c *Ctx, args []string) int {
 		Counts    store.Counts `json:"counts"`
 		DBBytes   int64        `json:"db_bytes"`
 		RepoBytes int64        `json:"repo_bytes"`
+		LFSBytes  int64        `json:"lfs_bytes"`
 		Repos     []repoDisk   `json:"repos"`
 	}
 	d := out{Counts: counts, Repos: []repoDisk{}}
+	d.LFSBytes = lfs.LocalStore{Root: lfs.RootFor(c.Cfg.LFS.Root, c.Cfg.Server.Root)}.Size()
 	for _, r := range repos {
 		b := gitutil.DirSize(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
 		d.Repos = append(d.Repos, repoDisk{r.Path(), b})
@@ -316,7 +319,7 @@ func runAdminStats(c *Ctx, args []string) int {
 		fmt.Fprintf(w, "users %d · orgs %d · repos %d · issues %d (%d open) · MRs %d (%d open)\n",
 			counts.Users, counts.Orgs, counts.Repos,
 			counts.Issues, counts.OpenIssues, counts.MRs, counts.OpenMRs)
-		fmt.Fprintf(w, "database %s · repositories %s\n\n", humanBytes(d.DBBytes), humanBytes(d.RepoBytes))
+		fmt.Fprintf(w, "database %s · repositories %s · lfs %s\n\n", humanBytes(d.DBBytes), humanBytes(d.RepoBytes), humanBytes(d.LFSBytes))
 		for _, r := range d.Repos {
 			fmt.Fprintf(w, "%s\t%s\n", r.Path, humanBytes(r.Bytes))
 		}
