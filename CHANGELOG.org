@@ -4,6 +4,68 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.4.0 — 2026-09-01
+
+Until now the instance had one operator surface: root on the host. Every
+question about the instance itself — who is on it, what is stuck, what a
+spam repository is doing — needed a shell on port 2222. This release
+gives an instance admin the same answers over SSH, and one page on the
+web.
+
+- =admin user list= pages accounts by username with
+  =--state active|pending|disabled|admin=, each row carrying its state
+  and =last_seen=, the newest use of any of its SSH keys or API tokens.
+  =admin user show <name>= adds the keys with their last use, each
+  address with how it was verified, PGP keys, org roles, owned
+  repository count, API token names and live browser sessions. Both are
+  SSH-only and refused to non-admins, like =audit=. #69
+- =admin user promote|demote=. The only way to admin was
+  =admin user create --admin=; an existing account could not be raised
+  and an admin could not step down. Demoting the last admin is refused
+  inside the transaction that counts them. The host-local twin is the
+  recovery path when no admin key is reachable. #70
+- Repository overrides for moderation: =admin repo list= with size and
+  last push, and =admin repo archive|unarchive|visibility|delete=. Policy
+  still knows nothing about instance admin — a private repository
+  answers not-found to an admin as before — so each override skips the
+  access check explicitly and writes its own =admin repo.<action>= audit
+  row. #71
+- =gitbayd admin= dispatches into the registry. User create, disable,
+  enable and delete, email verify, invite and stats were reimplemented on
+  the host; they now live in the registry, SSH-only and admin-gated, and
+  the host binary runs them as the host — an admin context with no
+  account behind it, so its audit rows say =source: host= where a
+  session says the key fingerprint. Invite and stats gain an SSH twin by
+  the same move. =backup=, =gc= and the backfills stay host-local. #72
+- =audit= filters: =--actor <user>= or =--actor -= for actorless rows,
+  =--action <prefix>=, and =--since= as a duration (=30m=, =24h=, =7d=)
+  or a date. =gitbayd admin audit= takes the same flags and =--json=. #73
+- =dashboard= carries a =queues= block for admins: per worker —
+  webhooks, mail, mirrors, builds, dependency checks — the pending,
+  retrying and dead-lettered counts, the oldest pending age, and the
+  retrying or failed rows themselves, capped at twenty each. The mail
+  queue was readable nowhere before. =/admin= renders the block by
+  dispatching =dashboard=; non-admins get a 404 and no rail link. #74
+- =gitbayd admin config show= prints the configuration in effect as
+  TOML, defaults filled in and =smtp_pass= redacted, so a support
+  question starts from what runs rather than what was written. #81
+- Build badges are served as PNG at =badge/build.png= as well as SVG,
+  for places that will not render SVG.
+- Host monitoring writes its reading to journald on every run and exits
+  non-zero on an alert, so an unset webhook no longer looks like a
+  healthy host; it reads the ACME cache where it actually lives and
+  reports the soonest expiry. govulncheck runs as its own CI job. The
+  database is snapshotted hourly by =gitbay-db-backup.timer=, keeping 48,
+  alongside the nightly full archive; archives inherit the database's
+  mode rather than the umask default. #28
+- A runner whose log stream drops no longer fails the build it was
+  recording. #67
+- =go.yaml.in/yaml/v3= and =golang.org/x/net= bumped. #60
+
+Replace the binary and restart. No migration. The =gitbay-db-backup=
+timer and the monitor changes ship in =deploy/cloud-init.yaml= for new
+hosts; an existing host takes them from there by hand.
+
 * v1.3.0 — 2026-08-31
 
 A runner took every repository's work, which decided where you could run
