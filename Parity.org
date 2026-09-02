@@ -118,6 +118,7 @@ format column and are always markdown.
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
+| build cancel                | yes | no  | no  |
 | dependency checks on/off    | yes | yes | no  |
 | dependency status           | yes | no  | no  |
 | delete, transfer            | yes | no  | no  |
@@ -127,6 +128,11 @@ No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a
 handler reading git or the store directly instead of dispatching a
 command — until krz/gitbay!99, !101 and !102 gave them commands.
+
+=build cancel= withdraws a queued build before a runner claims it; a
+running one is the runner's to finish. Cancelling a duplicate of a
+commit that already passed the job puts that result back on the commit.
+No button on the build page yet.
 
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps
