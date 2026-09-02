@@ -305,6 +305,14 @@ gitbayd --config /etc/gitbay/config.toml admin user create ci --admin \
 gitbay-runner -remote git@127.0.0.1 -workdir /var/lib/gitbay-runner/work
 #+end_src
 
+=make deploy-runner= also installs
+=deploy/gitbay-runner.override.conf= as a systemd drop-in: =Nice=10=,
+=CPUWeight=30=, =IOWeight=30=, so a build never starves the host's sshd,
+the daemon or the backup timers. The e2e suite alone starts sixty
+daemon instances; without the drop-in a deploy's copy over the admin
+sshd stalled. Both deploy targets copy with =rsync --partial=, which
+resumes a stalled transfer.
+
 v1 runs steps directly on the host — no containers — so treat the
 runner machine as executing whatever your users push. Install the
 toolchains your builds need on it.
