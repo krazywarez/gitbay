@@ -86,6 +86,10 @@ validation still prints, followed by the contradiction.
 - =mode= — =closed= (default) | =invite= | =open=. invite/open require
   [mail]. See the user guide for the flows.
 
+- =pending_expiry= (empty, never) — a duration such as ="168h"=; a
+  self-registered account still unverified after that long is removed,
+  hourly and at start, audited as =pending.expired=.
+
 ** [mail]
 - =smtp_host= (host:port, 587 assumed), =from=, optional =smtp_user= /
   =smtp_pass=. STARTTLS when offered. Required for invite/open
@@ -104,6 +108,11 @@ validation still prints, followed by the contradiction.
 - =clone_timeout= (3600s) — cap on =repo import= fetches.
 - =max_blob_bytes= (100MB) — cap on raw file serving over the web.
 - =max_asset_bytes= (512MB) — cap per uploaded release asset.
+- =max_repos_per_user= (0, unlimited) — repositories an account may own
+  directly; =repo create=, =fork= and =import= refuse past it.
+  Organizations are not capped.
+- =max_bytes_per_user= (0, unlimited) — disk the account's own
+  repositories may take; a push may be no larger than what is left.
 - =max_pack_bytes=, =ssh_auth_rate= — reserved, not yet enforced.
 
 ** [git_daemon]
@@ -156,6 +165,7 @@ gitbayd admin audit [--actor u|-] [--action prefix] [--since 24h|7d|date] [--lim
 ssh git@<host> audit ...             # the same, from an admin session (SSH only)
 ssh git@<host> admin user list [--state active|pending|disabled|admin]
 ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions
+ssh git@<host> admin user limits <name> [--repos n|default] [--bytes n|default]   # per-account caps
 ssh git@<host> admin user promote <name>   # grant instance admin
 ssh git@<host> admin user demote <name>    # remove it; the last admin is refused
 gitbayd admin user promote <name>    # host-local: recovery when no admin key is reachable

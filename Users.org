@@ -415,6 +415,14 @@ instance issues its own certificates). Claims are exclusive per
 instance; unverified claims serve nothing and expire after 7 days.
 =repo domain list= reports pending/verified/expired.
 
+* Browser sessions
+
+=gitbay web login= mints a one-time URL; the session it opens lasts
+seven days. =gitbay web sessions list= shows each of yours by a short
+id with its creation and expiry, and =gitbay web sessions revoke <id>=
+or =--all= ends them from the terminal, which is where a lost laptop is
+handled.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you: someone
