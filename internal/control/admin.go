@@ -306,6 +306,7 @@ func setAdmin(c *Ctx, args []string, admin bool) int {
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.Audit(c.User.ID, "admin user."+verb+"d", map[string]any{"user": u.Username})
 	return c.emit(map[string]any{"user": u.Username, "admin": admin}, func(w io.Writer) {
 		fmt.Fprintf(w, "%sd %s\n", verb, u.Username)
 	})

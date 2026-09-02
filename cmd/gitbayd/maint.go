@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -65,67 +63,6 @@ func gcCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&repoPath, "repo", "", "one repository (owner/name) instead of all")
 	cmd.Flags().BoolVar(&aggressive, "aggressive", false, "more thorough repack (slow; rarely needed)")
-	return cmd
-}
-
-func statsCmd() *cobra.Command {
-	var asJSON bool
-	cmd := &cobra.Command{
-		Use:   "stats",
-		Short: "instance statistics: counts and per-repository disk usage",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(configPath)
-			if err != nil {
-				return err
-			}
-			st, err := openStore(cfg)
-			if err != nil {
-				return err
-			}
-			defer st.Close()
-
-			counts, err := st.InstanceCounts()
-			if err != nil {
-				return err
-			}
-			repos, err := st.ListAllRepos()
-			if err != nil {
-				return err
-			}
-			type repoDisk struct {
-				Path  string `json:"path"`
-				Bytes int64  `json:"bytes"`
-			}
-			var disks []repoDisk
-			var totalDisk int64
-			for _, r := range repos {
-				b := gitutil.DirSize(control.RepoDir(cfg.Server.Root, r.OwnerName, r.Name))
-				disks = append(disks, repoDisk{r.Path(), b})
-				totalDisk += b
-			}
-			var dbBytes int64
-			if fi, err := os.Stat(cfg.Server.Root + "/gitbay.db"); err == nil {
-				dbBytes = fi.Size()
-			}
-
-			if asJSON {
-				return json.NewEncoder(os.Stdout).Encode(map[string]any{
-					"counts": counts, "db_bytes": dbBytes,
-					"repo_bytes": totalDisk, "repos": disks,
-				})
-			}
-			fmt.Printf("users %d · orgs %d · repos %d · issues %d (%d open) · MRs %d (%d open)\n",
-				counts.Users, counts.Orgs, counts.Repos,
-				counts.Issues, counts.OpenIssues, counts.MRs, counts.OpenMRs)
-			fmt.Printf("database %s · repositories %s\n\n", human(dbBytes), human(totalDisk))
-			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-			for _, d := range disks {
-				fmt.Fprintf(w, "%s\t%s\n", d.Path, human(d.Bytes))
-			}
-			return w.Flush()
-		},
-	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output")
 	return cmd
 }
 

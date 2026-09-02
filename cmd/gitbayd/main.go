@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/acme/autocert"
-	"golang.org/x/crypto/ssh"
 
 	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/ci"
@@ -26,10 +26,8 @@ import (
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
-	"gitbay.org/gitbay/internal/mail"
 	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
-	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/webhook"
@@ -309,164 +307,137 @@ func adminCmd() *cobra.Command {
 		Short: "host-local administration",
 	}
 	userCmd := &cobra.Command{Use: "user", Short: "manage users"}
-	userCmd.AddCommand(adminUserCreateCmd(), adminUserDisableCmd(), adminUserEnableCmd(), adminUserDeleteCmd(),
-		adminUserPromoteCmd(), adminUserDemoteCmd())
+	userCmd.AddCommand(
+		hostUserCreateCmd(),
+		hostCmd("list [--state active|pending|disabled|admin] [--limit n] [--cursor c]", "list accounts", "admin", "user", "list"),
+		hostCmd("show <username>", "show an account: keys, emails, orgs, tokens, sessions", "admin", "user", "show"),
+		hostCmd("disable <username>", "suspend an account: keys and sessions refused until re-enabled", "admin", "user", "disable"),
+		hostCmd("enable <username>", "restore a suspended account", "admin", "user", "enable"),
+		hostCmd("delete <username> --yes", "delete an account that anchors nothing (keys, emails, and sessions go with it)", "admin", "user", "delete"),
+		hostCmd("promote <username>", "make an account an instance admin", "admin", "user", "promote"),
+		hostCmd("demote <username>", "remove instance admin from an account (never the last one)", "admin", "user", "demote"),
+	)
 	emailCmd := &cobra.Command{Use: "email", Short: "manage user emails"}
-	emailCmd.AddCommand(adminEmailVerifyCmd())
+	emailCmd.AddCommand(hostCmd("verify <username> <address>", "mark an email verified by admin assertion", "admin", "email", "verify"))
+	repoCmd := &cobra.Command{Use: "repo", Short: "any repository, for moderation (audited)"}
+	repoCmd.AddCommand(
+		hostCmd("list [--owner o] [--visibility public|private] [--limit n] [--cursor c]", "every repository with size and last push", "admin", "repo", "list"),
+		hostCmd("archive <owner/name>", "archive a repository", "admin", "repo", "archive"),
+		hostCmd("unarchive <owner/name>", "unarchive a repository", "admin", "repo", "unarchive"),
+		hostCmd("visibility <owner/name> public|private", "set a repository's visibility", "admin", "repo", "visibility"),
+		hostCmd("delete <owner/name> --yes", "delete a repository", "admin", "repo", "delete"),
+	)
 	admin.AddCommand(
 		userCmd,
 		emailCmd,
-		adminInviteCmd(),
+		repoCmd,
+		hostCmd("invite --email <address>", "issue a registration invite and email its code", "admin", "invite"),
+		hostCmd("stats [--json]", "instance statistics: counts and per-repository disk usage", "admin", "stats"),
+		hostCmd("audit [--limit n] [--json]", "print the security audit log, newest first", "audit"),
 		backupCmd(),
 		gcCmd(),
-		statsCmd(),
-		adminAuditCmd(),
 		adminMigrateCommitRefsCmd(),
 		adminBackfillActivityCmd(),
 	)
 	return admin
 }
 
-func adminInviteCmd() *cobra.Command {
-	var email string
-	cmd := &cobra.Command{
-		Use:   "invite",
-		Short: "issue a registration invite and email its code",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if email == "" {
-				return fmt.Errorf("--email is required")
-			}
-			cfg, err := config.Load(configPath)
-			if err != nil {
-				return err
-			}
-			st, err := openStore(cfg)
-			if err != nil {
-				return err
-			}
-			defer st.Close()
-
-			if used, err := st.EmailInUse(email); err != nil {
-				return err
-			} else if used {
-				return fmt.Errorf("%s already belongs to an account; invites are for new users", email)
-			}
-			code, hash, err := store.NewToken()
-			if err != nil {
-				return err
-			}
-			if err := st.CreateInvite(hash, email); err != nil {
-				return err
-			}
-			host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(cfg.Server.SiteURL, "https://"), "http://"), "/")
-			body := fmt.Sprintf(
-				"You have been invited to %s.\n\nCreate your account by running (with the SSH key you want to use):\n\n"+
-					"    ssh git@%s register --username <name> --invite %s\n\n"+
-					"The invite is single-use and tied to this address.\n", host, host, code)
-			if cfg.Mail.SMTPHost != "" {
-				if err := mail.Send(cfg, email, "your invite to "+host, body); err != nil {
-					return fmt.Errorf("invite stored but mail failed: %w (code: %s)", err, code)
-				}
-				st.Audit(0, "admin invite.issued", map[string]any{"email": email})
-				fmt.Printf("invite emailed to %s\n", email)
-			} else {
-				fmt.Printf("invite for %s (no SMTP configured; deliver it yourself):\n%s\n", email, code)
-			}
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&email, "email", "", "address to invite (the account's verified email)")
-	return cmd
-}
-
-func adminUserCreateCmd() *cobra.Command {
-	var keyPath, email string
-	var verified, isAdmin bool
-	cmd := &cobra.Command{
-		Use:   "create <username>",
-		Short: "create a user (host-local bootstrap; the only path in closed mode)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			username := args[0]
-			if err := policy.ValidateOwnerName(username); err != nil {
-				return err
-			}
-			cfg, err := config.Load(configPath)
-			if err != nil {
-				return err
-			}
-			st, err := openStore(cfg)
-			if err != nil {
-				return err
-			}
-			defer st.Close()
-
-			uid, err := st.CreateUser(username, isAdmin)
-			if err != nil {
-				return err
-			}
-			if email != "" {
-				verifiedBy := ""
-				if verified {
-					verifiedBy = "admin"
-				}
-				if err := st.AddEmail(uid, email, verifiedBy, true); err != nil {
-					return err
-				}
-			}
-			if keyPath != "" {
-				raw, err := os.ReadFile(keyPath)
-				if err != nil {
-					return err
-				}
-				pub, _, _, _, err := ssh.ParseAuthorizedKey(raw)
-				if err != nil {
-					return fmt.Errorf("%s: not a public key in authorized_keys format: %w", keyPath, err)
-				}
-				fp := ssh.FingerprintSHA256(pub)
-				if err := st.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full"); err != nil {
-					return err
-				}
-				fmt.Println("key", fp)
-			}
-			st.Audit(0, "admin user.created", map[string]any{"user": username})
-			fmt.Println("created user", username)
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&keyPath, "key", "", "path to an SSH public key to register")
-	cmd.Flags().StringVar(&email, "email", "", "primary email address")
-	cmd.Flags().BoolVar(&verified, "verified", false, "mark the email verified (admin assertion)")
-	cmd.Flags().BoolVar(&isAdmin, "admin", false, "grant instance admin")
-	return cmd
-}
-
-func adminEmailVerifyCmd() *cobra.Command {
+// hostCmd runs a registry command as the host itself: an admin context
+// with no account behind it, so audit rows carry no actor and the source
+// "host". Arguments pass through untouched; the registry owns the flags,
+// which is what keeps this surface and an admin's SSH session from
+// drifting.
+func hostCmd(use, short string, path ...string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "verify <username> <address>",
-		Short: "mark an email verified by admin assertion",
-		Args:  cobra.ExactArgs(2),
+		Use:                use,
+		Short:              short,
+		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(configPath)
-			if err != nil {
-				return err
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					return cmd.Help()
+				}
 			}
-			st, err := openStore(cfg)
-			if err != nil {
-				return err
+			return runAsHost(path, args, os.Stdin)
+		},
+	}
+}
+
+// hostArgs pulls the root's --config out of args: with flag parsing off,
+// cobra hands the persistent flag through untouched.
+func hostArgs(args []string) []string {
+	var rest []string
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--config" && i+1 < len(args):
+			configPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--config="):
+			configPath = strings.TrimPrefix(args[i], "--config=")
+		default:
+			rest = append(rest, args[i])
+		}
+	}
+	return rest
+}
+
+func runAsHost(path, args []string, stdin io.Reader) error {
+	args = hostArgs(args)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return err
+	}
+	st, err := openStore(cfg)
+	if err != nil {
+		return err
+	}
+	c := &control.Ctx{
+		User:   store.User{Username: "host", IsAdmin: true},
+		Scope:  "full",
+		Store:  st,
+		Cfg:    cfg,
+		Stdin:  stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Source: "host",
+	}
+	code := control.Dispatch(c, append(append([]string{}, path...), args...))
+	st.Close()
+	if code != 0 {
+		os.Exit(code)
+	}
+	return nil
+}
+
+// hostUserCreateCmd keeps --key <path>, which the registry command cannot
+// take (no file paths over SSH): the file becomes the command's stdin.
+func hostUserCreateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:                "create <username> [--admin] [--email <address> [--verified]] [--key <file>]",
+		Short:              "create a user (host-local bootstrap; the only path in closed mode)",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var stdin io.Reader = os.Stdin
+			var rest []string
+			args = hostArgs(args)
+			for i := 0; i < len(args); i++ {
+				switch {
+				case args[i] == "--help" || args[i] == "-h":
+					return cmd.Help()
+				case args[i] == "--key" && i+1 < len(args) && args[i+1] != "-":
+					f, err := os.Open(args[i+1])
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					stdin = f
+					rest = append(rest, "--key", "-")
+					i++
+				default:
+					rest = append(rest, args[i])
+				}
 			}
-			defer st.Close()
-			u, err := st.UserByUsername(args[0])
-			if err != nil {
-				return fmt.Errorf("user %s: %w", args[0], err)
-			}
-			if err := st.VerifyEmail(u.ID, args[1], "admin"); err != nil {
-				st.Audit(0, "admin email.verify_failed", map[string]any{"user": args[0], "email": args[1]})
-				return fmt.Errorf("no address %s on user %s", args[1], args[0])
-			}
-			st.Audit(0, "admin email.verified", map[string]any{"user": args[0], "email": args[1]})
-			fmt.Println("verified", args[1])
-			return nil
+			return runAsHost([]string{"admin", "user", "create"}, rest, stdin)
 		},
 	}
 }

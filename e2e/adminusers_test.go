@@ -331,3 +331,71 @@ func TestAdminRepoModeration(t *testing.T) {
 		}
 	}
 }
+
+// The host-local admin commands dispatch into the registry, so the same
+// commands work in an admin's SSH session and audit rows say which path
+// ran them.
+func TestAdminHostAndSSHAreOneSurface(t *testing.T) {
+	inst := startInstance(t)
+	rootKey := inst.newKey(t, "root")
+	aliceKey := inst.newKey(t, "alice")
+	carolKey := inst.newKey(t, "carol")
+	inst.admin(t, "admin", "user", "create", "root", "--key", rootKey+".pub", "--admin")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+
+	pub, err := os.ReadFile(carolKey + ".pub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, errOut, code := inst.ssh(t, rootKey, string(pub), "admin", "user", "create", "carol",
+		"--email", "carol@example.test", "--verified", "--key", "-")
+	if code != 0 || !strings.Contains(out, "created user carol") || !strings.Contains(out, "key SHA256:") {
+		t.Fatalf("ssh user create: exit %d\n%s%s", code, out, errOut)
+	}
+	if _, _, code := inst.ssh(t, carolKey, "", "whoami"); code != 0 {
+		t.Fatal("created account cannot authenticate")
+	}
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "create", "alice"); code != 2 || !strings.Contains(errOut, "taken") {
+		t.Fatalf("duplicate create: exit %d %s", code, errOut)
+	}
+	for _, args := range [][]string{{"admin", "stats"}, {"admin", "user", "disable", "carol"}, {"admin", "invite", "--email", "x@example.test"}} {
+		if _, _, code := inst.ssh(t, aliceKey, "", args...); code != 4 {
+			t.Fatalf("non-admin ran %v: exit %d", args, code)
+		}
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "disable", "carol"); code != 0 {
+		t.Fatal("ssh disable failed")
+	}
+	if _, _, code := inst.ssh(t, carolKey, "", "whoami"); code != 4 {
+		t.Fatal("disabled account still authenticates")
+	}
+	inst.admin(t, "admin", "user", "enable", "carol")
+	if _, _, code := inst.ssh(t, carolKey, "", "whoami"); code != 0 {
+		t.Fatal("host enable did not take")
+	}
+	if out, _, code := inst.ssh(t, rootKey, "", "admin", "stats", "--json"); code != 0 || !strings.Contains(out, `"users":`) {
+		t.Fatalf("ssh stats: exit %d\n%s", code, out)
+	}
+	// No SMTP: the invite code comes back on stdout instead of by mail.
+	if out, _, code := inst.ssh(t, rootKey, "", "admin", "invite", "--email", "dave@example.test", "--json"); code != 0 || !strings.Contains(out, `"code":"`) {
+		t.Fatalf("ssh invite: exit %d\n%s", code, out)
+	}
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "email", "verify", "carol", "nope@example.test"); code != 3 || !strings.Contains(errOut, "no address") {
+		t.Fatalf("verify unknown address: exit %d %s", code, errOut)
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "delete", "carol", "--yes"); code != 0 {
+		t.Fatal("ssh delete failed")
+	}
+	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "delete", "root", "--yes"); code != 2 {
+		t.Fatal("deleted own account")
+	}
+
+	// Both paths audit under the same action names; the row says which
+	// credential ran it.
+	audit := inst.admin(t, "admin", "audit")
+	for _, want := range []string{`"source":"host"`, `"source":"SHA256:`, "admin user.created", "admin user.disabled", "admin user.enabled", "admin user.deleted"} {
+		if !strings.Contains(audit, want) {
+			t.Fatalf("audit lacks %q:\n%s", want, audit)
+		}
+	}
+}

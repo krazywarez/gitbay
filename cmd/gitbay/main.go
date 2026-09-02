@@ -81,7 +81,16 @@ func newRoot() *cobra.Command {
 				pass("show", "show an account: <username>", passOpts{server: []string{"admin", "user", "show"}}),
 				pass("promote", "make an account an instance admin: <username>", passOpts{server: []string{"admin", "user", "promote"}}),
 				pass("demote", "remove instance admin (never the last one): <username>", passOpts{server: []string{"admin", "user", "demote"}}),
+				pass("create", "create an account: <username> [--admin] [--email a [--verified]] [--key -] < key.pub", passOpts{server: []string{"admin", "user", "create"}, stdinOK: true}),
+				pass("disable", "suspend an account: <username>", passOpts{server: []string{"admin", "user", "disable"}}),
+				pass("enable", "restore a suspended account: <username>", passOpts{server: []string{"admin", "user", "enable"}}),
+				pass("delete", "delete an account that anchors nothing: <username> --yes", passOpts{server: []string{"admin", "user", "delete"}}),
 			),
+			group("email", "addresses on any account",
+				pass("verify", "mark an address verified by admin assertion: <username> <address>", passOpts{server: []string{"admin", "email", "verify"}}),
+			),
+			pass("invite", "issue a registration invite and mail its code: --email <address>", passOpts{server: []string{"admin", "invite"}}),
+			pass("stats", "instance statistics: counts and per-repository disk usage", passOpts{server: []string{"admin", "stats"}}),
 			group("repo", "any repository, for moderation (audited)",
 				pass("list", "every repository with size and last push: [--owner o] [--visibility v] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "repo", "list"}}),
 				pass("archive", "archive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "archive"}}),
@@ -209,7 +218,7 @@ func isEmptyReader(r io.Reader) bool {
 // usesStdin reports whether the arguments request stdin content.
 func usesStdin(args []string) bool {
 	for i, a := range args {
-		if a == "--file" && i+1 < len(args) && args[i+1] == "-" {
+		if (a == "--file" || a == "--key") && i+1 < len(args) && args[i+1] == "-" {
 			return true
 		}
 		if a == "--token-stdin" {
