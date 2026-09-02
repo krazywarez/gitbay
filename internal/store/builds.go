@@ -291,12 +291,13 @@ func (b Build) Elapsed() time.Duration {
 	return 0
 }
 
-// CancelBuild withdraws a build that no runner has claimed. A running
-// build is the runner's to finish; cancelling it here would leave the
-// runner reporting on a row that says otherwise.
+// CancelBuild withdraws a queued or running build. A running one is
+// ended by the runner, which learns of the cancellation when its log
+// session is closed, and whose later report lands on a row that already
+// says cancelled.
 func (s *Store) CancelBuild(id int64) error {
 	res, err := s.DB.Exec(`UPDATE builds SET status = 'cancelled',
-		finished_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND status = 'pending'`, id)
+		finished_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND status IN ('pending', 'running')`, id)
 	if err != nil {
 		return err
 	}

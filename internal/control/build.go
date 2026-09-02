@@ -379,24 +379,53 @@ func runRunnerLog(c *Ctx, args []string) int {
 	// append that fails drops its chunk and the loop keeps draining: ending
 	// the session here breaks the runner's pipe, and a broken pipe is how a
 	// transient SQLITE_BUSY used to fail the build the log belonged to.
-	buf := make([]byte, 64<<10)
-	dropped := 0
-	for {
-		n, rerr := c.Stdin.Read(buf)
-		if n > 0 {
-			if err := c.Store.AppendBuildLog(id, buf[:n]); err != nil {
-				dropped++
-				slog.Warn("appending build log", "build", id, "err", err)
+	//
+	// The session is also how a running build is cancelled: while it is
+	// open the build's row is watched, and when the row stops saying
+	// running the session ends with ExitNotFound, which the runner reads as
+	// "stop this build". Any other end of the session is a lost stream.
+	type chunk struct {
+		data []byte
+		err  error
+	}
+	chunks := make(chan chunk, 4)
+	go func() {
+		buf := make([]byte, 64<<10)
+		for {
+			n, rerr := c.Stdin.Read(buf)
+			if n > 0 {
+				chunks <- chunk{data: append([]byte(nil), buf[:n]...)}
+			}
+			if rerr != nil {
+				chunks <- chunk{err: rerr}
+				return
 			}
 		}
-		if rerr != nil {
-			break
+	}()
+	watch := time.NewTicker(2 * time.Second)
+	defer watch.Stop()
+	dropped := 0
+	for {
+		select {
+		case ch := <-chunks:
+			if len(ch.data) > 0 {
+				if err := c.Store.AppendBuildLog(id, ch.data); err != nil {
+					dropped++
+					slog.Warn("appending build log", "build", id, "err", err)
+				}
+			}
+			if ch.err != nil {
+				if dropped > 0 {
+					slog.Warn("build log incomplete", "build", id, "dropped_chunks", dropped)
+				}
+				return c.emit(map[string]string{"log": "ok"}, func(w io.Writer) {})
+			}
+		case <-watch.C:
+			if b, err := c.Store.BuildByID(id); err == nil && b.Status != "running" {
+				return c.fail(protocol.ExitNotFound, "build %d is %s; stop", id, b.Status)
+			}
 		}
 	}
-	if dropped > 0 {
-		slog.Warn("build log incomplete", "build", id, "dropped_chunks", dropped)
-	}
-	return c.emit(map[string]string{"log": "ok"}, func(w io.Writer) {})
 }
 
 func runRunnerDone(c *Ctx, args []string) int {
@@ -413,6 +442,14 @@ func runRunnerDone(c *Ctx, args []string) int {
 	b, err := c.Store.BuildByID(id)
 	if err != nil {
 		return c.fail(protocol.ExitNotFound, "no build %d", id)
+	}
+	// Cancelled underneath the runner: its report is late, not wrong.
+	// The row, the status and the log were settled by the cancel.
+	if b.Status == "cancelled" {
+		c.Store.RunnerDone(c.User.ID)
+		return c.emit(map[string]any{"build": b.Number, "status": "cancelled"}, func(w io.Writer) {
+			fmt.Fprintf(w, "build %d was cancelled\n", b.Number)
+		})
 	}
 	if err := c.Store.FinishBuild(id, args[1]); err != nil {
 		return c.fail(protocol.ExitFailure, "finishing build %d: %v", id, err)
@@ -527,13 +564,17 @@ func runBuildCancel(c *Ctx, args []string) int {
 	if !policy.CanWrite(c.User, repo, grant) {
 		return c.fail(protocol.ExitDenied, "cancelling a build needs write access to %s", repo.Path())
 	}
-	if b.Status != "pending" {
-		return c.fail(protocol.ExitUsage, "build %d is %s; only a queued build can be cancelled", b.Number, b.Status)
+	if b.Status != "pending" && b.Status != "running" {
+		return c.fail(protocol.ExitUsage, "build %d is %s; only a queued or running build can be cancelled", b.Number, b.Status)
 	}
 	if err := c.Store.CancelBuild(b.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf("cancelled by %s before a runner claimed it\n", c.User.Username)))
+	if b.Status == "running" {
+		c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf("\ncancelled by %s while running; the runner stops at its next check\n", c.User.Username)))
+	} else {
+		c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf("cancelled by %s before a runner claimed it\n", c.User.Username)))
+	}
 	// The queued status replaced whatever the commit had for this job. If
 	// the commit passed the job on another ref, that result stands again;
 	// otherwise the context says it was withdrawn.
@@ -546,7 +587,11 @@ func runBuildCancel(c *Ctx, args []string) int {
 		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "error", "cancelled", url, c.User.ID)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
-	return c.emit(map[string]any{"number": b.Number, "job": b.Job, "status": "cancelled"}, func(w io.Writer) {
+	return c.emit(map[string]any{"number": b.Number, "job": b.Job, "status": "cancelled", "was": b.Status}, func(w io.Writer) {
+		if b.Status == "running" {
+			fmt.Fprintf(w, "cancelled %s build %d (%s); the runner stops at its next check\n", repo.Path(), b.Number, b.Job)
+			return
+		}
 		fmt.Fprintf(w, "cancelled %s build %d (%s)\n", repo.Path(), b.Number, b.Job)
 	})
 }

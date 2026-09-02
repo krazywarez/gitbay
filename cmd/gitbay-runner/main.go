@@ -180,12 +180,29 @@ func (r *runner) run(j job) bool {
 		log.Printf("build %d: log stream: %v", j.ID, err)
 		return false
 	}
+	// The server ends the log session with exit 3 when the build is
+	// cancelled; any other end is a lost stream, which the sink absorbs.
+	cancelled := make(chan struct{})
+	logExited := make(chan struct{})
+	go func() {
+		defer close(logExited)
+		if err := logCmd.Wait(); err != nil {
+			if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 3 {
+				close(cancelled)
+			}
+		}
+	}()
 	defer func() {
-		if sink.broken() {
-			log.Printf("build %d: log stream lost; stored log is incomplete", j.ID)
+		select {
+		case <-cancelled:
+			log.Printf("build %d: cancelled", j.ID)
+		default:
+			if sink.broken() {
+				log.Printf("build %d: log stream lost; stored log is incomplete", j.ID)
+			}
 		}
 		pipe.Close()
-		logCmd.Wait()
+		<-logExited
 	}()
 
 	gitSSH := strings.TrimSpace("ssh " + strings.Join(r.sshOpts, " "))
@@ -227,6 +244,10 @@ func (r *runner) run(j job) bool {
 				fmt.Fprintf(sink, "step failed: %v\n", err)
 				return false
 			}
+		case <-cancelled:
+			cmd.Process.Kill()
+			<-done
+			return false
 		case <-time.After(time.Until(deadline)):
 			cmd.Process.Kill()
 			fmt.Fprintf(sink, "build timed out after %s\n", r.timeout)
