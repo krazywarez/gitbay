@@ -32,6 +32,7 @@ func newRoot() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.SetHelpCommand(helpCmd(root))
 
 	root.AddCommand(
 		authCmd(),
@@ -575,4 +576,30 @@ func manCmd(root *cobra.Command) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&dir, "dir", "man", "output directory")
 	return cmd
+}
+
+// helpCmd is `gitbay help`. Bare, it is cobra's tree of local commands.
+// With anything after it — a prefix such as `mr`, or --json — it is the
+// server's help: the registry is the only place flags are written down,
+// and its JSON is the contract. Cobra's built-in help used to swallow
+// both forms, so `gitbay help --json` failed on an unknown flag.
+func helpCmd(root *cobra.Command) *cobra.Command {
+	return &cobra.Command{
+		Use:                "help [<prefix>...] [--json]",
+		Short:              "this list, or the server's command reference for a prefix",
+		Annotations:        map[string]string{serverPath: "help", stdinMode: "none"},
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return root.Help()
+			}
+			t, err := resolveTarget()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "gitbay:", err)
+				os.Exit(protocol.ExitFailure)
+			}
+			os.Exit(runSSH(t, append([]string{"help"}, args...), strings.NewReader("")))
+			return nil
+		},
+	}
 }
