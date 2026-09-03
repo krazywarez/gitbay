@@ -26,7 +26,7 @@ func ListTree(dir, ref, path string) ([]TreeEntry, error) {
 	if path != "" {
 		spec = ref + ":" + path
 	}
-	cmd := exec.Command("git", "-C", dir, "ls-tree", "-l", spec)
+	cmd := exec.Command("git", "-C", dir, "ls-tree", "-l", "--end-of-options", spec)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("ls-tree %s: %w", spec, err)
@@ -56,7 +56,7 @@ func ListTree(dir, ref, path string) ([]TreeEntry, error) {
 
 // ReadBlob returns the contents of ref:path, capped at limit bytes.
 func ReadBlob(dir, ref, path string, limit int64) ([]byte, error) {
-	cmd := exec.Command("git", "-C", dir, "cat-file", "blob", ref+":"+path)
+	cmd := exec.Command("git", "-C", dir, "cat-file", "blob", "--end-of-options", ref+":"+path)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func ReadBlob(dir, ref, path string, limit int64) ([]byte, error) {
 
 // ResolveRef resolves a ref or sha to a full commit sha; errors if absent.
 func ResolveRef(dir, ref string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	cmd := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("unknown ref %q", ref)
@@ -118,7 +118,7 @@ var ErrArchiveTooLarge = errors.New("archive exceeds the size limit")
 func Archive(dir, ref, prefix string, w io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), archiveTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", ref)
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", "--end-of-options", ref)
 	lw := &cappedWriter{w: w, left: MaxArchiveBytes, stop: cancel}
 	cmd.Stdout = lw
 	err := cmd.Run()

@@ -10,7 +10,7 @@ import (
 // CountCommits returns the number of commits reachable from ref, or 0 when
 // the ref does not resolve (an empty repository).
 func CountCommits(dir, ref string) int {
-	out, err := exec.Command("git", "-C", dir, "rev-list", "--count", ref).Output()
+	out, err := exec.Command("git", "-C", dir, "rev-list", "--count", "--end-of-options", ref).Output()
 	if err != nil {
 		return 0
 	}
@@ -31,7 +31,7 @@ type Contributor struct {
 // say — a bare repo resolves that from HEAD:.mailmap with no config.
 func Contributors(dir, ref string) []Contributor {
 	out, err := exec.Command("git", "-C", dir, "log",
-		"--use-mailmap", "--format=%aN%x01%aE", ref).Output()
+		"--use-mailmap", "--format=%aN%x01%aE", "--end-of-options", ref).Output()
 	if err != nil {
 		return nil
 	}
@@ -62,7 +62,7 @@ func Contributors(dir, ref string) []Contributor {
 // largest first, keyed by the extension map the caller supplies. Only
 // blobs count; git's own metadata does not.
 func Languages(dir, ref string, lang func(path string) string) []Language {
-	out, err := exec.Command("git", "-C", dir, "ls-tree", "-r", "-l", "--full-name", ref).Output()
+	out, err := exec.Command("git", "-C", dir, "ls-tree", "-r", "-l", "--full-name", "--end-of-options", ref).Output()
 	if err != nil {
 		return nil
 	}

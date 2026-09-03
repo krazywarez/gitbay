@@ -87,7 +87,7 @@ func ZeroSHA(s string) bool {
 
 // RevList returns up to limit commit SHAs reachable from ref, newest first.
 func RevList(dir, ref string, limit int) ([]string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-list", fmt.Sprintf("--max-count=%d", limit), ref)
+	cmd := exec.Command("git", "-C", dir, "rev-list", fmt.Sprintf("--max-count=%d", limit), "--end-of-options", ref)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list %s: %w", ref, err)
@@ -106,7 +106,7 @@ func RevList(dir, ref string, limit int) ([]string, error) {
 // read as an option or ref.
 func RevListPath(dir, ref, filePath string, limit int) ([]string, error) {
 	cmd := exec.Command("git", "-C", dir, "rev-list",
-		fmt.Sprintf("--max-count=%d", limit), ref, "--", filePath)
+		fmt.Sprintf("--max-count=%d", limit), "--end-of-options", ref, "--", filePath)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list %s -- %s: %w", ref, filePath, err)
@@ -123,7 +123,7 @@ func RevListPath(dir, ref, filePath string, limit int) ([]string, error) {
 // PeelToCommit resolves a ref or object to its commit — annotated tags
 // peel to the commit they point at.
 func PeelToCommit(dir, ref string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", ref+"^{commit}").Output()
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}").Output()
 	if err != nil {
 		return "", fmt.Errorf("rev-parse %s^{commit}: %w", ref, err)
 	}
@@ -132,7 +132,7 @@ func PeelToCommit(dir, ref string) (string, error) {
 
 // ReadCommit returns the raw commit object bytes.
 func ReadCommit(dir, sha string) ([]byte, error) {
-	cmd := exec.Command("git", "-C", dir, "cat-file", "commit", sha)
+	cmd := exec.Command("git", "-C", dir, "cat-file", "commit", "--end-of-options", sha)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("cat-file commit %s: %w", sha, err)

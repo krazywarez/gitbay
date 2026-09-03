@@ -45,7 +45,7 @@ func LastCommits(dir, ref, path string, names []string) map[string]EntryCommit {
 	}
 
 	args := []string{"-C", dir, "log", "--first-parent", "--name-only",
-		"--format=%x1e%H%x1f%ct%x1f%an%x1f%ae%x1f%s", "-n", strconv.Itoa(lastCommitScan), ref}
+		"--format=%x1e%H%x1f%ct%x1f%an%x1f%ae%x1f%s", "-n", strconv.Itoa(lastCommitScan), "--end-of-options", ref}
 	if prefix != "" {
 		args = append(args, "--", strings.TrimSuffix(prefix, "/"))
 	}
@@ -108,7 +108,7 @@ func parseCommitHeader(s string) EntryCommit {
 // answers "who touched this repository last".
 func TipCommit(dir, ref string) EntryCommit {
 	out, err := exec.Command("git", "-C", dir, "log", "-1",
-		"--format=%H%x1f%ct%x1f%an%x1f%ae%x1f%s", ref).Output()
+		"--format=%H%x1f%ct%x1f%an%x1f%ae%x1f%s", "--end-of-options", ref).Output()
 	if err != nil {
 		return EntryCommit{}
 	}
@@ -137,7 +137,7 @@ func entryName(changed, prefix string) (string, bool) {
 // page can report the facts the file listing no longer carries: its size,
 // and whether it is executable or a symlink.
 func StatPath(dir, ref, path string) (TreeEntry, bool) {
-	out, err := exec.Command("git", "-C", dir, "ls-tree", "-l", ref, "--", path).Output()
+	out, err := exec.Command("git", "-C", dir, "ls-tree", "-l", "--end-of-options", ref, "--", path).Output()
 	if err != nil {
 		return TreeEntry{}, false
 	}

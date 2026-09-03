@@ -23,8 +23,13 @@ type BlameHunk struct {
 // Blame attributes lines start..end (1-based, inclusive) of path at ref,
 // merging consecutive same-commit lines into hunks.
 func Blame(dir, ref, path string, start, end int) ([]BlameHunk, error) {
+	// blame has no --end-of-options; a resolved sha cannot be an option.
+	sha, err := ResolveRef(dir, ref)
+	if err != nil {
+		return nil, err
+	}
 	cmd := exec.Command("git", "-C", dir, "blame", "--porcelain",
-		fmt.Sprintf("-L%d,%d", start, end), ref, "--", path)
+		fmt.Sprintf("-L%d,%d", start, end), sha, "--", path)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git blame %s at %s: %w", path, ref, err)
