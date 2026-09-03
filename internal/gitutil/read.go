@@ -2,11 +2,14 @@ package gitutil
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type TreeEntry struct {
@@ -101,11 +104,50 @@ func Refs(dir, kind string) ([]Ref, error) {
 	return refs, nil
 }
 
-// Archive streams a tar.gz of ref to w.
+// Bounds on one archive: a request cannot hold git and a goroutine for
+// longer than this, or stream more than this, however large the
+// repository or however slowly the client reads (#124).
+const archiveTimeout = 2 * time.Minute
+
+var MaxArchiveBytes int64 = 512 << 20
+
+var ErrArchiveTooLarge = errors.New("archive exceeds the size limit")
+
+// Archive streams a tar.gz of ref to w, within archiveTimeout and
+// MaxArchiveBytes. Past either, git is killed and the error says which.
 func Archive(dir, ref, prefix string, w io.Writer) error {
-	cmd := exec.Command("git", "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", ref)
-	cmd.Stdout = w
-	return cmd.Run()
+	ctx, cancel := context.WithTimeout(context.Background(), archiveTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", ref)
+	lw := &cappedWriter{w: w, left: MaxArchiveBytes, stop: cancel}
+	cmd.Stdout = lw
+	err := cmd.Run()
+	switch {
+	case lw.exceeded:
+		return ErrArchiveTooLarge
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		return fmt.Errorf("git archive: timed out after %s", archiveTimeout)
+	}
+	return err
+}
+
+// cappedWriter passes bytes through until the cap, then stops the
+// producer instead of writing a truncated tail.
+type cappedWriter struct {
+	w        io.Writer
+	left     int64
+	stop     func()
+	exceeded bool
+}
+
+func (c *cappedWriter) Write(p []byte) (int, error) {
+	if int64(len(p)) > c.left {
+		c.exceeded = true
+		c.stop()
+		return 0, ErrArchiveTooLarge
+	}
+	c.left -= int64(len(p))
+	return c.w.Write(p)
 }
 
 // ShowPatch returns the stat+patch text for one commit.
