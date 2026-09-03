@@ -7,7 +7,7 @@
     <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
     <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
   </nav>
-  {{if .Label}}<p class="meta">label: <span class="chip label" style="{{index .LabelColors .Label}}">{{.Label}}</span> <a href="?state={{.State}}">clear</a></p>{{end}}
+  {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
   <span class="spacer"></span>
   <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
 </div>

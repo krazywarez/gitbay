@@ -21,7 +21,7 @@ func init() {
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
 		Summary: "list issues",
-		Usage:   "issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
+		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
 		Summary: "show an issue with comments",
 		Usage:   "issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
@@ -198,31 +198,44 @@ func runIssueList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	state := "open"
+	const usage = "usage: issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
+	f := store.IssueFilter{State: "open"}
 	var path string
 	for i := 0; i < len(args); i++ {
+		var target *string
 		switch args[i] {
 		case "--state":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--state requires open|closed|all")
-			}
-			state = args[i+1]
-			i++
+			target = &f.State
+		case "--label":
+			target = &f.Label
+		case "--assignee":
+			target = &f.Assignee
+		case "--author":
+			target = &f.Author
+		case "--milestone":
+			target = &f.Milestone
 		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
+			if path != "" || strings.HasPrefix(args[i], "--") {
+				return c.fail(protocol.ExitUsage, "unexpected argument %q\n%s", args[i], usage)
 			}
 			path = args[i]
+			continue
 		}
+		if i+1 >= len(args) {
+			return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
+		}
+		*target = args[i+1]
+		i++
 	}
-	if path == "" || (state != "open" && state != "closed" && state != "all") {
-		return c.fail(protocol.ExitUsage, "usage: issue list <owner/name> [--state open|closed|all] [--limit <n>] [--cursor <c>]")
+	if path == "" || (f.State != "open" && f.State != "closed" && f.State != "all") {
+		return c.fail(protocol.ExitUsage, usage)
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
-	issues, err := c.Store.ListIssues(repo.ID, state, p.queryLimit(), p.keyInt())
+	f.Limit, f.Before = p.queryLimit(), p.keyInt()
+	issues, err := c.Store.QueryIssues(repo.ID, f)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

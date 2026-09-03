@@ -1487,7 +1487,12 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	if state != "closed" && state != "all" {
 		state = "open"
 	}
-	issues, err := s.st.ListIssues(p.Repo.ID, state, 0, 0)
+	// The same filters the CLI's issue list takes, as query parameters;
+	// label chips and author links point here.
+	qv := r.URL.Query()
+	f := store.IssueFilter{State: state, Label: qv.Get("label"), Assignee: qv.Get("assignee"),
+		Author: qv.Get("author"), Milestone: qv.Get("milestone")}
+	issues, err := s.st.QueryIssues(p.Repo.ID, f)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -1497,27 +1502,15 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 			issues[i].Labels = labels[issues[i].ID]
 		}
 	}
-	// ?label=x narrows to issues carrying that label (chips link here).
-	labelFilter := r.URL.Query().Get("label")
-	if labelFilter != "" {
-		var kept []store.Issue
-		for _, iss := range issues {
-			for _, l := range iss.Labels {
-				if l == labelFilter {
-					kept = append(kept, iss)
-					break
-				}
-			}
-		}
-		issues = kept
-	}
 	s.render(w, "issues.html", struct {
 		repoPage
 		State       string
 		Label       string
+		Filters     []listFilter
 		Issues      []store.Issue
 		LabelColors map[string]template.CSS
-	}{p, state, labelFilter, issues, s.labelColors(p.Repo.ID)})
+	}{p, state, f.Label, activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
+		issues, s.labelColors(p.Repo.ID)})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
@@ -1602,16 +1595,19 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	if !valid[state] {
 		state = "open"
 	}
-	mrs, err := s.st.ListMRs(p.Repo.ID, state, 0, 0)
+	qv := r.URL.Query()
+	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone")}
+	mrs, err := s.st.QueryMRs(p.Repo.ID, mf)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	s.render(w, "mrs.html", struct {
 		repoPage
-		State string
-		MRs   []store.MR
-	}{p, state, mrs})
+		State   string
+		Filters []listFilter
+		MRs     []store.MR
+	}{p, state, activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {

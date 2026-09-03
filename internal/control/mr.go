@@ -38,7 +38,7 @@ func init() {
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
-		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
 		Summary: "show a merge request",
 		Usage:   "mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
@@ -410,32 +410,41 @@ func runMRList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	state := "open"
+	const usage = "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
+	f := store.MRFilter{State: "open"}
 	var path string
 	for i := 0; i < len(args); i++ {
+		var target *string
 		switch args[i] {
 		case "--state":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--state requires a value")
-			}
-			state = args[i+1]
-			i++
+			target = &f.State
+		case "--author":
+			target = &f.Author
+		case "--milestone":
+			target = &f.Milestone
 		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
+			if path != "" || strings.HasPrefix(args[i], "--") {
+				return c.fail(protocol.ExitUsage, "unexpected argument %q\n%s", args[i], usage)
 			}
 			path = args[i]
+			continue
 		}
+		if i+1 >= len(args) {
+			return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
+		}
+		*target = args[i+1]
+		i++
 	}
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
-	if path == "" || !valid[state] {
-		return c.fail(protocol.ExitUsage, "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--limit <n>] [--cursor <c>]")
+	if path == "" || !valid[f.State] {
+		return c.fail(protocol.ExitUsage, usage)
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
-	mrs, err := c.Store.ListMRs(repo.ID, state, p.queryLimit(), p.keyInt())
+	f.Limit, f.Before = p.queryLimit(), p.keyInt()
+	mrs, err := c.Store.QueryMRs(repo.ID, f)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

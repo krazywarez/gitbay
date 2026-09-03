@@ -96,21 +96,49 @@ func (s *Store) MRByNumber(repoID, number int64) (MR, error) {
 // ListMRs returns merge requests for a repo. limit 0 means everything;
 // before (an MR number) starts the page strictly below it, matching the
 // number-descending order.
+// MRFilter narrows a listing. Empty strings match anything; State "all"
+// too. Milestone "none" selects merge requests with no milestone.
+type MRFilter struct {
+	State     string
+	Author    string
+	Milestone string
+	Limit     int
+	Before    int64
+}
+
 func (s *Store) ListMRs(repoID int64, state string, limit int, before int64) ([]MR, error) {
+	return s.QueryMRs(repoID, MRFilter{State: state, Limit: limit, Before: before})
+}
+
+// QueryMRs lists a repository's merge requests, newest first, narrowed
+// by f.
+func (s *Store) QueryMRs(repoID int64, f MRFilter) ([]MR, error) {
 	q := mrSelect + " WHERE m.repo_id = ?"
 	args := []any{repoID}
-	if state != "all" {
+	if f.State != "" && f.State != "all" {
 		q += " AND m.state = ?"
-		args = append(args, state)
+		args = append(args, f.State)
 	}
-	if before > 0 {
+	if f.Author != "" {
+		q += " AND u.username = ?"
+		args = append(args, f.Author)
+	}
+	switch f.Milestone {
+	case "":
+	case "none":
+		q += " AND m.milestone_id IS NULL"
+	default:
+		q += " AND ms.title = ?"
+		args = append(args, f.Milestone)
+	}
+	if f.Before > 0 {
 		q += " AND m.number < ?"
-		args = append(args, before)
+		args = append(args, f.Before)
 	}
 	q += " ORDER BY m.number DESC"
-	if limit > 0 {
+	if f.Limit > 0 {
 		q += " LIMIT ?"
-		args = append(args, limit)
+		args = append(args, f.Limit)
 	}
 	rows, err := s.DB.Query(q, args...)
 	if err != nil {

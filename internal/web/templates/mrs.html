@@ -8,6 +8,7 @@
     <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
     <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
   </nav>
+  {{range .Filters}}<p class="meta">{{.Key}}: <b>{{.Value}}</b> <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
 {{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
 <ul class="issuelist">

@@ -100,25 +100,64 @@ func (s *Store) issueStrings(issueID int64, query string) ([]string, error) {
 // ListIssues returns issues for a repo; state is "open", "closed", or
 // "all". limit 0 means everything; before (an issue number) starts the
 // page strictly below it, matching the number-descending order.
+// IssueFilter narrows a listing. Empty strings match anything; State
+// "all" too. Milestone "none" selects issues with no milestone.
+type IssueFilter struct {
+	State     string
+	Label     string
+	Assignee  string
+	Author    string
+	Milestone string
+	Limit     int
+	Before    int64
+}
+
 func (s *Store) ListIssues(repoID int64, state string, limit int, before int64) ([]Issue, error) {
+	return s.QueryIssues(repoID, IssueFilter{State: state, Limit: limit, Before: before})
+}
+
+// QueryIssues lists a repository's issues, newest first, narrowed by f.
+func (s *Store) QueryIssues(repoID int64, f IssueFilter) ([]Issue, error) {
 	q := `SELECT i.id, i.repo_id, i.number, u.username, i.title, i.body, i.body_format, i.state,
 	             COALESCE(m.title, ''), i.created_at, i.updated_at
 	      FROM issues i JOIN users u ON u.id = i.author_id
 	      LEFT JOIN milestones m ON m.id = i.milestone_id
 	      WHERE i.repo_id = ?`
 	args := []any{repoID}
-	if state != "all" {
+	if f.State != "" && f.State != "all" {
 		q += " AND i.state = ?"
-		args = append(args, state)
+		args = append(args, f.State)
 	}
-	if before > 0 {
+	if f.Label != "" {
+		q += ` AND EXISTS (SELECT 1 FROM issue_labels il JOIN labels l ON l.id = il.label_id
+			WHERE il.issue_id = i.id AND l.name = ?)`
+		args = append(args, f.Label)
+	}
+	if f.Assignee != "" {
+		q += ` AND EXISTS (SELECT 1 FROM issue_assignees ia JOIN users au ON au.id = ia.user_id
+			WHERE ia.issue_id = i.id AND au.username = ?)`
+		args = append(args, f.Assignee)
+	}
+	if f.Author != "" {
+		q += " AND u.username = ?"
+		args = append(args, f.Author)
+	}
+	switch f.Milestone {
+	case "":
+	case "none":
+		q += " AND i.milestone_id IS NULL"
+	default:
+		q += " AND m.title = ?"
+		args = append(args, f.Milestone)
+	}
+	if f.Before > 0 {
 		q += " AND i.number < ?"
-		args = append(args, before)
+		args = append(args, f.Before)
 	}
 	q += " ORDER BY i.number DESC"
-	if limit > 0 {
+	if f.Limit > 0 {
 		q += " LIMIT ?"
-		args = append(args, limit)
+		args = append(args, f.Limit)
 	}
 	rows, err := s.DB.Query(q, args...)
 	if err != nil {
