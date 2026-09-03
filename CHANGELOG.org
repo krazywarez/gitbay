@@ -4,6 +4,46 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.7.0 — 2026-09-02
+
+What an open instance needs before it is open: a cap on what one
+account can take, a way out of a browser session you no longer hold,
+and accounts that never verified do not stay forever.
+
+- =limits.max_repos_per_user= caps the repositories an account owns
+  directly; =repo create=, =fork= and =import= refuse past it with the
+  numbers. =limits.max_bytes_per_user= caps their disk: a push may be no
+  larger than what the owner has left, riding the same
+  =receive.maxInputSize= as the pack cap, and is refused outright when
+  nothing is left. Organizations are not capped. Migration 0031 adds
+  per-account overrides, set with =admin user limits <name> [--repos
+  n|default] [--bytes n|default]= and shown by =admin user show=. Both
+  default to 0, unlimited, so nothing changes until set. #82
+- =registration.pending_expiry=, a duration, removes self-registered
+  accounts still unverified after that long, hourly and once at start,
+  audited as =pending.expired=. Empty keeps them, as before. #82
+- =web sessions list= shows each unexpired browser session by a short id
+  with its creation and expiry; =web sessions revoke <id>= ends one and
+  =--all= ends every one. SSH-only, matching the token commands, and
+  scoped to the caller. #83
+- A step runs in its own process group and a cancel or timeout kills the
+  group. On a host whose =/bin/sh= is dash, killing the shell alone left
+  its child holding the log pipe, so a cancelled build held the runner
+  until the child finished on its own, minutes for a test suite. The
+  wait after a kill is capped at ten seconds besides.
+- A commit with a build still queued or running is not queued again
+  when a fast-forward lands it; the v1.6.0 skip counted only a finished
+  success. #90
+
+- =golang.org/x/crypto= v0.56.0: GO-2026-6354 and GO-2026-6355 in its
+  =ssh= package, both reached through =ssh.NewServerConn= in the
+  embedded SSH server; one is a denial of service on a deadlocked
+  undecided channel.
+
+Replace both binaries and restart: =make deploy= for the daemon
+(migration 0031 adds two columns to =users= on start), then
+=make deploy-runner= for the process-group kill.
+
 * v1.6.1 — 2026-09-02
 
 A cancel reaches a build in its clone.
