@@ -53,9 +53,11 @@ gitbay auth keys add --scope git < ~/.ssh/ci_key.pub   # key on stdin
 gitbay auth keys remove SHA256:...
 #+end_src
 
-Scopes: =full= (default; git plus every control command) or =git= (git
-transport only — right for CI and automation keys, which then cannot
-touch issues, settings, or your account).
+Scopes: =full= (default; git plus every control command), =git= (git
+transport only — right for automation keys, which then cannot touch
+issues, settings, or your account), or =runner= (the CI runner's
+protocol plus read-only git, for the key a =gitbay-runner= host holds;
+see [[Admin]]).
 
 A key belongs to exactly one account instance-wide. Registering a key
 someone else already holds is refused without telling you whose it is.
@@ -467,5 +469,8 @@ gitbay init [name] [--private]   # git init + repo create + origin, in one step
 
 Configuration lives at =~/.config/gitbay/config.toml=. The CLI shells
 out to your real =ssh=, so =~/.ssh/config=, the agent, and hardware keys
-all apply. Man pages: =gitbay man --dir <dir>=; completions:
+all apply. It shares one connection per instance through a control
+socket under =~/.ssh=: the first command in five minutes pays the
+handshake and the rest ride it. =no_multiplex = true= on an instance in
+the config turns that off. Man pages: =gitbay man --dir <dir>=; completions:
 =gitbay completion bash|zsh|fish=.
