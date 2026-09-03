@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // TestEveryCommandReachableFromBareSSH asserts that each registered command's
@@ -161,5 +162,34 @@ func TestHelpListsEveryCommandSorted(t *testing.T) {
 	}
 	if !slices.IsSortedFunc(env.Data, func(a, b helpEntry) int { return strings.Compare(a.Path, b.Path) }) {
 		t.Error("help output is not sorted by path")
+	}
+}
+
+// TestStdinCommandsReadStdin: a command whose usage says its input arrives
+// on stdin must set ReadsStdin, or Dispatch hands it an empty reader and
+// --file - silently stores nothing (#127).
+func TestStdinCommandsReadStdin(t *testing.T) {
+	for _, cmd := range Commands() {
+		u := cmd.Usage
+		wants := strings.Contains(u, "--file -") || strings.Contains(u, "< ") ||
+			strings.Contains(u, "stdin") || strings.Contains(u, "--key -")
+		if wants && !cmd.ReadsStdin {
+			t.Errorf("%s: usage %q reads stdin but ReadsStdin is not set", strings.Join(cmd.Path, " "), u)
+		}
+	}
+}
+
+// TestAdminNounGatedInDispatch: every admin command is refused for a
+// non-admin by the dispatcher itself, before any handler runs.
+func TestAdminNounGatedInDispatch(t *testing.T) {
+	for _, cmd := range Commands() {
+		if cmd.Path[0] != "admin" {
+			continue
+		}
+		var out, errOut bytes.Buffer
+		c := &Ctx{User: store.User{Username: "nobody"}, Scope: "full", Stdout: &out, Stderr: &errOut}
+		if code := Dispatch(c, cmd.Path); code != protocol.ExitDenied {
+			t.Errorf("%s: non-admin got exit %d, want %d", strings.Join(cmd.Path, " "), code, protocol.ExitDenied)
+		}
 	}
 }

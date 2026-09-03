@@ -99,6 +99,11 @@ func Dispatch(c *Ctx, argv []string) int {
 	if c.User.Disabled {
 		return c.fail(protocol.ExitDenied, "this account is disabled")
 	}
+	// The admin noun is gated here as well as in each handler, so a new
+	// admin command that forgets requireInstanceAdmin is still refused.
+	if cmd.Path[0] == "admin" && !c.User.IsAdmin {
+		return c.fail(protocol.ExitDenied, "admin commands are for instance admins")
+	}
 	if c.User.Pending && !pendingAllowed(cmd.Path) {
 		return c.fail(protocol.ExitDenied,
 			"your account is not active yet: verify your email first (email verify <code>, or ask for the mail again with email add)")
