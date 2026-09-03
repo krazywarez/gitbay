@@ -2,9 +2,12 @@ package httpd
 
 import (
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"strings"
+
+	"gitbay.org/gitbay/internal/web"
 )
 
 // Route is one entry in the explicit route table. The view-only guarantee is
@@ -41,11 +44,15 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/healthz", Handler: s.healthz},
 		Route{Method: "GET", Pattern: "/privacy", Handler: s.privacy},
 		Route{Method: "GET", Pattern: "/static/style.css", Handler: s.stylesheet},
-		// Literal per-file routes: a {name} wildcard is ambiguous against
-		// /{owner}/{repo}/... patterns in ServeMux precedence.
-		Route{Method: "GET", Pattern: "/static/fonts/plex-sans.woff2", Handler: s.font},
-		Route{Method: "GET", Pattern: "/static/fonts/plex-mono-400.woff2", Handler: s.font},
-		Route{Method: "GET", Pattern: "/static/fonts/plex-mono-500.woff2", Handler: s.font},
+	)
+	// One literal route per embedded font file: a {name} wildcard is
+	// ambiguous against /{owner}/{repo}/... patterns in ServeMux precedence,
+	// and hand-typed names drifted from the files once (#102).
+	fonts, _ := fs.ReadDir(web.FontFS, "static/fonts")
+	for _, f := range fonts {
+		routes = append(routes, Route{Method: "GET", Pattern: "/static/fonts/" + f.Name(), Handler: s.font})
+	}
+	routes = append(routes,
 		Route{Method: "GET", Pattern: "/favicon.svg", Handler: s.favicon},
 		Route{Method: "GET", Pattern: "/{owner}", Handler: s.ownerPage},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}", Handler: s.repoHome},
