@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -37,10 +38,21 @@ type Server struct {
 	sshCfg      *ssh.ServerConfig
 	authLimiter *rateLimiter
 	sessions    sync.WaitGroup // accepted connections still being served
+	mu          sync.Mutex
+	conns       map[*conn]struct{}
+}
+
+// conn is one accepted connection and how many sessions it is running.
+// A CLI's shared connection sits idle between commands; on shutdown an
+// idle connection is closed at once and only a session mid-command is
+// waited for (#141).
+type conn struct {
+	net    net.Conn
+	active atomic.Int32
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
-	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute)}
+	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}}
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
@@ -116,6 +128,13 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Pe
 	}
 	fp := ssh.FingerprintSHA256(pub)
 	key, err := s.st.SSHKeyByFingerprint(fp)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		// The store, not the key, failed. Neither a failure against the
+		// limiter nor "unknown key": a busy database during a restart
+		// would otherwise lock every client out for a minute.
+		slog.Error("ssh auth: key lookup", "err", err)
+		return nil, fmt.Errorf("authentication temporarily unavailable")
+	}
 	if err != nil {
 		if s.cfg.Registration.Mode != "closed" {
 			return &ssh.Permissions{Extensions: map[string]string{
@@ -138,22 +157,38 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Pe
 // Serve accepts connections on ln until it is closed.
 func (s *Server) Serve(ln net.Listener) error {
 	for {
-		conn, err := ln.Accept()
+		nc, err := ln.Accept()
 		if err != nil {
 			return err
 		}
+		c := &conn{net: nc}
+		s.mu.Lock()
+		s.conns[c] = struct{}{}
+		s.mu.Unlock()
 		s.sessions.Add(1)
 		go func() {
 			defer s.sessions.Done()
-			s.handleConn(conn)
+			defer func() {
+				s.mu.Lock()
+				delete(s.conns, c)
+				s.mu.Unlock()
+			}()
+			s.handleConn(c)
 		}()
 	}
 }
 
-// Shutdown waits for every accepted connection to finish, or for ctx. The
-// caller closes the listener first; a push in flight completes rather
-// than being cut mid-pack.
+// Shutdown closes every idle connection, then waits for the ones with a
+// session running, or for ctx. The caller closes the listener first; a
+// push in flight completes rather than being cut mid-pack.
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	for c := range s.conns {
+		if c.active.Load() == 0 {
+			c.net.Close()
+		}
+	}
+	s.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
 		s.sessions.Wait()
@@ -167,9 +202,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 }
 
-func (s *Server) handleConn(conn net.Conn) {
-	defer conn.Close()
-	sconn, chans, reqs, err := ssh.NewServerConn(conn, s.sshCfg)
+func (s *Server) handleConn(c *conn) {
+	defer c.net.Close()
+	sconn, chans, reqs, err := ssh.NewServerConn(c.net, s.sshCfg)
 	if err != nil {
 		return
 	}
@@ -185,7 +220,11 @@ func (s *Server) handleConn(conn net.Conn) {
 		if err != nil {
 			continue
 		}
-		go s.handleSession(sconn, ch, chReqs)
+		c.active.Add(1)
+		go func() {
+			defer c.active.Add(-1)
+			s.handleSession(sconn, ch, chReqs)
+		}()
 	}
 }
 

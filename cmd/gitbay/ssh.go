@@ -126,6 +126,8 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 	if ee, ok := err.(*exec.ExitError); ok {
 		code := ee.ExitCode()
 		if code == 255 { // ssh-level failure (connection, auth, host key)
+			fmt.Fprintln(os.Stderr, "gitbay: ssh could not connect or authenticate; if this worked a moment ago,"+
+				" the instance may be rate-limiting authentication after a burst of connections: wait a minute and retry")
 			return protocol.ExitProtocol
 		}
 		return code
