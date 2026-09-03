@@ -4,6 +4,33 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.8.0 — 2026-09-03
+
+The tracker's lists narrow, labels have colours you set, and the CLI's
+help is the server's.
+
+- =issue list= takes =--label=, =--assignee=, =--author= and
+  =--milestone= (a title, or =none= for issues with no milestone);
+  =mr list= takes =--author= and =--milestone=. The store narrows in
+  SQL, and the web lists take the same names as query parameters and
+  show each active filter with a link that drops it and keeps the rest.
+  Both lists had taken =--state= and nothing else, so the web's
+  filtering could never match the CLI's. #84
+- =label list= shows a repository's labels with their colour and how
+  many issues carry each; =label set <label> [--color rrggbb|'']=
+  creates a label or sets its colour; =label remove= takes it off every
+  issue. The colour column had existed since labels did and nothing
+  wrote it. The hash is optional because over bare ssh a bare =#= starts
+  a comment for the tokenizer. =issue label --add= still creates a
+  colourless label on the fly. #85
+- =gitbay help= with a prefix or =--json= runs the server's help, the
+  only place flags are written down and whose JSON is the contract;
+  bare =gitbay help= is still the local tree. Cobra's built-in help had
+  owned the word, so =gitbay help --json= failed on an unknown flag. #86
+
+Replace the binary and restart, and reinstall the CLI for the help
+change. No migration.
+
 * v1.7.0 — 2026-09-02
 
 What an open instance needs before it is open: a cap on what one
