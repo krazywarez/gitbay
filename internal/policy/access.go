@@ -46,6 +46,9 @@ func ScopeAllowsGit(scope, repoPath string, write bool) bool {
 	switch scope {
 	case "full", "git":
 		return true
+	case "runner":
+		// A CI runner clones what it builds and pushes nothing.
+		return !write
 	}
 	return false
 }

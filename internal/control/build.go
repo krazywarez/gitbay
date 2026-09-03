@@ -53,9 +53,11 @@ func init() {
 		Summary: "list build secret names",
 		Usage:   "repo secret list <owner/name>", ReadOnly: true, Run: runSecretList})
 
-	// Runner commands: the claim/report loop for gitbay-runner. Admin-only —
-	// a runner executes arbitrary repo code, so handing out jobs is the
-	// instance operator's call.
+	// Runner commands: the claim/report loop for gitbay-runner. A runner
+	// executes arbitrary repo code, so handing out jobs is the instance
+	// operator's call: a key added with --scope runner, which the
+	// dispatcher confines to these three commands and read-only git, or
+	// an admin key, which a runner host should not hold (#92).
 	register(Command{Path: []string{"runner", "next"},
 		Summary: "claim the oldest pending build (runner protocol)",
 		Usage:   "runner next [<owner/name>...]", SSHOnly: true, Run: runRunnerNext})
@@ -307,8 +309,8 @@ func runSecretList(c *Ctx, args []string) int {
 }
 
 func requireRunner(c *Ctx) int {
-	if !c.User.IsAdmin {
-		return c.fail(protocol.ExitDenied, "runner commands are for instance-admin runner accounts")
+	if c.Scope != "runner" && !c.User.IsAdmin {
+		return c.fail(protocol.ExitDenied, "runner commands need a key added with --scope runner")
 	}
 	return -1
 }

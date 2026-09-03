@@ -29,7 +29,7 @@ func init() {
 	register(Command{
 		Path:       []string{"keys", "add"},
 		Summary:    "register an SSH public key (authorized_keys format)",
-		Usage:      "keys add [--scope full|git] < key.pub",
+		Usage:      "keys add [--scope full|git|runner] < key.pub",
 		ReadsStdin: true,
 		Run:        runKeysAdd,
 	})
@@ -91,12 +91,12 @@ func runKeysAdd(c *Ctx, args []string) int {
 			scope = args[i+1]
 			i++
 		default:
-			return c.fail(protocol.ExitUsage, "usage: keys add [--scope full|git] < key.pub")
+			return c.fail(protocol.ExitUsage, "usage: keys add [--scope full|git|runner] < key.pub")
 		}
 	}
-	if scope != "full" && scope != "git" {
+	if scope != "full" && scope != "git" && scope != "runner" {
 		// deploy:* scopes are granted via repo settings, not self-service.
-		return c.fail(protocol.ExitUsage, "scope must be full or git")
+		return c.fail(protocol.ExitUsage, "scope must be full, git or runner")
 	}
 	raw, err := io.ReadAll(io.LimitReader(c.Stdin, 64<<10))
 	if err != nil {

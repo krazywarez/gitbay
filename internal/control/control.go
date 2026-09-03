@@ -83,7 +83,9 @@ func Dispatch(c *Ctx, argv []string) int {
 	if !ok {
 		return c.fail(protocol.ExitUsage, "unknown command %q", argv[0])
 	}
-	if c.Scope != "full" {
+	// A runner-scoped key reaches the runner protocol and nothing else, so
+	// the key a CI host holds cannot administer the instance.
+	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {
 		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands", c.Scope)
 	}
 	if c.ViaAPI && cmd.SSHOnly {
