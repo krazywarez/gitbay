@@ -94,10 +94,10 @@ func runTeamCreate(c *Ctx, args []string) int {
 		return code
 	}
 	if err := policy.ValidateName(args[1]); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if _, err := c.Store.CreateTeam(org.ID, args[1]); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	return c.emit(map[string]string{"team": args[1]}, func(w io.Writer) {
 		fmt.Fprintf(w, "created team %s/%s\n", org.Name, args[1])

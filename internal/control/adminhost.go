@@ -87,7 +87,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, usage)
 	}
 	if err := policy.ValidateOwnerName(username); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	// Parse the key before creating anything, so a bad key leaves no
 	// half-made account behind.
@@ -103,7 +103,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	}
 	uid, err := c.Store.CreateUser(username, isAdmin)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if email != "" {
 		by := ""
@@ -111,14 +111,14 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 			by = "admin"
 		}
 		if err := c.Store.AddEmail(uid, email, by, true); err != nil {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 	}
 	fp := ""
 	if pub != nil {
 		fp = ssh.FingerprintSHA256(pub)
 		if err := c.Store.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full"); err != nil {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 	}
 	c.Store.Audit(c.User.ID, "admin user.created", map[string]any{"user": username})
@@ -201,7 +201,7 @@ func runAdminUserDelete(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "that is your own account")
 	}
 	if err := c.Store.DeleteUser(u.ID); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	c.Store.Audit(c.User.ID, "admin user.deleted", map[string]any{"user": u.Username})
 	return c.emit(map[string]string{"deleted": u.Username}, func(w io.Writer) {

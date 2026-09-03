@@ -74,7 +74,7 @@ func runDomainAdd(c *Ctx, args []string) int {
 	}
 	domain := strings.ToLower(args[1])
 	if err := validatePageDomain(c, domain); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {

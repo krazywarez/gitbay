@@ -170,7 +170,7 @@ func runRepoCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private]")
 	}
 	if err := policyValidateRepoName(name); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	ownerKind, ownerID := "user", c.User.ID
 	if owner != c.User.Username {
@@ -382,7 +382,7 @@ func runRepoTransfer(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", newOwner, repo.Name)
 	}
 	if err := c.Store.TransferRepo(repo.ID, newKind, newID); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if err := os.MkdirAll(filepath.Dir(newDir), 0o750); err != nil {
 		c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID)
@@ -554,7 +554,7 @@ func runSetWebsite(c *Ctx, args []string) int {
 	}
 	site := strings.TrimSpace(args[1])
 	if err := validateWebsite(site); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if len(site) > 256 {
 		return c.fail(protocol.ExitUsage, "website URL too long (max 256)")
@@ -710,7 +710,7 @@ func editTopics(c *Ctx, args []string, add bool) int {
 	if add {
 		for _, t := range topics {
 			if err := policy.ValidateTopic(t); err != nil {
-				return c.fail(protocol.ExitUsage, "%v", err)
+				return c.failErr(err)
 			}
 		}
 		have, err := c.Store.ListTopics(repo.ID)
@@ -757,7 +757,7 @@ func runRepoSearch(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: repo search <query>")
 	}
 	if err := validQuery(args[0]); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	q := strings.ToLower(args[0])
 
@@ -833,7 +833,7 @@ func runRepoGrep(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
 	}
 	if err := validQuery(query); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {

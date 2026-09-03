@@ -58,7 +58,7 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	scope := fmt.Sprintf("deploy:%d:%s", repo.ID, mode)
 	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

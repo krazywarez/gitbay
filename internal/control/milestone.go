@@ -78,7 +78,7 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 		return code
 	}
 	if _, err := c.Store.CreateMilestone(repo.ID, title, description, due); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	return c.emit(map[string]string{"milestone": title}, func(w io.Writer) {
 		fmt.Fprintf(w, "created milestone %q on %s\n", title, repo.Path())

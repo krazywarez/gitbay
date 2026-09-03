@@ -109,7 +109,7 @@ func runKeysAdd(c *Ctx, args []string) int {
 	fp := ssh.FingerprintSHA256(pub)
 	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "adding key: %v", err)
 	}

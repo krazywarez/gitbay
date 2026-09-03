@@ -63,7 +63,7 @@ func runWebhookAdd(c *Ctx, args []string) int {
 		return code
 	}
 	if err := webhook.ValidateURL(url, c.Cfg.Webhooks.AllowLocal); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	id, err := c.Store.AddWebhook(repo.ID, url, secret, events)
 	if err != nil {

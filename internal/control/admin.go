@@ -310,7 +310,7 @@ func setAdmin(c *Ctx, args []string, admin bool) int {
 	}
 	if err := c.Store.SetUserAdmin(u.ID, admin); err != nil {
 		if errors.Is(err, store.ErrLastAdmin) {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

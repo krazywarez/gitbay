@@ -45,12 +45,12 @@ func runPGPAdd(c *Ctx, args []string) int {
 	}
 	meta, err := sig.ParsePGPKey(raw)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	uids, _ := json.Marshal(meta.Emails)
 	if err := c.Store.AddPGPKey(c.User.ID, meta.Fingerprint, string(raw), string(uids), meta.ExpiresAt, meta.RevokedAt); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "adding key: %v", err)
 	}

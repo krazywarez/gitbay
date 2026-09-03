@@ -173,7 +173,7 @@ func repoJobs(c *Ctx, repo store.Repo) ([]ci.Job, string, int) {
 	}
 	jobs, err := ci.Parse(raw)
 	if err != nil {
-		return nil, "", c.fail(protocol.ExitUsage, "%v", err)
+		return nil, "", c.failErr(err)
 	}
 	return jobs, sha, -1
 }

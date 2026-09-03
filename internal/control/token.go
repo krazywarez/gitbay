@@ -66,7 +66,7 @@ func runTokenCreate(c *Ctx, args []string) int {
 	if ttl != "" {
 		d, err := parseTTL(ttl)
 		if err != nil {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 		t := time.Now().Add(d)
 		expires = &t
@@ -78,7 +78,7 @@ func runTokenCreate(c *Ctx, args []string) int {
 	// The gb_ prefix makes leaked tokens findable by secret scanners.
 	token := "gb_" + raw
 	if err := c.Store.CreateAPIToken(c.User.ID, name, store.HashToken(token), scope, expires); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	type out struct {
 		Name  string `json:"name"`

@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -12,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 )
 
 //go:embed migrations/*.sql
@@ -176,4 +177,15 @@ func (s *Store) migrateTo(target int) error {
 		cur = m.version - 1
 	}
 	return nil
+}
+
+// IsInternal reports whether err is the database or the I/O beneath it
+// failing, as opposed to a sentinel or a message about the caller's
+// input. Callers map it to a failure exit rather than a usage error.
+func IsInternal(err error) bool {
+	var sqlErr *sqlite.Error
+	var pathErr *fs.PathError
+	return errors.As(err, &sqlErr) || errors.As(err, &pathErr) ||
+		errors.Is(err, sql.ErrTxDone) || errors.Is(err, sql.ErrConnDone) ||
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

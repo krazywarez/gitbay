@@ -95,7 +95,7 @@ func runRepoFork(c *Ctx, args []string) int {
 		name = src.Name
 	}
 	if err := policy.ValidateName(name); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if code := checkRepoQuota(c); code >= 0 {
 		return code
@@ -266,7 +266,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -303,7 +303,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA, fmtName)
 	if err != nil {
@@ -751,7 +751,7 @@ func runMRComment(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -765,7 +765,7 @@ func runMRComment(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")

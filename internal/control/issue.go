@@ -162,7 +162,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -177,7 +177,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	n, err := c.Store.CreateIssue(repo.ID, c.User.ID, title, b, fmtName)
 	if err != nil {
@@ -326,7 +326,7 @@ func runIssueComment(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -340,7 +340,7 @@ func runIssueComment(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
@@ -424,13 +424,13 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body, f
 	if file != "" {
 		b, err := bodyFrom(c, "", file)
 		if err != nil {
-			return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+			return nil, nil, nil, nil, c.failErr(err)
 		}
 		bodyV, haveBody = b, true
 	}
 	fmtName, err := markupFormat(formatV)
 	if err != nil {
-		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+		return nil, nil, nil, nil, c.failErr(err)
 	}
 	if !haveTitle && !haveBody && fmtName == "" {
 		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "usage: %s edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]", kind)
@@ -506,7 +506,7 @@ func addRemoveFlags(args []string) (rest, adds, removes []string, err error) {
 func runIssueLabel(c *Ctx, args []string) int {
 	rest, adds, removes, err := addRemoveFlags(args)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if len(adds)+len(removes) == 0 {
 		return c.fail(protocol.ExitUsage, "usage: issue label <owner/name> <n> [--add <l>]... [--remove <l>]...")
@@ -543,7 +543,7 @@ func runIssueLabel(c *Ctx, args []string) int {
 func runIssueAssign(c *Ctx, args []string) int {
 	rest, adds, removes, err := addRemoveFlags(args)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if len(adds)+len(removes) == 0 {
 		return c.fail(protocol.ExitUsage, "usage: issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...")

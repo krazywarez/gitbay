@@ -5,6 +5,7 @@ package control
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -162,6 +163,22 @@ func (c *Ctx) emit(data any, plain func(w io.Writer)) int {
 	}
 	plain(c.Stdout)
 	return protocol.ExitOK
+}
+
+// failErr reports an error from a store or helper call with the exit code
+// its kind deserves: not-found is not-found, the database or I/O failing
+// is a failure, and anything else is the caller's mistake, which is what
+// most such errors are (a name that does not validate, a state that does
+// not allow the change). A SQLite I/O error used to be a usage error and
+// an HTTP 400 (#107).
+func (c *Ctx) failErr(err error) int {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return c.fail(protocol.ExitNotFound, "%v", err)
+	case store.IsInternal(err):
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.fail(protocol.ExitUsage, "%v", err)
 }
 
 func (c *Ctx) fail(code int, format string, args ...any) int {

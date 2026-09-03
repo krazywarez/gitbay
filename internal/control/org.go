@@ -63,7 +63,7 @@ func runOrgCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: org create <name>")
 	}
 	if err := policy.ValidateOwnerName(args[0]); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if _, err := c.Store.CreateOrg(args[0], c.User.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -138,7 +138,7 @@ func runOrgRename(c *Ctx, args []string) int {
 	}
 	newName := args[1]
 	if err := policy.ValidateOwnerName(newName); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	oldDir := filepath.Join(c.Cfg.Server.Root, "repos", org.Name)
 	newDir := filepath.Join(c.Cfg.Server.Root, "repos", newName)
@@ -146,7 +146,7 @@ func runOrgRename(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "repository directory %s already exists", newName)
 	}
 	if err := c.Store.RenameOrg(org.ID, newName); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	// Repo paths on disk derive from the owner name; move the tree. If the
 	// move fails, revert the database so name and disk stay consistent.
@@ -220,7 +220,7 @@ func runOrgMembersAdd(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if err := c.Store.SetOrgMember(org.ID, target.ID, role); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	return c.emit(map[string]string{"org": org.Name, "user": target.Username, "role": role}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s is now a %s of %s\n", target.Username, role, org.Name)
@@ -246,7 +246,7 @@ func runOrgMembersRemove(c *Ctx, args []string) int {
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "%s is not a member of %s", target.Username, org.Name)
 		}
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	return c.emit(map[string]string{"org": org.Name, "removed": target.Username}, func(w io.Writer) {
 		fmt.Fprintf(w, "removed %s from %s\n", target.Username, org.Name)

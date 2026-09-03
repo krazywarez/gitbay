@@ -110,7 +110,7 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -128,13 +128,13 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, notes, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if title == "" {
 		title = tag
 	}
 	if _, err := c.Store.CreateRelease(repo.ID, tag, title, body, c.User.ID, fmtName); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "release.created", fmt.Sprintf(`{"tag":%q}`, tag))
 	return c.emit(map[string]string{"tag": tag, "title": title}, func(w io.Writer) {
@@ -203,7 +203,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if path == "" || tag == "" || (!setTitle && !setNotes && fmtName == "") {
 		return c.fail(protocol.ExitUsage, usage)
@@ -228,7 +228,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 	body := rel.Notes
 	if setNotes {
 		if body, err = bodyFrom(c, notes, file); err != nil {
-			return c.fail(protocol.ExitUsage, "%v", err)
+			return c.failErr(err)
 		}
 	}
 	if fmtName == "" {
@@ -349,7 +349,7 @@ func runAssetAdd(c *Ctx, args []string) int {
 	}
 	sum := hex.EncodeToString(h.Sum(nil))
 	if err := c.Store.AddReleaseAsset(rel.ID, name, n, sum); err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if err := os.Rename(tmp.Name(), filepath.Join(dir, name)); err != nil {
 		c.Store.RemoveReleaseAsset(rel.ID, name)

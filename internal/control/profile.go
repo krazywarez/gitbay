@@ -345,7 +345,7 @@ func runProfileShow(c *Ctx, args []string) int {
 func runProfileSet(c *Ctx, args []string) int {
 	rest, e, err := parseProfileFlags(c, args)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if len(rest) != 0 {
 		return c.fail(protocol.ExitUsage,
@@ -360,7 +360,7 @@ func runProfileSet(c *Ctx, args []string) int {
 	}
 	p, err = applyProfile(p, e)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if err := c.Store.SetOwnerProfile("user", c.User.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -373,7 +373,7 @@ func runProfileSet(c *Ctx, args []string) int {
 func runOrgProfile(c *Ctx, args []string) int {
 	rest, e, err := parseProfileFlags(c, args)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if len(rest) != 1 {
 		return c.fail(protocol.ExitUsage,
@@ -393,7 +393,7 @@ func runOrgProfile(c *Ctx, args []string) int {
 	}
 	p, err = applyProfile(p, e)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if err := c.Store.SetOwnerProfile("org", org.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

@@ -3,7 +3,10 @@ package control
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"slices"
 	"strings"
 	"testing"
@@ -221,5 +224,26 @@ func TestRefusalsHonourJSON(t *testing.T) {
 		if err := json.Unmarshal(out.Bytes(), &env); err != nil || env.Error == "" {
 			t.Errorf("%s: no JSON envelope on stdout: %q (stderr %q)", tc.name, out.String(), errOut.String())
 		}
+	}
+}
+
+// TestFailErrExitCodes: not-found, an internal failure, and the caller's
+// mistake each get their own exit code (#107).
+func TestFailErrExitCodes(t *testing.T) {
+	code := func(err error) int {
+		c := &Ctx{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
+		return c.failErr(err)
+	}
+	if got := code(store.ErrNotFound); got != protocol.ExitNotFound {
+		t.Errorf("not found: %d", got)
+	}
+	if got := code(fmt.Errorf("looking up: %w", store.ErrNotFound)); got != protocol.ExitNotFound {
+		t.Errorf("wrapped not found: %d", got)
+	}
+	if got := code(errors.New("name must be lowercase")); got != protocol.ExitUsage {
+		t.Errorf("caller's mistake: %d", got)
+	}
+	if got := code(&fs.PathError{Op: "open", Path: "/x", Err: fs.ErrPermission}); got != protocol.ExitFailure {
+		t.Errorf("i/o failure: %d", got)
 	}
 }

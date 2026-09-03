@@ -81,7 +81,7 @@ func runDiffComment(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
@@ -116,7 +116,7 @@ func runDiffComment(c *Ctx, args []string) int {
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "%v", err)
 		}
-		return c.fail(protocol.ExitUsage, "%v", err)
+		return c.failErr(err)
 	}
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
