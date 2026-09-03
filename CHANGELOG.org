@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.8.1 — 2026-09-03
+
+Markdown and org files render when opened.
+
+- A =.md=, =.markdown= or =.org= file renders on its page the way a
+  README does on the directory page, through the same renderer with
+  relative links resolved against the file's directory. =source= in the
+  action bar, or =?view=source=, shows the text as before. Every other
+  file is unchanged. #88
+- The e2e harness waits for the HTTP and git listeners as well as SSH
+  before a test starts; a test whose first act was an HTTP request could
+  be refused, which failed two otherwise green runs. #91
+
+Replace the binary and restart. No migration.
+
 * v1.8.0 — 2026-09-03
 
 The tracker's lists narrow, labels have colours you set, and the CLI's
