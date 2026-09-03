@@ -44,7 +44,7 @@ func (s *Server) apiRead(w http.ResponseWriter, r *http.Request) {
 			joinArgv(cmd.Path)+" changes state; POST it to /api/v1/cmd")
 		return
 	}
-	if allowed, wait := s.apiLimit.allow(limitKey(r, user), false); !allowed {
+	if allowed, wait := s.apiLimit.allow(s.limitKey(r, user), false); !allowed {
 		tooManyRequests(w, wait)
 		return
 	}
@@ -82,7 +82,7 @@ func (s *Server) apiRead(w http.ResponseWriter, r *http.Request) {
 	// Responses are authorized per account, so the ETag is salted with the
 	// caller: two users asking the same question may get different answers,
 	// and neither should ever be served the other's.
-	sum := sha256.Sum256(append([]byte(limitKey(r, user)+"\x00"), payload...))
+	sum := sha256.Sum256(append([]byte(s.limitKey(r, user)+"\x00"), payload...))
 	etag := `"` + hex.EncodeToString(sum[:16]) + `"`
 
 	// private keeps this out of shared caches; no-cache requires a

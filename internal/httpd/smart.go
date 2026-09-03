@@ -9,6 +9,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,10 +24,12 @@ type Server struct {
 	cfg      config.Config
 	st       *store.Store
 	apiLimit *apiLimiter
+	proxies  []*net.IPNet // http.trusted_proxies, parsed once
 }
 
 func New(cfg config.Config, st *store.Store) *Server {
-	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate)}
+	proxies, _ := cfg.HTTP.TrustedProxyNets() // validated at config load
+	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate), proxies: proxies}
 }
 
 // receivePackRefusal exists only to fail legibly if a client POSTs without

@@ -55,7 +55,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 	if cmd, _, ok := control.Lookup(req.Argv); ok {
 		write = !cmd.ReadOnly
 	}
-	if allowed, wait := s.apiLimit.allow(limitKey(r, user), write); !allowed {
+	if allowed, wait := s.apiLimit.allow(s.limitKey(r, user), write); !allowed {
 		tooManyRequests(w, wait)
 		return
 	}
@@ -114,11 +114,11 @@ func statusForExit(code int) int {
 
 // limitKey buckets an authenticated caller by account, so rotating tokens
 // buys no extra budget, and everyone else by peer address.
-func limitKey(r *http.Request, user store.User) string {
+func (s *Server) limitKey(r *http.Request, user store.User) string {
 	if user.ID != 0 {
 		return "u" + strconv.FormatInt(user.ID, 10)
 	}
-	return "ip" + clientIP(r)
+	return "ip" + s.clientIP(r)
 }
 
 // apiAuth resolves the bearer token; failures are uniform 401s.

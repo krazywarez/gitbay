@@ -36,6 +36,15 @@ func (s *Store) CreateEmailToken(userID int64, address, tokenHash string, ttl ti
 	return err
 }
 
+// CountEmailTokensSince is how many verification codes an account has
+// asked for since a moment, used or not.
+func (s *Store) CountEmailTokensSince(userID int64, since time.Time) (int, error) {
+	var n int
+	err := s.DB.QueryRow("SELECT count(*) FROM email_tokens WHERE user_id = ? AND created_at > ?",
+		userID, fmtTime(since)).Scan(&n)
+	return n, err
+}
+
 // ConsumeEmailToken redeems a verification code for the given user.
 func (s *Store) ConsumeEmailToken(userID int64, tokenHash string) (string, error) {
 	res, err := s.DB.Exec(`

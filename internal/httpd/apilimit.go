@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -102,14 +103,42 @@ func minf(a, b float64) float64 {
 	return b
 }
 
-// clientIP is the peer address. No forwarded headers are trusted: nothing
-// in front of this process is required to set them, and honouring a
-// client-supplied header would let a caller pick their own bucket.
-func clientIP(r *http.Request) string {
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
+// clientIP is the address a request is attributed to. With no trusted
+// proxies configured it is the peer, and forwarded headers are ignored:
+// honouring a client-supplied header would let a caller pick their own
+// bucket. When the peer is a trusted proxy, it is the last
+// X-Forwarded-For hop that is not itself a trusted proxy, so a proxied
+// deployment does not collapse every anonymous caller into one bucket
+// (#136).
+func (s *Server) clientIP(r *http.Request) string {
+	peer := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(peer); err == nil {
+		peer = host
 	}
-	return r.RemoteAddr
+	if !s.trustedProxy(peer) {
+		return peer
+	}
+	hops := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		if hop != "" && !s.trustedProxy(hop) {
+			return hop
+		}
+	}
+	return peer
+}
+
+func (s *Server) trustedProxy(addr string) bool {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return false
+	}
+	for _, n := range s.proxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func tooManyRequests(w http.ResponseWriter, wait time.Duration) {

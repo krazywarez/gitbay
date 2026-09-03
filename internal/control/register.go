@@ -54,12 +54,21 @@ func sendVerification(cfg config.Config, st *store.Store, userID int64, address 
 	return mail.Send(cfg, address, "verify your email on "+siteHost(cfg), body)
 }
 
+const maxEmailAddsPerHour = 5
+
 func runEmailAdd(c *Ctx, args []string) int {
 	if len(args) != 1 || !strings.Contains(args[0], "@") {
 		return c.fail(protocol.ExitUsage, "usage: email add <address>")
 	}
 	if c.Cfg.Mail.SMTPHost == "" {
 		return c.fail(protocol.ExitFailure, "this instance has no SMTP configured; ask an admin to verify the address (gitbayd admin email verify)")
+	}
+	// An authenticated account is not a mail cannon: a handful of codes an
+	// hour is plenty for a person and nothing for a script (#136).
+	if n, err := c.Store.CountEmailTokensSince(c.User.ID, time.Now().Add(-time.Hour)); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	} else if n >= maxEmailAddsPerHour {
+		return c.fail(protocol.ExitDenied, "%d verification mails in the last hour; try again later", n)
 	}
 	if err := c.Store.AddEmail(c.User.ID, args[0], "", false); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

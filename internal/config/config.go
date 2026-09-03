@@ -62,6 +62,13 @@ type HTTP struct {
 	// port still works).
 	ACMEEmail    string `toml:"acme_email"`
 	ACMEHTTPAddr string `toml:"acme_http_addr"`
+	// TrustedProxies are the addresses or CIDRs of reverse proxies in front
+	// of this process. A request from one of them is attributed to the
+	// last X-Forwarded-For hop that is not itself a trusted proxy; from
+	// anyone else the peer address is the client and the header is
+	// ignored. Empty means no proxy, which is how gitbayd is deployed by
+	// default: it terminates TLS itself.
+	TrustedProxies []string `toml:"trusted_proxies,omitempty"`
 }
 
 type GitDaemon struct {
@@ -238,6 +245,9 @@ func (c Config) Validate() error {
 	if err := oneOf("http.tls", c.HTTP.TLS, "acme", "files", "off"); err != nil {
 		errs = append(errs, err)
 	}
+	if _, err := c.HTTP.TrustedProxyNets(); err != nil {
+		errs = append(errs, err)
+	}
 	if c.HTTP.TLS == "files" && (c.HTTP.CertFile == "" || c.HTTP.KeyFile == "") {
 		errs = append(errs, errors.New("http.tls = \"files\" requires cert_file and key_file"))
 	}
@@ -327,4 +337,26 @@ func (c Config) CheckHost() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// TrustedProxyNets parses http.trusted_proxies; a bare address is a /32
+// or /128.
+func (h HTTP) TrustedProxyNets() ([]*net.IPNet, error) {
+	var nets []*net.IPNet
+	for _, p := range h.TrustedProxies {
+		if _, n, err := net.ParseCIDR(p); err == nil {
+			nets = append(nets, n)
+			continue
+		}
+		ip := net.ParseIP(p)
+		if ip == nil {
+			return nil, fmt.Errorf("http.trusted_proxies: %q is not an address or CIDR", p)
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+	return nets, nil
 }
