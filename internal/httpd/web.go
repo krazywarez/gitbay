@@ -547,6 +547,18 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	if !binary && !image {
 		codeHTML = highlight(filePath, data)
 	}
+	// Markdown and org render like a README, with the source one click
+	// away; ?view=source shows the text instead.
+	renderable := false
+	switch path.Ext(strings.ToLower(filePath)) {
+	case ".md", ".markdown", ".org":
+		renderable = !binary
+	}
+	var renderedHTML template.HTML
+	rendered := renderable && r.URL.Query().Get("view") != "source"
+	if rendered {
+		renderedHTML = rewriteRelativeLinks(renderReadme(path.Base(filePath), data), p, path.Dir(filePath))
+	}
 	cs := crumbs(p, "blob", filePath)
 	base := ""
 	if len(cs) > 0 {
@@ -566,21 +578,24 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	entry, _ := gitutil.StatPath(p.Dir, p.Ref, filePath)
 	s.render(w, "blob.html", struct {
 		repoPage
-		Crumbs   []crumb
-		Base     string
-		Path     string
-		DirPath  string
-		RefKind  string
-		Binary   bool
-		Image    bool
-		Size     int
-		Lines    int
-		Exec     bool
-		Symlink  bool
-		Branches []gitutil.Ref
-		CodeHTML template.HTML
+		Crumbs       []crumb
+		Base         string
+		Path         string
+		DirPath      string
+		RefKind      string
+		Binary       bool
+		Image        bool
+		Size         int
+		Lines        int
+		Exec         bool
+		Symlink      bool
+		Branches     []gitutil.Ref
+		CodeHTML     template.HTML
+		Renderable   bool // markdown or org: the toggle is offered
+		Rendered     bool // this response shows the rendering
+		RenderedHTML template.HTML
 	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), lines,
-		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML})
+		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML, renderable, rendered, renderedHTML})
 }
 
 // releases lists tag-anchored releases with notes and assets.
