@@ -337,16 +337,23 @@ type crumb struct {
 	URL  string
 }
 
+// crumbs builds one crumb per path component. Every component but the
+// last is a directory and links to the tree; only the leaf is a page of
+// the given kind.
 func crumbs(p repoPage, kind, filePath string) []crumb {
 	var cs []crumb
-	base := "/" + p.Repo.Path() + "/" + kind + "/" + p.Ref + "/"
+	parts := strings.Split(strings.Trim(filePath, "/"), "/")
 	acc := ""
-	for _, part := range strings.Split(filePath, "/") {
+	for i, part := range parts {
 		if part == "" {
 			continue
 		}
 		acc = path.Join(acc, part)
-		cs = append(cs, crumb{Name: part, URL: base + acc})
+		k := "tree"
+		if i == len(parts)-1 {
+			k = kind
+		}
+		cs = append(cs, crumb{Name: part, URL: "/" + p.Repo.Path() + "/" + k + "/" + p.Ref + "/" + acc})
 	}
 	return cs
 }
