@@ -104,6 +104,36 @@ DENY=, =X-Content-Type-Options: nosniff=, =Referrer-Policy: no-referrer=,
 and =Strict-Transport-Security= when TLS is on. The UI needs no
 JavaScript, so =script-src 'none'= costs nothing.
 
+* The CI runner
+
+=gitbay-runner= is the one component that executes repository content.
+gitbayd never does: it reads =.gitbay/ci.yml= and queues a build, and a
+runner, polling over SSH, clones the commit and runs its steps.
+
+- *What the runner holds.* A key added with =keys add --scope runner=,
+  which the dispatcher confines to =runner next=, =runner log= and
+  =runner done= and to read-only git. A step that reads the key off the
+  disk gets exactly that: it cannot administer the instance, push, or
+  read a repository the runner's account cannot. An admin key still
+  works for the runner protocol so an operator can rotate at their own
+  pace; a runner host should not hold one.
+- *What a build sees.* The commit, the =GITBAY_*= variables and the
+  repository's secrets — unless the head came from another repository.
+  A merge request from a fork is built in the target as untrusted, with
+  no secrets, so a stranger's branch cannot read the target's deploy
+  credentials.
+- *Where it runs.* Steps run as the runner's own user on the runner
+  host, with no container; the systemd drop-in adds =NoNewPrivileges=,
+  =ProtectSystem=full= and the kernel and cgroup protections. =-repos=
+  limits a runner to named repositories, which is the control that
+  matters on an open instance: without it a runner builds whatever
+  anyone pushes.
+
+Anything a step can do as the runner's user, a pushed =ci.yml= can do.
+Treat the runner host as executing untrusted code: keep it off the
+daemon's host where the database lives, or scope it to repositories
+whose writers you trust.
+
 * Residual risks, accepted
 
 - External images in rendered READMEs and profile about text load from
@@ -116,3 +146,6 @@ JavaScript, so =script-src 'none'= costs nothing.
   harmless (see [[Admin]]).
 - A global signature-verification epoch over-invalidates the cache on any
   trust-input change. Correct, not a leak; a performance tradeoff.
+- Build steps run as the runner's user with no container. Isolation is
+  the key scope, the sandboxing drop-in and =-repos=; containers are
+  future work.

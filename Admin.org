@@ -75,6 +75,12 @@ validation still prints, followed by the contradiction.
 - =files=: =cert_file= + =key_file=.
 - =off=: plain HTTP — development, or behind a TLS-terminating proxy.
 
+=trusted_proxies= lists the addresses or CIDRs of reverse proxies in
+front of the daemon. A request from one of them is attributed, for API
+rate limiting, to the last =X-Forwarded-For= hop that is not itself a
+trusted proxy; from anyone else the header is ignored. Empty, the
+default, is right when gitbayd terminates TLS itself.
+
 ** [web]
 - =mode= — =view_only= (default) | =accounts=. In view_only the mutating
   web routes are never registered; in accounts, browser sessions are
@@ -302,23 +308,39 @@ startup to point at the current binary path.
 
 * CI runner
 
-=gitbay-runner= executes builds queued by pushes. It polls over SSH as
-an admin account (runner commands are admin-only: a runner executes
-arbitrary repo code), clones, runs the steps, streams the log back, and
-resolves the commit status. Run it as a dedicated unprivileged user:
+=gitbay-runner= executes builds queued by pushes and merge requests. It
+polls over SSH with a key added by =keys add --scope runner=, which
+reaches only the runner protocol and read-only git (a runner executes
+arbitrary repository code, so the key it holds must not do more), then
+clones, runs the steps, streams the log back and resolves the commit
+status. Run it as a dedicated unprivileged user on a non-admin account.
+=admin user create --key= registers a full-scope key, so the runner key
+is added afterwards through a bootstrap key that is then removed:
 
 #+begin_src sh
 useradd --system --create-home --home-dir /var/lib/gitbay-runner ci-runner
 sudo -u ci-runner ssh-keygen -t ed25519 -N "" -f /var/lib/gitbay-runner/.ssh/id_ed25519
-gitbayd --config /etc/gitbay/config.toml admin user create ci --admin \
-  --key /var/lib/gitbay-runner/.ssh/id_ed25519.pub
+ssh-keygen -t ed25519 -N "" -f /tmp/ci-bootstrap
+gitbayd --config /etc/gitbay/config.toml admin user create ci --key /tmp/ci-bootstrap.pub
+ssh -i /tmp/ci-bootstrap git@127.0.0.1 keys add --scope runner < /var/lib/gitbay-runner/.ssh/id_ed25519.pub
+ssh -i /tmp/ci-bootstrap git@127.0.0.1 keys remove "$(ssh-keygen -lf /tmp/ci-bootstrap.pub | awk '{print $2}')"
+rm /tmp/ci-bootstrap /tmp/ci-bootstrap.pub
 gitbay-runner -remote git@127.0.0.1 -workdir /var/lib/gitbay-runner/work
 #+end_src
+
+=admin runners= shows which account each runner polls as; an admin key
+still works for the protocol during a rotation. A merge request head
+from a fork is built in the target repository as untrusted: the claim
+carries no secrets. Same-repository heads were built by their branch
+push and are not built again.
 
 =make deploy-runner= also installs
 =deploy/gitbay-runner.override.conf= as a systemd drop-in: =Nice=10=,
 =CPUWeight=30=, =IOWeight=30=, so a build never starves the host's sshd,
-the daemon or the backup timers. The e2e suite alone starts sixty
+the daemon or the backup timers, and =NoNewPrivileges=,
+=ProtectSystem=full=, =ProtectKernelTunables=, =ProtectControlGroups=
+and =RestrictSUIDSGID=, so a step cannot reach outside its workspace
+and the runner's home. The e2e suite alone starts sixty
 daemon instances; without the drop-in a deploy's copy over the admin
 sshd stalled. Both deploy targets copy with =rsync --partial=, which
 resumes a stalled transfer.
