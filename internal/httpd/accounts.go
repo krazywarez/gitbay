@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -133,44 +133,17 @@ func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.Use
 }
 
 func (s *Server) newRepoSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	name := r.FormValue("name")
-	visibility := "public"
-	if r.FormValue("visibility") == "private" {
-		visibility = "private"
-	}
-	fail := func(msg string) { s.renderNewRepo(w, u, msg) }
-	if err := policy.ValidateName(name); err != nil {
-		fail(err.Error())
-		return
-	}
-	// Owner: yourself, or an org you admin — same rule as repo create.
 	owner := r.FormValue("owner")
-	ownerKind, ownerID := "user", u.ID
 	if owner == "" {
 		owner = u.Username
 	}
-	if owner != u.Username {
-		org, err := s.st.OrgByName(owner)
-		if err != nil {
-			fail("no such organization")
-			return
-		}
-		role, _ := s.st.OrgRole(org.ID, u.ID)
-		if role != "admin" {
-			fail("only admins of " + owner + " can create repositories there")
-			return
-		}
-		ownerKind, ownerID = "org", org.ID
+	name := r.FormValue("name")
+	argv := []string{"repo", "create", owner + "/" + name}
+	if r.FormValue("visibility") == "private" {
+		argv = append(argv, "--private")
 	}
-	id, err := s.st.CreateRepo(ownerKind, ownerID, name, visibility)
-	if err != nil {
-		fail(err.Error())
-		return
-	}
-	dir := control.RepoDir(s.cfg.Server.Root, owner, name)
-	if err := gitutil.InitBare(dir, "main", control.HooksDir(s.cfg.Server.Root)); err != nil {
-		s.st.DeleteRepo(id)
-		fail("initializing repository failed")
+	if _, msg, ok := s.runControl(u, argv); !ok {
+		s.renderNewRepo(w, u, msg)
 		return
 	}
 	http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)
@@ -288,155 +261,91 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 	}{p, body, tplName, templates})
 }
 
+// Issue and merge request writes run the command the CLI runs, so the
+// archived check, notifications, body format and the audit entry have one
+// implementation. Bodies travel on stdin, the way --file - does.
+
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
-	if !ok {
-		return
-	}
+	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	title := strings.TrimSpace(r.FormValue("title"))
-	if title == "" {
-		http.Error(w, "title required", http.StatusBadRequest)
+	code, data, msg := s.dispatchJSON(u, []string{"issue", "create", repoPath, "--title", title, "--file", "-"}, r.FormValue("body"))
+	if code != protocol.ExitOK {
+		http.Error(w, msg, statusForExit(code))
 		return
 	}
-	n, err := s.st.CreateIssue(repo.ID, u.ID, title, r.FormValue("body"), "md")
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	n := int64(data["number"].(float64))
+	// Labels need write access, matching the SSH rule; the command refuses
+	// otherwise and the issue stands without them.
+	if args := fieldArgs("--add", r.FormValue("labels")); len(args) > 0 {
+		s.runControl(u, append([]string{"issue", "label", repoPath, fmt.Sprint(n)}, args...))
 	}
-	s.st.RecordEvent(repo.ID, u.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, n))
-	// Labels need write access, matching the SSH rule; ignored otherwise.
-	if labels := strings.Fields(r.FormValue("labels")); len(labels) > 0 {
-		grant, _ := s.st.AccessRole(repo.ID, u.ID)
-		if policy.CanWrite(u, repo, grant) {
-			if iss, err := s.st.IssueByNumber(repo.ID, n); err == nil {
-				for _, l := range labels {
-					s.st.SetIssueLabel(repo.ID, iss.ID, l, true)
-				}
-			}
-		}
-	}
-	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repoPath, n), http.StatusSeeOther)
 }
 
 // issueEditSubmit edits title/body (author or write) and, with write
 // access, replaces the label set.
 func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
-	if !ok {
-		return
-	}
-	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
-	iss, err := s.st.IssueByNumber(repo.ID, n)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	grant, _ := s.st.AccessRole(repo.ID, u.ID)
-	canWrite := policy.CanWrite(u, repo, grant)
-	if iss.Author != u.Username && !canWrite {
-		http.Error(w, "only the author or users with write access can edit", http.StatusForbidden)
-		return
-	}
+	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
+	n := r.PathValue("n")
 	title := strings.TrimSpace(r.FormValue("title"))
-	if title == "" {
-		http.Error(w, "title required", http.StatusBadRequest)
+	code, _, msg := s.dispatchJSON(u, []string{"issue", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
+	if code != protocol.ExitOK {
+		http.Error(w, msg, statusForExit(code))
 		return
 	}
-	body := r.FormValue("body")
-	if err := s.st.UpdateIssueText(iss.ID, &title, &body, nil); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	var cur struct {
+		Labels []string `json:"labels"`
 	}
-	if canWrite {
+	if _, ok := s.runControlInto(u, []string{"issue", "show", repoPath, n}, &cur); ok {
 		want := strings.Fields(r.FormValue("labels"))
-		for _, l := range iss.Labels {
+		var args []string
+		for _, l := range cur.Labels {
 			if !slices.Contains(want, l) {
-				s.st.SetIssueLabel(repo.ID, iss.ID, l, false)
+				args = append(args, "--remove", l)
 			}
 		}
 		for _, l := range want {
-			s.st.SetIssueLabel(repo.ID, iss.ID, l, true)
+			if !slices.Contains(cur.Labels, l) {
+				args = append(args, "--add", l)
+			}
+		}
+		if len(args) > 0 {
+			s.runControl(u, append([]string{"issue", "label", repoPath, n}, args...))
 		}
 	}
-	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%s", repoPath, n), http.StatusSeeOther)
 }
 
 // mrEditSubmit edits an MR's title/body (author or write).
 func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
-	if !ok {
-		return
-	}
-	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
-	m, err := s.st.MRByNumber(repo.ID, n)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	grant, _ := s.st.AccessRole(repo.ID, u.ID)
-	if m.Author != u.Username && !policy.CanWrite(u, repo, grant) {
-		http.Error(w, "only the author or users with write access can edit", http.StatusForbidden)
-		return
-	}
+	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
+	n := r.PathValue("n")
 	title := strings.TrimSpace(r.FormValue("title"))
-	if title == "" {
-		http.Error(w, "title required", http.StatusBadRequest)
+	code, _, msg := s.dispatchJSON(u, []string{"mr", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
+	if code != protocol.ExitOK {
+		http.Error(w, msg, statusForExit(code))
 		return
 	}
-	body := r.FormValue("body")
-	if err := s.st.UpdateMRText(m.ID, &title, &body, nil); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", repo.Path(), n), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%s", repoPath, n), http.StatusSeeOther)
 }
 
 func (s *Server) issueCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
-	if !ok {
-		return
-	}
-	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
-	iss, err := s.st.IssueByNumber(repo.ID, n)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	body := strings.TrimSpace(r.FormValue("body"))
-	if body == "" {
-		http.Error(w, "empty comment", http.StatusBadRequest)
-		return
-	}
-	if err := s.st.AddIssueComment(iss.ID, u.ID, body, "md"); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	s.st.RecordEvent(repo.ID, u.ID, "issue.commented", fmt.Sprintf(`{"number":%d}`, n))
-	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repo.Path(), n), http.StatusSeeOther)
+	s.commentSubmit(w, r, u, "issue", "issues")
 }
 
 func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
-	if !ok {
+	s.commentSubmit(w, r, u, "mr", "mrs")
+}
+
+func (s *Server) commentSubmit(w http.ResponseWriter, r *http.Request, u store.User, noun, segment string) {
+	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
+	n := r.PathValue("n")
+	code, _, msg := s.dispatchJSON(u, []string{noun, "comment", repoPath, n, "--file", "-"}, strings.TrimSpace(r.FormValue("body")))
+	if code != protocol.ExitOK {
+		http.Error(w, msg, statusForExit(code))
 		return
 	}
-	n, _ := strconv.ParseInt(r.PathValue("n"), 10, 64)
-	m, err := s.st.MRByNumber(repo.ID, n)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	body := strings.TrimSpace(r.FormValue("body"))
-	if body == "" {
-		http.Error(w, "empty comment", http.StatusBadRequest)
-		return
-	}
-	if err := s.st.AddMRComment(m.ID, u.ID, body, "md"); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	s.st.RecordEvent(repo.ID, u.ID, "mr.commented", fmt.Sprintf(`{"number":%d}`, n))
-	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", repo.Path(), n), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/%s/%s", repoPath, segment, n), http.StatusSeeOther)
 }
 
 type editPage struct {

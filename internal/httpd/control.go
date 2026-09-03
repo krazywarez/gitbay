@@ -120,6 +120,14 @@ func (s *Server) dispatchInto(u store.User, argv []string, target any) (int, str
 // In JSON mode a failure is an envelope carrying the message rather than
 // stderr text, so both paths are read from the same envelope.
 func (s *Server) runControlJSON(u store.User, argv []string) (data map[string]any, msg string, ok bool) {
+	code, data, msg := s.dispatchJSON(u, argv, "")
+	return data, msg, code == protocol.ExitOK
+}
+
+// dispatchJSON runs a command in JSON mode with stdin, and returns its
+// exit code with the decoded data or the failure message. Handlers that
+// answer a form use the code to pick an HTTP status.
+func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code int, data map[string]any, msg string) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -127,13 +135,13 @@ func (s *Server) runControlJSON(u store.User, argv []string) (data map[string]an
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
-		Stdin:  strings.NewReader(""),
+		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,
 		JSON:   true,
 		ViaAPI: true,
 	}
-	code := control.Dispatch(ctx, argv)
+	code = control.Dispatch(ctx, argv)
 	var env struct {
 		Data  map[string]any `json:"data"`
 		Error string         `json:"error"`
@@ -147,9 +155,9 @@ func (s *Server) runControlJSON(u store.User, argv []string) (data map[string]an
 		if m == "" {
 			m = "the command failed"
 		}
-		return nil, m, false
+		return code, nil, m
 	}
-	return env.Data, "", true
+	return code, env.Data, ""
 }
 
 // authorNames maps commit author addresses to account names for one
