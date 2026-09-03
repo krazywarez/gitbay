@@ -10,9 +10,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -146,6 +148,11 @@ func serveCmd() *cobra.Command {
 			}
 			defer stopHookd()
 
+			// SIGTERM is how a deploy restarts the daemon: stop accepting,
+			// let what is in flight finish, exit 0 (#105).
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
 			// Outbound webhook deliveries. The retry base is overridable
 			// for tests via GITBAY_WEBHOOK_RETRY_BASE.
 			retryBase := 30 * time.Second
@@ -173,6 +180,8 @@ func serveCmd() *cobra.Command {
 			}, buildinfo.String()).Run(whCtx)
 
 			errCh := make(chan error, 3)
+			var sshSrv *sshd.Server
+			var sshLn, gitLn net.Listener
 			if cfg.SSH.Mode == "embedded" {
 				srv, err := sshd.New(cfg, st)
 				if err != nil {
@@ -183,6 +192,7 @@ func serveCmd() *cobra.Command {
 					return err
 				}
 				slog.Info("ssh listening", "addr", ln.Addr())
+				sshSrv, sshLn = srv, ln
 				go func() { errCh <- srv.Serve(ln) }()
 			} else {
 				// system mode: the host sshd owns the SSH port and invokes
@@ -191,7 +201,16 @@ func serveCmd() *cobra.Command {
 			}
 
 			web := httpd.New(cfg, st)
-			hs := &http.Server{Addr: cfg.HTTP.Addr, Handler: web.Handler()}
+			// Header and idle timeouts bound what an idle or slow client can
+			// hold open. No write timeout: archives and upload-pack stream
+			// for as long as they take (#104).
+			hs := &http.Server{
+				Addr:              cfg.HTTP.Addr,
+				Handler:           web.Handler(),
+				ReadHeaderTimeout: 10 * time.Second,
+				IdleTimeout:       2 * time.Minute,
+				MaxHeaderBytes:    64 << 10,
+			}
 			go func() {
 				slog.Info("http listening", "addr", cfg.HTTP.Addr, "tls", cfg.HTTP.TLS)
 				switch cfg.HTTP.TLS {
@@ -250,7 +269,9 @@ func serveCmd() *cobra.Command {
 						})
 						go func() {
 							slog.Info("acme http listening", "addr", addr)
-							if err := http.ListenAndServe(addr, m.HTTPHandler(redirect)); err != nil {
+							acmeHTTP := &http.Server{Addr: addr, Handler: m.HTTPHandler(redirect),
+								ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
+							if err := acmeHTTP.ListenAndServe(); err != nil {
 								slog.Warn("acme http listener failed; continuing with TLS-ALPN only", "err", err)
 							}
 						}()
@@ -266,10 +287,33 @@ func serveCmd() *cobra.Command {
 					return err
 				}
 				slog.Info("git-daemon listening", "addr", gln.Addr())
+				gitLn = gln
 				go func() { errCh <- gitd.New(cfg, st).Serve(gln) }()
 			}
 
-			return <-errCh
+			select {
+			case err := <-errCh:
+				return err
+			case <-ctx.Done():
+			}
+			slog.Info("shutting down")
+			stop()
+			for _, ln := range []net.Listener{sshLn, gitLn} {
+				if ln != nil {
+					ln.Close()
+				}
+			}
+			drain, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := hs.Shutdown(drain); err != nil {
+				slog.Warn("http shutdown", "err", err)
+			}
+			if sshSrv != nil {
+				if err := sshSrv.Shutdown(drain); err != nil {
+					slog.Warn("ssh shutdown", "err", err)
+				}
+			}
+			return nil
 		},
 	}
 }

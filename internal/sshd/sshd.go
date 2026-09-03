@@ -3,6 +3,7 @@
 package sshd
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -34,6 +36,7 @@ type Server struct {
 	st          *store.Store
 	sshCfg      *ssh.ServerConfig
 	authLimiter *rateLimiter
+	sessions    sync.WaitGroup // accepted connections still being served
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
@@ -139,7 +142,28 @@ func (s *Server) Serve(ln net.Listener) error {
 		if err != nil {
 			return err
 		}
-		go s.handleConn(conn)
+		s.sessions.Add(1)
+		go func() {
+			defer s.sessions.Done()
+			s.handleConn(conn)
+		}()
+	}
+}
+
+// Shutdown waits for every accepted connection to finish, or for ctx. The
+// caller closes the listener first; a push in flight completes rather
+// than being cut mid-pack.
+func (s *Server) Shutdown(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		s.sessions.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
