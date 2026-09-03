@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 type instance struct {
@@ -113,19 +112,13 @@ port = %d
 		inst.proc.Wait()
 	})
 
-	// Wait for the listener.
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", inst.port), 200*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return inst
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("gitbayd did not start listening")
-		}
-		time.Sleep(50 * time.Millisecond)
+	// Every listener, not just SSH: the HTTP and git ones come up in their
+	// own goroutines, and a test whose first act is an HTTP request used
+	// to race them and be refused.
+	for _, port := range []int{inst.port, inst.httpPort, inst.gitPort} {
+		waitForPort(t, port)
 	}
+	return inst
 }
 
 // admin runs a gitbayd admin command against the instance's database.
