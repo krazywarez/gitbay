@@ -21,11 +21,11 @@ func TestReapStaleBuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stuck, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`)
+	stuck, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := s.CreateBuild(1, "pages", "abc123", "main", `["true"]`)
+	fresh, err := s.CreateBuild(1, "pages", "abc123", "main", `["true"]`, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,11 +87,11 @@ func TestBuildsForCommitTiming(t *testing.T) {
 	}
 	// Two runs of the same job on one commit: the retry is what counts.
 	for range 2 {
-		if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`); err != nil {
+		if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`, true); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.CreateBuild(repoID, "lint", "def456", "main", `["true"]`); err != nil {
+	if _, err := s.CreateBuild(repoID, "lint", "def456", "main", `["true"]`, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(`UPDATE builds SET started_at = '2026-08-28T04:42:54Z',
@@ -140,10 +140,10 @@ func TestClaimBuildScopedToRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Queued first, so an unscoped claim would take it.
-	if _, err := s.CreateBuild(theirs, "evil", "abc123", "main", `["true"]`); err != nil {
+	if _, err := s.CreateBuild(theirs, "evil", "abc123", "main", `["true"]`, true); err != nil {
 		t.Fatal(err)
 	}
-	wanted, err := s.CreateBuild(mine, "deploy", "def456", "main", `["true"]`)
+	wanted, err := s.CreateBuild(mine, "deploy", "def456", "main", `["true"]`, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestBuildLogSaysWhenItTruncates(t *testing.T) {
 	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
 		t.Fatal(err)
 	}
-	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`)
+	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -314,6 +314,9 @@ func runMRCreate(c *Ctx, args []string) int {
 	if err := gitutil.FetchInto(dstDir, srcDir, headSHA, mrHeadRef(n)); err != nil {
 		return c.fail(protocol.ExitFailure, "recording MR head: %v", err)
 	}
+	if srcRepo.ID != repo.ID {
+		QueueMRBuilds(c.Store, c.Cfg.Server.Root, c.Cfg.Server.SiteURL, repo, c.User.ID, n, headSHA)
+	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.created", fmt.Sprintf(`{"number":%d}`, n))
 	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
 		notifyUsers(c, targets, mrSubject(repo, n, title),

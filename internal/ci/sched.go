@@ -101,7 +101,7 @@ func (s *Scheduler) RunDue(now time.Time) {
 			continue
 		}
 		steps, _ := json.Marshal(job.Steps)
-		n, err := s.St.CreateBuild(repo.ID, job.Name, sha, repo.DefaultBranch, string(steps))
+		n, err := s.St.CreateBuild(repo.ID, job.Name, sha, repo.DefaultBranch, string(steps), true)
 		if err != nil {
 			slog.Error("scheduler: queueing build", "repo", repo.Path(), "job", job.Name, "err", err)
 			continue

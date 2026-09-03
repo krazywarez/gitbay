@@ -251,10 +251,14 @@ func (r *runner) run(j job) bool {
 	cloneURL := r.cloneBase + "/" + j.Repo + ".git"
 	deadline := time.Now().Add(r.timeout)
 	fmt.Fprintf(sink, "$ git clone %s (%.10s)\n", cloneURL, j.SHA)
-	for _, args := range [][]string{
-		{"clone", "-q", cloneURL, dir},
-		{"-C", dir, "checkout", "-q", j.SHA},
-	} {
+	// A merge request head lives under refs/merge-requests/, which a
+	// clone does not fetch; ask for the ref before checking out.
+	steps := [][]string{{"clone", "-q", cloneURL, dir}}
+	if strings.HasPrefix(j.Ref, "refs/") {
+		steps = append(steps, []string{"-C", dir, "fetch", "-q", "origin", j.Ref})
+	}
+	steps = append(steps, []string{"-C", dir, "checkout", "-q", j.SHA})
+	for _, args := range steps {
 		cmd := exec.Command("git", args...)
 		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND="+gitSSH, "GIT_TERMINAL_PROMPT=0")
 		cmd.Stdout, cmd.Stderr = sink, sink

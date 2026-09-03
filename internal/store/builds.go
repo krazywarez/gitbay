@@ -22,6 +22,9 @@ type Build struct {
 	CreatedAt  string
 	StartedAt  string
 	FinishedAt string
+	// Trusted is false for a merge request head fetched from another
+	// repository: its steps run without the target's secrets.
+	Trusted bool
 }
 
 // MaxBuildLog caps a build's stored log; appends past it are dropped.
@@ -35,7 +38,7 @@ var truncNotice = []byte("\n[log truncated: reached the " +
 
 // CreateBuild allocates the per-repo build number in the same transaction
 // as the insert, like issue and MR numbers.
-func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON string) (int64, error) {
+func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON string, trusted bool) (int64, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -49,21 +52,23 @@ func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON string) (int6
 		return 0, err
 	}
 	if _, err := tx.Exec(
-		"INSERT INTO builds (repo_id, number, job, sha, ref, steps) VALUES (?, ?, ?, ?, ?, ?)",
-		repoID, n, job, sha, ref, stepsJSON); err != nil {
+		"INSERT INTO builds (repo_id, number, job, sha, ref, steps, trusted) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		repoID, n, job, sha, ref, stepsJSON, trusted); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()
 }
 
 const buildSelect = `
-	SELECT id, repo_id, number, job, sha, ref, steps, status, created_at, started_at, finished_at
+	SELECT id, repo_id, number, job, sha, ref, steps, status, created_at, started_at, finished_at, trusted
 	FROM builds`
 
 func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 	var b Build
+	var trusted int
 	err := row.Scan(&b.ID, &b.RepoID, &b.Number, &b.Job, &b.SHA, &b.Ref, &b.Steps,
-		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt)
+		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &trusted)
+	b.Trusted = trusted != 0
 	return b, err
 }
 

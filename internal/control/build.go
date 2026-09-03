@@ -227,7 +227,7 @@ func runBuildTrigger(c *Ctx, args []string) int {
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps))
+		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps), true)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
@@ -347,9 +347,12 @@ func runRunnerNext(c *Ctx, args []string) int {
 	json.Unmarshal([]byte(b.Steps), &steps)
 	// Secrets ride the claim: this channel is admin-only and the values
 	// land in the build's environment, nowhere else.
-	secrets, err := c.Store.BuildSecrets(b.RepoID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+	var secrets map[string]string
+	if b.Trusted {
+		secrets, err = c.Store.BuildSecrets(b.RepoID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 	}
 	d := struct {
 		ID      int64             `json:"id"`
@@ -500,6 +503,28 @@ func QueueBranchBuilds(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID int64, branch, sha string, now time.Time,
 ) {
+	queueJobs(st, root, siteURL, repo, userID, branch, sha, now, true, branch == repo.DefaultBranch)
+}
+
+// QueueMRBuilds queues the push jobs for a merge request head fetched
+// from another repository, which the target holds at
+// refs/merge-requests/<n>/head, so a fork's merge request has ci/<job>
+// statuses for require-checks to gate on (#98). The head is untrusted:
+// its build runs without the target's secrets. A same-repository head is
+// the branch push's job and is not queued here; a failed one is rebuilt
+// when it lands, not when it is proposed.
+func QueueMRBuilds(
+	st *store.Store, root, siteURL string,
+	repo store.Repo, userID, n int64, sha string,
+) {
+	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), sha, time.Now(), false, false)
+}
+
+func queueJobs(
+	st *store.Store, root, siteURL string,
+	repo store.Repo, userID int64, ref, sha string, now time.Time,
+	trusted, syncSchedules bool,
+) {
 	dir := RepoDir(root, repo.OwnerName, repo.Name)
 	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
 	if err != nil {
@@ -531,7 +556,7 @@ func QueueBranchBuilds(
 		// Scheduled jobs run on their cron, not on push; a default-branch
 		// push (re)registers them.
 		if j.Schedule != "" {
-			if branch == repo.DefaultBranch {
+			if syncSchedules {
 				schedules = append(schedules, store.Schedule{
 					RepoID: repo.ID, Job: j.Name, Cron: j.Schedule,
 					NextRun: ci.NextRun(j.Schedule, now),
@@ -540,7 +565,7 @@ func QueueBranchBuilds(
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := st.CreateBuild(repo.ID, j.Name, sha, branch, string(steps))
+		n, err := st.CreateBuild(repo.ID, j.Name, sha, ref, string(steps), trusted)
 		if err != nil {
 			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
 			continue
@@ -548,7 +573,7 @@ func QueueBranchBuilds(
 		url := fmt.Sprintf("%s/%s/builds/%d", siteURL, repo.Path(), n)
 		st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "pending", "queued", url, userID)
 	}
-	if branch == repo.DefaultBranch {
+	if syncSchedules {
 		if err := st.SyncSchedules(repo.ID, schedules); err != nil {
 			slog.Error("syncing schedules", "repo", repo.Path(), "err", err)
 		}

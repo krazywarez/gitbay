@@ -234,6 +234,10 @@ func (s *Server) postReceive(req Request) {
 			if err := s.st.UpdateMRHead(mr.ID, u.New); err != nil {
 				slog.Error("post-receive: recording MR head", "mr", mr.Number, "err", err)
 			}
+			if srcRepo.ID != target.ID {
+				control.QueueMRBuilds(s.st, s.cfg.Server.Root, s.cfg.Server.SiteURL,
+					target, req.UserID, mr.Number, u.New)
+			}
 			if mr.State == "source_gone" {
 				s.st.SetMRState(mr.ID, "open") // branch came back
 			}
@@ -274,7 +278,7 @@ func (s *Server) queueTagBuilds(repo store.Repo, userID int64, tag, pushed strin
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, tag, string(steps))
+		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, tag, string(steps), true)
 		if err != nil {
 			slog.Error("queueing tag build", "repo", repo.Path(), "job", j.Name, "err", err)
 			continue

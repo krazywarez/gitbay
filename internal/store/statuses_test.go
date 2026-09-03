@@ -17,7 +17,7 @@ func TestChecksForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`); err != nil {
+	if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(`UPDATE builds SET started_at = '2026-08-28T04:42:54Z',
