@@ -80,7 +80,14 @@ reviews, since an approval was of the diff against the old branch.
 | labels, assignees   | yes | yes | yes |
 | milestone           | yes | yes | yes |
 | milestone list      | yes | yes | yes |
+| labels: list, colour | yes | no  | no  |
 | choose body markup  | yes | no  | no  |
+
+Labels are created on the fly by =issue label --add= and managed by
+=label list=, =label set <label> --color rrggbb= and =label remove=,
+which takes the label off every issue. The web paints the stored colour
+on every chip and derives one from the name when none is set; it has no
+form for setting one yet.
 
 Issue, MR and release bodies, and their comments, carry the markup they
 were written in — =--format md|org= on create, comment and edit, stored

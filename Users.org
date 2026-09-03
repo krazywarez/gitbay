@@ -297,6 +297,11 @@ Issue templates: commit =.gitbay/issue-template.md= (and optional
 issue create= prefills =$EDITOR= with the default template, the web
 form prefills its textarea, and =gitbay issue templates= lists them.
 
+Labels take a colour: =gitbay label set bug --color cf222e=; =label
+list= shows each with its colour and how many issues carry it, and
+=label remove= takes one off every issue. =issue label --add= still
+creates a colourless label on the fly.
+
 * Merge requests
 
 #+begin_src sh
