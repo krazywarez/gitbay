@@ -36,6 +36,11 @@ func newRoot() *cobra.Command {
 
 	root.AddCommand(
 		authCmd(),
+		group("label", "issue labels",
+			pass("list", "labels with colour and use", passOpts{server: []string{"label", "list"}, needsRepo: true}),
+			pass("set", "create a label or set its colour: <label> [--color rrggbb|'']", passOpts{server: []string{"label", "set"}, needsRepo: true}),
+			pass("remove", "remove a label everywhere: <label>", passOpts{server: []string{"label", "remove"}, needsRepo: true}),
+		),
 		group("status", "commit statuses (CI)",
 			pass("set", "report a status: <sha> --context <c> --state <s> [--description d] [--url u]", passOpts{server: []string{"status", "set"}, needsRepo: true}),
 			pass("list", "statuses on a commit: <sha>", passOpts{server: []string{"status", "list"}, needsRepo: true}),
