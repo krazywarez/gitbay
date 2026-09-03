@@ -193,3 +193,33 @@ func TestAdminNounGatedInDispatch(t *testing.T) {
 		}
 	}
 }
+
+// TestRefusalsHonourJSON: a refusal from the dispatcher's own checks is a
+// JSON envelope when --json was given, like any other failure. The flag
+// used to be stripped after those checks, so a read-only token or a
+// pending account got plain text on stderr exactly when a script needed
+// to parse the error (#109).
+func TestRefusalsHonourJSON(t *testing.T) {
+	cases := []struct {
+		name string
+		ctx  Ctx
+		argv []string
+	}{
+		{"read-only token", Ctx{ReadOnly: true, Scope: "full", ViaAPI: true}, []string{"repo", "create", "a/b", "--json"}},
+		{"pending account", Ctx{User: store.User{Pending: true}, Scope: "full"}, []string{"repo", "list", "--json"}},
+		{"git-scoped key", Ctx{Scope: "git"}, []string{"whoami", "--json"}},
+		{"non-admin", Ctx{Scope: "full"}, []string{"admin", "stats", "--json"}},
+	}
+	for _, tc := range cases {
+		var out, errOut bytes.Buffer
+		c := tc.ctx
+		c.Stdout, c.Stderr = &out, &errOut
+		if code := Dispatch(&c, tc.argv); code != protocol.ExitDenied {
+			t.Errorf("%s: exit %d, want %d", tc.name, code, protocol.ExitDenied)
+		}
+		var env protocol.Envelope
+		if err := json.Unmarshal(out.Bytes(), &env); err != nil || env.Error == "" {
+			t.Errorf("%s: no JSON envelope on stdout: %q (stderr %q)", tc.name, out.String(), errOut.String())
+		}
+	}
+}

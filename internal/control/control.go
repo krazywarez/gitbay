@@ -83,6 +83,17 @@ func Dispatch(c *Ctx, argv []string) int {
 	if !ok {
 		return c.fail(protocol.ExitUsage, "unknown command %q", argv[0])
 	}
+	// Strip the global --json flag wherever it appears, before any
+	// refusal below: a scripted caller needs the envelope most when it is
+	// being told no (#109).
+	args := rest[:0:0]
+	for _, a := range rest {
+		if a == "--json" {
+			c.JSON = true
+			continue
+		}
+		args = append(args, a)
+	}
 	// A runner-scoped key reaches the runner protocol and nothing else, so
 	// the key a CI host holds cannot administer the instance.
 	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {
@@ -107,15 +118,6 @@ func Dispatch(c *Ctx, argv []string) int {
 	if c.User.Pending && !pendingAllowed(cmd.Path) {
 		return c.fail(protocol.ExitDenied,
 			"your account is not active yet: verify your email first (email verify <code>, or ask for the mail again with email add)")
-	}
-	// Strip the global --json flag wherever it appears.
-	args := rest[:0:0]
-	for _, a := range rest {
-		if a == "--json" {
-			c.JSON = true
-			continue
-		}
-		args = append(args, a)
 	}
 	if !cmd.ReadsStdin {
 		c.Stdin = emptyReader{}
