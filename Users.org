@@ -202,6 +202,11 @@ gitbay repo mirror list               # sync status and last error, per mirror
 gitbay repo mirror sync / remove <id>
 #+end_src
 
+Markdown and org files render on the web when opened, the way a README
+does on the repository page, with relative links resolved against the
+file's directory; =source= in the file's action bar (or =?view=source=)
+shows the text instead. Other files show the text with highlighting.
+
 * Organizations
 
 Orgs share the owner namespace with users and own repositories at
