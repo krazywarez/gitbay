@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -78,14 +79,36 @@ func shellQuote(arg string) string {
 	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 }
 
+// sshArgs is every argument before the destination: the port, connection
+// multiplexing, and the profile's own options last so they win.
+//
+// Multiplexing is what makes a CLI over SSH usable: without it every
+// command pays a full handshake, seconds on a distant instance, and with
+// it the second command in five minutes rides the first's connection
+// (#94). The control socket lives under ~/.ssh, which ssh requires to be
+// private; a profile can set no_multiplex = true to opt out.
+func sshArgs(inst cliconfig.Instance) []string {
+	args := []string{}
+	if inst.Port != 0 && inst.Port != 22 {
+		args = append(args, "-p", strconv.Itoa(inst.Port))
+	}
+	if !inst.NoMultiplex {
+		if home, err := os.UserHomeDir(); err == nil {
+			if st, err := os.Stat(filepath.Join(home, ".ssh")); err == nil && st.IsDir() {
+				args = append(args,
+					"-o", "ControlMaster=auto",
+					"-o", "ControlPath="+filepath.Join(home, ".ssh", "gitbay-%C"),
+					"-o", "ControlPersist=300")
+			}
+		}
+	}
+	return append(args, inst.SSHOptions...)
+}
+
 // runSSH executes the server command over the system ssh binary, wiring
 // stdio through. It returns the remote exit code.
 func runSSH(t target, serverArgv []string, stdin io.Reader) int {
-	args := []string{}
-	if t.inst.Port != 0 && t.inst.Port != 22 {
-		args = append(args, "-p", strconv.Itoa(t.inst.Port))
-	}
-	args = append(args, t.inst.SSHOptions...)
+	args := sshArgs(t.inst)
 	quoted := make([]string, len(serverArgv))
 	for i, a := range serverArgv {
 		quoted[i] = shellQuote(a)
@@ -114,11 +137,7 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 // sshCapture runs a server command and returns its stdout, discarding
 // stderr. Used for quiet metadata fetches like issue templates.
 func sshCapture(t target, serverArgv []string) (string, int) {
-	args := []string{}
-	if t.inst.Port != 0 && t.inst.Port != 22 {
-		args = append(args, "-p", strconv.Itoa(t.inst.Port))
-	}
-	args = append(args, t.inst.SSHOptions...)
+	args := sshArgs(t.inst)
 	quoted := make([]string, len(serverArgv))
 	for i, a := range serverArgv {
 		quoted[i] = shellQuote(a)

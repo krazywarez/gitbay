@@ -187,11 +187,7 @@ func cmdInit(args []string) int {
 
 // captureSSH runs a server command and returns its stdout.
 func captureSSH(t target, serverArgv []string) (string, int) {
-	args := []string{}
-	if t.inst.Port != 0 && t.inst.Port != 22 {
-		args = append(args, "-p", fmt.Sprint(t.inst.Port))
-	}
-	args = append(args, t.inst.SSHOptions...)
+	args := sshArgs(t.inst)
 	quoted := quoteAll(serverArgv)
 	args = append(args, t.inst.SSHUser()+"@"+t.inst.Host, "--", strings.Join(quoted, " "))
 	cmd := exec.Command("ssh", args...)

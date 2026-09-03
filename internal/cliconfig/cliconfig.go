@@ -21,6 +21,10 @@ type Instance struct {
 	// e.g. ["-i", "~/.ssh/forge_ed25519"]. Most setups need none: the
 	// system ssh already honors ~/.ssh/config and the agent.
 	SSHOptions []string `toml:"ssh_options,omitempty"`
+	// NoMultiplex turns off SSH connection sharing for this instance. On
+	// by default: one handshake per five minutes instead of one per
+	// command.
+	NoMultiplex bool `toml:"no_multiplex,omitempty"`
 }
 
 func (i Instance) SSHUser() string {
