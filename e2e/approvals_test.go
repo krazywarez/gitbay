@@ -136,3 +136,59 @@ func TestMergeRequirements(t *testing.T) {
 		t.Fatalf("stale approval counted: exit %d, %s", code, errOut)
 	}
 }
+
+// A CODEOWNERS file gates on its own. It used to be read only inside the
+// require-approvals branch, so a repository with owners and the default
+// settings had no owner gating at all (#99).
+func TestCodeownersWithoutRequiredApprovals(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	carolKey := inst.newKey(t, "carol")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	inst.admin(t, "admin", "user", "create", "carol", "--key", carolKey+".pub")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/svc"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "access", "grant", "alice/svc", "carol", "write"); code != 0 {
+		t.Fatal("grant failed")
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/svc"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "CODEOWNERS"), []byte("*.go @carol\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "svc.go"), []byte("package svc\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "README"), []byte("svc\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	// One MR touches an owned file, one does not.
+	for i, f := range []string{"svc.go", "README"} {
+		mustGit(t, dir, env, "checkout", "-q", "-b", fmt.Sprintf("feat%d", i), "main")
+		os.WriteFile(filepath.Join(dir, f), []byte("changed\n"), 0o644)
+		mustGit(t, dir, env, "add", ".")
+		mustGit(t, dir, env, "commit", "-q", "-m", "change")
+		mustGit(t, dir, env, "push", "-q", "origin", fmt.Sprintf("feat%d", i))
+		if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/svc",
+			"--source", fmt.Sprintf("feat%d", i), "--target", "main", "--title", "'change'"); code != 0 {
+			t.Fatalf("mr create: %s", errOut)
+		}
+	}
+
+	// Default settings, no approvals: the owned file is gated, the other is not.
+	_, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1")
+	if code != 4 || !strings.Contains(errOut, "CODEOWNERS") || !strings.Contains(errOut, "carol") {
+		t.Fatalf("codeowners gate with require-approvals off: exit %d, %s", code, errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "2"); code != 0 {
+		t.Fatalf("unowned change refused: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, carolKey, "", "mr", "review", "alice/svc", "1", "--approve"); code != 0 {
+		t.Fatal("carol review failed")
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1"); code != 0 {
+		t.Fatalf("owner-approved merge refused: %s", errOut)
+	}
+}

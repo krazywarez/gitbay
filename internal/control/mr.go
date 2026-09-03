@@ -1145,37 +1145,35 @@ func runMRMerge(c *Ctx, args []string) int {
 }
 
 // reviewGates enforces require_approvals (fresh, non-author, latest review
-// per reviewer; a fresh request-changes blocks), CODEOWNERS coverage, and
+// per reviewer; a fresh request-changes blocks), CODEOWNERS coverage
+// whenever the target branch carries a CODEOWNERS file, and
 // require_resolved. Returns -1 to proceed.
 func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA string) int {
 	set := repo.Settings
-	if set.RequireApprovals == 0 && !set.RequireResolved {
-		return -1
+	reviews, err := c.Store.ListMRReviews(mr.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	// Latest fresh review per reviewer decides their stance.
+	latest := map[string]string{}
+	for _, r := range reviews {
+		if r.Stale || r.Reviewer == mr.Author {
+			continue
+		}
+		latest[r.Reviewer] = r.Verdict
+	}
+	var approvers []string
+	var blockers []string
+	for who, verdict := range latest {
+		switch verdict {
+		case "approve":
+			approvers = append(approvers, who)
+		case "request_changes":
+			blockers = append(blockers, who)
+		}
 	}
 
 	if set.RequireApprovals > 0 {
-		reviews, err := c.Store.ListMRReviews(mr.ID)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		// Latest fresh review per reviewer decides their stance.
-		latest := map[string]string{}
-		for _, r := range reviews {
-			if r.Stale || r.Reviewer == mr.Author {
-				continue
-			}
-			latest[r.Reviewer] = r.Verdict
-		}
-		var approvers []string
-		var blockers []string
-		for who, verdict := range latest {
-			switch verdict {
-			case "approve":
-				approvers = append(approvers, who)
-			case "request_changes":
-				blockers = append(blockers, who)
-			}
-		}
 		if len(blockers) > 0 {
 			slices.Sort(blockers)
 			return c.fail(protocol.ExitDenied,
@@ -1185,56 +1183,57 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 			return c.fail(protocol.ExitDenied,
 				"%s requires %d fresh approval(s); !%d has %d", repo.Path(), set.RequireApprovals, mr.Number, len(approvers))
 		}
+	}
 
-		// CODEOWNERS: every owned changed file needs an approval from one
-		// of its owners.
-		content, err := gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, "CODEOWNERS", 1<<20)
+	// CODEOWNERS: every owned changed file needs an approval from one of
+	// its owners. The file's presence is the opt-in; it does not wait on
+	// require_approvals (#99).
+	content, err := gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, "CODEOWNERS", 1<<20)
+	if err != nil {
+		content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
+	}
+	if err == nil && len(content) > 0 {
+		rules := policy.ParseCodeowners(string(content))
+		base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
 		if err != nil {
-			content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
+			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-		if err == nil && len(content) > 0 {
-			rules := policy.ParseCodeowners(string(content))
-			base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
+		files, err := gitutil.DiffFiles(dir, base, headSHA)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		approved := map[string]bool{}
+		for _, a := range approvers {
+			approved[a] = true
+		}
+		missing := map[string][]string{} // owner-set key -> example paths
+		for _, f := range files {
+			owners := policy.OwnersFor(rules, f)
+			if owners == nil {
+				continue
 			}
-			files, err := gitutil.DiffFiles(dir, base, headSHA)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			approved := map[string]bool{}
-			for _, a := range approvers {
-				approved[a] = true
-			}
-			missing := map[string][]string{} // owner-set key -> example paths
-			for _, f := range files {
-				owners := policy.OwnersFor(rules, f)
-				if owners == nil {
-					continue
-				}
-				ok := false
-				for _, o := range owners {
-					if approved[o] {
-						ok = true
-						break
-					}
-				}
-				if !ok {
-					key := strings.Join(owners, ",")
-					if len(missing[key]) < 3 {
-						missing[key] = append(missing[key], f)
-					}
+			ok := false
+			for _, o := range owners {
+				if approved[o] {
+					ok = true
+					break
 				}
 			}
-			if len(missing) > 0 {
-				var parts []string
-				for owners, paths := range missing {
-					parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), owners))
+			if !ok {
+				key := strings.Join(owners, ",")
+				if len(missing[key]) < 3 {
+					missing[key] = append(missing[key], f)
 				}
-				slices.Sort(parts)
-				return c.fail(protocol.ExitDenied,
-					"CODEOWNERS approval missing for: %s", strings.Join(parts, "; "))
 			}
+		}
+		if len(missing) > 0 {
+			var parts []string
+			for owners, paths := range missing {
+				parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), owners))
+			}
+			slices.Sort(parts)
+			return c.fail(protocol.ExitDenied,
+				"CODEOWNERS approval missing for: %s", strings.Join(parts, "; "))
 		}
 	}
 
