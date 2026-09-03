@@ -94,6 +94,11 @@ func Dispatch(c *Ctx, argv []string) int {
 	if c.ReadOnly && !cmd.ReadOnly {
 		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state", joinPath(cmd.Path))
 	}
+	// The SSH listener refuses a disabled account before it gets here; the
+	// API and the web reach Dispatch directly, so the check lives here too.
+	if c.User.Disabled {
+		return c.fail(protocol.ExitDenied, "this account is disabled")
+	}
 	if c.User.Pending && !pendingAllowed(cmd.Path) {
 		return c.fail(protocol.ExitDenied,
 			"your account is not active yet: verify your email first (email verify <code>, or ask for the mail again with email add)")

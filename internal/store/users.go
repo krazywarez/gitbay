@@ -183,7 +183,13 @@ func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 		return ErrNotFound
 	}
 	if disabled {
-		_, err = s.DB.Exec("DELETE FROM web_sessions WHERE user_id = ?", userID)
+		// Every credential the account holds goes with it: browser
+		// sessions and API tokens. Re-enabling means minting again.
+		for _, table := range []string{"web_sessions", "api_tokens"} {
+			if _, err = s.DB.Exec("DELETE FROM "+table+" WHERE user_id = ?", userID); err != nil {
+				return err
+			}
+		}
 	}
 	return err
 }
