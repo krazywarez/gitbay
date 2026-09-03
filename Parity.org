@@ -73,6 +73,7 @@ reviews, since an approval was of the diff against the old branch.
 | capability          | cli | web | ios |
 |---------------------+-----+-----+-----|
 | read, list, filter  | yes | yes | yes |
+| filter by label, assignee, author, milestone | yes | yes | no |
 | create              | yes | yes | yes |
 | comment             | yes | yes | yes |
 | edit title and body | yes | yes | yes |

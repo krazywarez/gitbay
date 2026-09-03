@@ -297,6 +297,12 @@ Issue templates: commit =.gitbay/issue-template.md= (and optional
 issue create= prefills =$EDITOR= with the default template, the web
 form prefills its textarea, and =gitbay issue templates= lists them.
 
+Lists narrow the same way on every surface: =issue list --label bug
+--assignee bob --author alice --milestone v1= (or =--milestone none=),
+=mr list --author bob --milestone v1=; the web's issue and merge request
+lists take the same names as query parameters, and each active filter
+shows with a link that drops it.
+
 Labels take a colour: =gitbay label set bug --color cf222e=; =label
 list= shows each with its colour and how many issues carry it, and
 =label remove= takes one off every issue. =issue label --add= still
