@@ -4,6 +4,58 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.9.0 — 2026-09-03
+
+The runner is no longer an admin, the web no longer reaches around the
+registry, and the CLI stops paying a handshake per command.
+
+- =keys add --scope runner= confines a key to =runner next/log/done= and
+  read-only git; the runner commands accept that scope or an admin. The
+  systemd drop-in sandboxes the runner process. gitbay.org's runner now
+  polls as a non-admin =ci= account scoped to one repository. #92
+- The web's repo create, issue create and edit, MR edit and both comment
+  forms dispatch the command the CLI runs, so the repository quota, the
+  archived-repository refusal, notifications, the body format and the
+  audit entry hold from a browser. #93
+- The CLI shares one SSH connection per instance (=ControlMaster=, five
+  minutes idle): a command costs a round trip instead of a handshake,
+  0.4 s instead of 4 s from a distant laptop. =no_multiplex = true= on
+  an instance opts out. #94
+- A disabled account is refused on every surface, and disabling revokes
+  its API tokens along with its sessions. #95
+- CODEOWNERS gates whenever the file exists on the target branch, not
+  only under =require-approvals=. #99
+- The HTTP listeners have header and idle timeouts, and SIGTERM drains
+  in-flight requests and SSH sessions before exit. #104 #105
+- =git archive= runs under a two-minute deadline and a 512 MiB cap. #124
+- Every git invocation ends option parsing before the ref, so a ref
+  shaped like an option is a bad revision and never a flag. #135
+- The admin noun is gated in the dispatcher as well as in each handler;
+  registry tests cover that and =ReadsStdin=. #127
+- An e2e test runs every =ReadOnly= command against a populated instance
+  and fails on any row it changes. #97
+- =http.trusted_proxies= attributes proxied API requests to the last
+  untrusted =X-Forwarded-For= hop for rate limiting; =email add= is
+  capped at five codes an hour per account. #136
+- A merge request head is built in the target repository, at
+  =refs/merge-requests/<n>/head=, so a fork's merge request has
+  =ci/<job>= statuses for =require-checks= to gate on. A head from
+  another repository is built without the target's secrets. #98
+- Triggers refuse deleting a user or organization that still owns
+  repositories, whatever path the delete takes. #136
+- The stylesheet's fonts are served again, and directory crumbs on blob
+  and blame pages link to the tree. #102 #103
+- The Threat-Model wiki page covers the runner. #138
+
+Replace the binary and restart, reinstall the CLI, and =make
+deploy-runner=: the runner fetches merge request refs before checkout.
+Migrations 0032 and 0033 run on start. The daemon host needs git 2.24
+or newer for =--end-of-options=.
+Operators running =gitbay-runner=: give it a non-admin account with a
+key added by =keys add --scope runner=, remove the admin key it held,
+and =make deploy-runner= to install the sandboxed unit drop-in; an
+admin key keeps working meanwhile.
+
 * v1.8.1 — 2026-09-03
 
 Markdown and org files render when opened.
