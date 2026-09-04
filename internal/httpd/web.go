@@ -1805,6 +1805,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	// its own view rather than a fold at the foot of the conversation.
 	// A query parameter keeps this working without JavaScript.
 	unresolved, _ := s.st.UnresolvedThreadCount(m.ID)
+	// The revisions this merge request has had. A stale review is the
+	// moment someone wants to know what moved, so the link to the
+	// range-diff belongs next to it.
+	revisions, _ := s.st.MRHeads(m.ID)
 	branches, _ := gitutil.Refs(p.Dir, "heads")
 	view := r.URL.Query().Get("view")
 	if view != "commits" && view != "diff" {
@@ -1839,13 +1843,14 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		CanEdit         bool
 		CanWrite        bool
 		Unresolved      int
+		Revisions       []store.MRHead
 		Notice          string
 		DetachedThreads []diffThread
 		StackedOn       *store.MR
 		Stacked         []store.MR
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviews, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, s.takeFlash(w, r), detachedThreads, stackedOn, stacked})
+		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

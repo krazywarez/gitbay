@@ -130,6 +130,8 @@
     <h2>Reviews</h2>
     {{range .Reviews}}<p class="row"><span class="dot {{if eq .Verdict "approve"}}ok{{else}}pend{{end}}"></span><a href="/{{.Reviewer}}">{{.Reviewer}}</a> {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}<span class="sub">{{when .CreatedAt}}</span></p>
     {{else}}<p class="none">No reviews yet</p>{{end}}
+    {{if gt (len .Revisions) 1}}<p class="row none">{{len .Revisions}} revisions pushed. What changed between the last two:
+      <code>gitbay mr range-diff {{.Repo.OwnerName}}/{{.Repo.Name}} {{.MR.Number}}</code></p>{{end}}
   </div>
   <div class="grp">
     <h2>Checks</h2>

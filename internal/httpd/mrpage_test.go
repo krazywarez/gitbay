@@ -28,6 +28,7 @@ type mrPageData struct {
 	CanEdit         bool
 	CanWrite        bool
 	Unresolved      int
+	Revisions       []store.MRHead
 	Notice          string
 	DetachedThreads []diffThread
 }

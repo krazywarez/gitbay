@@ -507,6 +507,8 @@ func mrCmd() *cobra.Command {
 		pass("review", "submit a review: --approve|--request-changes|--comment, or --discard a pending batch", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
 		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
+		pass("revisions", "the heads this merge request has had", passOpts{server: []string{"mr", "revisions"}, needsRepo: true}),
+		pass("range-diff", "what changed between two revisions: [--from <sha>] [--to <sha>]", passOpts{server: []string{"mr", "range-diff"}, needsRepo: true}),
 		pass("draft", "mark as work in progress", passOpts{server: []string{"mr", "draft"}, needsRepo: true}),
 		pass("ready", "take the draft mark off, so it can merge", passOpts{server: []string{"mr", "ready"}, needsRepo: true}),
 		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),

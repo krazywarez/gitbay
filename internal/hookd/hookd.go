@@ -247,7 +247,15 @@ func (s *Server) postReceive(req Request) {
 				slog.Error("post-receive: refreshing MR head", "mr", mr.Number, "err", err)
 				continue
 			}
-			if err := s.st.UpdateMRHead(mr.ID, u.New); err != nil {
+			// The merge base as it stands now, so a later range-diff
+			// compares each revision against the target it was written
+			// on rather than against today's. Best-effort: a base that
+			// cannot be worked out costs precision, not the record.
+			base, err := gitutil.MergeBase(dstDir, "refs/heads/"+mr.TargetRef, headRef)
+			if err != nil {
+				base = ""
+			}
+			if err := s.st.UpdateMRHead(mr.ID, u.New, base); err != nil {
 				slog.Error("post-receive: recording MR head", "mr", mr.Number, "err", err)
 			}
 			if srcRepo.ID != target.ID {

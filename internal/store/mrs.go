@@ -60,6 +60,16 @@ func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, target
 		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA, format, draft); err != nil {
 		return 0, err
 	}
+	if headSHA != "" {
+		var mrID int64
+		if err := tx.QueryRow("SELECT id FROM merge_requests WHERE repo_id = ? AND number = ?",
+			repoID, n).Scan(&mrID); err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec("INSERT INTO mr_heads (mr_id, sha) VALUES (?, ?)", mrID, headSHA); err != nil {
+			return 0, err
+		}
+	}
 	return n, tx.Commit()
 }
 
@@ -241,7 +251,11 @@ func (s *Store) SetMRState(mrID int64, state string) error {
 
 // UpdateMRHead records a new head and marks every review at another head
 // stale, in one transaction.
-func (s *Store) UpdateMRHead(mrID int64, headSHA string) error {
+// UpdateMRHead moves a merge request onto a new head, stales the reviews
+// of the old one, and records the head in the history a range-diff reads.
+// baseSHA is the merge base at this moment; "" when the caller could not
+// work it out, which only costs the range-diff its precision.
+func (s *Store) UpdateMRHead(mrID int64, headSHA, baseSHA string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
@@ -256,7 +270,43 @@ func (s *Store) UpdateMRHead(mrID int64, headSHA string) error {
 		"UPDATE mr_reviews SET stale = 1 WHERE mr_id = ? AND head_sha <> ?", mrID, headSHA); err != nil {
 		return err
 	}
+	// Same head twice is a push that changed nothing about this merge
+	// request; it should not add a revision to compare against.
+	var last string
+	tx.QueryRow("SELECT sha FROM mr_heads WHERE mr_id = ? ORDER BY id DESC LIMIT 1", mrID).Scan(&last)
+	if last != headSHA {
+		if _, err := tx.Exec(
+			"INSERT INTO mr_heads (mr_id, sha, base_sha) VALUES (?, ?, ?)", mrID, headSHA, baseSHA); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
+}
+
+// MRHead is one revision a merge request has had.
+type MRHead struct {
+	SHA       string
+	BaseSHA   string
+	CreatedAt string
+}
+
+// MRHeads returns a merge request's revisions, oldest first.
+func (s *Store) MRHeads(mrID int64) ([]MRHead, error) {
+	rows, err := s.DB.Query(
+		"SELECT sha, base_sha, created_at FROM mr_heads WHERE mr_id = ? ORDER BY id", mrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MRHead
+	for rows.Next() {
+		var h MRHead
+		if err := rows.Scan(&h.SHA, &h.BaseSHA, &h.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
 }
 
 // SetMRTarget retargets a merge request and marks every existing review

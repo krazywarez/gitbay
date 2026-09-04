@@ -284,3 +284,32 @@ func DiffFiles(dir, old, new string) ([]string, error) {
 	}
 	return files, nil
 }
+
+// RangeDiff compares two revisions of the same work: what the commits
+// between oldBase and oldHead became between newBase and newHead. This is
+// what answers "what changed since I reviewed this", which a plain diff
+// of the two heads cannot — that shows the whole branch again, rebases
+// and all.
+//
+// Each side carries its own base, because the target moves: comparing
+// both revisions against today's base would attribute every commit that
+// landed on the target in between to the author of this merge request.
+//
+// --creation-factor is raised from git's default of 60. That default is
+// tuned for comparing two independently developed patch series, where
+// refusing to pair is the safe answer. Here the two sides are known to be
+// revisions of one branch, and the commonest revision of all — a commit
+// that adds a file, with one line inside it changed — is not paired at
+// 60: git reports the commit as deleted and a different one added, which
+// tells a reviewer nothing. It pairs at 80, and two genuinely unrelated
+// commits are still left unpaired there; both measured.
+func RangeDiff(dir, oldBase, oldHead, newBase, newHead string, limit int64) (patch string, truncated bool, err error) {
+	cmd := exec.Command("git", "-C", dir, "range-diff", "--creation-factor=80", "--end-of-options",
+		oldBase+".."+oldHead, newBase+".."+newHead)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", false, fmt.Errorf("range-diff: %w", err)
+	}
+	out, truncated = cutAtLine(out, limit)
+	return string(out), truncated, nil
+}

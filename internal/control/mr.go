@@ -39,6 +39,14 @@ func init() {
 		Summary:    "open a merge request",
 		Usage:      "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org] [--draft]",
 		ReadsStdin: true, Run: runMRCreate})
+	register(Command{Path: []string{"mr", "range-diff"},
+		Summary:  "what changed between two revisions of a merge request",
+		Usage:    "mr range-diff <owner/name> <n> [--from <sha>] [--to <sha>]",
+		ReadOnly: true, Run: runMRRangeDiff})
+	register(Command{Path: []string{"mr", "revisions"},
+		Summary:  "the heads a merge request has had",
+		Usage:    "mr revisions <owner/name> <n>",
+		ReadOnly: true, Run: runMRRevisions})
 	register(Command{Path: []string{"mr", "draft"},
 		Summary: "mark a merge request as work in progress",
 		Usage:   "mr draft <owner/name> <n>", Run: runMRDraft})
@@ -1305,4 +1313,132 @@ func reviewAction(number int64, verdict string, published int64) string {
 		return fmt.Sprintf("reviewed !%d: %s, with %d comment(s)", number, verdict, published)
 	}
 	return fmt.Sprintf("reviewed !%d: %s", number, verdict)
+}
+
+// RevisionOut is one head a merge request has had.
+type RevisionOut struct {
+	N         int    `json:"n"` // 1 is the first push
+	SHA       string `json:"sha"`
+	BaseSHA   string `json:"base_sha,omitempty"`
+	CreatedAt string `json:"created_at"`
+	Current   bool   `json:"current,omitempty"`
+}
+
+func mrRevisions(c *Ctx, mr store.MR) ([]RevisionOut, error) {
+	heads, err := c.Store.MRHeads(mr.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RevisionOut, 0, len(heads))
+	for i, h := range heads {
+		out = append(out, RevisionOut{N: i + 1, SHA: h.SHA, BaseSHA: h.BaseSHA,
+			CreatedAt: h.CreatedAt, Current: h.SHA == mr.HeadSHA})
+	}
+	return out, nil
+}
+
+func runMRRevisions(c *Ctx, args []string) int {
+	repo, mr, code := mrRef(c, args, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: mr revisions <owner/name> <n>")
+	}
+	revs, err := mrRevisions(c, mr)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(revs, func(w io.Writer) {
+		for _, r := range revs {
+			mark := " "
+			if r.Current {
+				mark = "*"
+			}
+			fmt.Fprintf(w, "%s v%d\t%.10s\t%s\n", mark, r.N, r.SHA, r.CreatedAt)
+		}
+		if len(revs) < 2 {
+			fmt.Fprintf(w, "\nonly one revision; %s!%d has not been pushed to since it was opened\n",
+				repo.Path(), mr.Number)
+		}
+	})
+}
+
+func runMRRangeDiff(c *Ctx, args []string) int {
+	const usage = "mr range-diff <owner/name> <n> [--from <sha>] [--to <sha>]"
+	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--to"}, MaxPos: 2, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	repo, mr, code := mrRef(c, f.Pos, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if len(f.Pos) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+	}
+	revs, err := mrRevisions(c, mr)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	// One revision is a merge request nobody has pushed to since it was
+	// opened. The argv was fine and the answer is "nothing changed", so
+	// this succeeds with an empty patch rather than failing.
+	if len(revs) < 2 {
+		fmt.Fprintf(c.Stderr, "%s!%d has one revision; nothing to compare it against\n",
+			repo.Path(), mr.Number)
+		return protocol.ExitOK
+	}
+	// Default to the two most recent, which is "what changed since the
+	// last push" — the question a stale review asks.
+	from, to := revs[len(revs)-2], revs[len(revs)-1]
+	pick := func(sha string) (RevisionOut, bool) {
+		for _, r := range revs {
+			if strings.HasPrefix(r.SHA, sha) {
+				return r, true
+			}
+		}
+		return RevisionOut{}, false
+	}
+	if v := f.Value("--from"); v != "" {
+		r, ok := pick(v)
+		if !ok {
+			return c.fail(protocol.ExitNotFound, "%.12s is not a revision of !%d; see `mr revisions`", v, mr.Number)
+		}
+		from = r
+	}
+	if v := f.Value("--to"); v != "" {
+		r, ok := pick(v)
+		if !ok {
+			return c.fail(protocol.ExitNotFound, "%.12s is not a revision of !%d; see `mr revisions`", v, mr.Number)
+		}
+		to = r
+	}
+	if from.SHA == to.SHA {
+		return c.fail(protocol.ExitUsage, "--from and --to are the same revision")
+	}
+
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	// A revision recorded before its base could be worked out, or by a
+	// migration backfill, falls back to the target's merge base.
+	baseOf := func(r RevisionOut) string {
+		if r.BaseSHA != "" {
+			return r.BaseSHA
+		}
+		b, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, r.SHA)
+		if err != nil {
+			return r.SHA + "^"
+		}
+		return b
+	}
+	patch, truncated, err := gitutil.RangeDiff(dir, baseOf(from), from.SHA, baseOf(to), to.SHA, 4<<20)
+	if err != nil {
+		return c.fail(protocol.ExitFailure,
+			"%v (the objects for an older revision may have been garbage-collected)", err)
+	}
+	fmt.Fprint(c.Stdout, patch)
+	if truncated {
+		fmt.Fprintln(c.Stderr, "range-diff truncated at 4 MiB")
+	}
+	return protocol.ExitOK
 }
