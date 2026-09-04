@@ -344,6 +344,13 @@ func runIssueEdit(c *Ctx, args []string) int {
 	if err := c.Store.UpdateIssueText(issue.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.edited", fmt.Sprintf(`{"number":%d}`, issue.Number))
+	if parts, err := c.Store.IssueParticipants(issue.ID); err == nil {
+		notify(c, parts, notice{repo: repo, kind: "issue",
+			subject: issueSubject(repo, issue.Number, issue.Title),
+			action:  fmt.Sprintf("edited #%d", issue.Number),
+			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
+	}
 	return c.emit(map[string]any{"number": issue.Number}, func(w io.Writer) {
 		fmt.Fprintf(w, "edited %s#%d\n", repo.Path(), issue.Number)
 	})
@@ -394,6 +401,8 @@ func runIssueLabel(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.labeled",
+		fmt.Sprintf(`{"number":%d,"labels":%s}`, issue.Number, jsonStrings(updated.Labels)))
 	return c.emit(map[string]any{"number": issue.Number, "labels": updated.Labels}, func(w io.Writer) {
 		fmt.Fprintf(w, "labels on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(updated.Labels, ", "))
 	})
@@ -449,6 +458,8 @@ func runIssueAssign(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.assigned",
+		fmt.Sprintf(`{"number":%d,"assignees":%s}`, issue.Number, jsonStrings(updated.Assignees)))
 	return c.emit(map[string]any{"number": issue.Number, "assignees": updated.Assignees}, func(w io.Writer) {
 		fmt.Fprintf(w, "assignees on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(updated.Assignees, ", "))
 	})

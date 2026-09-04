@@ -430,6 +430,13 @@ func runRepoDelete(c *Ctx, args []string) int {
 
 // deleteRepo removes a repository the caller has already been cleared to
 // delete: the database row, then the directory and its wiki companion.
+//
+// There is deliberately no repo.deleted event. events.repo_id and
+// webhooks.repo_id both cascade from repos, so recording one would delete
+// it, and every webhook that could have subscribed, in the same
+// statement. A repository's deletion is not observable through its own
+// webhooks; an instance that needs to hear about it wants the audit log
+// (#112).
 func deleteRepo(c *Ctx, repo store.Repo) int {
 	// Open MRs sourced from this repo keep working (targets own the
 	// objects) but must show that the source is gone.

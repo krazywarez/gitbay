@@ -254,3 +254,56 @@ func TestWebhooks(t *testing.T) {
 		t.Fatal("non-http scheme accepted")
 	}
 }
+
+// TestWebhookEventCoverage drives the mutations #112 found unrecorded and
+// asserts each reaches a subscriber. Half the forge's mutations recorded
+// nothing, so a webhook could be subscribed to them and never fire.
+func TestWebhookEventCoverage(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "access", "grant", "alice/app", "bob", "write"); code != 0 {
+		t.Fatal("grant failed")
+	}
+
+	// A name that is not an event is refused rather than silently never
+	// firing.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "webhook", "add", "alice/app",
+		"https://example.test/h", "--events", "issue.tagged"); code != 2 ||
+		!strings.Contains(errOut, "not an event this forge records") {
+		t.Fatalf("bad event name: exit %d, %s", code, errOut)
+	}
+
+	// Drive each newly recorded mutation.
+	steps := [][]string{
+		{"issue", "create", "alice/app", "--title", "'first'", "--body", "'b'"},
+		{"issue", "edit", "alice/app", "1", "--title", "'renamed'"},
+		{"issue", "label", "alice/app", "1", "--add", "bug"},
+		{"issue", "assign", "alice/app", "1", "--add", "bob"},
+		{"milestone", "create", "alice/app", "v1"},
+		{"issue", "milestone", "alice/app", "1", "v1"},
+	}
+	for _, s := range steps {
+		if _, errOut, code := inst.ssh(t, aliceKey, "", s...); code != 0 {
+			t.Fatalf("%v: %s", s, errOut)
+		}
+	}
+
+	out, errOut, code := inst.ssh(t, aliceKey, "", "feed", "--json")
+	if code != 0 {
+		t.Fatalf("feed: %s", errOut)
+	}
+	for _, kind := range []string{
+		"issue.created", "issue.edited", "issue.labeled",
+		"issue.assigned", "issue.milestoned",
+	} {
+		if !strings.Contains(out, `"`+kind+`"`) {
+			t.Errorf("%s was not recorded:\n%s", kind, out)
+		}
+	}
+}

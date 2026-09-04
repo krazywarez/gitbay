@@ -601,6 +601,7 @@ func runMREdit(c *Ctx, args []string) int {
 	if err := c.Store.UpdateMRText(mr.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.edited", fmt.Sprintf(`{"number":%d}`, mr.Number))
 	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
 		fmt.Fprintf(w, "edited %s!%d\n", repo.Path(), mr.Number)
 	})
@@ -649,6 +650,8 @@ func runMRRetarget(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.AddMRSystemComment(mr.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s", old, target))
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.retargeted",
+		fmt.Sprintf(`{"number":%d,"from":%q,"to":%q}`, mr.Number, old, target))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",
 			subject: mrSubject(repo, mr.Number, mr.Title),
@@ -700,6 +703,8 @@ func runMRReview(c *Ctx, args []string) int {
 	if err := c.Store.AddMRReview(mr.ID, c.User.ID, verdict, mr.HeadSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.reviewed",
+		fmt.Sprintf(`{"number":%d,"verdict":%q}`, mr.Number, verdict))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",
 			subject: mrSubject(repo, mr.Number, mr.Title),
@@ -1170,6 +1175,13 @@ func runMRClose(c *Ctx, args []string) int {
 	}
 	if err := c.Store.MarkClosed(mr.ID, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.closed", fmt.Sprintf(`{"number":%d}`, mr.Number))
+	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+		notify(c, parts, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("closed !%d", mr.Number),
+			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
 	return c.emit(map[string]any{"number": mr.Number, "state": "closed"}, func(w io.Writer) {
 		fmt.Fprintf(w, "closed %s!%d\n", repo.Path(), mr.Number)

@@ -1,5 +1,7 @@
 package control
 
+import "encoding/json"
+
 // Named payloads for the commands other surfaces decode. A command used
 // to declare its output inline, so the web type-asserted map keys and
 // nothing tied what a command emits to what a client reads (#126).
@@ -54,4 +56,18 @@ type CheckOut struct {
 type CommitOut struct {
 	SHA     string `json:"sha"`
 	Subject string `json:"subject"`
+}
+
+// jsonStrings renders a string slice as a JSON array, for the event data
+// the webhook payload carries. A nil slice is [], never null: a consumer
+// iterating the field should not have to special-case one of them.
+func jsonStrings(ss []string) string {
+	if ss == nil {
+		ss = []string{}
+	}
+	raw, err := json.Marshal(ss)
+	if err != nil {
+		return "[]"
+	}
+	return string(raw)
 }

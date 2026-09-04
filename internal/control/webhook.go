@@ -46,6 +46,12 @@ func runWebhookAdd(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
+	// A name that is not an event is a subscription that never fires, and
+	// nothing would ever say so. Checked before the URL, which resolves
+	// DNS: a typo here should not need a reachable host to report.
+	if code := checkEventNames(c, events); code >= 0 {
+		return code
+	}
 	if err := webhook.ValidateURL(url, c.Cfg.Webhooks.AllowLocal); err != nil {
 		return c.failErr(err)
 	}

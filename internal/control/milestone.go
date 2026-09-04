@@ -159,7 +159,7 @@ func runIssueMilestone(c *Ctx, args []string) int {
 	if len(args) != 3 {
 		return c.fail(protocol.ExitUsage, "usage: issue milestone <owner/name> <n> <title|none>")
 	}
-	return setItemMilestone(c, repo, args[2], func(id int64) error {
+	return setItemMilestone(c, repo, "issue", issue.Number, args[2], func(id int64) error {
 		return c.Store.SetIssueMilestone(issue.ID, id)
 	})
 }
@@ -175,12 +175,13 @@ func runMRMilestone(c *Ctx, args []string) int {
 	if len(args) != 3 {
 		return c.fail(protocol.ExitUsage, "usage: mr milestone <owner/name> <n> <title|none>")
 	}
-	return setItemMilestone(c, repo, args[2], func(id int64) error {
+	return setItemMilestone(c, repo, "mr", mr.Number, args[2], func(id int64) error {
 		return c.Store.SetMRMilestone(mr.ID, id)
 	})
 }
 
-func setItemMilestone(c *Ctx, repo store.Repo, title string, set func(int64) error) int {
+// noun and number name what the milestone was set on, for the event.
+func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title string, set func(int64) error) int {
 	var id int64
 	if title != "none" {
 		m, err := c.Store.MilestoneByTitle(repo.ID, title)
@@ -192,6 +193,12 @@ func setItemMilestone(c *Ctx, repo store.Repo, title string, set func(int64) err
 	if err := set(id); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	cleared := title
+	if cleared == "none" {
+		cleared = ""
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, noun+".milestoned",
+		fmt.Sprintf(`{"number":%d,"milestone":%q}`, number, cleared))
 	if title == "none" {
 		return c.emit(map[string]string{"milestone": ""}, func(w io.Writer) {
 			fmt.Fprintln(w, "milestone cleared")

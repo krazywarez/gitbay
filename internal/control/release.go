@@ -259,6 +259,7 @@ func runReleaseDelete(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	os.RemoveAll(assetDir(c.Cfg.Server.Root, repo, rel.ID))
+	c.Store.RecordEvent(repo.ID, c.User.ID, "release.deleted", fmt.Sprintf(`{"tag":%q}`, rel.Tag))
 	return c.emit(map[string]string{"deleted": rel.Tag}, func(w io.Writer) {
 		fmt.Fprintf(w, "deleted release %s\n", rel.Tag)
 	})
