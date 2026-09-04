@@ -4,6 +4,42 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.10.0 — 2026-09-04
+
+Every command parses its arguments the same way, the web answers by
+exit code, and a restart no longer waits on idle connections.
+
+- One flag parser for every command: an unknown flag, a missing value or
+  too many arguments is exit 2 with the command's usage, everywhere.
+  =mr review --approve --bogus= used to report repository =--bogus= as
+  not found. #96
+- =--json= is honoured by the dispatcher's own refusals, so a script told
+  no gets the envelope. #109
+- A store failure is exit 1 and not-found is exit 3; both used to be
+  usage errors. #107
+- Web form actions answer by exit code: the 404 page for a thing that
+  does not exist, the page with the message for anything else. #106
+- Inside a clone, =gitbay mr create= takes the checked-out branch as
+  =--source=; =gitbay <noun> --help= is the server's reference for the
+  noun, flags included. #101 #130
+- Shutdown closes idle SSH connections at once and drains only sessions
+  mid-command; a store failure during key lookup no longer counts as a
+  bad key against the auth limiter; the CLI says on ssh's exit 255 that
+  a burst may have tripped it. #141
+- A merge request head the target already contains is recorded as
+  merged instead of refused; a fork is created with its parent in one
+  insert; a failed transfer revert is reported; the repository quota is
+  checked under a lock. #108
+- Issues and merge requests share their comment, reference and
+  author-or-write code. #110
+- The payloads the web and clients decode are named types: =Created=,
+  =MRCreated=, =IssueShow=, =MRShow=. JSON unchanged. #126
+- Tests: parse failures per command, non-ASCII paths (which found
+  =ls-tree= returning octal escapes, fixed with =core.quotepath=off= for
+  every git the server runs), concurrent pushes. #129
+
+Replace the binary and restart, and reinstall the CLI. No migration.
+
 * v1.9.0 — 2026-09-03
 
 The runner is no longer an admin, the web no longer reaches around the
