@@ -32,6 +32,7 @@ import (
 	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/toolpath"
 	"gitbay.org/gitbay/internal/webhook"
 )
 
@@ -122,6 +123,12 @@ func serveCmd() *cobra.Command {
 			// First line of every run: the journal then says which commit is
 			// serving, without rebuilding the binary to find out.
 			logBuild()
+			// The tools this daemon shells out to are resolved once, at
+			// package init. Say so now rather than failing on whichever
+			// request first needed git.
+			if err := toolpath.Verify(); err != nil {
+				return fmt.Errorf("required tools missing: %w", err)
+			}
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err

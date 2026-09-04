@@ -17,6 +17,7 @@ import (
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 const askpassScript = `#!/bin/sh
@@ -106,7 +107,7 @@ func (w *Worker) sync(m store.Mirror) error {
 		args = []string{"-C", dir, "fetch", "--prune", m.URL,
 			"+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"}
 	}
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), args...)
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git %s: %v: %.300s", m.Direction, err, out)

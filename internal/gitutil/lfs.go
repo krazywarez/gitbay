@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // lfsPointerMax bounds a pointer file; real ones are around 130 bytes.
@@ -18,7 +20,7 @@ var lfsOIDLine = regexp.MustCompile(`(?m)^oid sha256:([0-9a-f]{64})$`)
 // anywhere in the repository: every object, not just the reachable ones,
 // since an unreachable blob is still an object gc has not removed.
 func LFSPointerOIDs(dir string) ([]string, error) {
-	list := exec.Command("git", "-C", dir, "cat-file", "--batch-all-objects",
+	list := exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "--batch-all-objects",
 		"--batch-check=%(objecttype) %(objectsize) %(objectname)")
 	out, err := list.Output()
 	if err != nil {
@@ -38,7 +40,7 @@ func LFSPointerOIDs(dir string) ([]string, error) {
 	if len(small) == 0 {
 		return nil, nil
 	}
-	cat := exec.Command("git", "-C", dir, "cat-file", "--batch")
+	cat := exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "--batch")
 	cat.Stdin = strings.NewReader(strings.Join(small, "\n") + "\n")
 	out, err = cat.Output()
 	if err != nil {

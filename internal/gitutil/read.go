@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type TreeEntry struct {
@@ -26,7 +28,7 @@ func ListTree(dir, ref, path string) ([]TreeEntry, error) {
 	if path != "" {
 		spec = ref + ":" + path
 	}
-	cmd := exec.Command("git", "-C", dir, "ls-tree", "-l", "--end-of-options", spec)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "ls-tree", "-l", "--end-of-options", spec)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("ls-tree %s: %w", spec, err)
@@ -56,7 +58,7 @@ func ListTree(dir, ref, path string) ([]TreeEntry, error) {
 
 // ReadBlob returns the contents of ref:path, capped at limit bytes.
 func ReadBlob(dir, ref, path string, limit int64) ([]byte, error) {
-	cmd := exec.Command("git", "-C", dir, "cat-file", "blob", "--end-of-options", ref+":"+path)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "blob", "--end-of-options", ref+":"+path)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func ReadBlob(dir, ref, path string, limit int64) ([]byte, error) {
 
 // ResolveRef resolves a ref or sha to a full commit sha; errors if absent.
 func ResolveRef(dir, ref string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}")
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("unknown ref %q", ref)
@@ -89,7 +91,7 @@ type Ref struct {
 
 // Refs lists branches or tags; kind is "heads" or "tags".
 func Refs(dir, kind string) ([]Ref, error) {
-	cmd := exec.Command("git", "-C", dir, "for-each-ref",
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "for-each-ref",
 		"--format=%(refname:short) %(objectname)", "refs/"+kind)
 	out, err := cmd.Output()
 	if err != nil {
@@ -118,7 +120,7 @@ var ErrArchiveTooLarge = errors.New("archive exceeds the size limit")
 func Archive(dir, ref, prefix string, w io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), archiveTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", "--end-of-options", ref)
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", "--end-of-options", ref)
 	lw := &cappedWriter{w: w, left: MaxArchiveBytes, stop: cancel}
 	cmd.Stdout = lw
 	err := cmd.Run()
@@ -152,7 +154,7 @@ func (c *cappedWriter) Write(p []byte) (int, error) {
 
 // ShowPatch returns the stat+patch text for one commit.
 func ShowPatch(dir, sha string, limit int64) (patch string, truncated bool, err error) {
-	cmd := exec.Command("git", "-C", dir, "show", "--stat", "--patch", "--format=", "--end-of-options", sha)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "show", "--stat", "--patch", "--format=", "--end-of-options", sha)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", false, err

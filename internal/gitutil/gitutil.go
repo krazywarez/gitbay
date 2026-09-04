@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // InitBare creates a bare repository with the shared hooks directory wired
@@ -19,14 +21,14 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	cmd := exec.Command("git", "init", "--bare", "--initial-branch="+defaultBranch, path)
+	cmd := exec.Command(toolpath.Look("git"), "init", "--bare", "--initial-branch="+defaultBranch, path)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git init: %v\n%s", err, out)
 	}
 	// An empty hooksPath leaves the bare repo with no hooks — used for
 	// companion repos (wikis) that carry no ref policy.
 	if hooksPath != "" {
-		cmd = exec.Command("git", "-C", path, "config", "core.hooksPath", hooksPath)
+		cmd = exec.Command(toolpath.Look("git"), "-C", path, "config", "core.hooksPath", hooksPath)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git config core.hooksPath: %v\n%s", err, out)
 		}
@@ -49,7 +51,7 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 	default:
 		return fmt.Errorf("unknown service %q", service)
 	}
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	cmd.Env = append(os.Environ(), extraEnv...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
@@ -61,7 +63,7 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 // dir. It must run with the caller's environment intact so that quarantined
 // objects during pre-receive remain visible.
 func IsAncestor(dir, old, new string) (bool, error) {
-	cmd := exec.Command("git", "-C", dir, "merge-base", "--is-ancestor", old, new)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-base", "--is-ancestor", old, new)
 	err := cmd.Run()
 	if err == nil {
 		return true, nil
@@ -87,7 +89,7 @@ func ZeroSHA(s string) bool {
 
 // RevList returns up to limit commit SHAs reachable from ref, newest first.
 func RevList(dir, ref string, limit int) ([]string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-list", fmt.Sprintf("--max-count=%d", limit), "--end-of-options", ref)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", fmt.Sprintf("--max-count=%d", limit), "--end-of-options", ref)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list %s: %w", ref, err)
@@ -105,7 +107,7 @@ func RevList(dir, ref string, limit int) ([]string, error) {
 // touch filePath, newest first. The "--" keeps the path from ever being
 // read as an option or ref.
 func RevListPath(dir, ref, filePath string, limit int) ([]string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-list",
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list",
 		fmt.Sprintf("--max-count=%d", limit), "--end-of-options", ref, "--", filePath)
 	out, err := cmd.Output()
 	if err != nil {
@@ -123,7 +125,7 @@ func RevListPath(dir, ref, filePath string, limit int) ([]string, error) {
 // PeelToCommit resolves a ref or object to its commit — annotated tags
 // peel to the commit they point at.
 func PeelToCommit(dir, ref string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}").Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}").Output()
 	if err != nil {
 		return "", fmt.Errorf("rev-parse %s^{commit}: %w", ref, err)
 	}
@@ -132,7 +134,7 @@ func PeelToCommit(dir, ref string) (string, error) {
 
 // ReadCommit returns the raw commit object bytes.
 func ReadCommit(dir, sha string) ([]byte, error) {
-	cmd := exec.Command("git", "-C", dir, "cat-file", "commit", "--end-of-options", sha)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "commit", "--end-of-options", sha)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("cat-file commit %s: %w", sha, err)
@@ -145,7 +147,7 @@ func ReadCommit(dir, sha string) ([]byte, error) {
 // an interactive caller can watch. extraEnv carries credentials via
 // GIT_ASKPASS; the URL itself must never contain them.
 func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--progress", "--no-write-fetch-head", url,
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "fetch", "--progress", "--no-write-fetch-head", url,
 		"+refs/heads/*:refs/heads/*",
 		"+refs/tags/*:refs/tags/*",
 		"+refs/notes/*:refs/notes/*")
@@ -168,7 +170,7 @@ func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, extraEnv 
 // handshakes. extraEnv carries credentials via GIT_ASKPASS; the URL must
 // never contain them.
 func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--no-write-fetch-head", "--no-tags",
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "fetch", "--no-write-fetch-head", "--no-tags",
 		url, "+refs/pull/*/head:refs/gh-pull/*")
 	cmd.Env = append(os.Environ(), extraEnv...)
 	cmd.Stderr = errW
@@ -180,7 +182,7 @@ func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraE
 
 // RemoteDefaultBranch asks the remote which branch HEAD points at.
 func RemoteDefaultBranch(ctx context.Context, url string, extraEnv []string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", url, "HEAD")
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "ls-remote", "--symref", url, "HEAD")
 	cmd.Env = append(os.Environ(), extraEnv...)
 	out, err := cmd.Output()
 	if err != nil {
@@ -199,7 +201,7 @@ func RemoteDefaultBranch(ctx context.Context, url string, extraEnv []string) (st
 
 // SetHead points the bare repo's HEAD at a branch.
 func SetHead(dir, branch string) error {
-	cmd := exec.Command("git", "-C", dir, "symbolic-ref", "HEAD", "refs/heads/"+branch)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "symbolic-ref", "HEAD", "refs/heads/"+branch)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("symbolic-ref: %v\n%s", err, out)
 	}

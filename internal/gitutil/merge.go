@@ -6,13 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // FetchInto copies srcRef from srcDir into dstDir as dstRef, forcing the
 // update. Objects are copied, not shared — the destination owns everything
 // afterward, which is what keeps MRs alive when their fork is deleted.
 func FetchInto(dstDir, srcDir, srcRef, dstRef string) error {
-	cmd := exec.Command("git", "-C", dstDir, "fetch", "--quiet", "--no-write-fetch-head",
+	cmd := exec.Command(toolpath.Look("git"), "-C", dstDir, "fetch", "--quiet", "--no-write-fetch-head",
 		srcDir, "+"+srcRef+":"+dstRef)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("fetch %s from %s: %v\n%s", srcRef, srcDir, err, out)
@@ -28,7 +30,7 @@ func UpdateRefCAS(dir, ref, newSHA, oldSHA string) error {
 	if oldSHA != "" {
 		args = append(args, oldSHA)
 	}
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("update-ref %s: %v\n%s", ref, err, out)
 	}
@@ -36,7 +38,7 @@ func UpdateRefCAS(dir, ref, newSHA, oldSHA string) error {
 }
 
 func DeleteRef(dir, ref string) error {
-	cmd := exec.Command("git", "-C", dir, "update-ref", "-d", ref)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "update-ref", "-d", ref)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("delete-ref %s: %v\n%s", ref, err, out)
 	}
@@ -45,7 +47,7 @@ func DeleteRef(dir, ref string) error {
 
 // RevListRange returns commits in old..new, newest first.
 func RevListRange(dir, old, new string) ([]string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-list", "--end-of-options", new, "^"+old)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", "--end-of-options", new, "^"+old)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list %s..%s: %w", old, new, err)
@@ -62,7 +64,7 @@ func RevListRange(dir, old, new string) ([]string, error) {
 // MergeTree performs a real merge of ours and theirs, returning the merged
 // tree id. conflict=true means the merge cannot be done automatically.
 func MergeTree(dir, ours, theirs string) (tree string, conflict bool, err error) {
-	cmd := exec.Command("git", "-C", dir, "merge-tree", "--write-tree", "--end-of-options", ours, theirs)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-tree", "--write-tree", "--end-of-options", ours, theirs)
 	out, runErr := cmd.Output()
 	tree = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
 	if runErr != nil {
@@ -81,7 +83,7 @@ func CommitTree(dir, tree string, parents []string, name, email, message string)
 	for _, p := range parents {
 		args = append(args, "-p", p)
 	}
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME="+name, "GIT_AUTHOR_EMAIL="+email,
 		"GIT_COMMITTER_NAME="+name, "GIT_COMMITTER_EMAIL="+email,
@@ -98,7 +100,7 @@ func CommitTree(dir, tree string, parents []string, name, email, message string)
 // truncated says whether it was cut, so the caller can say so instead of
 // rendering a hunk that ends mid-line (#117).
 func Diff(dir, old, new string, limit int64) (patch string, truncated bool, err error) {
-	cmd := exec.Command("git", "-C", dir, "diff", "--stat", "--patch", "--end-of-options", old, new)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "diff", "--stat", "--patch", "--end-of-options", old, new)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", false, fmt.Errorf("diff: %w", err)
@@ -122,7 +124,7 @@ func cutAtLine(out []byte, limit int64) ([]byte, bool) {
 
 // MergeBase returns the best common ancestor, or an error if none exists.
 func MergeBase(dir, a, b string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "merge-base", "--end-of-options", a, b)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-base", "--end-of-options", a, b)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("no common history between %s and %s", a, b)
@@ -141,7 +143,7 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	}
 
 	// Hash the new blob.
-	hb := exec.Command("git", "-C", dir, "hash-object", "-w", "--stdin")
+	hb := exec.Command(toolpath.Look("git"), "-C", dir, "hash-object", "-w", "--stdin")
 	hb.Stdin = strings.NewReader(string(content))
 	out, err := hb.Output()
 	if err != nil {
@@ -159,17 +161,17 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	defer os.Remove(idx.Name())
 	env := append(os.Environ(), "GIT_INDEX_FILE="+idx.Name())
 
-	rt := exec.Command("git", "-C", dir, "read-tree", parent+"^{tree}")
+	rt := exec.Command(toolpath.Look("git"), "-C", dir, "read-tree", parent+"^{tree}")
 	rt.Env = env
 	if out, err := rt.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("read-tree: %v\n%s", err, out)
 	}
-	ui := exec.Command("git", "-C", dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+","+path)
+	ui := exec.Command(toolpath.Look("git"), "-C", dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+","+path)
 	ui.Env = env
 	if out, err := ui.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("update-index: %v\n%s", err, out)
 	}
-	wt := exec.Command("git", "-C", dir, "write-tree")
+	wt := exec.Command(toolpath.Look("git"), "-C", dir, "write-tree")
 	wt.Env = env
 	out, err = wt.Output()
 	if err != nil {
@@ -189,7 +191,7 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 
 // CommitParents returns the parent SHAs of a commit.
 func CommitParents(dir, sha string) ([]string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-list", "--parents", "-n1", "--end-of-options", sha).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", "--parents", "-n1", "--end-of-options", sha).Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list --parents %s: %w", sha, err)
 	}
@@ -202,7 +204,7 @@ func CommitParents(dir, sha string) ([]string, error) {
 
 // AuthorIdent returns a commit's author name, email, and ISO date.
 func AuthorIdent(dir, sha string) (name, email, date string, err error) {
-	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%an%x1f%ae%x1f%aI", "--end-of-options", sha).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%an%x1f%ae%x1f%aI", "--end-of-options", sha).Output()
 	if err != nil {
 		return "", "", "", fmt.Errorf("log %s: %w", sha, err)
 	}
@@ -215,7 +217,7 @@ func AuthorIdent(dir, sha string) (name, email, date string, err error) {
 
 // CommitMessage returns a commit's full message.
 func CommitMessage(dir, sha string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%B", "--end-of-options", sha).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%B", "--end-of-options", sha).Output()
 	if err != nil {
 		return "", fmt.Errorf("log %s: %w", sha, err)
 	}
@@ -225,7 +227,7 @@ func CommitMessage(dir, sha string) (string, error) {
 // MergeTreeOnto replays commit's changes (relative to base) onto onto,
 // returning the resulting tree. conflict=true when it cannot apply cleanly.
 func MergeTreeOnto(dir, base, onto, commit string) (tree string, conflict bool, err error) {
-	cmd := exec.Command("git", "-C", dir, "merge-tree", "--write-tree", "--merge-base="+base, "--end-of-options", onto, commit)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-tree", "--write-tree", "--merge-base="+base, "--end-of-options", onto, commit)
 	out, runErr := cmd.Output()
 	tree = strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
 	if runErr != nil {
@@ -245,7 +247,7 @@ func CommitTreeIdent(dir, tree string, parents []string,
 	for _, p := range parents {
 		args = append(args, "-p", p)
 	}
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	env := append(os.Environ(),
 		"GIT_AUTHOR_NAME="+authorName, "GIT_AUTHOR_EMAIL="+authorEmail,
 		"GIT_COMMITTER_NAME="+committerName, "GIT_COMMITTER_EMAIL="+committerEmail,
@@ -263,7 +265,7 @@ func CommitTreeIdent(dir, tree string, parents []string,
 
 // ResolveTree returns the tree id of a commit.
 func ResolveTree(dir, sha string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--verify", "--end-of-options", sha+"^{tree}").Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "rev-parse", "--verify", "--end-of-options", sha+"^{tree}").Output()
 	if err != nil {
 		return "", fmt.Errorf("rev-parse %s^{tree}: %w", sha, err)
 	}
@@ -272,7 +274,7 @@ func ResolveTree(dir, sha string) (string, error) {
 
 // DiffFiles lists the paths changed between old and new.
 func DiffFiles(dir, old, new string) ([]string, error) {
-	out, err := exec.Command("git", "-C", dir, "diff", "--name-only", "--end-of-options", old, new).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "diff", "--name-only", "--end-of-options", old, new).Output()
 	if err != nil {
 		return nil, fmt.Errorf("diff --name-only: %w", err)
 	}
@@ -304,7 +306,7 @@ func DiffFiles(dir, old, new string) ([]string, error) {
 // tells a reviewer nothing. It pairs at 80, and two genuinely unrelated
 // commits are still left unpaired there; both measured.
 func RangeDiff(dir, oldBase, oldHead, newBase, newHead string, limit int64) (patch string, truncated bool, err error) {
-	cmd := exec.Command("git", "-C", dir, "range-diff", "--creation-factor=80", "--end-of-options",
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "range-diff", "--creation-factor=80", "--end-of-options",
 		oldBase+".."+oldHead, newBase+".."+newHead)
 	out, err := cmd.Output()
 	if err != nil {

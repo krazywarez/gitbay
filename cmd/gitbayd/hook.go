@@ -15,6 +15,7 @@ import (
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // incomingSHAs lists the commits this push introduces, in order, without
@@ -28,7 +29,7 @@ func incomingSHAs(updates []policy.RefUpdate) ([]string, error) {
 			continue
 		}
 		// Everything reachable from the new tip that no existing ref has.
-		raw, err := exec.Command("git", "rev-list", u.New, "--not", "--all").Output()
+		raw, err := exec.Command(toolpath.Look("git"), "rev-list", u.New, "--not", "--all").Output()
 		if err != nil {
 			return nil, fmt.Errorf("rev-list %s: %w", u.New, err)
 		}
@@ -62,7 +63,7 @@ func streamIncomingCommits(updates []policy.RefUpdate, emit func(hookd.RawCommit
 	// part-way through a large push leaves git blocked writing into a
 	// pipe nobody is reading and Wait blocked on git.
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "git", "cat-file", "--batch")
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "cat-file", "--batch")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()

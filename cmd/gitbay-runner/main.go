@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"gitbay.org/gitbay/internal/buildinfo"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type job struct {
@@ -203,7 +204,7 @@ func (r *runner) run(j job) bool {
 	defer os.RemoveAll(dir)
 
 	// One long-lived `runner log` session receives the whole stream.
-	logCmd := exec.Command("ssh", append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
+	logCmd := exec.Command(toolpath.Look("ssh"), append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
 	pipe, err := logCmd.StdinPipe()
 	if err != nil {
 		log.Printf("build %d: log pipe: %v", j.ID, err)
@@ -294,7 +295,7 @@ func (r *runner) run(j job) bool {
 	}
 	steps = append(steps, []string{"-C", dir, "checkout", "-q", j.SHA})
 	for _, args := range steps {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(toolpath.Look("git"), args...)
 		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND="+gitSSH, "GIT_TERMINAL_PROMPT=0")
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
@@ -305,7 +306,7 @@ func (r *runner) run(j job) bool {
 
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
-		cmd := exec.Command("sh", "-c", step)
+		cmd := exec.Command(toolpath.Look("sh"), "-c", step)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(),
 			"GITBAY_REPO="+j.Repo, "GITBAY_SHA="+j.SHA, "GITBAY_REF="+j.Ref, "GITBAY_JOB="+j.Job, "CI=true")
@@ -323,7 +324,7 @@ func (r *runner) run(j job) bool {
 
 // ssh runs one control command against the server and returns stdout.
 func (r *runner) ssh(stdin io.Reader, args ...string) (string, error) {
-	cmd := exec.Command("ssh", append(append(r.sshOpts, r.remote), args...)...)
+	cmd := exec.Command(toolpath.Look("ssh"), append(append(r.sshOpts, r.remote), args...)...)
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}

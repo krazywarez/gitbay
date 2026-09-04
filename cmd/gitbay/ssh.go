@@ -13,6 +13,7 @@ import (
 
 	"gitbay.org/gitbay/internal/cliconfig"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // context is the resolved target for a command: which instance to talk to
@@ -59,7 +60,7 @@ func resolveTarget() (target, error) {
 }
 
 func originURL() string {
-	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
+	out, err := exec.Command(toolpath.Look("git"), "remote", "get-url", "origin").Output()
 	if err != nil {
 		return ""
 	}
@@ -115,7 +116,7 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 	}
 	args = append(args, t.inst.SSHUser()+"@"+t.inst.Host, "--", strings.Join(quoted, " "))
 
-	cmd := exec.Command("ssh", args...)
+	cmd := exec.Command(toolpath.Look("ssh"), args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -145,7 +146,7 @@ func sshCapture(t target, serverArgv []string) (string, int) {
 		quoted[i] = shellQuote(a)
 	}
 	args = append(args, t.inst.SSHUser()+"@"+t.inst.Host, "--", strings.Join(quoted, " "))
-	out, err := exec.Command("ssh", args...).Output()
+	out, err := exec.Command(toolpath.Look("ssh"), args...).Output()
 	if err != nil {
 		code := protocol.ExitProtocol
 		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() != 255 {

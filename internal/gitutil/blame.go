@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // BlameHunk is a run of consecutive lines attributed to one commit.
@@ -28,7 +30,7 @@ func Blame(dir, ref, path string, start, end int) ([]BlameHunk, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("git", "-C", dir, "blame", "--porcelain",
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "blame", "--porcelain",
 		fmt.Sprintf("-L%d,%d", start, end), sha, "--", path)
 	out, err := cmd.Output()
 	if err != nil {

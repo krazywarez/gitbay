@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 const zeroSHA = "0000000000000000000000000000000000000000"
@@ -22,7 +24,7 @@ func RevListAuthors(dir, old, new string, max int) ([]CommitAuthor, error) {
 	if old != "" && old != zeroSHA {
 		args = append(args, "^"+old)
 	}
-	out, err := exec.Command("git", args...).Output()
+	out, err := exec.Command(toolpath.Look("git"), args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list authors: %w", err)
 	}
@@ -39,7 +41,7 @@ func RevListAuthors(dir, old, new string, max int) ([]CommitAuthor, error) {
 
 // Parents returns a commit's parent shas.
 func Parents(dir, sha string) []string {
-	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%P", sha).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%P", sha).Output()
 	if err != nil {
 		return nil
 	}
@@ -49,7 +51,7 @@ func Parents(dir, sha string) []string {
 // LastCommitDate returns the committer date (YYYY-MM-DD) of the ref tip,
 // or "" for empty repos.
 func LastCommitDate(dir, ref string) string {
-	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%cs", ref).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%cs", ref).Output()
 	if err != nil {
 		return ""
 	}
@@ -58,7 +60,7 @@ func LastCommitDate(dir, ref string) string {
 
 // HasCommit reports whether sha names a commit object present in dir.
 func HasCommit(dir, sha string) bool {
-	return exec.Command("git", "-C", dir, "cat-file", "-e", sha+"^{commit}").Run() == nil
+	return exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "-e", sha+"^{commit}").Run() == nil
 }
 
 type CommitMsg struct {
@@ -76,7 +78,7 @@ func RevListMessages(dir, old, new string, max int) ([]CommitMsg, error) {
 	if old != "" && old != zeroSHA {
 		args = append(args, "^"+old)
 	}
-	out, err := exec.Command("git", args...).Output()
+	out, err := exec.Command(toolpath.Look("git"), args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("rev-list messages: %w", err)
 	}

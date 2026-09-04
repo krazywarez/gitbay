@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // EntryCommit is the newest commit touching one entry of a tree listing.
@@ -49,7 +51,7 @@ func LastCommits(dir, ref, path string, names []string) map[string]EntryCommit {
 	if prefix != "" {
 		args = append(args, "--", strings.TrimSuffix(prefix, "/"))
 	}
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil
@@ -107,7 +109,7 @@ func parseCommitHeader(s string) EntryCommit {
 // TipCommit is the commit at ref, for the bar above a tree listing that
 // answers "who touched this repository last".
 func TipCommit(dir, ref string) EntryCommit {
-	out, err := exec.Command("git", "-C", dir, "log", "-1",
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1",
 		"--format=%H%x1f%ct%x1f%an%x1f%ae%x1f%s", "--end-of-options", ref).Output()
 	if err != nil {
 		return EntryCommit{}
@@ -137,7 +139,7 @@ func entryName(changed, prefix string) (string, bool) {
 // page can report the facts the file listing no longer carries: its size,
 // and whether it is executable or a symlink.
 func StatPath(dir, ref, path string) (TreeEntry, bool) {
-	out, err := exec.Command("git", "-C", dir, "ls-tree", "-l", "--end-of-options", ref, "--", path).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "ls-tree", "-l", "--end-of-options", ref, "--", path).Output()
 	if err != nil {
 		return TreeEntry{}, false
 	}

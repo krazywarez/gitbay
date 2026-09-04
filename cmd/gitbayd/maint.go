@@ -13,6 +13,7 @@ import (
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/lfs"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 func gcCmd() *cobra.Command {
@@ -51,7 +52,7 @@ func gcCmd() *cobra.Command {
 				if aggressive {
 					gcArgs = append(gcArgs, "--aggressive")
 				}
-				if out, err := exec.Command("git", gcArgs...).CombinedOutput(); err != nil {
+				if out, err := exec.Command(toolpath.Look("git"), gcArgs...).CombinedOutput(); err != nil {
 					fmt.Fprintf(os.Stderr, "%s: gc failed: %v\n%s", r.Path(), err, out)
 					continue
 				}

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type GrepMatch struct {
@@ -23,7 +25,7 @@ func Grep(dir, ref, query string, max int) ([]GrepMatch, error) {
 	defer cancel()
 	// -z: NUL after the path and the line number, so paths containing
 	// ':' parse unambiguously (format: "ref:path\0line\0text\n").
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "grep", "-nIiF", "-z", "-e", query, "--end-of-options", ref)
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "grep", "-nIiF", "-z", "-e", query, "--end-of-options", ref)
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {

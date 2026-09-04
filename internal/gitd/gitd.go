@@ -16,6 +16,7 @@ import (
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type Server struct {
@@ -68,7 +69,7 @@ func (s *Server) handle(conn net.Conn) {
 	}
 
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	cmd := exec.Command("git", "upload-pack", dir)
+	cmd := exec.Command(toolpath.Look("git"), "upload-pack", dir)
 	cmd.Env = append(os.Environ(), protoEnv...)
 	cmd.Stdin = conn
 	cmd.Stdout = conn

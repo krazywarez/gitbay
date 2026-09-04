@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 func migrateCmd() *cobra.Command {
@@ -43,7 +44,7 @@ func sourceSSH(host string, port int, extra ...string) *exec.Cmd {
 	}
 	args = append(args, "git@"+host, "--")
 	args = append(args, extra...)
-	return exec.Command("ssh", args...)
+	return exec.Command(toolpath.Look("ssh"), args...)
 }
 
 func runMigrate(from string, fromPort int) int {
@@ -99,14 +100,14 @@ func runMigrate(from string, fromPort int) int {
 		if fromPort != 0 && fromPort != 22 {
 			srcURL = fmt.Sprintf("ssh://git@%s:%d/%s.git", from, fromPort, repoPath)
 		}
-		clone := exec.Command("git", "clone", "--quiet", "--mirror", srcURL, tmp+"/r")
+		clone := exec.Command(toolpath.Look("git"), "clone", "--quiet", "--mirror", srcURL, tmp+"/r")
 		clone.Stderr = os.Stderr
 		if err := clone.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "gitbay: cloning %s failed; fix and re-run migrate (it resumes)\n", repoPath)
 			os.RemoveAll(tmp)
 			return protocol.ExitFailure
 		}
-		push := exec.Command("git", "-C", tmp+"/r", "push", "--quiet", t.inst.CloneURL(repoPath),
+		push := exec.Command(toolpath.Look("git"), "-C", tmp+"/r", "push", "--quiet", t.inst.CloneURL(repoPath),
 			"+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*")
 		if len(t.inst.SSHOptions) > 0 {
 			push.Env = append(os.Environ(), "GIT_SSH_COMMAND=ssh "+strings.Join(quoteAll(t.inst.SSHOptions), " "))

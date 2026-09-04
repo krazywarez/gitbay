@@ -11,6 +11,7 @@ import (
 
 	"gitbay.org/gitbay/internal/cliconfig"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 // hasBodyFlag reports whether args already carry body/message input.
@@ -50,7 +51,7 @@ func maybeEditor(args []string, kind string, prefill func() string) ([]string, *
 	fmt.Fprintf(f, "\n# Write the %s body above. Lines starting with '#' are ignored.\n# Save an empty file to skip the body.\n", kind)
 	f.Close()
 
-	ed := exec.Command("sh", "-c", editor+" "+shellQuote(f.Name()))
+	ed := exec.Command(toolpath.Look("sh"), "-c", editor+" "+shellQuote(f.Name()))
 	ed.Stdin, ed.Stdout, ed.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := ed.Run(); err != nil {
 		return nil, nil, false, fmt.Errorf("editor: %w", err)
@@ -74,7 +75,7 @@ func maybeEditor(args []string, kind string, prefill func() string) ([]string, *
 }
 
 func runGitLocal(args ...string) int {
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(toolpath.Look("git"), args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -190,7 +191,7 @@ func captureSSH(t target, serverArgv []string) (string, int) {
 	args := sshArgs(t.inst)
 	quoted := quoteAll(serverArgv)
 	args = append(args, t.inst.SSHUser()+"@"+t.inst.Host, "--", strings.Join(quoted, " "))
-	cmd := exec.Command("ssh", args...)
+	cmd := exec.Command(toolpath.Look("ssh"), args...)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
@@ -301,7 +302,7 @@ func cmdRemoteList() int {
 // currentBranch is the checked-out branch of the working directory's
 // clone, or "" outside a clone or on a detached HEAD.
 func currentBranch() string {
-	out, err := exec.Command("git", "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	out, err := exec.Command(toolpath.Look("git"), "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	if err != nil {
 		return ""
 	}
