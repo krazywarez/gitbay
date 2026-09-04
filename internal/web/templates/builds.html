@@ -8,7 +8,7 @@
   <select id="job" name="job">
     {{range .Jobs}}<option value="{{.Name}}">{{.Name}}{{if .Schedule}} (schedule {{.Schedule}}){{else if .Tags}} (tags {{.Tags}}){{end}}</option>{{end}}
   </select>
-  <button type="submit" class="primary">Run</button>
+  <button type="submit">Run</button>
 </form>
 {{end}}
 <details class="editbox"><summary>Status badge</summary>

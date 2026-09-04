@@ -16,7 +16,7 @@
 </p>
 <p><input type="text" name="title" aria-label="Title" placeholder="title" value="{{.Title}}" required></p>
 <p><textarea name="body" aria-label="Description" rows="10" placeholder="what changes, and why">{{.Body}}</textarea></p>
-<p><button type="submit" class="primary">Open merge request</button></p>
+<p><button type="submit">Open merge request</button></p>
 </form>
 <p class="meta">A branch in a fork opens from the CLI:
 <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source owner/fork:branch --target {{.Repo.DefaultBranch}} --title "…"</code></p>
