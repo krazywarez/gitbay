@@ -45,6 +45,25 @@ func TestAuditAndHardening(t *testing.T) {
 		t.Fatalf("host audit: %s", out)
 	}
 
+	// Prose reaches argv through --title and --body. The entry records
+	// that the flags were given, not what was written: the issue itself is
+	// the record of its own text, and the audit log is not pruned by
+	// default (#122).
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/app",
+		"--title", "'a short title'", "--body", "'prose that must not be copied'"); code != 0 {
+		t.Fatalf("issue create: %s", errOut)
+	}
+	out, _, code = inst.ssh(t, adminKey, "", "audit", "--json")
+	if code != 0 || !strings.Contains(out, "cmd issue create") {
+		t.Fatalf("issue create not audited: %s", out)
+	}
+	if strings.Contains(out, "prose that must not be copied") || strings.Contains(out, "a short title") {
+		t.Fatalf("audit log copied the issue text:\n%s", out)
+	}
+	if !strings.Contains(out, "--body") || !strings.Contains(out, "alice/app") {
+		t.Fatalf("audit log dropped the flag names or the target:\n%s", out)
+	}
+
 	// Disable: everything refused, sessions dropped, nothing deleted.
 	inst.admin(t, "admin", "user", "disable", "bob")
 	if _, errOut, code := inst.ssh(t, bobKey, "", "whoami"); code != 4 || !strings.Contains(errOut, "disabled") {

@@ -190,6 +190,15 @@ write_files:
       [registration]
       mode = "closed"
 
+      # How long the append-only tables keep a row. Unset means forever,
+      # which is the default: growing is a decision, but so is deleting an
+      # audit trail. Expired sessions and tokens are swept either way.
+      # [retention]
+      # audit = "8760h"              # a year
+      # events = "4380h"             # six months
+      # webhook_deliveries = "720h"  # a month
+      # mail = "720h"
+
   - path: /etc/systemd/system/gitbayd.service
     content: |
       [Unit]

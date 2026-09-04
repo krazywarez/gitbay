@@ -26,3 +26,40 @@ func TestParseSince(t *testing.T) {
 		}
 	}
 }
+
+// TestAuditArgsDropFlagValues: prose reaches argv through --body and
+// --message, and the audit log kept it verbatim for a repository that may
+// be private. Identifiers are positional and survive; flag names survive
+// so the entry still says what shape the command had (#122).
+func TestAuditArgsDropFlagValues(t *testing.T) {
+	cases := []struct {
+		in   []string
+		want []string
+	}{
+		{[]string{"krz/gitbay", "--title", "a bug", "--body", "the whole issue text"},
+			[]string{"krz/gitbay", "--title", "--body"}},
+		{[]string{"krz/gitbay", "7", "--add", "bug", "--add", "ui"},
+			[]string{"krz/gitbay", "7", "--add", "--add"}},
+		// A switch takes no value, so the next argument is not swallowed.
+		{[]string{"krz/gitbay", "--private", "--name", "x"},
+			[]string{"krz/gitbay", "--private", "--name"}},
+		// After "--" everything is positional, including a token that
+		// looks like a flag.
+		{[]string{"krz/gitbay", "--", "--not-a-flag"},
+			[]string{"krz/gitbay", "--", "--not-a-flag"}},
+		{nil, []string{}},
+	}
+	for _, tc := range cases {
+		got := auditArgs(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("auditArgs(%v) = %v, want %v", tc.in, got, tc.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("auditArgs(%v) = %v, want %v", tc.in, got, tc.want)
+				break
+			}
+		}
+	}
+}

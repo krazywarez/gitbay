@@ -28,6 +28,7 @@ type Config struct {
 	Mail         Mail         `toml:"mail"`
 	Mirrors      Mirrors      `toml:"mirrors"`
 	Deps         Deps         `toml:"deps"`
+	Retention    Retention    `toml:"retention"`
 	// GoImport maps vanity Go module paths to repositories, e.g.
 	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
 	// under a mapped path get a go-import meta tag.
@@ -99,6 +100,31 @@ type Registration struct {
 func (r Registration) PendingExpiryDuration() time.Duration {
 	d, _ := time.ParseDuration(r.PendingExpiry)
 	return d
+}
+
+// Retention is how long the append-only tables keep a row. Each is a
+// duration string ("2160h"); empty or zero keeps forever, which is what
+// an instance that has never configured this gets. Expired sessions and
+// tokens are swept regardless: they are dead weight the moment they
+// expire and no setting makes them worth keeping.
+type Retention struct {
+	Audit             string `toml:"audit"`
+	Events            string `toml:"events"`
+	WebhookDeliveries string `toml:"webhook_deliveries"`
+	// Mail is the outbound queue: rows already sent or given up on.
+	Mail string `toml:"mail"`
+}
+
+// Durations parses the four, mapping each to zero when unset or bad.
+func (r Retention) Durations() (audit, events, deliveries, mail time.Duration) {
+	parse := func(s string) time.Duration {
+		d, err := time.ParseDuration(s)
+		if err != nil || d < 0 {
+			return 0
+		}
+		return d
+	}
+	return parse(r.Audit), parse(r.Events), parse(r.WebhookDeliveries), parse(r.Mail)
 }
 
 // LFS stores large-file objects content-addressed under Root (default

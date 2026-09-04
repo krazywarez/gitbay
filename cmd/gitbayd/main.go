@@ -171,6 +171,7 @@ func serveCmd() *cobra.Command {
 			if d := cfg.Registration.PendingExpiryDuration(); d > 0 {
 				go reapPending(whCtx, st, d)
 			}
+			go sweep(whCtx, st, cfg)
 			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL,
 				RepoDir: func(owner, name string) string {
 					return control.RepoDir(cfg.Server.Root, owner, name)
@@ -491,6 +492,36 @@ func hostUserCreateCmd() *cobra.Command {
 			}
 			return runAsHost([]string{"admin", "user", "create"}, rest, stdin)
 		},
+	}
+}
+
+// sweep prunes expired sessions and tokens, and rows past their
+// configured retention, hourly and once at start. GITBAY_SWEEP_TICK
+// shortens the interval for tests.
+func sweep(ctx context.Context, st *store.Store, cfg config.Config) {
+	tick := time.Hour
+	if v := os.Getenv("GITBAY_SWEEP_TICK"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			tick = d
+		}
+	}
+	audit, events, deliveries, mail := cfg.Retention.Durations()
+	r := store.Retention{Audit: audit, Events: events,
+		WebhookDeliveries: deliveries, Mail: mail}
+	t := time.NewTicker(tick)
+	defer t.Stop()
+	for {
+		swept, err := st.Sweep(r, time.Now())
+		if err != nil {
+			slog.Error("sweeping", "err", err, "removed", swept.Total())
+		} else if n := swept.Total(); n > 0 {
+			slog.Info("swept expired rows", "removed", n, "tables", swept)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
 	}
 }
 

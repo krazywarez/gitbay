@@ -124,16 +124,44 @@ func Dispatch(c *Ctx, argv []string) int {
 		c.Stdin = emptyReader{}
 	}
 	code := cmd.Run(c, args)
-	// Every successful mutating command lands in the audit log. Argv is
-	// safe to record by construction: secrets travel on stdin, never as
-	// arguments.
+	// Every successful mutating command lands in the audit log.
 	if code == protocol.ExitOK && !cmd.ReadOnly {
 		c.Store.Audit(c.User.ID, "cmd "+joinPath(cmd.Path), map[string]any{
-			"argv":   args,
+			"argv":   auditArgs(args),
 			"source": c.Source,
 		})
 	}
 	return code
+}
+
+// auditArgs is argv with flag values dropped. Secrets never reach argv —
+// they travel on stdin — but prose does: `issue create a/b --title x
+// --body <the whole issue>` used to store the body verbatim, in a table
+// nothing pruned, for a repository that may be private. The identifiers
+// are positional, so keeping those and the flag names says what was done
+// without copying what was written (#122).
+func auditArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "--") {
+			out = append(out, a)
+			continue
+		}
+		out = append(out, a)
+		// "--" ends flag parsing; everything after it is positional.
+		if a == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		// A flag's value is the next argument unless that is itself a
+		// flag, which is how a switch is told from one that takes a value
+		// without consulting the command's spec.
+		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+			i++
+		}
+	}
+	return out
 }
 
 // pendingAllowed lists what an unverified self-registered account may do.
