@@ -249,6 +249,15 @@ var pages = func() map[string]*template.Template {
 	return m
 }()
 
+// TemplateSource returns a template's raw text, for tests that inspect the
+// markup rather than the rendered output — an accessibility rule about
+// labels and ids is a property of the source, and holds whatever data a
+// page is given.
+func TemplateSource(name string) (string, error) {
+	b, err := templateFS.ReadFile("templates/" + name)
+	return string(b), err
+}
+
 // Pages lists the page template names, for tests that render each one.
 func Pages() []string {
 	names := make([]string, 0, len(pages))

@@ -19,9 +19,10 @@
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="topics">
-  <label for="topics-add">Topics</label>
+  <label for="topics-add">Topics to add</label>
   <input type="text" id="topics-add" name="add" placeholder="add, space-separated">
-  <input type="text" name="remove" placeholder="remove">
+  <label for="topics-remove">Topics to remove</label>
+  <input type="text" id="topics-remove" name="remove" placeholder="remove">
   <button type="submit">Apply</button>
 </form>
 {{if .Topics}}<p class="meta">{{range .Topics}}<span class="chip topic">{{.}}</span> {{end}}</p>{{end}}
