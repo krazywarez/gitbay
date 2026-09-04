@@ -25,32 +25,24 @@ func runAudit(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitDenied, "the audit log is for instance admins")
 	}
 	f := store.AuditFilter{Limit: 100}
-	for i := 0; i < len(args); i++ {
-		if i+1 >= len(args) {
-			return c.fail(protocol.ExitUsage, auditUsage)
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: auditUsage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if fl.Has("--limit") {
+		n, err := strconv.Atoi(fl.Value("--limit"))
+		if err != nil || n < 1 || n > 10000 {
+			return c.fail(protocol.ExitUsage, "--limit must be 1 to 10000")
 		}
-		v := args[i+1]
-		switch args[i] {
-		case "--limit":
-			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 || n > 10000 {
-				return c.fail(protocol.ExitUsage, "--limit must be 1 to 10000")
-			}
-			f.Limit = n
-		case "--actor":
-			f.Actor = v
-		case "--action":
-			f.ActionPrefix = v
-		case "--since":
-			t, ok := parseSince(v, time.Now())
-			if !ok {
-				return c.fail(protocol.ExitUsage, "--since takes a duration (30m, 24h, 7d) or a date (2026-09-01, RFC 3339)")
-			}
-			f.Since = t.UTC().Format("2006-01-02T15:04:05.000Z")
-		default:
-			return c.fail(protocol.ExitUsage, auditUsage)
+		f.Limit = n
+	}
+	f.Actor, f.ActionPrefix = fl.Value("--actor"), fl.Value("--action")
+	if fl.Has("--since") {
+		t, ok := parseSince(fl.Value("--since"), time.Now())
+		if !ok {
+			return c.fail(protocol.ExitUsage, "--since takes a duration (30m, 24h, 7d) or a date (2026-09-01, RFC 3339)")
 		}
-		i++
+		f.Since = t.UTC().Format("2006-01-02T15:04:05.000Z")
 	}
 	entries, err := c.Store.AuditEntries(f)
 	if err != nil {

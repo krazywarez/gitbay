@@ -68,22 +68,11 @@ func init() {
 }
 
 func runRepoFork(c *Ctx, args []string) int {
-	var path, name string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--name":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--name requires a value")
-			}
-			name = args[i+1]
-			i++
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo fork <owner/name> [--name <n>]")
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--name"}, MaxPos: 1, Usage: "repo fork <owner/name> [--name <n>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, name := f.pos(0), f.Value("--name")
 	if path == "" {
 		return c.fail(protocol.ExitUsage, "usage: repo fork <owner/name> [--name <n>]")
 	}
@@ -231,36 +220,13 @@ func mrRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool
 func mrHeadRef(n int64) string { return fmt.Sprintf("refs/merge-requests/%d/head", n) }
 
 func runMRCreate(c *Ctx, args []string) int {
-	var path, source, target, title, body, file, format string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--source", "--target", "--title", "--body", "--file", "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			v := args[i+1]
-			switch args[i] {
-			case "--source":
-				source = v
-			case "--target":
-				target = v
-			case "--title":
-				title = v
-			case "--body":
-				body = v
-			case "--file":
-				file = v
-			case "--format":
-				format = v
-			}
-			i++
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--source", "--target", "--title", "--body", "--file", "--format"}, MaxPos: 1,
+		Usage: "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t>"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, source, target := f.pos(0), f.Value("--source"), f.Value("--target")
+	title, body, file, format := f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
 	if path == "" || source == "" || title == "" {
 		return c.fail(protocol.ExitUsage, "usage: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t>")
 	}
@@ -415,29 +381,15 @@ func runMRList(c *Ctx, args []string) int {
 	}
 	const usage = "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
 	f := store.MRFilter{State: "open"}
-	var path string
-	for i := 0; i < len(args); i++ {
-		var target *string
-		switch args[i] {
-		case "--state":
-			target = &f.State
-		case "--author":
-			target = &f.Author
-		case "--milestone":
-			target = &f.Milestone
-		default:
-			if path != "" || strings.HasPrefix(args[i], "--") {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q\n%s", args[i], usage)
-			}
-			path = args[i]
-			continue
-		}
-		if i+1 >= len(args) {
-			return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-		}
-		*target = args[i+1]
-		i++
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone"}, MaxPos: 1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path := fl.pos(0)
+	if fl.Has("--state") {
+		f.State = fl.Value("--state")
+	}
+	f.Author, f.Milestone = fl.Value("--author"), fl.Value("--milestone")
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
 	if path == "" || !valid[f.State] {
 		return c.fail(protocol.ExitUsage, usage)
@@ -728,27 +680,13 @@ func runMRRetarget(c *Ctx, args []string) int {
 }
 
 func runMRComment(c *Ctx, args []string) int {
-	var rest []string
-	var message, file, format string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--message", "--file", "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--message":
-				message = args[i+1]
-			case "--file":
-				file = args[i+1]
-			case "--format":
-				format = args[i+1]
-			}
-			i++
-		default:
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--message", "--file", "--format"}, MaxPos: -1,
+		Usage: "mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest := f.Pos
+	message, file, format := f.Value("--message"), f.Value("--file"), f.Value("--format")
 	fmtName, err := markupFormat(format)
 	if err != nil {
 		return c.failErr(err)
@@ -824,19 +762,11 @@ func runMRReview(c *Ctx, args []string) int {
 }
 
 func runMRMerge(c *Ctx, args []string) int {
-	strategy := ""
-	var rest []string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--strategy" {
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--strategy requires ff|merge|squash|rebase")
-			}
-			strategy = args[i+1]
-			i++
-			continue
-		}
-		rest = append(rest, args[i])
+	f, err := parseFlags(args, flagSpec{Values: []string{"--strategy"}, MaxPos: -1, Usage: "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	strategy, rest := f.Value("--strategy"), f.Pos
 	valid := map[string]bool{"": true, "ff": true, "merge": true, "squash": true, "rebase": true}
 	if !valid[strategy] {
 		return c.fail(protocol.ExitUsage, "--strategy must be ff, merge, squash, or rebase")

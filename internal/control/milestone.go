@@ -41,29 +41,12 @@ func init() {
 var duePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 func runMilestoneCreate(c *Ctx, args []string) int {
-	var path, title, description, due string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--description", "--due":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			if args[i] == "--description" {
-				description = args[i+1]
-			} else {
-				due = args[i+1]
-			}
-			i++
-		default:
-			if path == "" {
-				path = args[i]
-			} else if title == "" {
-				title = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, "usage: milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]")
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2,
+		Usage: "milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, title, description, due := f.pos(0), f.pos(1), f.Value("--description"), f.Value("--due")
 	if path == "" || title == "" {
 		return c.fail(protocol.ExitUsage, "usage: milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]")
 	}
@@ -86,20 +69,13 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 }
 
 func runMilestoneList(c *Ctx, args []string) int {
-	state := "open"
-	var path string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--state" {
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--state requires open|closed|all")
-			}
-			state = args[i+1]
-			i++
-		} else if path == "" {
-			path = args[i]
-		} else {
-			return c.fail(protocol.ExitUsage, "usage: milestone list <owner/name> [--state open|closed|all]")
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "milestone list <owner/name> [--state open|closed|all]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	state, path := "open", f.pos(0)
+	if f.Has("--state") {
+		state = f.Value("--state")
 	}
 	if path == "" || (state != "open" && state != "closed" && state != "all") {
 		return c.fail(protocol.ExitUsage, "usage: milestone list <owner/name> [--state open|closed|all]")

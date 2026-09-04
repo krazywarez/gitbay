@@ -56,32 +56,17 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 		return code
 	}
 	const usage = "usage: admin user create <username> [--admin] [--email <address> [--verified]] [--key -] < key.pub"
-	var username, email string
-	var isAdmin, verified, withKey bool
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--admin":
-			isAdmin = true
-		case "--verified":
-			verified = true
-		case "--email":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--email requires a value")
-			}
-			email = args[i+1]
-			i++
-		case "--key":
-			if i+1 >= len(args) || args[i+1] != "-" {
-				return c.fail(protocol.ExitUsage, "--key only supports - (the public key on stdin)")
-			}
-			withKey = true
-			i++
-		default:
-			if username != "" || len(args[i]) == 0 || args[i][0] == '-' {
-				return c.fail(protocol.ExitUsage, usage)
-			}
-			username = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--email", "--key"}, Bools: []string{"--admin", "--verified"}, MaxPos: 1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	username, email := f.pos(0), f.Value("--email")
+	isAdmin, verified, withKey := f.Has("--admin"), f.Has("--verified"), f.Has("--key")
+	if withKey && f.Value("--key") != "-" {
+		return c.fail(protocol.ExitUsage, "--key only supports - (the public key on stdin)")
+	}
+	if username == "" || username[0] == '-' {
+		return c.fail(protocol.ExitUsage, usage)
 	}
 	if username == "" || (verified && email == "") {
 		return c.fail(protocol.ExitUsage, usage)

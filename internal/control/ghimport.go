@@ -100,29 +100,12 @@ func attribution(src string, n int64, kind, login, date string) string {
 }
 
 func runImportIssues(c *Ctx, args []string) int {
-	var path, from, apiBase string
-	tokenStdin := false
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--from", "--api-base":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			if args[i] == "--from" {
-				from = args[i+1]
-			} else {
-				apiBase = args[i+1]
-			}
-			i++
-		case "--token-stdin":
-			tokenStdin = true
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--api-base"}, Bools: []string{"--token-stdin"}, MaxPos: 1,
+		Usage: "repo import-issues <owner/name> --from <owner/repo> [--api-base <url>] [--token-stdin]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, from, apiBase, tokenStdin := f.pos(0), f.Value("--from"), f.Value("--api-base"), f.Has("--token-stdin")
 	if path == "" || from == "" {
 		return c.fail(protocol.ExitUsage, "usage: repo import-issues <owner/name> --from <ghowner/ghrepo> [--token-stdin]")
 	}

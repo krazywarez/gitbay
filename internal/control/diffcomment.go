@@ -31,43 +31,27 @@ func init() {
 }
 
 func runDiffComment(c *Ctx, args []string) int {
-	var rest []string
-	var path, message, file string
+	f, err := parseFlags(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"}, Bools: []string{"--old"}, MaxPos: -1,
+		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--reply <id>] [--message <m> | --file -]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	rest := f.Pos
+	path, message, file, old := f.Value("--path"), f.Value("--message"), f.Value("--file"), f.Has("--old")
 	var line, replyTo int64
-	old := false
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--path", "--line", "--reply", "--message", "--file":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			v := args[i+1]
-			switch args[i] {
-			case "--path":
-				path = v
-			case "--line":
-				n, err := strconv.ParseInt(v, 10, 64)
-				if err != nil || n < 1 {
-					return c.fail(protocol.ExitUsage, "--line must be a positive number")
-				}
-				line = n
-			case "--reply":
-				n, err := strconv.ParseInt(v, 10, 64)
-				if err != nil || n < 1 {
-					return c.fail(protocol.ExitUsage, "--reply must be a thread id")
-				}
-				replyTo = n
-			case "--message":
-				message = v
-			case "--file":
-				file = v
-			}
-			i++
-		case "--old":
-			old = true
-		default:
-			rest = append(rest, args[i])
+	if f.Has("--line") {
+		n, err := strconv.ParseInt(f.Value("--line"), 10, 64)
+		if err != nil || n < 1 {
+			return c.fail(protocol.ExitUsage, "--line must be a positive number")
 		}
+		line = n
+	}
+	if f.Has("--reply") {
+		n, err := strconv.ParseInt(f.Value("--reply"), 10, 64)
+		if err != nil || n < 1 {
+			return c.fail(protocol.ExitUsage, "--reply must be a thread id")
+		}
+		replyTo = n
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanRead)
 	if code >= 0 {

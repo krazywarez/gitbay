@@ -77,34 +77,12 @@ func releaseRef(c *Ctx, args []string, perm func(store.User, store.Repo, string)
 
 func runReleaseCreate(c *Ctx, args []string) int {
 	const usage = "usage: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
-	var path, tag, title, notes, file, format string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--title", "--notes", "--file", "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--title":
-				title = args[i+1]
-			case "--notes":
-				notes = args[i+1]
-			case "--file":
-				file = args[i+1]
-			case "--format":
-				format = args[i+1]
-			}
-			i++
-		default:
-			if path == "" {
-				path = args[i]
-			} else if tag == "" {
-				tag = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, usage)
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, tag := f.pos(0), f.pos(1)
+	title, notes, file, format := f.Value("--title"), f.Value("--notes"), f.Value("--file"), f.Value("--format")
 	if path == "" || tag == "" {
 		return c.fail(protocol.ExitUsage, usage)
 	}
@@ -172,35 +150,13 @@ func releaseToOut(r store.Release, withNotes bool) releaseOut {
 
 func runReleaseEdit(c *Ctx, args []string) int {
 	const usage = "usage: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
-	var path, tag, title, notes, file, format string
-	var setTitle, setNotes bool
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--title", "--notes", "--file", "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--title":
-				title, setTitle = args[i+1], true
-			case "--notes":
-				notes, setNotes = args[i+1], true
-			case "--file":
-				file, setNotes = args[i+1], true
-			case "--format":
-				format = args[i+1]
-			}
-			i++
-		default:
-			if path == "" {
-				path = args[i]
-			} else if tag == "" {
-				tag = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, usage)
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, tag := f.pos(0), f.pos(1)
+	title, notes, file, format := f.Value("--title"), f.Value("--notes"), f.Value("--file"), f.Value("--format")
+	setTitle, setNotes := f.Has("--title"), f.Has("--notes") || f.Has("--file")
 	fmtName, err := markupFormat(format)
 	if err != nil {
 		return c.failErr(err)

@@ -50,19 +50,12 @@ func runLabelList(c *Ctx, args []string) int {
 
 func runLabelSet(c *Ctx, args []string) int {
 	const usage = "usage: label set <owner/name> <label> [--color #rrggbb|'']"
-	var rest []string
-	color, colorSet := "", false
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--color" {
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--color requires rrggbb, or '' to clear")
-			}
-			color, colorSet = strings.ToLower(args[i+1]), true
-			i++
-			continue
-		}
-		rest = append(rest, args[i])
+	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: -1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest := f.Pos
+	color, colorSet := strings.ToLower(f.Value("--color")), f.Has("--color")
 	if len(rest) != 2 {
 		return c.fail(protocol.ExitUsage, usage)
 	}

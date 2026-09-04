@@ -39,25 +39,13 @@ func parseTTL(s string) (time.Duration, error) {
 }
 
 func runTokenCreate(c *Ctx, args []string) int {
-	name, scope, ttl := "", "full", ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--name", "--scope", "--ttl":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--name":
-				name = args[i+1]
-			case "--scope":
-				scope = args[i+1]
-			case "--ttl":
-				ttl = args[i+1]
-			}
-			i++
-		default:
-			return c.fail(protocol.ExitUsage, "usage: token create --name <n> [--scope full|read] [--ttl 30d]")
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: "token create --name <n> [--scope full|read] [--ttl 30d]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	name, scope, ttl := f.Value("--name"), "full", f.Value("--ttl")
+	if f.Has("--scope") {
+		scope = f.Value("--scope")
 	}
 	if name == "" || (scope != "full" && scope != "read") {
 		return c.fail(protocol.ExitUsage, "usage: token create --name <n> [--scope full|read] [--ttl 30d]")

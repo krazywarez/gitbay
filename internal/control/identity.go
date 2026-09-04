@@ -81,18 +81,13 @@ func runKeysList(c *Ctx, args []string) int {
 }
 
 func runKeysAdd(c *Ctx, args []string) int {
+	f, err := parseFlags(args, flagSpec{Values: []string{"--scope"}, MaxPos: 0, Usage: "keys add [--scope full|git|runner] < key.pub"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
 	scope := "full"
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--scope":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--scope requires a value")
-			}
-			scope = args[i+1]
-			i++
-		default:
-			return c.fail(protocol.ExitUsage, "usage: keys add [--scope full|git|runner] < key.pub")
-		}
+	if f.Has("--scope") {
+		scope = f.Value("--scope")
 	}
 	if scope != "full" && scope != "git" && scope != "runner" {
 		// deploy:* scopes are granted via repo settings, not self-service.

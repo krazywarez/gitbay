@@ -120,29 +120,13 @@ func runEmailVerify(c *Ctx, args []string) int {
 // that registration is enabled and that argv[0] == "register".
 func RunRegister(cfg config.Config, st *store.Store, pub ssh.PublicKey, argv []string,
 	stdout, stderr io.Writer) int {
-	var username, email, invite string
-	args := argv[1:]
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--username", "--email", "--invite":
-			if i+1 >= len(args) {
-				fmt.Fprintf(stderr, "%s requires a value\n", args[i])
-				return protocol.ExitUsage
-			}
-			switch args[i] {
-			case "--username":
-				username = args[i+1]
-			case "--email":
-				email = args[i+1]
-			case "--invite":
-				invite = args[i+1]
-			}
-			i++
-		default:
-			fmt.Fprintf(stderr, "unexpected argument %q\n", args[i])
-			return protocol.ExitUsage
-		}
+	f, err := parseFlags(argv[1:], flagSpec{Values: []string{"--username", "--email", "--invite"}, MaxPos: 0,
+		Usage: "register --username <n> --email <a> | --invite <code>"})
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return protocol.ExitUsage
 	}
+	username, email, invite := f.Value("--username"), f.Value("--email"), f.Value("--invite")
 	fail := func(code int, format string, a ...any) int {
 		fmt.Fprintf(stderr, format+"\n", a...)
 		return code

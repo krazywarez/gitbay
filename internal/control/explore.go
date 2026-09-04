@@ -80,20 +80,11 @@ func runExplore(c *Ctx, args []string) int {
 // same bytes with a Content-Disposition on them.
 func runRepoDownload(c *Ctx, args []string) int {
 	const usage = "repo download <owner/name> [--ref <r>] > repo.tar.gz"
-	var rest []string
-	var ref string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--ref requires a value")
-			}
-			ref = args[i+1]
-			i++
-		default:
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: -1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest, ref := f.Pos, f.Value("--ref")
 	if len(rest) != 1 {
 		return c.fail(protocol.ExitUsage, "usage: %s", usage)
 	}

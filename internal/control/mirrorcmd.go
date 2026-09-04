@@ -31,32 +31,13 @@ func init() {
 }
 
 func runMirrorAdd(c *Ctx, args []string) int {
-	var path, urlArg, direction, username string
-	tokenStdin := false
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--direction", "--username":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			if args[i] == "--direction" {
-				direction = args[i+1]
-			} else {
-				username = args[i+1]
-			}
-			i++
-		case "--token-stdin":
-			tokenStdin = true
-		default:
-			if path == "" {
-				path = args[i]
-			} else if urlArg == "" {
-				urlArg = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--direction", "--username"}, Bools: []string{"--token-stdin"}, MaxPos: 2,
+		Usage: "repo mirror add <owner/name> <url> --direction push|pull [--username <u>] [--token-stdin]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, urlArg := f.pos(0), f.pos(1)
+	direction, username, tokenStdin := f.Value("--direction"), f.Value("--username"), f.Has("--token-stdin")
 	if path == "" || urlArg == "" || (direction != "push" && direction != "pull") {
 		return c.fail(protocol.ExitUsage, "usage: repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]")
 	}

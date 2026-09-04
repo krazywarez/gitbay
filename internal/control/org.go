@@ -192,18 +192,13 @@ func runOrgDelete(c *Ctx, args []string) int {
 }
 
 func runOrgMembersAdd(c *Ctx, args []string) int {
-	role := "member"
-	var rest []string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--role" {
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--role requires member|admin")
-			}
-			role = args[i+1]
-			i++
-			continue
-		}
-		rest = append(rest, args[i])
+	f, err := parseFlags(args, flagSpec{Values: []string{"--role"}, MaxPos: -1, Usage: "org members add <org> <user> [--role member|admin]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	role, rest := "member", f.Pos
+	if f.Has("--role") {
+		role = f.Value("--role")
 	}
 	if len(rest) != 2 || (role != "member" && role != "admin") {
 		return c.fail(protocol.ExitUsage, "usage: org members add <org> <user> [--role member|admin]")

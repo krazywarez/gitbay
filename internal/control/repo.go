@@ -146,24 +146,13 @@ func resolveRepo(c *Ctx, path string, check func(store.User, store.Repo, string)
 }
 
 func runRepoCreate(c *Ctx, args []string) int {
-	visibility := "public"
-	var path, description string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--private":
-			visibility = "private"
-		case "--description":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--description requires a value")
-			}
-			description = args[i+1]
-			i++
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private] [--description <text>]")
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description"}, Bools: []string{"--private"}, MaxPos: 1, Usage: "repo create <owner/name> [--private] [--description <text>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	visibility, path, description := "public", f.pos(0), f.Value("--description")
+	if f.Has("--private") {
+		visibility = "private"
 	}
 	owner, name, ok := strings.Cut(path, "/")
 	if !ok {
@@ -810,25 +799,11 @@ func matchesRepo(q string, r store.Repo, desc string, topics []string) bool {
 }
 
 func runRepoGrep(c *Ctx, args []string) int {
-	var path, query, ref string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--ref requires a value")
-			}
-			ref = args[i+1]
-			i++
-		default:
-			if path == "" {
-				path = args[i]
-			} else if query == "" {
-				query = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: 2, Usage: "repo grep <owner/name> <query> [--ref <ref>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, query, ref := f.pos(0), f.pos(1), f.Value("--ref")
 	if path == "" || query == "" {
 		return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
 	}

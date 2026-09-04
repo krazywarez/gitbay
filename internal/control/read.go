@@ -94,36 +94,21 @@ const BlameSpan = 1000
 
 func runRepoBlame(c *Ctx, args []string) int {
 	const usage = "repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]"
-	var rest []string
-	var ref string
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--from", "--to"}, MaxPos: -1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	rest, ref := f.Pos, f.Value("--ref")
 	from, to := 0, 0
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref", "--from", "--to":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			v := args[i+1]
-			if args[i] == "--ref" {
-				ref = v
-			} else {
-				n, err := strconv.Atoi(v)
-				if err != nil || n < 1 {
-					return c.fail(protocol.ExitUsage, "%s must be a positive line number", args[i])
-				}
-				if args[i] == "--from" {
-					from = n
-				} else {
-					to = n
-				}
-			}
-			i++
-		default:
-			if strings.HasPrefix(args[i], "--") {
-				return c.fail(protocol.ExitUsage, "unknown flag %q\nusage: %s", args[i], usage)
-			}
-			rest = append(rest, args[i])
+	for name, dst := range map[string]*int{"--from": &from, "--to": &to} {
+		if !f.Has(name) {
+			continue
 		}
+		n, err := strconv.Atoi(f.Value(name))
+		if err != nil || n < 1 {
+			return c.fail(protocol.ExitUsage, "%s must be a positive line number", name)
+		}
+		*dst = n
 	}
 	if len(rest) != 2 {
 		return c.fail(protocol.ExitUsage, "usage: %s", usage)
@@ -219,24 +204,11 @@ func runRepoBlame(c *Ctx, args []string) int {
 // off argv. Positionals are returned in order so each command can name them
 // in its own usage message.
 func readArgs(c *Ctx, args []string, usage string, maxPos int) (pos []string, ref string, code int) {
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref":
-			if i+1 >= len(args) {
-				return nil, "", c.fail(protocol.ExitUsage, "--ref requires a value")
-			}
-			ref = args[i+1]
-			i++
-		default:
-			if strings.HasPrefix(args[i], "--") {
-				return nil, "", c.fail(protocol.ExitUsage, "unknown flag %q\nusage: %s", args[i], usage)
-			}
-			if len(pos) >= maxPos {
-				return nil, "", c.fail(protocol.ExitUsage, "usage: %s", usage)
-			}
-			pos = append(pos, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: maxPos, Usage: usage})
+	if err != nil {
+		return nil, "", c.fail(protocol.ExitUsage, "%v", err)
 	}
+	pos, ref = f.Pos, f.Value("--ref")
 	return pos, ref, -1
 }
 

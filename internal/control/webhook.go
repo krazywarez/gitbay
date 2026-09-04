@@ -31,29 +31,13 @@ func init() {
 }
 
 func runWebhookAdd(c *Ctx, args []string) int {
-	var path, url, secret string
-	events := "*"
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--secret", "--events":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			if args[i] == "--secret" {
-				secret = args[i+1]
-			} else {
-				events = args[i+1]
-			}
-			i++
-		default:
-			if path == "" {
-				path = args[i]
-			} else if url == "" {
-				url = args[i]
-			} else {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--secret", "--events"}, MaxPos: 2, Usage: "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	path, url, secret, events := f.pos(0), f.pos(1), f.Value("--secret"), "*"
+	if f.Has("--events") {
+		events = f.Value("--events")
 	}
 	if path == "" || url == "" {
 		return c.fail(protocol.ExitUsage, "usage: webhook add <owner/name> <url> [--secret <s>] [--events <k1,k2>|*]")
@@ -128,25 +112,17 @@ func runWebhookRemove(c *Ctx, args []string) int {
 }
 
 func runWebhookDeliveries(c *Ctx, args []string) int {
-	limit := 20
-	var path string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--limit" {
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--limit requires a value")
-			}
-			n, err := strconv.Atoi(args[i+1])
-			if err != nil || n < 1 || n > 200 {
-				return c.fail(protocol.ExitUsage, "--limit must be 1..200")
-			}
-			limit = n
-			i++
-			continue
+	f, err := parseFlags(args, flagSpec{Values: []string{"--limit"}, MaxPos: 1, Usage: "webhook deliveries <owner/name> [--limit n]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	limit, path := 20, f.pos(0)
+	if f.Has("--limit") {
+		n, err := strconv.Atoi(f.Value("--limit"))
+		if err != nil || n < 1 || n > 200 {
+			return c.fail(protocol.ExitUsage, "--limit must be 1..200")
 		}
-		if path != "" {
-			return c.fail(protocol.ExitUsage, "usage: webhook deliveries <owner/name> [--limit n]")
-		}
-		path = args[i]
+		limit = n
 	}
 	if path == "" {
 		return c.fail(protocol.ExitUsage, "usage: webhook deliveries <owner/name> [--limit n]")

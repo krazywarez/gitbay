@@ -127,38 +127,17 @@ func VerifyCommitCached(st *store.Store, repo store.Repo, parsed *sig.Commit, sh
 }
 
 func runRepoLog(c *Ctx, args []string) int {
-	limit := 30
-	var path, filePath, ref string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--ref requires a value")
-			}
-			ref = args[i+1]
-			i++
-		case "--limit":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--limit requires a value")
-			}
-			n, err := strconv.Atoi(args[i+1])
-			if err != nil || n < 1 || n > 1000 {
-				return c.fail(protocol.ExitUsage, "--limit must be 1..1000")
-			}
-			limit = n
-			i++
-		case "--path":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--path requires a value")
-			}
-			filePath = args[i+1]
-			i++
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]")
-			}
-			path = args[i]
+	f, perr := parseFlags(args, flagSpec{Values: []string{"--ref", "--limit", "--path"}, MaxPos: 1, Usage: "repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]"})
+	if perr != nil {
+		return c.fail(protocol.ExitUsage, "%v", perr)
+	}
+	limit, path, filePath, ref := 30, f.pos(0), f.Value("--path"), f.Value("--ref")
+	if f.Has("--limit") {
+		n, err := strconv.Atoi(f.Value("--limit"))
+		if err != nil || n < 1 || n > 1000 {
+			return c.fail(protocol.ExitUsage, "--limit must be 1..1000")
 		}
+		limit = n
 	}
 	if path == "" {
 		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]")

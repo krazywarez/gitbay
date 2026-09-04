@@ -123,40 +123,12 @@ func issueToOut(i store.Issue, withBody bool) issueOut {
 }
 
 func runIssueCreate(c *Ctx, args []string) int {
-	var path, title, body, file, format string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--format requires a value")
-			}
-			format = args[i+1]
-			i++
-		case "--title":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--title requires a value")
-			}
-			title = args[i+1]
-			i++
-		case "--body":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--body requires a value")
-			}
-			body = args[i+1]
-			i++
-		case "--file":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--file requires a value")
-			}
-			file = args[i+1]
-			i++
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--format", "--title", "--body", "--file"}, MaxPos: 1,
+		Usage: "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, title, body, file, format := f.pos(0), f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
 	if path == "" || title == "" {
 		return c.fail(protocol.ExitUsage, "usage: issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]")
 	}
@@ -200,33 +172,15 @@ func runIssueList(c *Ctx, args []string) int {
 	}
 	const usage = "usage: issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
 	f := store.IssueFilter{State: "open"}
-	var path string
-	for i := 0; i < len(args); i++ {
-		var target *string
-		switch args[i] {
-		case "--state":
-			target = &f.State
-		case "--label":
-			target = &f.Label
-		case "--assignee":
-			target = &f.Assignee
-		case "--author":
-			target = &f.Author
-		case "--milestone":
-			target = &f.Milestone
-		default:
-			if path != "" || strings.HasPrefix(args[i], "--") {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q\n%s", args[i], usage)
-			}
-			path = args[i]
-			continue
-		}
-		if i+1 >= len(args) {
-			return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-		}
-		*target = args[i+1]
-		i++
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone"}, MaxPos: 1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path := fl.pos(0)
+	if fl.Has("--state") {
+		f.State = fl.Value("--state")
+	}
+	f.Label, f.Assignee, f.Author, f.Milestone = fl.Value("--label"), fl.Value("--assignee"), fl.Value("--author"), fl.Value("--milestone")
 	if path == "" || (f.State != "open" && f.State != "closed" && f.State != "all") {
 		return c.fail(protocol.ExitUsage, usage)
 	}
@@ -298,32 +252,13 @@ func runIssueShow(c *Ctx, args []string) int {
 }
 
 func runIssueComment(c *Ctx, args []string) int {
-	var rest []string
-	var message, file, format string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--format":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--format requires a value")
-			}
-			format = args[i+1]
-			i++
-		case "--message":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--message requires a value")
-			}
-			message = args[i+1]
-			i++
-		case "--file":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--file requires a value")
-			}
-			file = args[i+1]
-			i++
-		default:
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--format", "--message", "--file"}, MaxPos: -1,
+		Usage: "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest := f.Pos
+	message, file, format := f.Value("--message"), f.Value("--file"), f.Value("--format")
 	fmtName, err := markupFormat(format)
 	if err != nil {
 		return c.failErr(err)
@@ -398,29 +333,14 @@ func setIssueState(c *Ctx, args []string, state string) int {
 // editText parses --title/--body/--file -/--format and authorizes: author or
 // write. A nil format means the stored markup format stays as it is.
 func editText(c *Ctx, args []string, kind string) (rest []string, title, body, format *string, code int) {
-	var titleV, bodyV, file, formatV string
-	haveTitle, haveBody := false, false
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--title", "--body", "--file", "--format":
-			if i+1 >= len(args) {
-				return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--title":
-				titleV, haveTitle = args[i+1], true
-			case "--body":
-				bodyV, haveBody = args[i+1], true
-			case "--file":
-				file = args[i+1]
-			case "--format":
-				formatV = args[i+1]
-			}
-			i++
-		default:
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--body", "--file", "--format"}, MaxPos: -1,
+		Usage: kind + " edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]"})
+	if err != nil {
+		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest = f.Pos
+	titleV, bodyV, file, formatV := f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
+	haveTitle, haveBody := f.Has("--title"), f.Has("--body")
 	if file != "" {
 		b, err := bodyFrom(c, "", file)
 		if err != nil {
@@ -482,24 +402,11 @@ func runIssueReopen(c *Ctx, args []string) int { return setIssueState(c, args, "
 
 // addRemoveFlags parses repeated --add/--remove flags.
 func addRemoveFlags(args []string) (rest, adds, removes []string, err error) {
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--add":
-			if i+1 >= len(args) {
-				return nil, nil, nil, errors.New("--add requires a value")
-			}
-			adds = append(adds, args[i+1])
-			i++
-		case "--remove":
-			if i+1 >= len(args) {
-				return nil, nil, nil, errors.New("--remove requires a value")
-			}
-			removes = append(removes, args[i+1])
-			i++
-		default:
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Multi: []string{"--add", "--remove"}, MaxPos: -1})
+	if err != nil {
+		return nil, nil, nil, err
 	}
+	rest, adds, removes = f.Pos, f.List("--add"), f.List("--remove")
 	return rest, adds, removes, nil
 }
 

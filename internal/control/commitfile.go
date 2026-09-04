@@ -35,30 +35,12 @@ const maxCommitFileBytes = 1 << 20
 // command rather than writing a commit its own policy would reject.
 func runCommitFile(c *Ctx, args []string) int {
 	const usage = "repo commit-file <owner/name> <path> --ref <branch> [--message <m>] [--file -]"
-	var rest []string
-	var ref, message, file string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--ref", "--message", "--file":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "%s requires a value", args[i])
-			}
-			switch args[i] {
-			case "--ref":
-				ref = args[i+1]
-			case "--message":
-				message = args[i+1]
-			case "--file":
-				file = args[i+1]
-			}
-			i++
-		default:
-			if strings.HasPrefix(args[i], "--") {
-				return c.fail(protocol.ExitUsage, "unknown flag %q\nusage: %s", args[i], usage)
-			}
-			rest = append(rest, args[i])
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--message", "--file"}, MaxPos: -1, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	rest := f.Pos
+	ref, message, file := f.Value("--ref"), f.Value("--message"), f.Value("--file")
 	if len(rest) != 2 || ref == "" {
 		return c.fail(protocol.ExitUsage, "usage: %s", usage)
 	}

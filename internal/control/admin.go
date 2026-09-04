@@ -91,19 +91,12 @@ func runAdminUserList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	state := ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--state":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--state requires active|pending|disabled|admin")
-			}
-			state = args[i+1]
-			i++
-		default:
-			return c.fail(protocol.ExitUsage, "usage: admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]")
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 0,
+		Usage: "admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	state := f.Value("--state")
 	switch state {
 	case "", "active", "pending", "disabled", "admin":
 	default:
@@ -344,24 +337,14 @@ func runAdminRepoList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	var owner, visibility string
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--owner":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--owner requires a value")
-			}
-			owner = args[i+1]
-			i++
-		case "--visibility":
-			if i+1 >= len(args) || (args[i+1] != "public" && args[i+1] != "private") {
-				return c.fail(protocol.ExitUsage, "--visibility requires public|private")
-			}
-			visibility = args[i+1]
-			i++
-		default:
-			return c.fail(protocol.ExitUsage, "usage: admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]")
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--owner", "--visibility"}, MaxPos: 0,
+		Usage: "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	owner, visibility := f.Value("--owner"), f.Value("--visibility")
+	if visibility != "" && visibility != "public" && visibility != "private" {
+		return c.fail(protocol.ExitUsage, "--visibility requires public|private")
 	}
 	repos, err := c.Store.ListReposAdmin(owner, visibility, p.queryLimit(), p.key)
 	if err != nil {

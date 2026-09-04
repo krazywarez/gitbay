@@ -52,41 +52,43 @@ func parseProfileFlags(c *Ctx, args []string) (rest []string, e profileEdit, err
 	about, file := "", ""
 	sawAbout := false
 	var links []store.ProfileLink
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--description", "--website", "--about", "--about-format", "--file", "--link":
-			if i+1 >= len(args) {
-				return nil, e, fmt.Errorf("%s requires a value", args[i])
-			}
-			v := args[i+1]
-			switch args[i] {
-			case "--description":
-				e.Description = &v
-			case "--website":
-				e.Website = &v
-			case "--about":
-				about, sawAbout = v, true
-			case "--about-format":
-				e.AboutFormat = &v
-			case "--file":
-				file, sawAbout = v, true
-			case "--link":
-				if v == "" {
-					links = nil
-					e.Links = &links
-					break
-				}
-				l, lerr := parseProfileLink(v)
-				if lerr != nil {
-					return nil, e, lerr
-				}
-				links = append(links, l)
-				e.Links = &links
-			}
-			i++
-		default:
-			rest = append(rest, args[i])
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--website", "--about", "--about-format", "--file"}, Multi: []string{"--link"}, MaxPos: -1})
+	if err != nil {
+		return nil, e, err
+	}
+	rest = f.Pos
+	for _, name := range []string{"--description", "--website", "--about-format"} {
+		if !f.Has(name) {
+			continue
 		}
+		v := f.Value(name)
+		switch name {
+		case "--description":
+			e.Description = &v
+		case "--website":
+			e.Website = &v
+		case "--about-format":
+			e.AboutFormat = &v
+		}
+	}
+	if f.Has("--about") {
+		about, sawAbout = f.Value("--about"), true
+	}
+	if f.Has("--file") {
+		file, sawAbout = f.Value("--file"), true
+	}
+	for _, v := range f.List("--link") {
+		if v == "" {
+			links = nil
+			e.Links = &links
+			continue
+		}
+		l, lerr := parseProfileLink(v)
+		if lerr != nil {
+			return nil, e, lerr
+		}
+		links = append(links, l)
+		e.Links = &links
 	}
 	if sawAbout {
 		body, berr := bodyFrom(c, about, file)

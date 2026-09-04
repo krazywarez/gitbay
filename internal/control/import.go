@@ -33,28 +33,12 @@ esac
 `
 
 func runRepoImport(c *Ctx, args []string) int {
-	var path, from string
-	private := false
-	tokenStdin := false
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--from":
-			if i+1 >= len(args) {
-				return c.fail(protocol.ExitUsage, "--from requires a URL")
-			}
-			from = args[i+1]
-			i++
-		case "--private":
-			private = true
-		case "--token-stdin":
-			tokenStdin = true
-		default:
-			if path != "" {
-				return c.fail(protocol.ExitUsage, "unexpected argument %q", args[i])
-			}
-			path = args[i]
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--from"}, Bools: []string{"--private", "--token-stdin"}, MaxPos: 1,
+		Usage: "repo import <owner/name> --from <url> [--private] [--token-stdin]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path, from, private, tokenStdin := f.pos(0), f.Value("--from"), f.Has("--private"), f.Has("--token-stdin")
 	if path == "" || from == "" {
 		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url> [--private] [--token-stdin]")
 	}
