@@ -24,9 +24,12 @@ at [[https://gitbay.org/register][gitbay.org/register]] for a browser.
    gitbay repo clone you/gitbay && cd gitbay
    git checkout -b my-change
    #+end_src
-2. Make the change. =go build ./...= and =go test ./...= must be green —
-   the e2e suite drives real =git=, =ssh=, =sshd=, and =gpg= binaries and
-   takes about two minutes.
+2. Make the change. =go build ./...= and =make test= must be green. Use
+   =make test=, not a bare =go test ./...=: the e2e suite drives real
+   =git=, =ssh=, =sshd= and =gpg= binaries and takes six to fifteen
+   minutes depending on the machine, which is past =go test='s ten-minute
+   default. The bare command panics part way through and names whichever
+   test was running, which is not the one at fault.
 3. **Sign your commits.** =main= requires verified signatures: register
    your signing key (=gitbay auth pgp add= for OpenPGP, or sign with a
    registered SSH key) and make sure your author email is verified on
