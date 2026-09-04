@@ -22,4 +22,5 @@
 </li>
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues — open one with <code>gitbay issue create {{.Repo.OwnerName}}/{{.Repo.Name}} --title "..."</code></li>{{end}}
 </ul>
+{{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 {{end}}

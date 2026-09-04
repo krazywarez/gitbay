@@ -1584,6 +1584,18 @@ func (s *Server) labelColors(repoID int64) map[string]template.CSS {
 	return out
 }
 
+// listPage is how many issues or merge requests a list page shows before
+// it offers the older ones (#118). Keyset paging on the number, the same
+// cursor the commands use, so every filter carries across pages.
+const listPage = 50
+
+// olderLink is the current URL with before=<number> set.
+func olderLink(r *http.Request, before int64) string {
+	q := r.URL.Query()
+	q.Set("before", strconv.FormatInt(before, 10))
+	return "?" + q.Encode()
+}
+
 func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
@@ -1598,11 +1610,17 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	// label chips and author links point here.
 	qv := r.URL.Query()
 	f := store.IssueFilter{State: state, Label: qv.Get("label"), Assignee: qv.Get("assignee"),
-		Author: qv.Get("author"), Milestone: qv.Get("milestone")}
+		Author: qv.Get("author"), Milestone: qv.Get("milestone"), Limit: listPage + 1}
+	f.Before, _ = strconv.ParseInt(qv.Get("before"), 10, 64)
 	issues, err := s.st.QueryIssues(p.Repo.ID, f)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	older := ""
+	if len(issues) > listPage {
+		issues = issues[:listPage]
+		older = olderLink(r, issues[len(issues)-1].Number)
 	}
 	if labels, err := s.st.ListIssueLabels(p.Repo.ID); err == nil {
 		for i := range issues {
@@ -1616,8 +1634,9 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 		Filters     []listFilter
 		Issues      []store.Issue
 		LabelColors map[string]template.CSS
+		Older       string
 	}{p, state, f.Label, activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
-		issues, s.labelColors(p.Repo.ID)})
+		issues, s.labelColors(p.Repo.ID), older})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
@@ -1703,18 +1722,25 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		state = "open"
 	}
 	qv := r.URL.Query()
-	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone")}
+	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone"), Limit: listPage + 1}
+	mf.Before, _ = strconv.ParseInt(qv.Get("before"), 10, 64)
 	mrs, err := s.st.QueryMRs(p.Repo.ID, mf)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	older := ""
+	if len(mrs) > listPage {
+		mrs = mrs[:listPage]
+		older = olderLink(r, mrs[len(mrs)-1].Number)
 	}
 	s.render(w, "mrs.html", struct {
 		repoPage
 		State   string
 		Filters []listFilter
 		MRs     []store.MR
-	}{p, state, activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs})
+		Older   string
+	}{p, state, activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs, older})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {

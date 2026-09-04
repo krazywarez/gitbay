@@ -21,4 +21,5 @@
 </li>
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}
 </ul>
+{{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 {{end}}
