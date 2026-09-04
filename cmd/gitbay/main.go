@@ -250,7 +250,32 @@ func usesStdin(args []string) bool {
 func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 	c := &cobra.Command{Use: use, Short: short}
 	c.AddCommand(subs...)
+	// A noun's help is the server's, like a command's: the registry is
+	// the only place flags are written down, and cobra's subcommand list
+	// carried none (#130). Offline, or for a noun the server does not
+	// know by that name, cobra's own tree still prints.
+	local := c.HelpFunc()
+	c.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if !serverHelp(use) {
+			local(cmd, args)
+		}
+	})
 	return c
+}
+
+// serverHelp prints the registry's usage for a prefix and reports whether
+// it did.
+func serverHelp(prefix string) bool {
+	t, err := resolveTarget()
+	if err != nil {
+		return false
+	}
+	out, code := sshCapture(t, []string{"help", prefix})
+	if code != 0 || out == "" {
+		return false
+	}
+	fmt.Print(out)
+	return true
 }
 
 // local wraps a locally-implemented command (git plumbing, config).

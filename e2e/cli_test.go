@@ -156,6 +156,12 @@ func TestCLI(t *testing.T) {
 	mustGit(t, dir, cliGitEnv, "add", ".")
 	mustGit(t, dir, cliGitEnv, "commit", "-q", "-m", "feature work")
 	mustGit(t, dir, cliGitEnv, "push", "-q", "origin", "feature")
+	// A noun's --help is the server's reference for that noun, flags
+	// included, not cobra's flagless subcommand list (#130).
+	if out := c.must(t, dir, "", "issue", "--help"); !strings.Contains(out, "issue create <owner/name>") {
+		t.Fatalf("issue --help is not the server's reference:\n%s", out)
+	}
+
 	// Inside the clone on the branch, --source is the checked-out branch
 	// and --target the default branch; neither needs typing (#101).
 	c.must(t, dir, "", "mr", "create", "--title", "via cli")
