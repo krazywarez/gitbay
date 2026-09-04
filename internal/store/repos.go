@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -92,13 +93,64 @@ func (s *Store) SetRepoVisibility(repoID int64, visibility string) error {
 	return err
 }
 
-func (s *Store) SetRepoSettings(repoID int64, settings RepoSettings) error {
-	raw, err := json.Marshal(settings)
+// UpdateRepoSettings applies mutate to the repository's settings and
+// stores the result, returning what was stored.
+//
+// settings_json is one blob, so changing one field means writing all of
+// them. Callers used to read the struct off a Repo they had loaded
+// earlier, change a field and write the whole blob back, which loses the
+// other admin's change whenever two ran at once — last write wins over a
+// value it never read. The read and the write happen here instead, inside
+// one transaction, and BEGIN IMMEDIATE takes the write lock up front: a
+// second updater waits at the start rather than discovering the conflict
+// after it has already read a stale blob.
+func (s *Store) UpdateRepoSettings(repoID int64, mutate func(*RepoSettings)) (RepoSettings, error) {
+	ctx := context.Background()
+	var out RepoSettings
+	// The whole exchange must run on one connection for BEGIN to bracket
+	// it; the pool would otherwise be free to hand the statements out
+	// separately.
+	conn, err := s.DB.Conn(ctx)
 	if err != nil {
-		return err
+		return out, err
 	}
-	_, err = s.DB.Exec("UPDATE repos SET settings_json = ? WHERE id = ?", string(raw), repoID)
-	return err
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return out, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			conn.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+	var raw string
+	if err := conn.QueryRowContext(ctx,
+		"SELECT settings_json FROM repos WHERE id = ?", repoID).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return out, ErrNotFound
+		}
+		return out, err
+	}
+	if raw != "" {
+		if err := json.Unmarshal([]byte(raw), &out); err != nil {
+			return out, err
+		}
+	}
+	mutate(&out)
+	next, err := json.Marshal(out)
+	if err != nil {
+		return out, err
+	}
+	if _, err := conn.ExecContext(ctx,
+		"UPDATE repos SET settings_json = ? WHERE id = ?", string(next), repoID); err != nil {
+		return out, err
+	}
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return out, err
+	}
+	committed = true
+	return out, nil
 }
 
 // CreateFork is CreateRepo with fork_of set in the same insert, so a fork

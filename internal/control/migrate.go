@@ -215,8 +215,10 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 		if len(cmds) > 0 {
 			deferrals = append(deferrals, deferred{path, cmds})
 		}
+		// An import writes the whole blob: the repository was created a
+		// few lines up and nobody else holds settings on it yet.
 		s.GitDaemon = false // instance-dependent; opt back in explicitly
-		c.Store.SetRepoSettings(repo.ID, s)
+		c.Store.UpdateRepoSettings(repo.ID, func(cur *store.RepoSettings) { *cur = s })
 
 		for _, bi := range br.Issues {
 			key := fmt.Sprintf("mig-issue:%d", bi.Number)

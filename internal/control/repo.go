@@ -562,9 +562,7 @@ func runSetWebsite(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.Website = site
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	if _, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.Website = site }); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]string{"website": site}, func(w io.Writer) {
@@ -601,9 +599,7 @@ func setRepoVisibility(c *Ctx, repo store.Repo, visibility string) int {
 	// Going private takes the repository off every anonymous surface, so
 	// git:// exposure cannot outlive the change.
 	if visibility == "private" && repo.Settings.GitDaemon {
-		s := repo.Settings
-		s.GitDaemon = false
-		c.Store.SetRepoSettings(repo.ID, s)
+		c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.GitDaemon = false })
 	}
 	c.Store.Audit(c.User.ID, "repo.visibility", map[string]any{"repo": repo.ID, "visibility": visibility})
 	return c.emit(map[string]string{"visibility": visibility}, func(w io.Writer) {
@@ -626,9 +622,8 @@ func runGitDaemon(c *Ctx, args []string) int {
 	if on && !c.Cfg.GitDaemon.Enabled {
 		return c.fail(protocol.ExitUsage, "this instance does not run the git:// daemon ([git_daemon] enabled = false)")
 	}
-	s := repo.Settings
-	s.GitDaemon = on
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.GitDaemon = on })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "git-daemon %s on %s\n", args[1], repo.Path()) })
@@ -662,9 +657,8 @@ func archiveRepo(c *Ctx, repo store.Repo, archived bool) int {
 	if repo.Settings.Archived == archived {
 		return c.fail(protocol.ExitUsage, "%s is already %sd", repo.Path(), verb)
 	}
-	s := repo.Settings
-	s.Archived = archived
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.Archived = archived })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "repo."+verb+"d", "{}")
@@ -898,16 +892,19 @@ func setProtect(c *Ctx, args []string, protect bool) int {
 		return code
 	}
 	branch := args[1]
-	s := repo.Settings
-	has := slices.Contains(s.ProtectedBranches, branch)
-	if protect && !has {
-		s.ProtectedBranches = append(s.ProtectedBranches, branch)
-		slices.Sort(s.ProtectedBranches)
-	}
-	if !protect && has {
-		s.ProtectedBranches = slices.DeleteFunc(s.ProtectedBranches, func(b string) bool { return b == branch })
-	}
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	// The list is read and rewritten inside the update, so two admins
+	// protecting different branches at once both land.
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) {
+		has := slices.Contains(s.ProtectedBranches, branch)
+		if protect && !has {
+			s.ProtectedBranches = append(s.ProtectedBranches, branch)
+			slices.Sort(s.ProtectedBranches)
+		}
+		if !protect && has {
+			s.ProtectedBranches = slices.DeleteFunc(s.ProtectedBranches, func(b string) bool { return b == branch })
+		}
+	})
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	verb := "protected"

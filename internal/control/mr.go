@@ -133,9 +133,8 @@ func runRequireApprovals(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.RequireApprovals = n
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireApprovals = n })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
@@ -151,9 +150,8 @@ func runRequireResolved(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.RequireResolved = args[1] == "on"
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireResolved = args[1] == "on" })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
@@ -169,9 +167,8 @@ func runRequireCodeowners(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.RequireCodeowners = args[1] == "on"
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireCodeowners = args[1] == "on" })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
@@ -187,9 +184,8 @@ func runRequireChecks(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.RequireChecks = args[1] == "on"
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireChecks = args[1] == "on" })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
@@ -205,9 +201,8 @@ func runRequireSigned(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s := repo.Settings
-	s.RequireSignedCommits = args[1] == "on"
-	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireSignedCommits = args[1] == "on" })
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
