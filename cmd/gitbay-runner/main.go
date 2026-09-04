@@ -58,6 +58,7 @@ func main() {
 		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
 		repos     = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
 		once      = flag.Bool("once", false, "process at most one build, then exit")
+		jobs      = flag.Int("jobs", 1, "builds to run at once")
 		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
 	flag.Parse()
@@ -88,18 +89,45 @@ func main() {
 	if err := os.MkdirAll(r.workdir, 0o755); err != nil {
 		log.Fatal(err)
 	}
-	for {
-		ran, err := r.step()
-		if err != nil {
-			log.Printf("runner: %v", err)
-		}
-		if *once {
-			return
-		}
-		if !ran {
-			time.Sleep(*poll)
-		}
+	n := *jobs
+	if n < 1 {
+		log.Fatal("-jobs must be at least 1")
 	}
+	if *once {
+		// "at most one build" is one build, whatever -jobs says.
+		n = 1
+	}
+	// `runner next` claims inside one transaction, so several workers
+	// claiming at once is already safe; the runner just never used that.
+	// Each build works in its own build-<id> directory, so they do not
+	// meet on disk either.
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			// Spread the idle polls across the interval rather than
+			// having every worker wake together: n workers asking the
+			// same question in the same instant is n times the load for
+			// one answer.
+			if n > 1 {
+				time.Sleep(time.Duration(i) * *poll / time.Duration(n))
+			}
+			for {
+				ran, err := r.step()
+				if err != nil {
+					log.Printf("runner: %v", err)
+				}
+				if *once {
+					return
+				}
+				if !ran {
+					time.Sleep(*poll)
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 // step claims and executes at most one build. ran reports whether there was
