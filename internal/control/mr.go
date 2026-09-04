@@ -1217,9 +1217,17 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 		fmt.Sprintf(`{"number":%d,"draft":%t}`, mr.Number, draft))
 	// Marking ready is the request for review; going back to draft
 	// withdraws it and is not worth anyone's inbox.
+	//
+	// The targets are the repository's, not the thread's participants.
+	// Until someone comments or reviews, the only participant is the
+	// author, who is the actor and excluded — so notifying participants
+	// here reaches nobody, which is exactly what opening it as a draft
+	// and then marking it ready would do. Opening a merge request tells
+	// the repository; so does saying it is finally asking.
 	if !draft {
-		if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-			notify(c, parts, notice{repo: repo, kind: "mr",
+		if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
+			parts, _ := c.Store.MRParticipants(mr.ID)
+			notify(c, append(targets, parts...), notice{repo: repo, kind: "mr",
 				subject: mrSubject(repo, mr.Number, mr.Title),
 				action:  fmt.Sprintf("marked !%d ready for review", mr.Number),
 				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
