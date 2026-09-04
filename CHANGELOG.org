@@ -4,6 +4,62 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.12.0 — 2026-09-04
+
+The store and the push path. Dashboard queries walk an index instead of
+sorting the table, concurrent writers wait instead of failing, expired
+rows are swept, and a large first push no longer forks a process per
+commit.
+
+- Every dashboard list scanned its table and sorted the result to take
+  fifty rows. Reachability is correlated subqueries and cannot be
+  indexed; the index supplies the =ORDER BY= instead, so the walk stops
+  at =LIMIT=. On 20k issues and 20k merge requests: open issues 11.8ms
+  to 0.8ms, open merge requests 12.1ms to 0.8ms, the review queue 15.5ms
+  to 0.3ms, assigned issues 10.6ms to 0.04ms. The last of those also
+  drives from =issue_assignees= rather than testing =EXISTS= against
+  every issue. #137
+- Concurrent writers serialise rather than failing. Every transaction in
+  the store writes, and a deferred one takes the write lock at its first
+  write, by which point another may hold it; SQLite answers
+  =SQLITE_BUSY= and does not run the busy handler for that case, so
+  =busy_timeout= could not help. Measured with eight concurrent
+  read-then-write transactions, 44% of them failed. Beginning immediate
+  takes the lock up front, where the timeout applies. #121
+- =repo settings= updates no longer overwrite each other.
+  =settings_json= is one blob, and every caller read it off a repository
+  loaded earlier, changed a field and wrote it all back; two admins at
+  once and the later write put back what it had read for the other's
+  field. The read and the write happen together now, under one
+  immediate transaction. #123
+- Expired sessions and tokens are swept, and =[retention]= caps how long
+  the audit log, the activity feed, webhook deliveries and the mail
+  queue keep a row. Unset means forever, which is what every existing
+  instance gets. #122
+- The audit entry records flag names without their values. Secrets never
+  reached argv — they travel on stdin — but prose did: =--body <the
+  whole issue>= was stored verbatim, in a table nothing pruned, for a
+  repository that may be private. Identifiers are positional and
+  survive. #122
+- pre-receive on a require-signed repository forked a =cat-file= per
+  incoming commit and built one JSON message holding the whole push. A
+  50k-commit first push forked 50k processes and held the history in
+  memory twice. One =cat-file --batch= serves the push now, and the
+  daemon verifies each commit as it arrives. #100
+- The payloads other surfaces decode are named types in =control=. httpd
+  had its own copies of what the build, profile and dashboard commands
+  emit, so a field added to a command was silently absent on the page.
+  #126
+
+Migration 0035 adds three indexes; it runs on daemon start.
+
+Two changes in behaviour rather than configuration. A heavily contended
+write now blocks for up to =busy_timeout= (five seconds) instead of
+returning an error immediately — waiting is the point, but a caller that
+treated the error as normal will see a pause instead. And anything
+parsing =audit --json= for command arguments will find flag values gone;
+the flag names and the positional arguments are still there.
+
 * v1.11.0 — 2026-09-04
 
 The web catches up with the rest of the forge: search across the
