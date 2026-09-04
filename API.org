@@ -128,9 +128,31 @@ gitbay webhook remove <id>
 
 ** Events
 
-=push= (data: ref, old, new, forced, deleted), =issue.created=,
-=issue.commented=, =issue.closed=, =issue.open=, =mr.created=,
-=mr.merged= (data: number, sha), =repo.imported= (data: from).
+Every event this forge records, and so every name =--events= may take.
+The server holds the same list as =control.EventKinds=, and a test
+fails if the code emits something not listed or lists something it never
+emits — so this is the whole set, not a sample. =webhook add= refuses a
+name that is not one of them, since a subscription to a typo would
+silently never fire.
+
+- repository: =push= (ref, old, new, forced, deleted), =repo.archived=,
+  =repo.unarchived=, =repo.imported= (from)
+- issues: =issue.created=, =issue.edited=, =issue.commented=,
+  =issue.closed=, =issue.open=, =issue.labeled= (labels),
+  =issue.assigned= (assignees), =issue.milestoned= (milestone)
+- merge requests: =mr.created=, =mr.edited=, =mr.commented=,
+  =mr.reviewed= (verdict), =mr.draft= (draft), =mr.retargeted= (from,
+  to), =mr.milestoned= (milestone), =mr.merged= (number, sha),
+  =mr.closed=
+- releases: =release.created= (tag), =release.deleted= (tag)
+- CI: =status=, =build.success=, =build.failure=, =build.cancelled=
+
+Every payload carries =number= where it names an issue or merge request.
+
+There is deliberately no =repo.deleted=. Both =events.repo_id= and
+=webhooks.repo_id= cascade from =repos=, so recording one would delete
+it — and every webhook that could have received it — in the same
+statement. A repository's deletion is visible in the audit log.
 
 ** Delivery
 

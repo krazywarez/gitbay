@@ -40,6 +40,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | merge (all strategies) | yes | yes | yes |
 | close                  | yes | yes | yes |
 | create                 | yes | yes | yes |
+| draft, ready           | yes | yes | no  |
+| search title and body  | yes | yes | no  |
 | create from a fork     | yes | no  | yes |
 | retarget               | yes | yes | no  |
 | milestone              | yes | yes | yes |
@@ -63,6 +65,16 @@ refused while anything is stacked on the merge request, since it would
 rewrite the commits the stack builds on. The iOS client renders the
 retarget but has no stack view yet.
 
+A draft merge request is open but not asking: it does not merge, and it
+does not appear in anyone's review queue. Draft is a flag rather than a
+fifth state, so every =state = 'open'= rule still means what it did.
+Batched review and range-diff (krz/gitbay#111) are not built.
+
+Nothing asks a *particular* person for a review. The review queue is
+computed from involvement — what you own, are granted, or reach through
+an org or team — so a collaborator with write access who has not touched
+a thread hears nothing until they do (krz/gitbay#145).
+
 Creating from a fork works anywhere the source can be typed as
 =owner/name:branch=; only the web lacks it. Retargeting moves an open
 merge request onto another branch of the same repository and stales the
@@ -74,6 +86,7 @@ reviews, since an approval was of the diff against the old branch.
 |---------------------+-----+-----+-----|
 | read, list, filter  | yes | yes | yes |
 | filter by label, assignee, author, milestone | yes | yes | no |
+| search title and body | yes | yes | no |
 | create              | yes | yes | yes |
 | comment             | yes | yes | yes |
 | edit title and body | yes | yes | yes |
@@ -183,11 +196,14 @@ now render the way the reference does. go-org is not yet on the corpus.
 | command reference                | yes | no  | n/a |
 
 =explore= is the listing without a query; =repo search= is the one with.
-=search= is both plus issue and merge request titles, over everything
-the caller can read; the web serves it at =/search= with a field in the
-rail, and an anonymous visitor gets the public rows from the same query.
-Titles only — body search wants FTS5 and belongs with krz/gitbay#114.
-=repo grep= remains the per-repository file-contents search.
+=search= is both plus the title and body of every issue and merge
+request the caller can read, over FTS5; the web serves it at =/search=
+with a field in the rail, and an anonymous visitor gets the public rows
+from the same query. =issue list --search= and =mr list --search= narrow
+one repository. What someone types is quoted term by term, so an FTS5
+operator — =c++=, =AND=, a lone quote — is a word to match and never a
+syntax error. =repo grep= remains the per-repository file-contents
+search.
 
 About text renders as markdown or org-mode per the =about_format= it
 was stored with. The iOS =Profile= decoder lists its keys explicitly,

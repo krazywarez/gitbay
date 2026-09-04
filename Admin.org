@@ -328,7 +328,17 @@ rm /tmp/ci-bootstrap /tmp/ci-bootstrap.pub
 gitbay-runner -remote git@127.0.0.1 -workdir /var/lib/gitbay-runner/work
 #+end_src
 
-=admin runners= shows which account each runner polls as; an admin key
+=-jobs N= runs N builds at once. Claiming is one transaction that
+selects and updates, and each build works in its own =build-<id>=
+directory, so workers do not collide; idle polls are staggered across
+the interval so N of them do not wake together. The drop-in's weights
+below are per service, not per build, so raising =-jobs= divides them
+rather than multiplying the host's load.
+
+=admin runners= shows which account each runner polls as, and what each
+is scoped to. A runner with no scope claims builds for *any*
+repository, which on an instance with open registration means running a
+stranger's steps; scope one with =-repos owner/name=. An admin key
 still works for the protocol during a rotation. A merge request head
 from a fork is built in the target repository as untrusted: the claim
 carries no secrets. Same-repository heads were built by their branch
