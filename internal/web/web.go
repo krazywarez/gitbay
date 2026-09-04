@@ -4,10 +4,13 @@ package web
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"reflect"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -225,13 +228,42 @@ var funcs = template.FuncMap{
 	},
 }
 
+// pages holds every page template parsed once with the layout, at
+// start-up: a template that does not parse fails the process before it
+// serves anything, rather than the first visit to a rarely-hit page, and
+// a request no longer re-parses the layout (#116).
+var pages = func() map[string]*template.Template {
+	entries, err := fs.ReadDir(templateFS, "templates")
+	if err != nil {
+		panic(err)
+	}
+	m := map[string]*template.Template{}
+	for _, e := range entries {
+		name := e.Name()
+		if name == "layout.html" || !strings.HasSuffix(name, ".html") {
+			continue
+		}
+		layout := template.Must(template.New("layout.html").Funcs(funcs).ParseFS(templateFS, "templates/layout.html"))
+		m[name] = template.Must(layout.ParseFS(templateFS, "templates/"+name))
+	}
+	return m
+}()
+
+// Pages lists the page template names, for tests that render each one.
+func Pages() []string {
+	names := make([]string, 0, len(pages))
+	for name := range pages {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // Render executes the named page template with the shared layout.
 func Render(w io.Writer, page string, data any) error {
-	t, err := template.Must(
-		template.New("layout.html").Funcs(funcs).ParseFS(templateFS, "templates/layout.html"),
-	).ParseFS(templateFS, "templates/"+page)
-	if err != nil {
-		return err
+	t, ok := pages[page]
+	if !ok {
+		return fmt.Errorf("no page template %q", page)
 	}
 	return t.ExecuteTemplate(w, "layout", data)
 }
