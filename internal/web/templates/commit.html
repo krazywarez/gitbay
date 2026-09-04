@@ -9,5 +9,6 @@
   {{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
 </div>
 <pre class="message">{{.Message}}</pre>
+{{if .DiffTruncated}}<p class="error" role="alert">This patch is larger than 4 MiB and is cut off below. Clone the repository to see all of it.</p>{{end}}
 {{template "difffiles" dict "Files" .DiffFiles "Base" "" "Viewer" ""}}
 {{end}}

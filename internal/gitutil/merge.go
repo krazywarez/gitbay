@@ -1,6 +1,7 @@
 package gitutil
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -93,17 +94,30 @@ func CommitTree(dir, tree string, parents []string, name, email, message string)
 }
 
 // Diff returns the patch for old..new (three-dot semantics are the caller's
-// job: pass the merge base as old).
-func Diff(dir, old, new string, limit int64) (string, error) {
+// job: pass the merge base as old), cut at limit bytes on a line boundary;
+// truncated says whether it was cut, so the caller can say so instead of
+// rendering a hunk that ends mid-line (#117).
+func Diff(dir, old, new string, limit int64) (patch string, truncated bool, err error) {
 	cmd := exec.Command("git", "-C", dir, "diff", "--stat", "--patch", "--end-of-options", old, new)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("diff: %w", err)
+		return "", false, fmt.Errorf("diff: %w", err)
 	}
-	if int64(len(out)) > limit {
-		out = out[:limit]
+	out, truncated = cutAtLine(out, limit)
+	return string(out), truncated, nil
+}
+
+// cutAtLine keeps at most limit bytes, ending on the last newline before
+// the limit.
+func cutAtLine(out []byte, limit int64) ([]byte, bool) {
+	if int64(len(out)) <= limit {
+		return out, false
 	}
-	return string(out), nil
+	cut := out[:limit]
+	if i := bytes.LastIndexByte(cut, '\n'); i >= 0 {
+		cut = cut[:i+1]
+	}
+	return cut, true
 }
 
 // MergeBase returns the best common ancestor, or an error if none exists.

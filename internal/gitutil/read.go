@@ -151,21 +151,23 @@ func (c *cappedWriter) Write(p []byte) (int, error) {
 }
 
 // ShowPatch returns the stat+patch text for one commit.
-func ShowPatch(dir, sha string, limit int64) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "show", "--stat", "--patch", "--format=", sha)
+func ShowPatch(dir, sha string, limit int64) (patch string, truncated bool, err error) {
+	cmd := exec.Command("git", "-C", dir, "show", "--stat", "--patch", "--format=", "--end-of-options", sha)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return "", false, err
 	}
-	data, _ := io.ReadAll(io.LimitReader(stdout, limit))
+	// One byte past the limit says whether there was more.
+	data, _ := io.ReadAll(io.LimitReader(stdout, limit+1))
 	io.Copy(io.Discard, stdout)
 	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("show %s: %w", sha, err)
+		return "", false, fmt.Errorf("show %s: %w", sha, err)
 	}
-	return string(data), nil
+	data, truncated = cutAtLine(data, limit)
+	return string(data), truncated, nil
 }
 
 // IsBinary reports whether data looks like binary content.

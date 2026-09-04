@@ -246,9 +246,12 @@ func runRepoCommit(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "verifying %s: %v", full, err)
 	}
-	patch, err := gitutil.ShowPatch(dir, full, 4<<20)
+	patch, truncated, err := gitutil.ShowPatch(dir, full, 4<<20)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if truncated {
+		fmt.Fprintln(c.Stderr, "patch truncated at 4 MiB; clone the repository for the rest")
 	}
 	statuses, err := c.Store.ListCommitStatuses(repo.ID, full)
 	if err != nil {

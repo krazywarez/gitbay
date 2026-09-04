@@ -1448,7 +1448,7 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	patch, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
+	patch, truncated, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
 	files := parseDiff(patch)
 	committerEmail := ""
 	if parsed.CommitterEmail != parsed.AuthorEmail {
@@ -1468,9 +1468,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		Sig                                                                               sigView
 		Checks                                                                            []store.CommitStatus
 		DiffFiles                                                                         []diffFile
+		DiffTruncated                                                                     bool
 	}{p, full, full[:10], commitNames.name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, commitUser, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
-		gitutil.Parents(p.Dir, full), v, checks, files})
+		gitutil.Parents(p.Dir, full), v, checks, files, truncated})
 }
 
 // labelPalette provides default label chip colors: mid-tone hues that stay
@@ -1661,9 +1662,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			base = b
 		}
 	}
+	var diffTruncated bool
 	if base != "" {
-		if patch, err := gitutil.Diff(p.Dir, base, headRef, 4<<20); err == nil {
-			files = parseDiff(patch)
+		if patch, truncated, err := gitutil.Diff(p.Dir, base, headRef, 4<<20); err == nil {
+			files, diffTruncated = parseDiff(patch), truncated
 		}
 	}
 	md := s.ugcFor(r, p.Repo)
@@ -1682,9 +1684,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	mrNames := s.authorNames()
 	var commits []commitRow
+	commitsTotal := 0
 	if base != "" {
 		const maxMRCommits = 100
 		shas, _ := gitutil.RevListRange(p.Dir, base, headRef)
+		commitsTotal = len(shas)
 		if len(shas) > maxMRCommits {
 			shas = shas[:maxMRCommits]
 		}
@@ -1730,8 +1734,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Comments        []renderedComment
 		Reviews         []store.MRReview
 		DiffFiles       []diffFile
+		DiffTruncated   bool
 		Stat            diffStat
 		Commits         []commitRow
+		CommitsTotal    int
 		Branches        []gitutil.Ref
 		CanEdit         bool
 		CanWrite        bool
@@ -1741,7 +1747,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		StackedOn       *store.MR
 		Stacked         []store.MR
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
-		reviews, files, stat, commits, branches, s.canEditItem(r, p.Repo, m.Author),
+		reviews, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads, stackedOn, stacked})
 }
 

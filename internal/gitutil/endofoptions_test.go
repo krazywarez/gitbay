@@ -35,7 +35,7 @@ func TestRefsAreNotOptions(t *testing.T) {
 		"Archive":      func() error { return Archive(dir, ref, "x", &sink) },
 		"Grep":         func() error { _, err := Grep(dir, ref, "hi", 10); return err },
 		"MergeBase":    func() error { _, err := MergeBase(dir, ref, "main"); return err },
-		"Diff":         func() error { _, err := Diff(dir, ref, "main", 1<<20); return err },
+		"Diff":         func() error { _, _, err := Diff(dir, ref, "main", 1<<20); return err },
 		"DiffFiles":    func() error { _, err := DiffFiles(dir, ref, "main"); return err },
 		"RevListRange": func() error { _, err := RevListRange(dir, "main", ref); return err },
 		"Blame":        func() error { _, err := Blame(dir, ref, "f.txt", 1, 1); return err },

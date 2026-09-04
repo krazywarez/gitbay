@@ -548,11 +548,14 @@ func runMRDiff(c *Ctx, args []string) int {
 		}
 		base = b
 	}
-	patch, err := gitutil.Diff(dir, base, head, 4<<20)
+	patch, truncated, err := gitutil.Diff(dir, base, head, 4<<20)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	fmt.Fprint(c.Stdout, patch)
+	if truncated {
+		fmt.Fprintln(c.Stderr, "diff truncated at 4 MiB; fetch the branch for the rest")
+	}
 	return protocol.ExitOK
 }
 

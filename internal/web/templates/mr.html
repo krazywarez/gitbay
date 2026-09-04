@@ -57,6 +57,7 @@
 {{end}}
 
 {{else if eq .View "commits"}}
+{{if gt .CommitsTotal (len .Commits)}}<p class="meta">first {{len .Commits}} of {{.CommitsTotal}} commits; the rest are in the branch</p>{{end}}
 <ul class="loglist">
 {{range .Commits}}<li>
   <div class="commitmain">
@@ -73,7 +74,8 @@
 </ul>
 
 {{else}}
-<p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span></p>
+<p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span>{{if .DiffTruncated}} · shown up to 4 MiB; the counts and the last file are partial{{end}}</p>
+{{if .DiffTruncated}}<p class="error" role="alert">This diff is larger than 4 MiB and is cut off below. Fetch the branch to see all of it.</p>{{end}}
 {{template "difffiles" dict "Files" .DiffFiles "Base" $base "Viewer" .Viewer}}
 {{end}}
 
