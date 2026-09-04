@@ -4,6 +4,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
@@ -77,7 +78,7 @@ func (s *Server) servePage(w http.ResponseWriter, r *http.Request, host string) 
 			dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
 			if _, err := gitutil.ResolveRef(dir, PagesBranch); err == nil {
 				if rest == "" && !strings.HasSuffix(r.URL.Path, "/") {
-					http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+					http.Redirect(w, r, pageRedirectTarget(r.URL.Path), http.StatusMovedPermanently)
 					return
 				}
 				s.servePageFile(w, r, repo, rest)
@@ -104,7 +105,7 @@ func (s *Server) servePageFile(w http.ResponseWriter, r *http.Request, repo stor
 		// relative links working.
 		if idx, ierr := gitutil.ReadBlob(dir, PagesBranch, filePath+"/index.html", s.cfg.Limits.MaxBlobBytes); ierr == nil {
 			if !strings.HasSuffix(r.URL.Path, "/") {
-				http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+				http.Redirect(w, r, pageRedirectTarget(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
 			data, filePath = idx, filePath+"/index.html"
@@ -124,4 +125,30 @@ func (s *Server) servePageFile(w http.ResponseWriter, r *http.Request, repo stor
 		return
 	}
 	w.Write(data)
+}
+
+// pageRedirectTarget is the "add a trailing slash" destination for a
+// directory URL, normalised so it cannot leave the site.
+//
+// The raw request path is not safe to redirect to. net/url keeps a
+// leading "//", and Go emits `Location: //evil.example/` unchanged, which
+// a browser reads as protocol-relative and follows to another origin.
+// Reaching it needed content named like a host under the subdomain's
+// owner — repository names permit dots — so it was narrow rather than
+// impossible (gosecurity:S5146, #153).
+//
+// path.Clean collapses the leading slashes and resolves any "..", and the
+// result is re-rooted, so the destination is always one same-origin
+// absolute path.
+func pageRedirectTarget(reqPath string) string {
+	clean := path.Clean("/" + reqPath)
+	if clean == "/" {
+		return "/"
+	}
+	// Encoding through url.URL rather than concatenating: a backslash is
+	// not a path separator here but browsers following the WHATWG URL
+	// rules treat one as a slash, so "/\\evil.example/" would be another
+	// way to say "//evil.example/". Escaping settles that, and every other
+	// byte a path can hold, without a denylist.
+	return (&url.URL{Path: clean + "/"}).String()
 }
