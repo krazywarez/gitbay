@@ -773,6 +773,10 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 
 /* rendered markdown / org / html */
 .rendered { max-width: 100%; overflow-wrap: anywhere; }
+/* A linked line: #f2-n17 on a diff, #L17 on a file (#118). */
+.difftable tr:target td, .code .line:has(a:target) { background: color-mix(in srgb, var(--mark) 18%, transparent); }
+.difftable tr:target td.ln, .code .line:has(a:target) .ln { border-left: 3px solid var(--mark); }
+.thread:target { outline: 2px solid var(--mark); outline-offset: 2px; }
 /* GFM task lists: the box sits in the line, sized to the prose. */
 .rendered li input[type="checkbox"] { width: 0.9em; height: 0.9em; margin: 0 0.35em 0 0; vertical-align: -0.05em; accent-color: var(--accent); }
 .rendered li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }

@@ -119,7 +119,7 @@
      endpoint and Viewer the signed-in account; the commit page passes
      neither and gets the same diff without review controls. */}}
 {{define "difffiles"}}{{$base := .Base}}{{$viewer := .Viewer}}
-{{range .Files}}<details class="difffold"{{if .Open}} open{{end}}>
+{{range $fi, $f := .Files}}<details class="difffold" id="f{{$fi}}"{{if .Open}} open{{end}}>
   <summary>
     <span class="fpath">{{if eq .Status "renamed"}}<span class="was">{{.OldPath}} →</span> {{end}}{{.Path}}</span>
     {{if ne .Status "modified"}}<span class="chip">{{.Status}}</span>{{end}}
@@ -129,7 +129,7 @@
   {{else}}<div class="tablewrap"><table class="difftable">
   {{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
   {{else if eq .Class "meta"}}<tr class="dmeta"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
-  {{else}}<tr class="{{.Class}}"><td class="ln">{{if .OldLine}}{{if eq .Class "del"}}{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer}}{{else}}{{.OldLine}}{{end}}{{end}}</td><td class="ln">{{if .NewLine}}{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
+  {{else}}<tr class="{{.Class}}" id="f{{$fi}}-{{if eq .Class "del"}}o{{.OldLine}}{{else}}n{{.NewLine}}{{end}}"><td class="ln">{{if .OldLine}}{{if eq .Class "del"}}{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer}}{{else}}{{.OldLine}}{{end}}{{end}}</td><td class="ln">{{if .NewLine}}{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
   {{if .Compose}}<tr class="threadrow"><td colspan="3"><form id="compose" method="post" action="{{$base}}/diff-comment" class="thread composing">
     <input type="hidden" name="path" value="{{.Path}}">
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
@@ -149,7 +149,7 @@
 
 {{/* thread renders one review thread with its reply and resolve controls.
      Class carries "stale" for threads whose anchor is gone. */}}
-{{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if .Class}} {{.Class}}{{end}}">
+{{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if .Class}} {{.Class}}{{end}}" id="thread-{{$t.ID}}">
 {{if or $t.Resolved (and .Class $t.Stale)}}<p class="threadstate">{{if and .Class $t.Stale}}stale{{end}}{{if $t.Resolved}}{{if and .Class $t.Stale}} · {{end}}resolved by {{$t.Resolved}}{{end}}</p>{{end}}
 {{range $t.Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}
 {{if .Viewer}}<details class="threadreply"><summary>Reply</summary>
