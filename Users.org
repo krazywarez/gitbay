@@ -346,10 +346,14 @@ Semantics worth knowing:
 Repo admins can gate merges (=repo settings ...=): =require-approvals
 <n>= (fresh, non-author approvals; each reviewer's latest review is
 their stance, and a fresh request-changes blocks), =require-resolved=
-(no open review threads), =require-checks= (all statuses green). With
-approvals required, a =CODEOWNERS= file on the target branch (root or
-=.gitbay/=) additionally demands an approval from an owner of every
-owned changed file — gitignore-style patterns, last match wins.
+(no open review threads), =require-checks= (all statuses green), and
+=require-codeowners= (an approval from an owner of every owned changed
+file). Owners come from a =CODEOWNERS= file on the target branch, root
+or =.gitbay/=, gitignore-style patterns, last match wins. The toggle is
+the opt-in, so a repository can carry the file as documentation of who
+to ask without it gating merges; with it on and no file on the target
+branch, the merge is refused and says so. It does not wait on
+=require-approvals=.
 
 A merge request whose target is another open merge request's source
 branch is stacked on it: =mr create= says so, =mr show= carries
