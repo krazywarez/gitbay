@@ -186,14 +186,14 @@ func TestWebInteractions(t *testing.T) {
 		t.Fatal("pin toggle failed")
 	}
 	_, body := browserGet(t, browser, inst.base()+"/theorg/webborn")
-	if !strings.Contains(body, "★ Pinned") {
+	if !strings.Contains(body, "</span> Pinned</button>") {
 		t.Fatal("repo header not pinned")
 	}
 	if _, body = browserGet(t, browser, inst.base()+"/"); !strings.Contains(body, ">theorg/</span>webborn") {
 		t.Fatal("dashboard missing pinned repo")
 	}
 	browserPost(t, browser, inst.base()+"/theorg/webborn/pin", url.Values{})
-	if _, body = browserGet(t, browser, inst.base()+"/theorg/webborn"); !strings.Contains(body, "☆ Pin") {
+	if _, body = browserGet(t, browser, inst.base()+"/theorg/webborn"); !strings.Contains(body, "</span> Pin</button>") {
 		t.Fatal("unpin failed")
 	}
 

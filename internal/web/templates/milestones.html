@@ -3,9 +3,9 @@
 <div class="listhead">
   <h1>Milestones</h1>
   <nav class="filters">
-    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
-    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
-    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+    <a {{if eq .State "open"}}class="active" aria-current="page" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "closed"}}class="active" aria-current="page" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
 </div>
 <ul class="milestonelist">

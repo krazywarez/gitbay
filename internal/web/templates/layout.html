@@ -59,7 +59,7 @@
     {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
     {{if .Settings.Archived}}<span class="chip">Archived</span>{{end}}
     <span class="grow"></span>
-    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}">{{if field $ "Pinned"}}★ Pinned{{else}}☆ Pin{{end}}</button></form>{{end}}
+    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>{{end}}
   </div>
   {{with field $ "Desc"}}<p class="repodesc">{{.}}</p>{{end}}
   {{with field $ "Topics"}}<p class="topics">{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}

@@ -523,6 +523,14 @@ table.tree td.size { text-align: right; }
 table.tree td.empty, table.refs td.empty, li.empty, ul.loglist li.empty { color: var(--muted); }
 
 /* refs page */
+table.refs th, table.assets th {
+  text-align: left;
+  font-size: var(--fs-0);
+  font-weight: 500;
+  color: var(--muted);
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
 table.refs td.name { width: 100%; }
 table.refs td.sha { color: var(--muted); }
 

@@ -3,9 +3,9 @@
 <div class="listhead">
   <h1>Issues</h1>
   <nav class="filters">
-    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
-    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
-    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+    <a {{if eq .State "open"}}class="active" aria-current="page" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "closed"}}class="active" aria-current="page" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
   {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
   <span class="spacer"></span>

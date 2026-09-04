@@ -33,6 +33,7 @@
     <p><button type="submit">Save</button></p>
   </form></details>{{end}}
   {{if $rel.Assets}}<table class="assets">
+  <thead><tr><th scope="col">File</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead>
   {{range $rel.Assets}}<tr>
     <td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/download/{{$rel.Tag}}/{{.Name}}">{{.Name}}</a></td>
     <td class="size">{{.Size}}</td>

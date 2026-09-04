@@ -3,10 +3,10 @@
 <div class="listhead">
   <h1>Merge requests</h1>
   <nav class="filters">
-    <a {{if eq .State "open"}}class="active" {{end}}href="?state=open">open</a>
-    <a {{if eq .State "merged"}}class="active" {{end}}href="?state=merged">merged</a>
-    <a {{if eq .State "closed"}}class="active" {{end}}href="?state=closed">closed</a>
-    <a {{if eq .State "all"}}class="active" {{end}}href="?state=all">all</a>
+    <a {{if eq .State "open"}}class="active" aria-current="page" {{end}}href="?state=open">open</a>
+    <a {{if eq .State "merged"}}class="active" aria-current="page" {{end}}href="?state=merged">merged</a>
+    <a {{if eq .State "closed"}}class="active" aria-current="page" {{end}}href="?state=closed">closed</a>
+    <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
   {{range .Filters}}<p class="meta">{{.Key}}: <b>{{.Value}}</b> <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
