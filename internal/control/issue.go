@@ -49,16 +49,9 @@ func init() {
 
 // issueArgs parses "<owner/name> <n>" plus flags handled by the caller.
 func issueRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool) (store.Repo, store.Issue, int) {
-	if len(args) < 2 {
-		return store.Repo{}, store.Issue{}, c.fail(protocol.ExitUsage, "expected <owner/name> <number>")
-	}
-	repo, code := resolveRepo(c, args[0], perm)
+	repo, n, code := refArgs(c, args, perm, "issue")
 	if code >= 0 {
 		return repo, store.Issue{}, code
-	}
-	n, err := strconv.ParseInt(args[1], 10, 64)
-	if err != nil {
-		return repo, store.Issue{}, c.fail(protocol.ExitUsage, "bad issue number %q", args[1])
 	}
 	issue, err := c.Store.IssueByNumber(repo.ID, n)
 	if errors.Is(err, store.ErrNotFound) {
@@ -219,12 +212,6 @@ func runIssueShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	type commentOut struct {
-		Author     string `json:"author"`
-		Body       string `json:"body"`
-		BodyFormat string `json:"body_format,omitempty"`
-		CreatedAt  string `json:"created_at"`
-	}
 	var cs []commentOut
 	for _, cm := range comments {
 		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
@@ -252,45 +239,12 @@ func runIssueShow(c *Ctx, args []string) int {
 }
 
 func runIssueComment(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--format", "--message", "--file"}, MaxPos: -1,
-		Usage: "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]"})
-	if err != nil {
-		return c.fail(protocol.ExitUsage, "%v", err)
-	}
-	rest := f.Pos
-	message, file, format := f.Value("--message"), f.Value("--file"), f.Value("--format")
-	fmtName, err := markupFormat(format)
-	if err != nil {
-		return c.failErr(err)
-	}
-	if fmtName == "" {
-		fmtName = "md"
-	}
-	repo, issue, code := issueRef(c, rest, policy.CanRead)
-	if code >= 0 {
-		return code
-	}
-	if code := refuseArchived(c, repo); code >= 0 {
-		return code
-	}
-	body, err := bodyFrom(c, message, file)
-	if err != nil {
-		return c.failErr(err)
-	}
-	if strings.TrimSpace(body) == "" {
-		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
-	}
-	if err := c.Store.AddIssueComment(issue.ID, c.User.ID, body, fmtName); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.commented", fmt.Sprintf(`{"number":%d}`, issue.Number))
-	if parts, err := c.Store.IssueParticipants(issue.ID); err == nil {
-		notifyUsers(c, parts, issueSubject(repo, issue.Number, issue.Title),
-			notifyBody(c, fmt.Sprintf("commented on #%d", issue.Number), body, fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)))
-	}
-	return c.emit(map[string]any{"number": issue.Number}, func(w io.Writer) {
-		fmt.Fprintf(w, "commented on %s#%d\n", repo.Path(), issue.Number)
-	})
+	return runComment(c, args, issueThread, "issue",
+		func(rest []string) (store.Repo, int64, int64, string, int) {
+			repo, issue, code := issueRef(c, rest, policy.CanRead)
+			return repo, issue.ID, issue.Number, issue.Title, code
+		},
+		c.Store.AddIssueComment, c.Store.IssueParticipants)
 }
 
 func setIssueState(c *Ctx, args []string, state string) int {
@@ -305,13 +259,8 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	if len(args) != 2 {
 		return c.fail(protocol.ExitUsage, "usage: issue %s <owner/name> <n>", state)
 	}
-	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if issue.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
-		return c.fail(protocol.ExitDenied, "only the author or users with write access can %s this issue",
-			map[string]string{"open": "reopen", "closed": "close"}[state])
+	if code := authorOrWrite(c, repo, issue.Author, map[string]string{"open": "reopen", "closed": "close"}[state]+" this issue"); code >= 0 {
+		return code
 	}
 	if issue.State == state {
 		return c.fail(protocol.ExitUsage, "issue #%d is already %s", issue.Number, state)
@@ -382,12 +331,8 @@ func runIssueEdit(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if issue.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
-		return c.fail(protocol.ExitDenied, "only the author or users with write access can edit this issue")
+	if code := authorOrWrite(c, repo, issue.Author, "edit this issue"); code >= 0 {
+		return code
 	}
 	if err := c.Store.UpdateIssueText(issue.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
