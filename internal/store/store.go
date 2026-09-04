@@ -25,10 +25,22 @@ type Store struct {
 
 // Open opens (creating if needed) the database at path with WAL mode and
 // foreign keys enforced. Use ":memory:" in tests.
+//
+// _txlock=immediate is what serialises writers. Every transaction in this
+// package writes, and a deferred one takes the write lock only when it
+// reaches its first write — by which point another writer may hold it.
+// SQLite answers that with SQLITE_BUSY and does not invoke the busy
+// handler, because waiting would deadlock two transactions each holding a
+// read lock the other needs; busy_timeout cannot help. Measured with
+// eight concurrent read-then-write transactions, 44% of them failed.
+// Beginning immediate takes the write lock up front, where busy_timeout
+// does apply, so a second writer waits its turn: the same load runs with
+// no failures, and readers, which WAL keeps out of the way, are
+// unaffected (#121).
 func Open(path string) (*Store, error) {
-	dsn := path + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
+	dsn := path + "?_txlock=immediate&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
 	if path == ":memory:" {
-		dsn = ":memory:?_pragma=foreign_keys(ON)"
+		dsn = ":memory:?_txlock=immediate&_pragma=foreign_keys(ON)"
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
