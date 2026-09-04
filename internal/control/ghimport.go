@@ -2,11 +2,14 @@ package control
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -140,9 +143,18 @@ func runImportIssues(c *Ctx, args []string) int {
 	}
 	g := &ghClient{base: apiBase, token: token, http: &http.Client{Timeout: 30 * time.Second}}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+
+	// Pull heads first, so every merge request below has objects to point
+	// at. A mirror made with the default refspecs does not carry
+	// refs/pull/*, which is why imported pull requests used to have no
+	// head and `mr diff` could only fail on them (#128). Best-effort: an
+	// import of issues from a repository whose git data is not here yet
+	// is a legitimate thing to do, and the merge requests still arrive
+	// with their head SHA recorded.
+	fetchedPullHeads := fetchPullHeads(c, dir, from, token)
 	src := "github.com/" + from
 
-	var issues, mrs, comments, skipped int
+	var issues, mrs, comments, skipped, headed int
 	for page := 1; ; page++ {
 		var items []ghIssue
 		q := fmt.Sprintf("/repos/%s/issues?state=all&sort=created&direction=asc&per_page=100&page=%d", from, page)
@@ -182,10 +194,11 @@ func runImportIssues(c *Ctx, args []string) int {
 				} else {
 					c.Store.MarkClosed(mr.ID, 0, it.ClosedAt)
 				}
-				// Point the MR head ref at the PR head when the mirror
-				// already holds the objects (refs/pull backups).
+				// Point the MR head ref at the PR head, from the fetch
+				// above or from objects a mirror already had.
 				if pr.Head.SHA != "" && gitutil.HasCommit(dir, pr.Head.SHA) {
 					gitutil.UpdateRefCAS(dir, fmt.Sprintf("refs/merge-requests/%d/head", localN), pr.Head.SHA, "")
+					headed++
 				}
 				c.Store.SetImportMarker(repo.ID, key, fmt.Sprintf("mr:%d", localN))
 				mrs++
@@ -218,10 +231,17 @@ func runImportIssues(c *Ctx, args []string) int {
 			fmt.Fprintf(c.Stderr, "%s#%d -> %s%d\n", src, it.Number, map[bool]string{true: "!", false: "#"}[isPR], localN)
 		}
 	}
-	d := map[string]any{"issues": issues, "mrs": mrs, "comments": comments, "already_imported": skipped}
+	d := map[string]any{"issues": issues, "mrs": mrs, "comments": comments,
+		"already_imported": skipped, "mrs_with_head": headed, "pull_heads_fetched": fetchedPullHeads}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "imported %d issues, %d merge requests, %d comments (%d items already imported)\n",
 			issues, mrs, comments, skipped)
+		if mrs > headed {
+			fmt.Fprintf(w, "%d merge request(s) have no head objects; `mr diff` cannot render them.\n", mrs-headed)
+			if !fetchedPullHeads {
+				fmt.Fprintln(w, "refs/pull/* could not be fetched — re-run with --token-stdin if the repository is private.")
+			}
+		}
 	})
 }
 
@@ -272,4 +292,36 @@ func importComments(c *Ctx, g *ghClient, repo store.Repo, from, src string, ghN,
 			imported++
 		}
 	}
+}
+
+// ghAskpass answers git's credential prompts from the environment, so a
+// token never appears in argv where /proc would expose it. Same shape the
+// mirror worker uses.
+const ghAskpass = `#!/bin/sh
+case "$1" in
+  Username*) echo "x-access-token" ;;
+  *)         echo "${GITBAY_GH_TOKEN}" ;;
+esac
+`
+
+// fetchPullHeads brings refs/pull/*/head into refs/gh-pull/*. Reports
+// whether it worked; a failure is not fatal, since importing issues from
+// a repository whose git data is not here yet is a reasonable thing to
+// do.
+func fetchPullHeads(c *Ctx, dir, from, token string) bool {
+	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + c.Cfg.Server.Root}
+	if token != "" {
+		askpass := filepath.Join(c.Cfg.Server.Root, "gh-import-askpass.sh")
+		if err := os.WriteFile(askpass, []byte(ghAskpass), 0o700); err != nil {
+			return false
+		}
+		env = append(env, "GIT_ASKPASS="+askpass, "GITBAY_GH_TOKEN="+token)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	url := "https://github.com/" + from + ".git"
+	if err := gitutil.FetchPullHeads(ctx, dir, url, io.Discard, env); err != nil {
+		return false
+	}
+	return true
 }

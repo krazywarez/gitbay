@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
@@ -42,15 +43,23 @@ type bundleIssue struct {
 	Comments  []bundleComment `json:"comments,omitempty"`
 }
 type bundleMR struct {
-	Number    int64           `json:"number"`
-	Title     string          `json:"title"`
-	Body      string          `json:"body"`
-	State     string          `json:"state"`
-	Author    string          `json:"author"`
-	SourceRef string          `json:"source_ref"`
-	TargetRef string          `json:"target_ref"`
-	CreatedAt string          `json:"created_at"`
-	Comments  []bundleComment `json:"comments,omitempty"`
+	Number    int64  `json:"number"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	State     string `json:"state"`
+	Author    string `json:"author"`
+	SourceRef string `json:"source_ref"`
+	TargetRef string `json:"target_ref"`
+	// HeadSHA and MergedBase are what a diff is measured between. The
+	// bundle carried neither, so every migrated merge request arrived
+	// with an empty head and `mr diff` could only fail on it (#128).
+	// They are recorded whether or not the objects have been pushed yet;
+	// the ref is pointed at the head once they have.
+	HeadSHA    string          `json:"head_sha,omitempty"`
+	MergedBase string          `json:"merged_base,omitempty"`
+	MergedAt   string          `json:"merged_at,omitempty"`
+	CreatedAt  string          `json:"created_at"`
+	Comments   []bundleComment `json:"comments,omitempty"`
 }
 type bundleRepo struct {
 	Name          string             `json:"name"`
@@ -110,7 +119,9 @@ func runAccountExport(c *Ctx, args []string) int {
 		for i := len(mrs) - 1; i >= 0; i-- {
 			m := mrs[i]
 			bm := bundleMR{Number: m.Number, Title: m.Title, Body: m.Body, State: m.State,
-				Author: m.Author, SourceRef: m.SourceRef, TargetRef: m.TargetRef, CreatedAt: m.CreatedAt}
+				Author: m.Author, SourceRef: m.SourceRef, TargetRef: m.TargetRef,
+				HeadSHA: m.HeadSHA, MergedBase: m.MergedBase, MergedAt: m.MergedAt,
+				CreatedAt: m.CreatedAt}
 			if cs, err := c.Store.ListMRComments(m.ID); err == nil {
 				for _, cm := range cs {
 					bm.Comments = append(bm.Comments, bundleComment{cm.Author, cm.Body, cm.CreatedAt})
@@ -251,12 +262,20 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 		}
 		for _, bm := range br.MRs {
 			key := fmt.Sprintf("mig-mr:%d", bm.Number)
-			if _, seen, _ := c.Store.ImportMarker(repo.ID, key); seen {
+			if val, seen, _ := c.Store.ImportMarker(repo.ID, key); seen {
 				skipped++
+				// A bundle is imported before the git push as often as
+				// after, so the objects a merge request needs may only
+				// have arrived since. Re-running the import is how the
+				// head ref gets set, and doing that costs nothing when it
+				// is already right.
+				if local, err := strconv.ParseInt(val, 10, 64); err == nil {
+					setMigratedHead(c, repo, local, bm.HeadSHA)
+				}
 				continue
 			}
 			body := migAttribution(src, "merge request", bm.Author, bm.CreatedAt, bm.Number) + bm.Body
-			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, "", "md", false)
+			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, bm.HeadSHA, "md", false)
 			if err != nil {
 				return c.fail(protocol.ExitFailure, "%v", err)
 			}
@@ -264,13 +283,20 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 			if err != nil {
 				return c.fail(protocol.ExitFailure, "%v", err)
 			}
-			if bm.State != "open" {
+			switch {
+			case bm.State == "merged":
+				// MarkMerged, not SetMRState: a merged MR's diff is
+				// measured from the base recorded at merge time, and
+				// SetMRState leaves that empty.
+				c.Store.MarkMerged(mr.ID, bm.MergedBase, 0, bm.MergedAt)
+			case bm.State != "open":
 				state := bm.State
 				if state == "source_gone" {
 					state = "closed"
 				}
 				c.Store.SetMRState(mr.ID, state)
 			}
+			setMigratedHead(c, repo, n, bm.HeadSHA)
 			for _, cm := range bm.Comments {
 				c.Store.AddMRComment(mr.ID, c.User.ID,
 					fmt.Sprintf("> %s, %.10s\n\n%s", cm.Author, cm.CreatedAt, cm.Body), "md")
@@ -299,3 +325,27 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 }
 
 var _ = strings.TrimSpace // placeholder against accidental import drops
+
+// setMigratedHead points refs/merge-requests/<n>/head at the head a
+// bundle recorded, once the objects for it are present. `mr diff`
+// resolves through that ref, not through the stored head_sha, so a merge
+// request whose source branch is gone — every merged one — has nothing to
+// diff without it (#128).
+//
+// Best-effort by design: a bundle is imported before the git push as
+// often as after. head_sha is stored either way, and running the import
+// again after the push sets the ref.
+func setMigratedHead(c *Ctx, repo store.Repo, number int64, headSHA string) {
+	if headSHA == "" {
+		return
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if !gitutil.HasCommit(dir, headSHA) {
+		return
+	}
+	ref := fmt.Sprintf("refs/merge-requests/%d/head", number)
+	if cur, err := gitutil.ResolveRef(dir, ref); err == nil && cur == headSHA {
+		return
+	}
+	gitutil.UpdateRefCAS(dir, ref, headSHA, "")
+}

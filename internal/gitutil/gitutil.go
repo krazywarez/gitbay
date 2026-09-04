@@ -157,6 +157,27 @@ func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, extraEnv 
 	return nil
 }
 
+// FetchPullHeads pulls a GitHub repository's pull-request heads into
+// refs/gh-pull/*, so an imported pull request has something to diff.
+// GitHub publishes every PR head at refs/pull/<n>/head on the git remote,
+// but a mirror made with the default refspecs does not carry them, which
+// is why an import used to produce merge requests with no head at all.
+//
+// One fetch for every pull request rather than one each: the ref count is
+// the repository's history, and asking a hundred times is a hundred
+// handshakes. extraEnv carries credentials via GIT_ASKPASS; the URL must
+// never contain them.
+func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--no-write-fetch-head", "--no-tags",
+		url, "+refs/pull/*/head:refs/gh-pull/*")
+	cmd.Env = append(os.Environ(), extraEnv...)
+	cmd.Stderr = errW
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("fetch pull heads from %s: %w", url, err)
+	}
+	return nil
+}
+
 // RemoteDefaultBranch asks the remote which branch HEAD points at.
 func RemoteDefaultBranch(ctx context.Context, url string, extraEnv []string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", url, "HEAD")
