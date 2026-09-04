@@ -221,25 +221,16 @@ func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	}{s.base(r), s.cfg.SiteHost(), s.cfg.Web.PrivacyNotice})
 }
 
-// filterRepos keeps repos whose path, description, or topics contain the
-// query, case-insensitively. An empty query keeps everything.
+// filterRepos keeps repos matching the query by the same rule `repo
+// search` uses. An empty query keeps everything.
 func (s *Server) filterRepos(q string, repos []describedRepo) []describedRepo {
 	if q == "" {
 		return repos
 	}
-	q = strings.ToLower(q)
 	var out []describedRepo
 	for _, d := range repos {
-		if strings.Contains(strings.ToLower(d.Path()), q) ||
-			strings.Contains(strings.ToLower(d.Desc), q) {
+		if control.MatchesRepo(q, d.Path(), d.Desc, d.Topics) {
 			out = append(out, d)
-			continue
-		}
-		for _, t := range d.Topics {
-			if strings.Contains(t, q) {
-				out = append(out, d)
-				break
-			}
 		}
 	}
 	return out
@@ -255,7 +246,8 @@ type repoPage struct {
 	Dir      string
 	Tab      string // active tab in the repo header
 	Topics   []string
-	Pinned   bool // by the viewer
+	Pinned   bool   // by the viewer
+	Watch    string // the viewer's watch state: watching, muted, or ""
 	HasWiki  bool
 	Host     string
 	Mirrors  []mirrorLine // repo admins only
@@ -315,9 +307,10 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		ref = repo.DefaultBranch
 	}
 	topics, _ := s.st.ListTopics(repo.ID)
-	pinned := false
+	pinned, watch := false, ""
 	if viewer.ID != 0 {
 		pinned = s.st.IsPinned(viewer.ID, repo.ID)
+		watch = s.st.RepoWatchState(repo.ID, viewer.ID)
 	}
 	canAdmin := viewer.ID != 0 && policy.CanAdmin(viewer, repo, grant)
 	var mirrors []mirrorLine
@@ -339,6 +332,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		CanAdmin:   canAdmin,
 		Mirrors:    mirrors,
 		Pinned:     pinned,
+		Watch:      watch,
 		HasWiki:    s.wikiDir(repo.OwnerName, repo.Name) != "",
 		Host:       s.cfg.SiteHost(),
 		Desc:       gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),

@@ -15,10 +15,14 @@
 <nav class="rail" aria-label="Site">
   <a class="brand" href="/">{{template "mark"}}<span>{{.Site}}</span></a>
   <div class="railbody">
+    <form method="get" action="/search" class="railsearch" role="search">
+      <input type="search" name="q" aria-label="Search {{.Site}}" placeholder="Search">
+    </form>
     <ul class="raillist">
       {{if .Viewer}}<li><a href="/">Dashboard</a></li>{{end}}
       <li><a {{if eq (str . "Tab") "explore"}}aria-current="page" {{end}}href="/explore">Explore</a></li>
-      {{if .Viewer}}<li><a href="/new">New repository</a></li>{{end}}
+      {{if .Viewer}}<li><a {{if eq (str . "Tab") "notifications"}}aria-current="page" {{end}}href="/notifications">Notifications{{with .Rail.Unread}} <b class="count">{{.}}</b>{{end}}</a></li>
+      <li><a href="/new">New repository</a></li>{{end}}
     </ul>
     {{with .Rail.Pinned}}
     <div class="railgroup">
@@ -59,7 +63,8 @@
     {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
     {{if .Settings.Archived}}<span class="chip">Archived</span>{{end}}
     <span class="grow"></span>
-    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>{{end}}
+    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>{{end}}
   </div>
   {{$top := topTab (str $ "Tab")}}
   {{/* The header is the same on every tab: it sits above the tab bar,

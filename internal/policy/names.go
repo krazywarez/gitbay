@@ -11,22 +11,24 @@ import (
 // the httpd mux's top-level routes must be reflected here; the httpd package
 // asserts this in its tests.
 var reservedNames = map[string]bool{
-	"admin":       true,
-	"api":         true,
-	"archive":     true,
-	"explore":     true,
-	"favicon.svg": true,
-	"gitbay":      true, // vanity go-import path on gitbay.org
-	"gitbay-bot":  true, // authors dependency-update issues
-	"healthz":     true,
-	"login":       true,
-	"logout":      true,
-	"new":         true,
-	"privacy":     true,
-	"raw":         true,
-	"register":    true,
-	"settings":    true,
-	"static":      true,
+	"admin":         true,
+	"api":           true,
+	"archive":       true,
+	"explore":       true,
+	"favicon.svg":   true,
+	"gitbay":        true, // vanity go-import path on gitbay.org
+	"gitbay-bot":    true, // authors dependency-update issues
+	"healthz":       true,
+	"login":         true,
+	"logout":        true,
+	"new":           true,
+	"notifications": true,
+	"privacy":       true,
+	"raw":           true,
+	"register":      true,
+	"search":        true,
+	"settings":      true,
+	"static":        true,
 }
 
 // namePat matches valid user, org, and repo names: lowercase alphanumerics,

@@ -27,6 +27,7 @@ type railItem struct {
 type rail struct {
 	Pinned  []railRepo
 	Reviews []railItem
+	Unread  int
 }
 
 // Empty reports whether the rail has nothing to show beyond the global
@@ -78,6 +79,7 @@ func (s *Server) railFor(viewer store.User) rail {
 			rl.Pinned = append(rl.Pinned, railRepo{Owner: rp.OwnerName, Name: rp.Name})
 		}
 	}
+	rl.Unread = s.st.UnreadNotices(viewer.ID)
 	queue, _ := s.st.ReviewQueue(viewer.ID)
 	for _, q := range queue {
 		rl.Reviews = append(rl.Reviews, railItem{

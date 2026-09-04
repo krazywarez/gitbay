@@ -783,7 +783,7 @@ func runRepoSearch(c *Ctx, args []string) int {
 		seen[r.ID] = true
 		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
 		topics, _ := c.Store.ListTopics(r.ID)
-		if !matchesRepo(q, r, desc, topics) {
+		if !MatchesRepo(q, r.Path(), desc, topics) {
 			continue
 		}
 		ds = append(ds, out{r.Path(), r.Visibility, desc, topics})
@@ -795,13 +795,18 @@ func runRepoSearch(c *Ctx, args []string) int {
 	})
 }
 
-func matchesRepo(q string, r store.Repo, desc string, topics []string) bool {
-	if strings.Contains(strings.ToLower(r.Path()), q) ||
+// MatchesRepo is the one rule for matching a repository against a text
+// query: its path, its description, or any of its topics. The web's
+// /explore filter and /search page call it too, so the three surfaces
+// cannot answer the same query differently.
+func MatchesRepo(q, path, desc string, topics []string) bool {
+	q = strings.ToLower(q)
+	if strings.Contains(strings.ToLower(path), q) ||
 		strings.Contains(strings.ToLower(desc), q) {
 		return true
 	}
 	for _, t := range topics {
-		if strings.Contains(t, q) {
+		if strings.Contains(strings.ToLower(t), q) {
 			return true
 		}
 	}

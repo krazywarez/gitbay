@@ -1,0 +1,22 @@
+{{define "title"}}notifications · {{.Site}}{{end}}
+{{define "content"}}
+<div class="listhead">
+  <h1>Notifications</h1>
+  <nav class="filters">
+    <a {{if not .All}}class="active" aria-current="page" {{end}}href="/notifications">unread</a>
+    <a {{if .All}}class="active" aria-current="page" {{end}}href="/notifications?all=1">all</a>
+  </nav>
+  <span class="spacer"></span>
+  {{if .Notices}}<form method="post" action="/notifications" class="inline"><button type="submit" class="btn">Mark all read</button></form>{{end}}
+</div>
+<ul class="issuelist">
+{{range .Notices}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="{{.Href}}">{{.Actor}} {{.Summary}}</a></p>
+    <p class="meta"><a href="/{{.RepoPath}}">{{.RepoPath}}</a> · {{when .CreatedAt}}</p>
+  </div>
+  {{if not .Read}}<form method="post" action="/notifications" class="inline"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="btn">Mark read</button></form>{{end}}
+</li>
+{{else}}<li class="empty">{{if .All}}nothing here yet{{else}}nothing unread — <a href="/notifications?all=1">show all</a>{{end}}</li>{{end}}
+</ul>
+{{end}}

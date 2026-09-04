@@ -1,0 +1,34 @@
+{{define "title"}}search · {{.Site}}{{end}}
+{{define "content"}}
+<div class="listhead">
+  <h1>Search</h1>
+  <nav class="filters">
+    <a {{if eq .Kind ""}}class="active" aria-current="page" {{end}}href="?q={{.Query}}">everything</a>
+    <a {{if eq .Kind "repo"}}class="active" aria-current="page" {{end}}href="?q={{.Query}}&amp;kind=repo">repositories</a>
+    <a {{if eq .Kind "issue"}}class="active" aria-current="page" {{end}}href="?q={{.Query}}&amp;kind=issue">issues</a>
+    <a {{if eq .Kind "mr"}}class="active" aria-current="page" {{end}}href="?q={{.Query}}&amp;kind=mr">merge requests</a>
+  </nav>
+</div>
+<form method="get" action="/search" class="searchform">
+  <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names, topics, issue and merge request titles" autofocus>
+  {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
+  <button type="submit">search</button>
+</form>
+{{if .QueryErr}}<p class="error" role="alert">{{.QueryErr}}</p>
+{{else if .Query}}
+{{if .Results}}
+<ul class="issuelist">
+{{range .Results}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="{{.Href}}">{{if .Number}}{{.Title}}{{else}}{{.Repo}}{{end}}</a></p>
+    <p class="meta">{{if .Number}}<a href="/{{.Repo}}">{{.Repo}}</a>{{.Marker}}{{.Number}} opened by <a href="/{{.Author}}">{{.Author}}</a>{{else if .Title}}{{.Title}}{{else}}repository{{end}}</p>
+  </div>
+  {{if .State}}<span class="chip chip-{{.State}}">{{.State}}</span>{{end}}
+</li>
+{{end}}
+</ul>
+{{else}}<p class="empty-note">no matches for “{{.Query}}”</p>{{end}}
+{{else}}
+<p class="empty-note">Repository names, descriptions and topics, and issue and merge request titles. File contents are searched per repository, from a repository's Code tab.</p>
+{{end}}
+{{end}}

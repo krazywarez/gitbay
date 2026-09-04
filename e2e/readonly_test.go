@@ -143,6 +143,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"release show":         {"alice/app", "v1"},
 		"release asset get":    {"alice/app", "v1", "a.txt"},
 		"notifications list":   nil,
+		"search":               {"app"},
 		"webhook list":         {"alice/app"},
 		"webhook deliveries":   {"alice/app"},
 		"wiki list":            {"alice/app"},

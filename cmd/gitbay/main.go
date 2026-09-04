@@ -59,6 +59,8 @@ func newRoot() *cobra.Command {
 			passOpts{server: []string{"feed"}}),
 		pass("explore", "public repositories on this instance [--limit n] [--cursor c]",
 			passOpts{server: []string{"explore"}}),
+		pass("search", "find repositories, issues and merge requests: <query> [--kind repo|issue|mr]",
+			passOpts{server: []string{"search"}}),
 		group("notifications", "your notification inbox",
 			pass("list", "unread notifications, or [--all] [--limit n] [--cursor c]",
 				passOpts{server: []string{"notifications", "list"}}),

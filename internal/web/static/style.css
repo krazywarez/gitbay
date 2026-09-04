@@ -224,6 +224,19 @@ a.brand svg.mark { display: block; flex: none; }
 a.brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .railbody { flex: 1; overflow-y: auto; padding: var(--sp-3) 0; }
+/* search is reachable from every page, so it sits above the rail's links
+   rather than on one page of its own */
+form.railsearch { padding: 0 var(--sp-4) var(--sp-3); }
+form.railsearch input[type="search"] {
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-1);
+  color: var(--shell-fg);
+  background: var(--shell-hover);
+  border: 1px solid var(--shell-line);
+  border-radius: var(--r-sm);
+}
+form.railsearch input[type="search"]::placeholder { color: var(--shell-muted); }
 ul.raillist { list-style: none; margin: 0; padding: 0; }
 ul.raillist a {
   display: block;
@@ -258,7 +271,7 @@ ul.raillist.wide .owner { font-size: var(--fs-0); }
   text-transform: uppercase;
   color: var(--shell-muted);
 }
-.raillabel .count {
+.raillabel .count, ul.raillist .count {
   font-family: var(--sans);
   font-size: var(--fs-0);
   font-weight: 700;
@@ -409,6 +422,8 @@ nav.tabs a i {
   }
   a.brand { border-bottom: 0; padding-right: var(--sp-2); }
   .railbody { flex: 1; overflow: visible; padding: 0; display: flex; align-items: center; }
+  form.railsearch { padding: 0 var(--sp-2); }
+  form.railsearch input[type="search"] { min-width: 8rem; }
   /* pinned repos and the review queue both live on the dashboard, so the
      strip keeps only what has nowhere else to go */
   .railgroup { display: none; }
