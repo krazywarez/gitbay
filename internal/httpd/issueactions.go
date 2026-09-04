@@ -36,11 +36,8 @@ func (s *Server) issueStateSubmit(w http.ResponseWriter, r *http.Request, u stor
 	if r.FormValue("action") == "reopen" {
 		verb = "reopen"
 	}
-	_, msg, ok := s.runControl(u, issueArgs(r, verb))
-	if ok {
-		msg = ""
-	}
-	s.issueRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, issueArgs(r, verb))
+	s.done(w, r, code, msg, s.issueRedirect)
 }
 
 // fieldArgs turns a space-separated form value into repeated flags, the
@@ -59,11 +56,8 @@ func (s *Server) issueLabelSubmit(w http.ResponseWriter, r *http.Request, u stor
 		s.issueRedirect(w, r, "name at least one label")
 		return
 	}
-	_, msg, ok := s.runControl(u, issueArgs(r, "label", args...))
-	if ok {
-		msg = ""
-	}
-	s.issueRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, issueArgs(r, "label", args...))
+	s.done(w, r, code, msg, s.issueRedirect)
 }
 
 func (s *Server) issueAssignSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -72,11 +66,8 @@ func (s *Server) issueAssignSubmit(w http.ResponseWriter, r *http.Request, u sto
 		s.issueRedirect(w, r, "name at least one person")
 		return
 	}
-	_, msg, ok := s.runControl(u, issueArgs(r, "assign", args...))
-	if ok {
-		msg = ""
-	}
-	s.issueRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, issueArgs(r, "assign", args...))
+	s.done(w, r, code, msg, s.issueRedirect)
 }
 
 func (s *Server) issueMilestoneSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -84,9 +75,6 @@ func (s *Server) issueMilestoneSubmit(w http.ResponseWriter, r *http.Request, u 
 	if title == "" {
 		title = "none"
 	}
-	_, msg, ok := s.runControl(u, issueArgs(r, "milestone", title))
-	if ok {
-		msg = ""
-	}
-	s.issueRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, issueArgs(r, "milestone", title))
+	s.done(w, r, code, msg, s.issueRedirect)
 }

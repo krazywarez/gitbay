@@ -59,11 +59,8 @@ func (s *Server) mrReviewSubmit(w http.ResponseWriter, r *http.Request, u store.
 		s.mrRedirect(w, r, "pick approve, request changes, or comment")
 		return
 	}
-	_, msg, ok := s.runControl(u, mrArgs(r, "review", flag))
-	if ok {
-		msg = ""
-	}
-	s.mrRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, mrArgs(r, "review", flag))
+	s.done(w, r, code, msg, s.mrRedirect)
 }
 
 func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -71,19 +68,13 @@ func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.U
 	if st := strings.TrimSpace(r.FormValue("strategy")); st != "" && st != "auto" {
 		args = append(args, "--strategy", st)
 	}
-	_, msg, ok := s.runControl(u, mrArgs(r, "merge", args...))
-	if ok {
-		msg = ""
-	}
-	s.mrRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, mrArgs(r, "merge", args...))
+	s.done(w, r, code, msg, s.mrRedirect)
 }
 
 func (s *Server) mrCloseSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	_, msg, ok := s.runControl(u, mrArgs(r, "close"))
-	if ok {
-		msg = ""
-	}
-	s.mrRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, mrArgs(r, "close"))
+	s.done(w, r, code, msg, s.mrRedirect)
 }
 
 // mrDiffCommentSubmit opens a review thread on a diff line, or replies to
@@ -114,11 +105,8 @@ func (s *Server) mrDiffCommentSubmit(w http.ResponseWriter, r *http.Request, u s
 			extra = append(extra, "--old")
 		}
 	}
-	msg, ok := s.runControlStdin(u, mrArgs(r, "diff-comment", append(extra, "--file", "-")...), body)
-	if ok {
-		msg = ""
-	}
-	s.mrDiffRedirect(w, r, msg)
+	msg, code := s.runControlStdinCode(u, mrArgs(r, "diff-comment", append(extra, "--file", "-")...), body)
+	s.done(w, r, code, msg, s.mrDiffRedirect)
 }
 
 // mrRetargetSubmit moves the merge request onto another branch.
@@ -128,11 +116,8 @@ func (s *Server) mrRetargetSubmit(w http.ResponseWriter, r *http.Request, u stor
 		s.mrRedirect(w, r, "pick a branch to retarget onto")
 		return
 	}
-	_, msg, ok := s.runControl(u, mrArgs(r, "retarget", target))
-	if ok {
-		msg = ""
-	}
-	s.mrRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, mrArgs(r, "retarget", target))
+	s.done(w, r, code, msg, s.mrRedirect)
 }
 
 // mrThreadSubmit resolves or reopens one review thread.
@@ -146,11 +131,8 @@ func (s *Server) mrThreadSubmit(w http.ResponseWriter, r *http.Request, u store.
 		s.mrRedirect(w, r, "bad thread id")
 		return
 	}
-	_, msg, ok := s.runControl(u, mrArgs(r, verb, id))
-	if ok {
-		msg = ""
-	}
-	s.mrRedirect(w, r, msg)
+	_, msg, code := s.runControlCode(u, mrArgs(r, verb, id))
+	s.done(w, r, code, msg, s.mrRedirect)
 }
 
 // mrNewPage is the create form: branches to choose from, plus whatever

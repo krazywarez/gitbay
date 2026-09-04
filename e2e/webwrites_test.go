@@ -50,6 +50,12 @@ func TestWebWritesGoThroughRegistry(t *testing.T) {
 		t.Fatalf("repo created past the quota from the web: exit %d, want 3", code)
 	}
 
+	// A form action on an issue that does not exist is the 404 page, not a
+	// redirect carrying a message (#106).
+	if status, _ := browserPost(t, browser, inst.base()+"/alice/first/issues/999/state", url.Values{"action": {"close"}}); status != 404 {
+		t.Fatalf("closing a missing issue from the web: %d, want 404", status)
+	}
+
 	// An archived repository refuses a comment from the web as it does
 	// over ssh.
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "archive", "alice/first"); code != 0 {

@@ -20,6 +20,14 @@ import (
 // ViaAPI is set, which refuses SSHOnly commands: anything whose input is a
 // credential (secrets, mirror tokens, session minting) stays on SSH.
 func (s *Server) runControl(u store.User, argv []string) (out string, msg string, ok bool) {
+	out, msg, code := s.runControlCode(u, argv)
+	return out, msg, code == protocol.ExitOK
+}
+
+// runControlCode is runControl with the exit code, for handlers that
+// answer a form: not-found and denied deserve their own statuses rather
+// than a redirect carrying the message (#106).
+func (s *Server) runControlCode(u store.User, argv []string) (out string, msg string, code int) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -32,12 +40,30 @@ func (s *Server) runControl(u store.User, argv []string) (out string, msg string
 		Stderr: &stderr,
 		ViaAPI: true,
 	}
-	code := control.Dispatch(ctx, argv)
+	code = control.Dispatch(ctx, argv)
 	m := strings.TrimSpace(stderr.String())
 	if m == "" {
 		m = strings.TrimSpace(stdout.String())
 	}
-	return stdout.String(), m, code == protocol.ExitOK
+	return stdout.String(), m, code
+}
+
+// done finishes a form action by exit code: back to the page on success,
+// the 404 page when the thing does not exist, and back to the page with
+// the message for anything else. A refusal is feedback on the page a
+// person was looking at, whether it is a merge gate, a permission they
+// lack, or a field they got wrong; only a thing that does not exist has
+// no page to go back to.
+func (s *Server) done(w http.ResponseWriter, r *http.Request, code int, msg string,
+	redirect func(http.ResponseWriter, *http.Request, string)) {
+	switch code {
+	case protocol.ExitOK:
+		redirect(w, r, "")
+	case protocol.ExitNotFound:
+		s.notFound(w, r)
+	default:
+		redirect(w, r, msg)
+	}
 }
 
 // runControlStdin is runControl for the handful of commands whose input
@@ -46,6 +72,11 @@ func (s *Server) runControl(u store.User, argv []string) (out string, msg string
 // tokens and mirror credentials remain SSHOnly and are refused by the
 // dispatcher.
 func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg string, ok bool) {
+	msg, code := s.runControlStdinCode(u, argv, stdin)
+	return msg, code == protocol.ExitOK
+}
+
+func (s *Server) runControlStdinCode(u store.User, argv []string, stdin string) (msg string, code int) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -58,12 +89,12 @@ func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg
 		Stderr: &stderr,
 		ViaAPI: true,
 	}
-	code := control.Dispatch(ctx, argv)
+	code = control.Dispatch(ctx, argv)
 	m := strings.TrimSpace(stderr.String())
 	if m == "" {
 		m = strings.TrimSpace(stdout.String())
 	}
-	return m, code == protocol.ExitOK
+	return m, code
 }
 
 // runControlInto runs a command in JSON mode and decodes its data into

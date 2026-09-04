@@ -45,11 +45,8 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 	if notes != "" || verb == "edit" {
 		argv = append(argv, "--notes", notes)
 	}
-	_, msg, ok := s.runControl(u, argv)
-	if ok {
-		msg = ""
-	}
-	s.backTo(w, r, "releases", msg)
+	_, msg, code := s.runControlCode(u, argv)
+	s.done(w, r, code, msg, func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) })
 }
 
 func (s *Server) buildTriggerSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -59,9 +56,6 @@ func (s *Server) buildTriggerSubmit(w http.ResponseWriter, r *http.Request, u st
 		s.backTo(w, r, "builds", "pick a job")
 		return
 	}
-	_, msg, ok := s.runControl(u, []string{"build", "trigger", repo, job})
-	if ok {
-		msg = ""
-	}
-	s.backTo(w, r, "builds", msg)
+	_, msg, code := s.runControlCode(u, []string{"build", "trigger", repo, job})
+	s.done(w, r, code, msg, func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "builds", msg) })
 }
