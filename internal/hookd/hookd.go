@@ -44,15 +44,17 @@ type Request struct {
 	Updates []policy.RefUpdate `json:"updates"`
 }
 
+// RawCommit is one incoming commit object. When NeedCommits is set the
+// hook streams these one per JSON value and ends with a zero one, rather
+// than sending a single message holding every commit in the push: an
+// initial push of a large history is tens of thousands of them (#100).
 type RawCommit struct {
 	SHA string `json:"sha"`
 	Raw []byte `json:"raw"`
 }
 
-// CommitsPayload is the hook's second message when NeedCommits was set.
-type CommitsPayload struct {
-	Commits []RawCommit `json:"commits"`
-}
+// Done marks the end of the commit stream.
+func (c RawCommit) Done() bool { return c.SHA == "" }
 
 type Response struct {
 	Allow       bool   `json:"allow"`
@@ -139,17 +141,29 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 	if err := enc.Encode(Response{Allow: true, NeedCommits: true}); err != nil {
 		return
 	}
-	var payload CommitsPayload
-	if err := dec.Decode(&payload); err != nil {
-		enc.Encode(Response{Allow: false, Message: "bad commits payload"})
-		return
-	}
+	// Each commit is verified as it arrives, so nothing holds the push in
+	// memory. The first refusal decides the answer, but the stream is
+	// still drained to its end before replying: the hook is writing, and
+	// answering early would leave it writing into a socket nobody reads.
+	// Draining costs a decode per commit and no verification.
 	db := store.SigDB{Store: s.st}
-	for _, rc := range payload.Commits {
+	refusal := ""
+	for {
+		var rc RawCommit
+		if err := dec.Decode(&rc); err != nil {
+			enc.Encode(Response{Allow: false, Message: "bad commits payload"})
+			return
+		}
+		if rc.Done() {
+			break
+		}
+		if refusal != "" {
+			continue
+		}
 		parsed, err := sig.ParseCommit(rc.Raw)
 		if err != nil {
-			enc.Encode(Response{Allow: false, Message: fmt.Sprintf("unparseable commit %s", rc.SHA)})
-			return
+			refusal = fmt.Sprintf("unparseable commit %s", rc.SHA)
+			continue
 		}
 		res, err := sig.VerifyCommit(db, parsed)
 		if err != nil || res.State != sig.Verified {
@@ -157,10 +171,12 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 			if err == nil {
 				state = string(res.State)
 			}
-			enc.Encode(Response{Allow: false, Message: fmt.Sprintf(
-				"this repository requires signed commits: %.10s is %s", rc.SHA, state)})
-			return
+			refusal = fmt.Sprintf("this repository requires signed commits: %.10s is %s", rc.SHA, state)
 		}
+	}
+	if refusal != "" {
+		enc.Encode(Response{Allow: false, Message: refusal})
+		return
 	}
 	enc.Encode(Response{Allow: true})
 }
@@ -296,9 +312,10 @@ func cutHeads(ref string) (string, bool) {
 	return "", false
 }
 
-// Ask sends one request from the hook process to the daemon. commits is
-// called if the daemon asks for the incoming commit objects.
-func Ask(socketPath string, req Request, commits func() (CommitsPayload, error)) (Response, error) {
+// Ask sends one request from the hook process to the daemon. stream is
+// called if the daemon asks for the incoming commit objects; it hands each
+// commit to the callback, which writes it on the wire.
+func Ask(socketPath string, req Request, stream func(emit func(RawCommit) error) error) (Response, error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
 		return Response{}, err
@@ -316,11 +333,10 @@ func Ask(socketPath string, req Request, commits func() (CommitsPayload, error))
 	if !resp.NeedCommits {
 		return resp, nil
 	}
-	payload, err := commits()
-	if err != nil {
+	if err := stream(func(rc RawCommit) error { return enc.Encode(rc) }); err != nil {
 		return Response{}, err
 	}
-	if err := enc.Encode(payload); err != nil {
+	if err := enc.Encode(RawCommit{}); err != nil { // end of stream
 		return Response{}, err
 	}
 	err = dec.Decode(&resp)
