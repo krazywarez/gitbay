@@ -278,8 +278,10 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.created", fmt.Sprintf(`{"number":%d}`, n))
 	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
-		notifyUsers(c, targets, mrSubject(repo, n, title),
-			notifyBody(c, fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target), b, fmt.Sprintf("%s/mrs/%d", repo.Path(), n)))
+		notify(c, targets, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, n, title),
+			action:  fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target),
+			excerpt: b, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), n)})
 	}
 	out := MRCreated{Number: n, HeadSHA: headSHA}
 	if p, ok, err := c.Store.OpenMRBySource(repo.ID, target); err == nil && ok {
@@ -626,9 +628,10 @@ func runMRRetarget(c *Ctx, args []string) int {
 	}
 	c.Store.AddMRSystemComment(mr.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s", old, target))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
-			notifyBody(c, fmt.Sprintf("retargeted !%d from %s to %s", mr.Number, old, target), "",
-				fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+		notify(c, parts, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("retargeted !%d from %s to %s", mr.Number, old, target),
+			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
 	return c.emit(map[string]any{"number": mr.Number, "target_ref": target, "merge_base": base}, func(w io.Writer) {
 		fmt.Fprintf(w, "retargeted %s!%d from %s to %s (base %.10s)\n", repo.Path(), mr.Number, old, target, base)
@@ -676,8 +679,10 @@ func runMRReview(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
-			notifyBody(c, fmt.Sprintf("reviewed !%d: %s", mr.Number, verdict), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+		notify(c, parts, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("reviewed !%d: %s", mr.Number, verdict),
+			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
 	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict}, func(w io.Writer) {
 		fmt.Fprintf(w, "reviewed %s!%d: %s\n", repo.Path(), mr.Number, verdict)
@@ -978,9 +983,10 @@ func runMRMerge(c *Ctx, args []string) int {
 		}
 		c.Store.AddMRSystemComment(k.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s: !%d merged", mr.SourceRef, mr.TargetRef, mr.Number))
 		if parts, err := c.Store.MRParticipants(k.ID); err == nil {
-			notifyUsers(c, parts, mrSubject(repo, k.Number, k.Title),
-				notifyBody(c, fmt.Sprintf("retargeted !%d from %s to %s: !%d merged", k.Number, mr.SourceRef, mr.TargetRef, mr.Number), "",
-					fmt.Sprintf("%s/mrs/%d", repo.Path(), k.Number)))
+			notify(c, parts, notice{repo: repo, kind: "mr",
+				subject: mrSubject(repo, k.Number, k.Title),
+				action:  fmt.Sprintf("retargeted !%d from %s to %s: !%d merged", k.Number, mr.SourceRef, mr.TargetRef, mr.Number),
+				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), k.Number)})
 		}
 	}
 	// Merges bypass receive-pack, so the commit-message issue actions
@@ -1002,8 +1008,10 @@ func runMRMerge(c *Ctx, args []string) int {
 		repo, c.User.ID, mr.TargetRef, newSHA, time.Now())
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
-			notifyBody(c, fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy), "", fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+		notify(c, parts, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy),
+			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
 	return c.emit(map[string]any{"number": mr.Number, "strategy": strategy, "sha": newSHA}, func(w io.Writer) {
 		fmt.Fprintf(w, "merged %s!%d into %s (%s) at %.10s\n", repo.Path(), mr.Number, mr.TargetRef, strategy, newSHA)

@@ -103,9 +103,10 @@ func runDiffComment(c *Ctx, args []string) int {
 		return c.failErr(err)
 	}
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notifyUsers(c, parts, mrSubject(repo, mr.Number, mr.Title),
-			notifyBody(c, fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number), body,
-				fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)))
+		notify(c, parts, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number),
+			excerpt: body, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
 	return c.emit(map[string]any{"id": id, "thread": firstNonZero(replyTo, id)}, func(w io.Writer) {
 		if replyTo != 0 {

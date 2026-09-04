@@ -226,20 +226,31 @@ func (w *Worker) openIssue(repo store.Repo, number int64) (store.Issue, bool) {
 	return issue, true
 }
 
-// notify mails the repo's owners, the same targets and shape as an issue
-// filed over SSH. Best-effort, like every other notification.
+// notify files an inbox row for the repo's owners and watchers and mails
+// them, the same targets and shape as an issue opened over SSH.
+// Best-effort, like every other notification.
 func (w *Worker) notify(repo store.Repo, number int64, action, body string) {
-	if w.Cfg.Mail.SMTPHost == "" {
+	targets, err := w.St.RepoNotifyTargets(repo)
+	if err != nil {
 		return
 	}
-	targets, err := w.St.RepoNotifyTargets(repo)
+	author, err := w.St.UserByUsername(store.BotUsername)
+	if err != nil {
+		return
+	}
+	recipients, err := w.St.NotifyRecipients(repo.ID, author.ID, targets)
 	if err != nil {
 		return
 	}
 	subject := fmt.Sprintf("[%s] #%d: %s", repo.Path(), number, IssueTitle)
 	text := fmt.Sprintf("%s %s\n\n%s\n%s/%s/issues/%d\n", store.BotUsername, action, body,
 		strings.TrimSuffix(w.Cfg.Server.SiteURL, "/"), repo.Path(), number)
-	for _, id := range targets {
+	path := fmt.Sprintf("%s/issues/%d", repo.Path(), number)
+	for _, id := range recipients {
+		w.St.AddNotice(id, repo.ID, "issue", store.BotUsername, action, path)
+		if w.Cfg.Mail.SMTPHost == "" {
+			continue
+		}
 		email, err := w.St.PrimaryVerifiedEmail(id)
 		if err != nil || email == "" {
 			continue

@@ -69,7 +69,10 @@ func runDashboard(c *Ctx, args []string) int {
 		Pinned   []pinnedOut     `json:"pinned"`
 		Activity []feedOut       `json:"recent_activity"`
 		Builds   []buildOut      `json:"builds"`
-		Server   *serverOut      `json:"server,omitempty"`
+		// Unread is the notification inbox badge, so a client showing one
+		// does not need a second read to fill it.
+		Unread int        `json:"unread"`
+		Server *serverOut `json:"server,omitempty"`
 		// Queues is admin-only: every background worker's backlog and
 		// failures, the operator's view of what is stuck.
 		Queues *store.Queues `json:"queues,omitempty"`
@@ -140,6 +143,7 @@ func runDashboard(c *Ctx, args []string) int {
 	for _, b := range builds {
 		d.Builds = append(d.Builds, buildOut{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
 	}
+	d.Unread = c.Store.UnreadNotices(c.User.ID)
 	if c.User.IsAdmin {
 		d.Server = &serverOut{Commit: buildinfo.String()}
 		q, err := c.Store.QueueStatus()
@@ -150,6 +154,9 @@ func runDashboard(c *Ctx, args []string) int {
 	}
 
 	return c.emit(d, func(w io.Writer) {
+		if d.Unread > 0 {
+			fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
+		}
 		fmt.Fprintln(w, "waiting on your review:")
 		printDashboardItems(w, d.Reviews, "!")
 		fmt.Fprintln(w, "assigned to you:")

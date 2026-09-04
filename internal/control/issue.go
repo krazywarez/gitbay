@@ -150,8 +150,10 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, n))
 	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
-		notifyUsers(c, targets, issueSubject(repo, n, title),
-			notifyBody(c, fmt.Sprintf("opened issue #%d", n), b, fmt.Sprintf("%s/issues/%d", repo.Path(), n)))
+		notify(c, targets, notice{repo: repo, kind: "issue",
+			subject: issueSubject(repo, n, title),
+			action:  fmt.Sprintf("opened issue #%d", n),
+			excerpt: b, path: fmt.Sprintf("%s/issues/%d", repo.Path(), n)})
 	}
 	return c.emit(Created{Number: n}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s#%d\n", repo.Path(), n)
@@ -268,8 +270,10 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue."+state, fmt.Sprintf(`{"number":%d}`, issue.Number))
 	if parts, err := c.Store.IssueParticipants(issue.ID); err == nil {
 		verb := map[string]string{"open": "reopened", "closed": "closed"}[state]
-		notifyUsers(c, parts, issueSubject(repo, issue.Number, issue.Title),
-			notifyBody(c, fmt.Sprintf("%s #%d", verb, issue.Number), "", fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)))
+		notify(c, parts, notice{repo: repo, kind: "issue",
+			subject: issueSubject(repo, issue.Number, issue.Title),
+			action:  fmt.Sprintf("%s #%d", verb, issue.Number),
+			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
 	}
 	return c.emit(map[string]any{"number": issue.Number, "state": state}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s#%d is now %s\n", repo.Path(), issue.Number, state)

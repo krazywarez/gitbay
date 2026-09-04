@@ -61,11 +61,12 @@ type thread struct {
 	symbol  string // "#" or "!"
 	segment string // "issues" or "mrs"
 	event   string // issue.commented or mr.commented
+	kind    string // the noun an inbox row is filed under
 }
 
 var (
-	issueThread = thread{"#", "issues", "issue.commented"}
-	mrThread    = thread{"!", "mrs", "mr.commented"}
+	issueThread = thread{"#", "issues", "issue.commented", "issue"}
+	mrThread    = thread{"!", "mrs", "mr.commented", "mr"}
 )
 
 // runComment is issue comment and mr comment: the noun's resolver hands
@@ -106,9 +107,10 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, t.event, fmt.Sprintf(`{"number":%d}`, number))
 	if parts, err := participants(id); err == nil {
-		subject := fmt.Sprintf("[%s] %s%d: %s", repo.Path(), t.symbol, number, title)
-		notifyUsers(c, parts, subject,
-			notifyBody(c, fmt.Sprintf("commented on %s%d", t.symbol, number), body, fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)))
+		notify(c, parts, notice{repo: repo, kind: t.kind,
+			subject: fmt.Sprintf("[%s] %s%d: %s", repo.Path(), t.symbol, number, title),
+			action:  fmt.Sprintf("commented on %s%d", t.symbol, number),
+			excerpt: body, path: fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)})
 	}
 	return c.emit(Created{Number: number}, func(w io.Writer) {
 		fmt.Fprintf(w, "commented on %s%s%d\n", repo.Path(), t.symbol, number)

@@ -482,9 +482,11 @@ func runRunnerDone(c *Ctx, args []string) int {
 				}
 				tail = string(log)
 			}
-			notifyUsers(c, targets,
-				fmt.Sprintf("[%s] build %d failed: %s on %s", repo.Path(), b.Number, b.Job, b.Ref),
-				fmt.Sprintf("job %s failed at %.10s.\n\n…%s\n\n%s\n", b.Job, b.SHA, tail, url))
+			notify(c, targets, notice{repo: repo, kind: "build",
+				subject: fmt.Sprintf("[%s] build %d failed: %s on %s", repo.Path(), b.Number, b.Job, b.Ref),
+				action:  fmt.Sprintf("build %d failed: %s on %s", b.Number, b.Job, b.Ref),
+				body:    fmt.Sprintf("job %s failed at %.10s.\n\n…%s\n\n%s\n", b.Job, b.SHA, tail, url),
+				path:    fmt.Sprintf("%s/builds/%d", repo.Path(), b.Number)})
 		}
 	}
 	return c.emit(map[string]any{"build": b.Number, "status": args[1]}, func(w io.Writer) {
