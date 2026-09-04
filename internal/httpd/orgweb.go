@@ -2,7 +2,6 @@ package httpd
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"gitbay.org/gitbay/internal/store"
@@ -45,11 +44,8 @@ func (s *Server) orgAdminView(viewer store.User, kind, name string) (teams []tea
 func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	owner := r.PathValue("owner")
 	back := func(msg string) {
-		dest := "/" + owner
-		if msg != "" {
-			dest += "?e=" + url.QueryEscape(msg)
-		}
-		http.Redirect(w, r, dest, http.StatusSeeOther)
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/"+owner, http.StatusSeeOther)
 	}
 	field := r.FormValue("field")
 	team := strings.TrimSpace(r.FormValue("team"))

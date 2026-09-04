@@ -45,7 +45,7 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 		Jobs     []jobView
 		CanWrite bool
 		Notice   string
-	}{p, builds, jobs, s.canWriteRepo(r, p.Repo), r.URL.Query().Get("e")})
+	}{p, builds, jobs, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 
 func (s *Server) build(w http.ResponseWriter, r *http.Request) {

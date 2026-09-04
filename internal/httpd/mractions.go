@@ -22,12 +22,7 @@ import (
 func (s *Server) mrRedirect(w http.ResponseWriter, r *http.Request, msg string) {
 	dest := fmt.Sprintf("/%s/%s/mrs/%s",
 		r.PathValue("owner"), r.PathValue("repo"), r.PathValue("n"))
-	if msg != "" {
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		dest += "?e=" + url.QueryEscape(msg)
-	}
+	s.setFlash(w, msg)
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
@@ -35,12 +30,7 @@ func (s *Server) mrRedirect(w http.ResponseWriter, r *http.Request, msg string) 
 func (s *Server) mrDiffRedirect(w http.ResponseWriter, r *http.Request, msg string) {
 	dest := fmt.Sprintf("/%s/%s/mrs/%s?view=diff",
 		r.PathValue("owner"), r.PathValue("repo"), r.PathValue("n"))
-	if msg != "" {
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		dest += "&e=" + url.QueryEscape(msg)
-	}
+	s.setFlash(w, msg)
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
@@ -163,7 +153,7 @@ func (s *Server) mrCreateForm(w http.ResponseWriter, r *http.Request, u store.Us
 	s.render(w, "mrnew.html", mrNewPage{
 		repoPage: p, Branches: branches,
 		Source: q.Get("source"), Target: target,
-		Title: q.Get("title"), Body: q.Get("body"), Notice: q.Get("e"),
+		Title: q.Get("title"), Body: q.Get("body"), Notice: s.takeFlash(w, r),
 	})
 }
 
@@ -178,7 +168,8 @@ func (s *Server) mrCreateSubmit(w http.ResponseWriter, r *http.Request, u store.
 	body := strings.TrimSpace(r.FormValue("body"))
 
 	back := func(msg string) {
-		q := url.Values{"source": {source}, "target": {target}, "title": {title}, "body": {body}, "e": {msg}}
+		q := url.Values{"source": {source}, "target": {target}, "title": {title}, "body": {body}}
+		s.setFlash(w, msg)
 		http.Redirect(w, r, fmt.Sprintf("/%s/mrs/new?%s", p.Repo.Path(), q.Encode()), http.StatusSeeOther)
 	}
 	if source == "" || title == "" {

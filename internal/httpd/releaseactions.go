@@ -3,7 +3,6 @@ package httpd
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"gitbay.org/gitbay/internal/store"
@@ -15,12 +14,7 @@ import (
 
 func (s *Server) backTo(w http.ResponseWriter, r *http.Request, page, msg string) {
 	dest := fmt.Sprintf("/%s/%s/%s", r.PathValue("owner"), r.PathValue("repo"), page)
-	if msg != "" {
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		dest += "?e=" + url.QueryEscape(msg)
-	}
+	s.setFlash(w, msg)
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 

@@ -56,7 +56,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		Notice  string
 		Message string
 	}{s.baseFor(u), "account", keys, pgp, emails, s.cfg.SiteHost(),
-		r.URL.Query().Get("e"), r.URL.Query().Get("m")})
+		s.takeFlash(w, r), r.URL.Query().Get("m")})
 }
 
 // accountSubmit routes the account forms to their commands. Everything
@@ -64,12 +64,10 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	back := func(msg, note string) {
 		q := ""
-		switch {
-		case msg != "":
-			q = "?e=" + url.QueryEscape(msg)
-		case note != "":
+		if note != "" {
 			q = "?m=" + url.QueryEscape(note)
 		}
+		s.setFlash(w, msg)
 		http.Redirect(w, r, "/settings"+q, http.StatusSeeOther)
 	}
 

@@ -3,7 +3,6 @@ package httpd
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
@@ -39,18 +38,13 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.Us
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: depsErr == nil,
-		Notice:      r.URL.Query().Get("e"),
+		Notice:      s.takeFlash(w, r),
 	})
 }
 
 func (s *Server) settingsRedirect(w http.ResponseWriter, r *http.Request, msg string) {
 	dest := fmt.Sprintf("/%s/%s/settings", r.PathValue("owner"), r.PathValue("repo"))
-	if msg != "" {
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		dest += "?e=" + url.QueryEscape(msg)
-	}
+	s.setFlash(w, msg)
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 

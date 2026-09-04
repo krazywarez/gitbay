@@ -469,7 +469,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Notice        string
 	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
 		d.Repos, d.Members, d.Orgs,
-		weeks, activityTotal, teams, canAdmin, r.URL.Query().Get("e")})
+		weeks, activityTotal, teams, canAdmin, s.takeFlash(w, r)})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
@@ -665,7 +665,7 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 		FreeTags []string
 		CanWrite bool
 		Notice   string
-	}{p, views, freeTags, s.canWriteRepo(r, p.Repo), r.URL.Query().Get("e")})
+	}{p, views, freeTags, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 
 // releaseAsset streams one uploaded asset. Tags containing '/' are not
@@ -1640,7 +1640,7 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		LabelColors map[string]template.CSS
 	}{p, iss, md(iss.Body, iss.BodyFormat), renderComments(comments, md),
 		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
-		milestones, r.URL.Query().Get("e"), s.labelColors(p.Repo.ID)})
+		milestones, s.takeFlash(w, r), s.labelColors(p.Repo.ID)})
 }
 
 // canEditItem: the author or anyone with write access may edit.
@@ -1817,7 +1817,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Stacked         []store.MR
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviews, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, r.URL.Query().Get("e"), detachedThreads, stackedOn, stacked})
+		canWrite, unresolved, s.takeFlash(w, r), detachedThreads, stackedOn, stacked})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
