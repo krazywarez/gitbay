@@ -156,7 +156,12 @@ func TestCLI(t *testing.T) {
 	mustGit(t, dir, cliGitEnv, "add", ".")
 	mustGit(t, dir, cliGitEnv, "commit", "-q", "-m", "feature work")
 	mustGit(t, dir, cliGitEnv, "push", "-q", "origin", "feature")
-	c.must(t, dir, "", "mr", "create", "--source", "feature", "--target", "main", "--title", "via cli")
+	// Inside the clone on the branch, --source is the checked-out branch
+	// and --target the default branch; neither needs typing (#101).
+	c.must(t, dir, "", "mr", "create", "--title", "via cli")
+	if out := c.must(t, dir, "", "mr", "show", "1", "--json"); !strings.Contains(out, `"source":"feature"`) || !strings.Contains(out, `"target_ref":"main"`) {
+		t.Fatalf("mr create did not infer source and target:\n%s", out)
+	}
 
 	// mr checkout uses the clone's own git; the MR ref comes from origin.
 	mustGit(t, dir, cliGitEnv, "checkout", "-q", "main")

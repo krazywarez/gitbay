@@ -297,3 +297,22 @@ func cmdRemoteList() int {
 	}
 	return 0
 }
+
+// currentBranch is the checked-out branch of the working directory's
+// clone, or "" outside a clone or on a detached HEAD.
+func currentBranch() string {
+	out, err := exec.Command("git", "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag || strings.HasPrefix(a, flag+"=") {
+			return true
+		}
+	}
+	return false
+}

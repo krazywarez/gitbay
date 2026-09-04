@@ -125,6 +125,7 @@ type passOpts struct {
 	stdinOK     bool     // wire local stdin through when --file - asks for it
 	alwaysStdin bool     // stdin is the payload, named by no flag: a bare redirect
 	editor      string   // open $EDITOR for a body when none given
+	inferSource bool     // --source defaults to the checked-out branch inside a clone
 }
 
 // pass builds a passthrough command. Flags are parsed by the server, which
@@ -182,11 +183,20 @@ func runPass(o passOpts, args []string) int {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
+	explicitRepo := len(args) > 0 && !strings.HasPrefix(args[0], "-") && strings.Contains(args[0], "/")
 	if o.needsRepo {
 		args, err = withRepo(t, args)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "gitbay:", err)
 			return protocol.ExitUsage
+		}
+	}
+	// Inside a clone, the branch you are on is the one you mean (#101).
+	// Only when the repository was inferred from the clone too: naming
+	// another repository and meaning this checkout's branch is unlikely.
+	if o.inferSource && !explicitRepo && !hasFlag(args, "--source") {
+		if branch := currentBranch(); branch != "" {
+			args = append(args, "--source", branch)
 		}
 	}
 
@@ -447,7 +457,7 @@ func milestoneCmd() *cobra.Command {
 func mrCmd() *cobra.Command {
 	return group("mr", "merge requests",
 		pass("create", "open a merge request: --source <branch> --target <branch> --title <t>",
-			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request"}),
+			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
 		pass("list", "list merge requests [--state ...] [--author u] [--milestone m|none] [--limit n] [--cursor c]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
 		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
 		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
