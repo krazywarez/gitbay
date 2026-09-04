@@ -10,7 +10,7 @@
   </nav>
 </div>
 <form method="get" action="/search" class="searchform">
-  <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names, topics, issue and merge request titles" autofocus>
+  <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names and topics, issue and merge request text" autofocus>
   {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
   <button type="submit">search</button>
 </form>
@@ -29,6 +29,6 @@
 </ul>
 {{else}}<p class="empty-note">no matches for “{{.Query}}”</p>{{end}}
 {{else}}
-<p class="empty-note">Repository names, descriptions and topics, and issue and merge request titles. File contents are searched per repository, from a repository's Code tab.</p>
+<p class="empty-note">Repository names, descriptions and topics, and the title and body of every issue and merge request you can read. File contents are searched per repository, from a repository's Code tab.</p>
 {{end}}
 {{end}}

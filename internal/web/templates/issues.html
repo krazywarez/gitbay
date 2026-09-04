@@ -8,6 +8,10 @@
     <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
   {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
+  <form method="get" class="searchform compact">
+    <input type="search" name="q" aria-label="Search issues" value="{{.Query}}" placeholder="search title and body">
+    <input type="hidden" name="state" value="{{.State}}">
+  </form>
   <span class="spacer"></span>
   <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
 </div>
@@ -20,7 +24,8 @@
   </div>
   <span class="chip {{if eq .State "open"}}chip-open{{else}}chip-done{{end}}">{{.State}}</span>
 </li>
-{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues — open one with <code>gitbay issue create {{.Repo.OwnerName}}/{{.Repo.Name}} --title "..."</code></li>{{end}}
+{{else}}{{if .Query}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues matching “{{.Query}}”</li>
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues — open one with <code>gitbay issue create {{.Repo.OwnerName}}/{{.Repo.Name}} --title "..."</code></li>{{end}}{{end}}
 </ul>
 {{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 {{end}}

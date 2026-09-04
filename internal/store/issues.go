@@ -108,6 +108,7 @@ type IssueFilter struct {
 	Assignee  string
 	Author    string
 	Milestone string
+	Search    string // full-text over title and body
 	Limit     int
 	Before    int64
 }
@@ -149,6 +150,10 @@ func (s *Store) QueryIssues(repoID int64, f IssueFilter) ([]Issue, error) {
 	default:
 		q += " AND m.title = ?"
 		args = append(args, f.Milestone)
+	}
+	if f.Search != "" {
+		q += " AND i.id IN (SELECT rowid FROM issue_fts WHERE issue_fts MATCH ?)"
+		args = append(args, FTSQuery(f.Search))
 	}
 	if f.Before > 0 {
 		q += " AND i.number < ?"

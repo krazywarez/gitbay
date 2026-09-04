@@ -102,6 +102,7 @@ type MRFilter struct {
 	State     string
 	Author    string
 	Milestone string
+	Search    string // full-text over title and body
 	Limit     int
 	Before    int64
 }
@@ -130,6 +131,10 @@ func (s *Store) QueryMRs(repoID int64, f MRFilter) ([]MR, error) {
 	default:
 		q += " AND ms.title = ?"
 		args = append(args, f.Milestone)
+	}
+	if f.Search != "" {
+		q += " AND m.id IN (SELECT rowid FROM mr_fts WHERE mr_fts MATCH ?)"
+		args = append(args, FTSQuery(f.Search))
 	}
 	if f.Before > 0 {
 		q += " AND m.number < ?"

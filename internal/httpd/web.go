@@ -1584,7 +1584,8 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 	// label chips and author links point here.
 	qv := r.URL.Query()
 	f := store.IssueFilter{State: state, Label: qv.Get("label"), Assignee: qv.Get("assignee"),
-		Author: qv.Get("author"), Milestone: qv.Get("milestone"), Limit: listPage + 1}
+		Author: qv.Get("author"), Milestone: qv.Get("milestone"),
+		Search: strings.TrimSpace(qv.Get("q")), Limit: listPage + 1}
 	f.Before, _ = strconv.ParseInt(qv.Get("before"), 10, 64)
 	issues, err := s.st.QueryIssues(p.Repo.ID, f)
 	if err != nil {
@@ -1605,11 +1606,13 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 		repoPage
 		State       string
 		Label       string
+		Query       string
 		Filters     []listFilter
 		Issues      []store.Issue
 		LabelColors map[string]template.CSS
 		Older       string
-	}{p, state, f.Label, activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
+	}{p, state, f.Label, f.Search,
+		activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
 		issues, s.labelColors(p.Repo.ID), older})
 }
 
@@ -1696,7 +1699,8 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		state = "open"
 	}
 	qv := r.URL.Query()
-	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone"), Limit: listPage + 1}
+	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone"),
+		Search: strings.TrimSpace(qv.Get("q")), Limit: listPage + 1}
 	mf.Before, _ = strconv.ParseInt(qv.Get("before"), 10, 64)
 	mrs, err := s.st.QueryMRs(p.Repo.ID, mf)
 	if err != nil {
@@ -1711,10 +1715,12 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "mrs.html", struct {
 		repoPage
 		State   string
+		Query   string
 		Filters []listFilter
 		MRs     []store.MR
 		Older   string
-	}{p, state, activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs, older})
+	}{p, state, mf.Search,
+		activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs, older})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {

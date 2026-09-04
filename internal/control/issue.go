@@ -21,7 +21,7 @@ func init() {
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
 		Summary: "list issues",
-		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
+		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
 		Summary: "show an issue with comments",
 		Usage:   "issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
@@ -165,9 +165,9 @@ func runIssueList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	const usage = "usage: issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
+	const usage = "usage: issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]"
 	f := store.IssueFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone"}, MaxPos: 1, Usage: usage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -176,6 +176,12 @@ func runIssueList(c *Ctx, args []string) int {
 		f.State = fl.Value("--state")
 	}
 	f.Label, f.Assignee, f.Author, f.Milestone = fl.Value("--label"), fl.Value("--assignee"), fl.Value("--author"), fl.Value("--milestone")
+	f.Search = fl.Value("--search")
+	if fl.Has("--search") {
+		if err := validQuery(f.Search); err != nil {
+			return c.failErr(err)
+		}
+	}
 	if path == "" || (f.State != "open" && f.State != "closed" && f.State != "all") {
 		return c.fail(protocol.ExitUsage, usage)
 	}

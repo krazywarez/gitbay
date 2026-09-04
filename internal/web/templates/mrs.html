@@ -8,6 +8,10 @@
     <a {{if eq .State "closed"}}class="active" aria-current="page" {{end}}href="?state=closed">closed</a>
     <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
+  <form method="get" class="searchform compact">
+    <input type="search" name="q" aria-label="Search merge requests" value="{{.Query}}" placeholder="search title and body">
+    <input type="hidden" name="state" value="{{.State}}">
+  </form>
   {{range .Filters}}<p class="meta">{{.Key}}: <b>{{.Value}}</b> <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
 {{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
@@ -19,7 +23,8 @@
   </div>
   <span class="chip chip-{{.State}}">{{.State}}</span>
 </li>
-{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}
+{{else}}{{if .Query}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests matching “{{.Query}}”</li>
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}{{end}}
 </ul>
 {{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 {{end}}

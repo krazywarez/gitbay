@@ -41,7 +41,7 @@ func init() {
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
-		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
 		Summary: "show a merge request",
 		Usage:   "mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
@@ -388,9 +388,9 @@ func runMRList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	const usage = "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--limit <n>] [--cursor <c>]"
+	const usage = "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]"
 	f := store.MRFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone"}, MaxPos: 1, Usage: usage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -399,6 +399,12 @@ func runMRList(c *Ctx, args []string) int {
 		f.State = fl.Value("--state")
 	}
 	f.Author, f.Milestone = fl.Value("--author"), fl.Value("--milestone")
+	f.Search = fl.Value("--search")
+	if fl.Has("--search") {
+		if err := validQuery(f.Search); err != nil {
+			return c.failErr(err)
+		}
+	}
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
 	if path == "" || !valid[f.State] {
 		return c.fail(protocol.ExitUsage, usage)
