@@ -226,3 +226,17 @@ func DirSize(dir string) int64 {
 	})
 	return total
 }
+
+// Every git this package runs prints paths as they are, not quoted with
+// octal escapes the way core.quotepath does by default, so a file called
+// übersicht.txt lists, greps, blames and diffs under its own name.
+// GIT_CONFIG_PARAMETERS reaches every subprocess, hooks included,
+// without touching each call site (#129).
+func init() {
+	const q = "'core.quotepath=off'"
+	if cur := os.Getenv("GIT_CONFIG_PARAMETERS"); cur != "" {
+		os.Setenv("GIT_CONFIG_PARAMETERS", cur+" "+q)
+	} else {
+		os.Setenv("GIT_CONFIG_PARAMETERS", q)
+	}
+}
