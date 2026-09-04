@@ -5,12 +5,16 @@ is not used.
 
 * Getting an account
 
-The instance is currently invite-based. Ask for an invite (hello@gitbay.org)
-and register with the SSH key you will push with:
+Registration is open. Register with the SSH key you will push with, and
+the address that will receive the verification code:
 
 #+begin_src sh
-ssh git@gitbay.org register --username you --invite <code>
+ssh git@gitbay.org register --username you --email you@example.org
+ssh git@gitbay.org email verify <code>       # the code arrives by mail
 #+end_src
+
+The account is active once the address is verified. The same signup is
+at [[https://gitbay.org/register][gitbay.org/register]] for a browser.
 
 * The workflow
 
