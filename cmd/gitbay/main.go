@@ -126,14 +126,24 @@ func newRoot() *cobra.Command {
 const serverPath = "gitbay.server_path"
 const stdinMode = "gitbay.stdin_mode"
 
+// stdinWhat carries the payload's name onto the command tree so the
+// coverage test can assert every stdin-payload command has one; without
+// it the terminal prompt says the unhelpful word "input" (#150).
+const stdinWhat = "gitbay.stdin_what"
+
 // passOpts describes how one CLI command maps onto the server command.
 type passOpts struct {
 	server      []string // server-side command path
 	needsRepo   bool     // prepend inferred owner/name unless given
 	stdinOK     bool     // wire local stdin through when --file - asks for it
 	alwaysStdin bool     // stdin is the payload, named by no flag: a bare redirect
-	editor      string   // open $EDITOR for a body when none given
-	inferSource bool     // --source defaults to the checked-out branch inside a clone
+	// stdinWhat names the payload for the prompt shown when stdin is a
+	// terminal; stdinSecret hides the input and takes one line, for a
+	// value that should not reach the scrollback.
+	stdinWhat   string
+	stdinSecret bool
+	editor      string // open $EDITOR for a body when none given
+	inferSource bool   // --source defaults to the checked-out branch inside a clone
 }
 
 // pass builds a passthrough command. Flags are parsed by the server, which
@@ -158,6 +168,7 @@ func pass(use, short string, o passOpts) *cobra.Command {
 		Annotations: map[string]string{
 			serverPath: strings.Join(o.server, " "),
 			stdinMode:  o.stdinModeName(),
+			stdinWhat:  o.stdinWhat,
 		},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -231,7 +242,16 @@ func runPass(o passOpts, args []string) int {
 	}
 	if stdin == nil || isEmptyReader(stdin) {
 		if o.alwaysStdin || (o.stdinOK && usesStdin(args)) {
-			stdin = os.Stdin
+			what := o.stdinWhat
+			if what == "" {
+				what = "input"
+			}
+			r, err := stdinPayload(os.Stdin, what, o.stdinSecret)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "gitbay:", err)
+				return protocol.ExitFailure
+			}
+			stdin = r
 		}
 	}
 	return runSSH(t, append(o.server, args...), stdin)
@@ -306,26 +326,38 @@ func local(use, short string, fn func(args []string) int) *cobra.Command {
 
 func authCmd() *cobra.Command {
 	keysAdd := pass("add", "register an SSH public key (reads the key from stdin or --file -)",
-		passOpts{server: []string{"keys", "add"}, alwaysStdin: true})
+		passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
 	// keys add always reads stdin on the server; wire it through directly.
 	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
 		t, err := resolveTarget()
 		if err != nil {
 			return err
 		}
-		os.Exit(runSSH(t, append([]string{"keys", "add"}, args...), os.Stdin))
+		in, err := stdinPayload(os.Stdin, "an SSH public key", false)
+		if err != nil {
+			return err
+		}
+		os.Exit(runSSH(t, append([]string{"keys", "add"}, args...), in))
 		return nil
 	}
 	pgpAdd := &cobra.Command{
 		Use: "add", Short: "register an OpenPGP public key (armored, on stdin)",
-		Annotations:        map[string]string{serverPath: "pgp add"},
+		Annotations: map[string]string{
+			serverPath: "pgp add",
+			stdinMode:  "always",
+			stdinWhat:  "an armored OpenPGP public key",
+		},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := resolveTarget()
 			if err != nil {
 				return err
 			}
-			os.Exit(runSSH(t, append([]string{"pgp", "add"}, args...), os.Stdin))
+			in, err := stdinPayload(os.Stdin, "an armored OpenPGP public key", false)
+			if err != nil {
+				return err
+			}
+			os.Exit(runSSH(t, append([]string{"pgp", "add"}, args...), in))
 			return nil
 		},
 	}
@@ -391,7 +423,7 @@ func repoCmd() *cobra.Command {
 		pass("import-issues", "import GitHub issue/PR history: --from <ghowner/ghrepo> [--token-stdin]",
 			passOpts{server: []string{"repo", "import-issues"}, needsRepo: true, stdinOK: true}),
 		group("deploy-key", "repository-bound CI keys",
-			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, alwaysStdin: true}),
+			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "an SSH public key"}),
 			pass("list", "list deploy keys", passOpts{server: []string{"repo", "deploy-key", "list"}, needsRepo: true}),
 			pass("remove", "remove a deploy key: <fingerprint>", passOpts{server: []string{"repo", "deploy-key", "remove"}, needsRepo: true}),
 		),
@@ -408,7 +440,7 @@ func repoCmd() *cobra.Command {
 			pass("status", "show check state and what is behind", passOpts{server: []string{"repo", "deps", "status"}, needsRepo: true}),
 		),
 		group("secret", "build secrets (values on stdin, injected into build env)",
-			pass("set", "set a secret: <NAME> (value on stdin)", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true}),
+			pass("set", "set a secret: <NAME> (value on stdin)", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the secret value", stdinSecret: true}),
 			pass("list", "list secret names", passOpts{server: []string{"repo", "secret", "list"}, needsRepo: true}),
 			pass("remove", "remove a secret: <NAME>", passOpts{server: []string{"repo", "secret", "remove"}, needsRepo: true}),
 		),
@@ -473,7 +505,7 @@ func releaseCmd() *cobra.Command {
 		pass("show", "show a release with assets: <tag>", passOpts{server: []string{"release", "show"}, needsRepo: true}),
 		pass("delete", "delete a release and its assets: <tag> --yes", passOpts{server: []string{"release", "delete"}, needsRepo: true}),
 		group("asset", "binary assets on a release",
-			pass("add", "upload from stdin: <tag> <filename> < file", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true}),
+			pass("add", "upload from stdin: <tag> <filename> < file", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the asset's bytes"}),
 			pass("get", "download to stdout: <tag> <filename> > file", passOpts{server: []string{"release", "asset", "get"}, needsRepo: true}),
 			pass("remove", "remove an asset: <tag> <filename>", passOpts{server: []string{"release", "asset", "remove"}, needsRepo: true}),
 		),
