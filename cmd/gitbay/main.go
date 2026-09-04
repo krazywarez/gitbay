@@ -360,6 +360,7 @@ func repoCmd() *cobra.Command {
 		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
 		pass("search", "find repositories by name, description, or topic: <query>", passOpts{server: []string{"repo", "search"}}),
 		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
+		pass("diff", "the patch between two refs: <base> <head>", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
 		pass("tree", "list a directory: [<path>] [--ref <ref>]", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
 		pass("cat", "read a file: <path> [--ref <ref>]", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
 		pass("blame", "attribute lines to commits: <path> [--ref <ref>] [--from <n>] [--to <n>]",

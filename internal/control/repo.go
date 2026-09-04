@@ -90,6 +90,9 @@ func init() {
 	register(Command{Path: []string{"repo", "grep"},
 		Summary: "search file contents",
 		Usage:   "repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
+	register(Command{Path: []string{"repo", "diff"},
+		Summary: "the patch between two refs, from their merge base",
+		Usage:   "repo diff <owner/name> <base> <head>", ReadOnly: true, Run: runRepoDiff})
 	register(Command{Path: []string{"repo", "pin"},
 		Summary: "pin a repository to your dashboard",
 		Usage:   "repo pin <owner/name>", Run: runRepoPin})
@@ -907,4 +910,43 @@ func setProtect(c *Ctx, args []string, protect bool) int {
 		verb = "unprotected"
 	}
 	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "%s %s on %s\n", verb, branch, repo.Path()) })
+}
+
+// runRepoDiff is the compare view's command: what head adds on top of
+// base, measured from their merge base the way a merge request diff is,
+// so a base that moved on does not show up as removals (#118).
+func runRepoDiff(c *Ctx, args []string) int {
+	f, err := parseFlags(args, flagSpec{MaxPos: 3, Usage: "repo diff <owner/name> <base> <head>"})
+	if err != nil || len(f.Pos) != 3 {
+		return c.fail(protocol.ExitUsage, "usage: repo diff <owner/name> <base> <head>")
+	}
+	repo, code := resolveRepo(c, f.pos(0), policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	base, err := gitutil.ResolveRef(dir, f.pos(1))
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", f.pos(1), repo.Path())
+	}
+	head, err := gitutil.ResolveRef(dir, f.pos(2))
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", f.pos(2), repo.Path())
+	}
+	mergeBase, err := gitutil.MergeBase(dir, base, head)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	patch, truncated, err := gitutil.Diff(dir, mergeBase, head, 4<<20)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if c.JSON {
+		return c.emit(map[string]any{"base": base, "head": head, "merge_base": mergeBase, "patch": patch, "truncated": truncated}, nil)
+	}
+	fmt.Fprint(c.Stdout, patch)
+	if truncated {
+		fmt.Fprintln(c.Stderr, "diff truncated at 4 MiB")
+	}
+	return protocol.ExitOK
 }
