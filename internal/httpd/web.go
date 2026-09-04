@@ -1257,9 +1257,13 @@ func renderReadme(name string, raw []byte) template.HTML {
 }
 
 type diffThread struct {
-	ID         int64
-	Resolved   string
-	Stale      bool
+	ID       int64
+	Resolved string
+	Stale    bool
+	// Pending marks a thread in the viewer's own unsubmitted review. Only
+	// they are shown it, and the page says so, since it looks exactly
+	// like a posted one otherwise.
+	Pending    bool
 	CanResolve bool
 	Comments   []renderedComment
 }
@@ -1294,6 +1298,7 @@ func attachThreads(files []diffFile, comments []store.DiffComment, headSHA strin
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
+				Pending:    cm.Pending,
 				CanResolve: rights.canResolve(cm.Author),
 				Comments:   []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
@@ -1742,7 +1747,9 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	comments, _ := s.st.ListMRComments(m.ID)
 	reviews, _ := s.st.ListMRReviews(m.ID)
 	checks, combined, _ := s.st.ChecksForCommit(p.Repo.ID, m.HeadSHA)
-	diffComments, _ := s.st.ListDiffComments(m.ID)
+	// The viewer sees their own unsubmitted review comments and nobody
+	// else's.
+	diffComments, _ := s.st.ListDiffComments(m.ID, s.webViewer(r).ID)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
 	var files []diffFile

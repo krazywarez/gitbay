@@ -17,7 +17,7 @@ import (
 func init() {
 	register(Command{Path: []string{"mr", "diff-comment"},
 		Summary:    "comment on a diff line",
-		Usage:      "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--reply <id>] [--message <m> | --file -]",
+		Usage:      "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]",
 		ReadsStdin: true, Run: runDiffComment})
 	register(Command{Path: []string{"mr", "threads"},
 		Summary: "review threads on an MR",
@@ -31,8 +31,9 @@ func init() {
 }
 
 func runDiffComment(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"}, Bools: []string{"--old"}, MaxPos: -1,
-		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--reply <id>] [--message <m> | --file -]"})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"},
+		Bools: []string{"--old", "--pending"}, MaxPos: -1,
+		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -95,24 +96,35 @@ func runDiffComment(c *Ctx, args []string) int {
 		}
 	}
 
-	id, err := c.Store.AddDiffComment(mr.ID, c.User.ID, mr.HeadSHA, path, side, line, body, replyTo)
+	pending := f.Has("--pending")
+	id, err := c.Store.AddDiffComment(mr.ID, c.User.ID, mr.HeadSHA, path, side, line, body, replyTo, pending)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "%v", err)
 		}
 		return c.failErr(err)
 	}
-	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "mr",
-			subject: mrSubject(repo, mr.Number, mr.Title),
-			action:  fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number),
-			excerpt: body, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
+	// A pending comment is not part of the conversation yet, so it does
+	// not reach anyone's inbox. `mr review` is what says it out loud.
+	if !pending {
+		if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+			notify(c, parts, notice{repo: repo, kind: "mr",
+				subject: mrSubject(repo, mr.Number, mr.Title),
+				action:  fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number),
+				excerpt: body, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
+		}
 	}
-	return c.emit(map[string]any{"id": id, "thread": firstNonZero(replyTo, id)}, func(w io.Writer) {
+	return c.emit(map[string]any{"id": id, "thread": firstNonZero(replyTo, id), "pending": pending}, func(w io.Writer) {
+		what := "thread %d opened on %s:%d in %s!%d\n"
 		if replyTo != 0 {
 			fmt.Fprintf(w, "replied to thread %d on %s!%d\n", replyTo, repo.Path(), mr.Number)
 		} else {
-			fmt.Fprintf(w, "thread %d opened on %s:%d in %s!%d\n", id, path, line, repo.Path(), mr.Number)
+			fmt.Fprintf(w, what, id, path, line, repo.Path(), mr.Number)
+		}
+		if pending {
+			n := c.Store.CountPendingComments(mr.ID, c.User.ID)
+			fmt.Fprintf(w, "pending: %d comment(s) in this review, submit with `gitbay mr review %s %d --comment`\n",
+				n, repo.Path(), mr.Number)
 		}
 	})
 }
@@ -132,7 +144,7 @@ func runMRThreads(c *Ctx, args []string) int {
 	if len(args) != 2 {
 		return c.fail(protocol.ExitUsage, "usage: mr threads <owner/name> <n>")
 	}
-	comments, err := c.Store.ListDiffComments(mr.ID)
+	comments, err := c.Store.ListDiffComments(mr.ID, c.User.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

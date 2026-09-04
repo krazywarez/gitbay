@@ -67,7 +67,7 @@ func init() {
 		ReadsStdin: true, Run: runMRComment})
 	register(Command{Path: []string{"mr", "review"},
 		Summary: "review",
-		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment", Run: runMRReview})
+		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard", Run: runMRReview})
 	register(Command{Path: []string{"mr", "merge"},
 		Summary: "merge",
 		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
@@ -319,9 +319,9 @@ func runMRCreate(c *Ctx, args []string) int {
 }
 
 type mrOut struct {
-	Number     int64  `json:"number"`
-	Title      string `json:"title"`
-	State      string `json:"state"`
+	Number int64  `json:"number"`
+	Title  string `json:"title"`
+	State  string `json:"state"`
 	// Draft is an open merge request not asking to be merged yet.
 	Draft      bool   `json:"draft,omitempty"`
 	Author     string `json:"author"`
@@ -690,7 +690,7 @@ func runMRComment(c *Ctx, args []string) int {
 }
 
 func runMRReview(c *Ctx, args []string) int {
-	verdict := ""
+	verdict, discard := "", false
 	var rest []string
 	for _, a := range args {
 		switch a {
@@ -700,12 +700,18 @@ func runMRReview(c *Ctx, args []string) int {
 			verdict = "request_changes"
 		case "--comment":
 			verdict = "comment"
+		case "--discard":
+			discard = true
 		default:
 			rest = append(rest, a)
 		}
 	}
-	if verdict == "" {
-		return c.fail(protocol.ExitUsage, "usage: mr review <owner/name> <n> --approve|--request-changes|--comment")
+	const usage = "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard"
+	if discard && verdict != "" {
+		return c.fail(protocol.ExitUsage, "--discard throws the batch away; it takes no verdict")
+	}
+	if verdict == "" && !discard {
+		return c.fail(protocol.ExitUsage, "usage: %s", usage)
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanRead)
 	if code >= 0 {
@@ -717,7 +723,24 @@ func runMRReview(c *Ctx, args []string) int {
 	if mr.State != "open" {
 		return c.fail(protocol.ExitUsage, "MR !%d is %s", mr.Number, mr.State)
 	}
+	// Throwing the batch away is not a review, so it stops here: no
+	// verdict, no event, nobody told about comments nobody ever saw.
+	if discard {
+		n, err := c.Store.DiscardPendingComments(mr.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		return c.emit(map[string]any{"number": mr.Number, "discarded": n}, func(w io.Writer) {
+			fmt.Fprintf(w, "discarded %d pending comment(s) on %s!%d\n", n, repo.Path(), mr.Number)
+		})
+	}
 	if err := c.Store.AddMRReview(mr.ID, c.User.ID, verdict, mr.HeadSHA); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	// The batch the reviewer composed becomes visible with the verdict,
+	// which is what makes it one review rather than a trickle.
+	published, err := c.Store.PublishPendingComments(mr.ID, c.User.ID)
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.reviewed",
@@ -725,11 +748,15 @@ func runMRReview(c *Ctx, args []string) int {
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",
 			subject: mrSubject(repo, mr.Number, mr.Title),
-			action:  fmt.Sprintf("reviewed !%d: %s", mr.Number, verdict),
+			action:  reviewAction(mr.Number, verdict, published),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
-	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict}, func(w io.Writer) {
-		fmt.Fprintf(w, "reviewed %s!%d: %s\n", repo.Path(), mr.Number, verdict)
+	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict, "published": published}, func(w io.Writer) {
+		fmt.Fprintf(w, "reviewed %s!%d: %s", repo.Path(), mr.Number, verdict)
+		if published > 0 {
+			fmt.Fprintf(w, " (%d comment(s))", published)
+		}
+		fmt.Fprintln(w)
 	})
 }
 
@@ -1268,4 +1295,14 @@ func runMRClose(c *Ctx, args []string) int {
 	return c.emit(map[string]any{"number": mr.Number, "state": "closed"}, func(w io.Writer) {
 		fmt.Fprintf(w, "closed %s!%d\n", repo.Path(), mr.Number)
 	})
+}
+
+// reviewAction is what a review notification says it was. A verdict with
+// a batch behind it is a different thing from a bare verdict, and the
+// person reading the mail is deciding whether to open it.
+func reviewAction(number int64, verdict string, published int64) string {
+	if published > 0 {
+		return fmt.Sprintf("reviewed !%d: %s, with %d comment(s)", number, verdict, published)
+	}
+	return fmt.Sprintf("reviewed !%d: %s", number, verdict)
 }

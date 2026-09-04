@@ -143,7 +143,9 @@
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
     <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
     <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
-    <p><button type="submit">Comment</button> <a href="{{$base}}?view=diff">Cancel</a></p>
+    <p><button type="submit">Comment</button>
+       <button type="submit" name="pending" value="on">Add to review</button>
+       <a href="{{$base}}?view=diff">Cancel</a></p>
   </form></td></tr>
   {{end}}{{end}}{{range .Threads}}<tr class="threadrow"><td colspan="3">{{template "thread" dict "T" . "Base" $base "Viewer" $viewer "Class" ""}}</td></tr>
   {{end}}{{end}}
@@ -157,7 +159,8 @@
 
 {{/* thread renders one review thread with its reply and resolve controls.
      Class carries "stale" for threads whose anchor is gone. */}}
-{{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if .Class}} {{.Class}}{{end}}" id="thread-{{$t.ID}}">
+{{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if $t.Pending}} pending{{end}}{{if .Class}} {{.Class}}{{end}}" id="thread-{{$t.ID}}">
+{{if $t.Pending}}<p class="threadstate">pending — only you can see this until you submit your review</p>{{end}}
 {{if or $t.Resolved (and .Class $t.Stale)}}<p class="threadstate">{{if and .Class $t.Stale}}stale{{end}}{{if $t.Resolved}}{{if and .Class $t.Stale}} · {{end}}resolved by {{$t.Resolved}}{{end}}</p>{{end}}
 {{range $t.Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}
 {{if .Viewer}}<details class="threadreply"><summary>Reply</summary>

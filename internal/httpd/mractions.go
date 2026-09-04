@@ -107,6 +107,11 @@ func (s *Server) mrDiffCommentSubmit(w http.ResponseWriter, r *http.Request, u s
 			extra = append(extra, "--old")
 		}
 	}
+	// "Add to review" holds the comment back until the verdict; "Comment"
+	// posts it now, which is what the form did before there was a choice.
+	if r.FormValue("pending") == "on" {
+		extra = append(extra, "--pending")
+	}
 	msg, code := s.runControlStdinCode(u, mrArgs(r, "diff-comment", append(extra, "--file", "-")...), body)
 	s.done(w, r, code, msg, s.mrDiffRedirect)
 }

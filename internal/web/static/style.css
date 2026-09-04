@@ -1194,6 +1194,8 @@ details.editbox input[type="text"] { width: 100%; }
   margin: var(--sp-2) 0 var(--sp-2) var(--sp-6);
 }
 .thread.resolved { border-left-color: var(--ok); opacity: 0.75; }
+/* an unsubmitted comment is the viewer's own note, not the conversation */
+.thread.pending { border-left-color: var(--neutral); border-left-style: dashed; }
 .thread.stale { border-left-color: var(--warn); }
 .thread p.commenthead { font-size: var(--fs-2); margin: var(--sp-2) 0 0; }
 .thread .when { color: var(--muted); }
