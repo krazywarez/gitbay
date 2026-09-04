@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"gitbay.org/gitbay/internal/buildinfo"
@@ -53,7 +54,7 @@ func main() {
 		remote    = flag.String("remote", "git@gitbay.org", "ssh destination of the gitbay server")
 		sshOpts   = flag.String("ssh-opts", "", "extra ssh options, space-separated (also used for git clone)")
 		cloneBase = flag.String("clone-base", "", "clone URL prefix (default ssh://<remote>)")
-		workdir   = flag.String("workdir", filepath.Join(os.TempDir(), "gitbay-runner"), "build workspace root")
+		workdir   = flag.String("workdir", defaultWorkdir(), "build workspace root")
 		poll      = flag.Duration("poll", 5*time.Second, "idle poll interval")
 		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
 		repos     = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
@@ -86,7 +87,13 @@ func main() {
 	if r.cloneBase == "" {
 		r.cloneBase = "ssh://" + *remote
 	}
-	if err := os.MkdirAll(r.workdir, 0o755); err != nil {
+	// 0o700, not 0o755: a build's checkout and its secrets-bearing
+	// environment are this user's business alone, and the default sits
+	// beside other users' data on a shared host.
+	if err := os.MkdirAll(r.workdir, 0o700); err != nil {
+		log.Fatal(err)
+	}
+	if err := checkWorkdir(r.workdir); err != nil {
 		log.Fatal(err)
 	}
 	n := *jobs
@@ -326,4 +333,57 @@ func (r *runner) ssh(stdin io.Reader, args ...string) (string, error) {
 		return out.String() + errOut.String(), err
 	}
 	return out.String(), nil
+}
+
+// defaultWorkdir picks a build workspace that another local user cannot
+// have created first.
+//
+// The default used to be <tmp>/gitbay-runner: a fixed name inside a
+// world-writable directory, created with MkdirAll, which succeeds against
+// an existing directory whoever owns it. On a shared host another user
+// could have made it — or symlinked it — before the runner started, and
+// this is the process that clones repositories and exports build secrets
+// into step environments (go:S5445, #153).
+//
+// The user's cache directory is not world-writable and is per-user by
+// construction. Falling back to tmp keeps a runner working where HOME is
+// unset, and checkWorkdir refuses the unsafe cases there.
+func defaultWorkdir() string {
+	if cache, err := os.UserCacheDir(); err == nil && cache != "" {
+		return filepath.Join(cache, "gitbay-runner")
+	}
+	return filepath.Join(os.TempDir(), "gitbay-runner")
+}
+
+// checkWorkdir makes sure the workspace is a directory this user owns
+// privately. MkdirAll is happy with one that already exists, so being
+// able to create it proves nothing about who made it.
+//
+// A directory we own that is merely too permissive is tightened rather
+// than refused: every runner before this one created its workspace 0755,
+// so refusing would take the runner down on upgrade to fix a permission
+// we are entitled to change. What cannot be repaired — a symlink, or
+// something owned by someone else — is refused, because those are what an
+// attacker leaves behind and neither is ours to correct.
+func checkWorkdir(dir string) error {
+	fi, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("workdir %s is a symlink; point -workdir at a real directory", dir)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("workdir %s is not a directory", dir)
+	}
+	if st, ok := fi.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Getuid() {
+		return fmt.Errorf("workdir %s is owned by uid %d, not this process's %d", dir, st.Uid, os.Getuid())
+	}
+	if perm := fi.Mode().Perm(); perm&0o077 != 0 {
+		log.Printf("workdir %s was mode %04o; tightening to 0700 (builds and their secrets are this user's alone)", dir, perm)
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return fmt.Errorf("tightening workdir %s: %w", dir, err)
+		}
+	}
+	return nil
 }
