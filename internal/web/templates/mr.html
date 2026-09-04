@@ -3,7 +3,7 @@
 {{define "content"}}
 {{$base := printf "/%s/%s/mrs/%d" .Repo.OwnerName .Repo.Name .MR.Number}}
 <h1 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h1>
-<p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
+<p class="issuemeta">{{if .MR.Draft}}<span class="chip chip-neutral">draft</span> {{end}}<span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
 {{if and (eq .MR.State "merged") .MR.MergedAt}}
   {{if .MR.MergedBy}}<a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a> merged{{else}}Merged{{end}}
   {{template "mrrange" .MR}} on {{when .MR.MergedAt}}
@@ -106,6 +106,10 @@
     </form>
     <form method="post" action="{{$base}}/close" class="actions">
       <button type="submit">Close without merging</button>
+    </form>
+    <form method="post" action="{{$base}}/draft" class="actions">
+      {{if .MR.Draft}}<button type="submit">Ready for review</button>
+      {{else}}<input type="hidden" name="draft" value="on"><button type="submit">Convert to draft</button>{{end}}
     </form>
   </div>
   {{end}}

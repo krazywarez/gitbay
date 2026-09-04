@@ -169,7 +169,7 @@ func runImportIssues(c *Ctx, args []string) int {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
 				body := attribution(src, it.Number, "pull request", it.User.Login, it.CreatedAt) + it.Body
-				localN, err = c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, pr.Head.Ref, pr.Base.Ref, it.Title, body, pr.Head.SHA, "md")
+				localN, err = c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, pr.Head.Ref, pr.Base.Ref, it.Title, body, pr.Head.SHA, "md", false)
 				if err != nil {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}

@@ -31,6 +31,7 @@ var EventKinds = []string{
 	"mr.closed",
 	"mr.commented",
 	"mr.created",
+	"mr.draft",
 	"mr.edited",
 	"mr.merged",
 	"mr.milestoned",

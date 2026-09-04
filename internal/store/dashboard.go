@@ -139,6 +139,7 @@ const reviewQueueQuery = `
 	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 	JOIN users au ON au.id = x.author_id
 	WHERE x.state IN ('open', 'source_gone')
+	  AND x.draft = 0
 	  AND x.author_id <> ?1
 	  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
 	                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1

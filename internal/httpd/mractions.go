@@ -68,6 +68,17 @@ func (s *Server) mrCloseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 	s.done(w, r, code, msg, s.mrRedirect)
 }
 
+// mrDraftSubmit toggles the draft mark. The form says which way it is
+// going, so a stale page cannot flip the wrong one.
+func (s *Server) mrDraftSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	verb := "ready"
+	if r.FormValue("draft") == "on" {
+		verb = "draft"
+	}
+	_, msg, code := s.runControlCode(u, mrArgs(r, verb))
+	s.done(w, r, code, msg, s.mrRedirect)
+}
+
 // mrDiffCommentSubmit opens a review thread on a diff line, or replies to
 // one. The body goes in on stdin: it is user prose, and argv is visible in
 // /proc.

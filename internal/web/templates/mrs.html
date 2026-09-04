@@ -21,7 +21,7 @@
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></p>
     <p class="meta">!{{.Number}} by <a href="/{{.Author}}">{{.Author}}</a> · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
   </div>
-  <span class="chip chip-{{.State}}">{{.State}}</span>
+  {{if .Draft}}<span class="chip chip-neutral">draft</span> {{end}}<span class="chip chip-{{.State}}">{{.State}}</span>
 </li>
 {{else}}{{if .Query}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests matching “{{.Query}}”</li>
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}{{end}}

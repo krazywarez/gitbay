@@ -37,8 +37,14 @@ func init() {
 		Usage:   "repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
 	register(Command{Path: []string{"mr", "create"},
 		Summary:    "open a merge request",
-		Usage:      "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org]",
+		Usage:      "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org] [--draft]",
 		ReadsStdin: true, Run: runMRCreate})
+	register(Command{Path: []string{"mr", "draft"},
+		Summary: "mark a merge request as work in progress",
+		Usage:   "mr draft <owner/name> <n>", Run: runMRDraft})
+	register(Command{Path: []string{"mr", "ready"},
+		Summary: "take the draft mark off, so it can merge",
+		Usage:   "mr ready <owner/name> <n>", Run: runMRReady})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
 		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
@@ -229,15 +235,16 @@ func mrRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool
 func mrHeadRef(n int64) string { return fmt.Sprintf("refs/merge-requests/%d/head", n) }
 
 func runMRCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--source", "--target", "--title", "--body", "--file", "--format"}, MaxPos: 1,
-		Usage: "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t>"})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--source", "--target", "--title", "--body", "--file", "--format"},
+		Bools: []string{"--draft"}, MaxPos: 1,
+		Usage: "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--draft]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	path, source, target := f.pos(0), f.Value("--source"), f.Value("--target")
 	title, body, file, format := f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
 	if path == "" || source == "" || title == "" {
-		return c.fail(protocol.ExitUsage, "usage: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t>")
+		return c.fail(protocol.ExitUsage, "usage: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--draft]")
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
@@ -280,7 +287,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	if err != nil {
 		return c.failErr(err)
 	}
-	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA, fmtName)
+	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA, fmtName, f.Has("--draft"))
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -315,6 +322,8 @@ type mrOut struct {
 	Number     int64  `json:"number"`
 	Title      string `json:"title"`
 	State      string `json:"state"`
+	// Draft is an open merge request not asking to be merged yet.
+	Draft      bool   `json:"draft,omitempty"`
 	Author     string `json:"author"`
 	Source     string `json:"source"` // owner/name:branch, or branch, "" if gone
 	TargetRef  string `json:"target_ref"`
@@ -372,7 +381,7 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 			src = m.SourcePath + ":" + m.SourceRef
 		}
 	}
-	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Author: m.Author,
+	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Draft: m.Draft, Author: m.Author,
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
 		CreatedAt: m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
 		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy}
@@ -433,7 +442,11 @@ func runMRList(c *Ctx, args []string) int {
 			if d.StackedOn != nil {
 				stacked = fmt.Sprintf("\tstacked on !%d", d.StackedOn.Number)
 			}
-			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s%s\n", d.Number, d.State, d.Title, d.Source, d.TargetRef, stacked)
+			state := d.State
+			if d.Draft {
+				state = "draft"
+			}
+			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s%s\n", d.Number, state, d.Title, d.Source, d.TargetRef, stacked)
 		}
 	})
 }
@@ -513,7 +526,11 @@ func runMRShow(c *Ctx, args []string) int {
 		UnresolvedThreads: unresolved, Commits: commits, Comments: cs, Reviews: rs}
 	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)
+		state := d.State
+		if d.Draft {
+			state = "draft"
+		}
+		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, state, d.Author, d.Source, d.TargetRef, d.HeadSHA)
 		if d.StackedOn != nil {
 			fmt.Fprintf(w, "stacked on !%d %s\n", d.StackedOn.Number, d.StackedOn.Title)
 		}
@@ -1049,6 +1066,12 @@ func runMRMerge(c *Ctx, args []string) int {
 // per reviewer; a fresh request-changes blocks), require_codeowners, and
 // require_resolved. Returns -1 to proceed.
 func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA string) int {
+	// A draft is open but not asking. This gate is unconditional — no
+	// setting turns it off — because the author said so themselves.
+	if mr.Draft {
+		return c.fail(protocol.ExitDenied,
+			"!%d is a draft; `gitbay mr ready %s %d` first", mr.Number, repo.Path(), mr.Number)
+	}
 	set := repo.Settings
 	reviews, err := c.Store.ListMRReviews(mr.ID)
 	if err != nil {
@@ -1154,6 +1177,57 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 		}
 	}
 	return -1
+}
+
+func runMRDraft(c *Ctx, args []string) int { return setMRDraft(c, args, true) }
+func runMRReady(c *Ctx, args []string) int { return setMRDraft(c, args, false) }
+
+func setMRDraft(c *Ctx, args []string, draft bool) int {
+	verb := "ready"
+	if draft {
+		verb = "draft"
+	}
+	repo, mr, code := mrRef(c, args, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: mr %s <owner/name> <n>", verb)
+	}
+	if code := authorOrWrite(c, repo, mr.Author, "change this merge request"); code >= 0 {
+		return code
+	}
+	if mr.State != "open" && mr.State != "source_gone" {
+		return c.fail(protocol.ExitUsage, "MR !%d is %s", mr.Number, mr.State)
+	}
+	if mr.Draft == draft {
+		state := "already ready"
+		if draft {
+			state = "already a draft"
+		}
+		return c.fail(protocol.ExitUsage, "MR !%d is %s", mr.Number, state)
+	}
+	if err := c.Store.SetMRDraft(mr.ID, draft); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.draft",
+		fmt.Sprintf(`{"number":%d,"draft":%t}`, mr.Number, draft))
+	// Marking ready is the request for review; going back to draft
+	// withdraws it and is not worth anyone's inbox.
+	if !draft {
+		if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
+			notify(c, parts, notice{repo: repo, kind: "mr",
+				subject: mrSubject(repo, mr.Number, mr.Title),
+				action:  fmt.Sprintf("marked !%d ready for review", mr.Number),
+				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
+		}
+	}
+	return c.emit(map[string]any{"number": mr.Number, "draft": draft}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s!%d is %s\n", repo.Path(), mr.Number, map[bool]string{true: "a draft", false: "ready"}[draft])
+	})
 }
 
 func runMRClose(c *Ctx, args []string) int {

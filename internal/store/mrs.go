@@ -19,15 +19,18 @@ type MR struct {
 	Body         string
 	BodyFormat   string // md | org
 	State        string // open | merged | closed | source_gone
-	Milestone    string
-	HeadSHA      string
-	MergedBase   string // target tip at merge time; base for historical diffs
-	MergedAt     string // "" unless merged
-	MergedBy     string // "" when unknown (imports) or the account is gone
-	ClosedAt     string // "" unless closed without merging
-	ClosedBy     string
-	CreatedAt    string
-	UpdatedAt    string
+	// Draft marks an open merge request that is not asking to be merged
+	// yet. Not a state: see migration 0037.
+	Draft      bool
+	Milestone  string
+	HeadSHA    string
+	MergedBase string // target tip at merge time; base for historical diffs
+	MergedAt   string // "" unless merged
+	MergedBy   string // "" when unknown (imports) or the account is gone
+	ClosedAt   string // "" unless closed without merging
+	ClosedBy   string
+	CreatedAt  string
+	UpdatedAt  string
 }
 
 type MRReview struct {
@@ -38,7 +41,7 @@ type MRReview struct {
 	CreatedAt string
 }
 
-func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, targetRef, title, body, headSHA, format string) (int64, error) {
+func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, targetRef, title, body, headSHA, format string, draft bool) (int64, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -52,19 +55,28 @@ func (s *Store) CreateMR(repoID, authorID, sourceRepoID int64, sourceRef, target
 		return 0, err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO merge_requests (repo_id, number, author_id, source_repo_id, source_ref, target_ref, title, body, head_sha, body_format)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA, format); err != nil {
+		INSERT INTO merge_requests (repo_id, number, author_id, source_repo_id, source_ref, target_ref, title, body, head_sha, body_format, draft)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		repoID, n, authorID, sourceRepoID, sourceRef, targetRef, title, body, headSHA, format, draft); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()
+}
+
+// SetMRDraft marks an open merge request as a draft, or takes the mark
+// off. Merging is refused while it is set.
+func (s *Store) SetMRDraft(mrID int64, draft bool) error {
+	_, err := s.DB.Exec(
+		"UPDATE merge_requests SET draft = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+		draft, mrID)
+	return err
 }
 
 const mrSelect = `
 	SELECT m.id, m.repo_id, m.number, u.username,
 	       COALESCE(m.source_repo_id, 0),
 	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
-	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state,
+	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state, m.draft,
 	       COALESCE(ms.title, ''), m.head_sha,
 	       m.merged_base, m.merged_at, COALESCE(mu.username, ''),
 	       m.closed_at, COALESCE(cu.username, ''), m.created_at, m.updated_at
@@ -80,7 +92,7 @@ const mrSelect = `
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
-		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Milestone, &m.HeadSHA, &m.MergedBase,
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Draft, &m.Milestone, &m.HeadSHA, &m.MergedBase,
 		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.CreatedAt, &m.UpdatedAt)
 	return m, err
 }

@@ -256,7 +256,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 				continue
 			}
 			body := migAttribution(src, "merge request", bm.Author, bm.CreatedAt, bm.Number) + bm.Body
-			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, "", "md")
+			n, err := c.Store.CreateMR(repo.ID, c.User.ID, repo.ID, bm.SourceRef, bm.TargetRef, bm.Title, body, "", "md", false)
 			if err != nil {
 				return c.fail(protocol.ExitFailure, "%v", err)
 			}

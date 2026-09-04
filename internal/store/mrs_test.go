@@ -16,7 +16,7 @@ func mrFixture(t *testing.T) (*Store, int64, int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateMR(repoID, uid, repoID, "feature", "main", "t", "", "abc123", "md"); err != nil {
+	if _, err := s.CreateMR(repoID, uid, repoID, "feature", "main", "t", "", "abc123", "md", false); err != nil {
 		t.Fatal(err)
 	}
 	return s, repoID, uid
