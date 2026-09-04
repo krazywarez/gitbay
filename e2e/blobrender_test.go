@@ -30,7 +30,7 @@ func TestBlobRendersMarkup(t *testing.T) {
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
 
 	status, body := inst.get(t, "/alice/docs/blob/main/docs/notes.md")
-	if status != 200 || !strings.Contains(body, "<h1") || !strings.Contains(body, "Field notes</h1>") {
+	if status != 200 || !strings.Contains(body, `<h2 id="field-notes">Field notes</h2>`) {
 		t.Fatalf("markdown not rendered: %d\n%s", status, body)
 	}
 	if !strings.Contains(body, `href="?view=source"`) || !strings.Contains(body, "<strong>rendered</strong>") {

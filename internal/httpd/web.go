@@ -1244,6 +1244,21 @@ func renderOrg(name string, raw []byte, contents bool, fallback func() template.
 	return template.HTML(ugcPolicy.Sanitize(out))
 }
 
+// headingTag matches an opening or closing h1..h5 tag, so a rendered
+// document's headings can move down one level.
+var headingTag = regexp.MustCompile(`<(/?)h([1-5])([\s>])`)
+
+// demoteHeadings moves every heading in a rendered document down one
+// level: the page it sits on already has its h1 (the repository, the
+// file, the wiki page), so a README's own h1 would be a second top-level
+// heading in the outline (#133). Ids and anchors are untouched.
+func demoteHeadings(h template.HTML) template.HTML {
+	return template.HTML(headingTag.ReplaceAllStringFunc(string(h), func(m string) string {
+		sub := headingTag.FindStringSubmatch(m)
+		return "<" + sub[1] + "h" + string(rune(sub[2][0]+1)) + sub[3]
+	}))
+}
+
 func renderReadme(name string, raw []byte) template.HTML {
 	plain := func() template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(raw)) + "</pre>")
@@ -1257,9 +1272,9 @@ func renderReadme(name string, raw []byte) template.HTML {
 		if markdown.Convert(raw, &buf) != nil {
 			return plain()
 		}
-		return template.HTML(buf.String())
+		return demoteHeadings(template.HTML(buf.String()))
 	case ".org":
-		return renderOrg(name, raw, true, plain)
+		return demoteHeadings(renderOrg(name, raw, true, plain))
 	case ".html", ".htm":
 		return template.HTML(ugcPolicy.Sanitize(string(raw)))
 	default:
