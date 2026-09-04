@@ -109,12 +109,14 @@ format column and are always markdown.
 | one commit with its patch   | yes | yes | yes |
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
+| compare two refs            | yes | yes | no  |
 | branches and tags           | yes | yes | yes |
 | wiki (read)                 | yes | yes | yes |
 | download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
 | create                      | yes | yes | yes |
 | pin                         | yes | yes | yes |
+| watch, mute                 | yes | yes | no  |
 | settings, protection        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
@@ -170,16 +172,22 @@ now render the way the reference does. go-org is not yet on the corpus.
 
 * Discovery
 
-| capability                    | cli | web | ios |
-|-------------------------------+-----+-----+-----|
-| search repositories           | yes | yes | yes |
-| browse all public repositories| yes | yes | yes |
-| profile page                  | yes | yes | yes |
-| profile about and links       | yes | yes | no  |
-| activity feed                 | yes | yes | yes |
-| command reference             | yes | no  | n/a |
+| capability                       | cli | web | ios |
+|----------------------------------+-----+-----+-----|
+| search repositories              | yes | yes | yes |
+| search issues and merge requests | yes | yes | no  |
+| browse all public repositories   | yes | yes | yes |
+| profile page                     | yes | yes | yes |
+| profile about and links          | yes | yes | no  |
+| activity feed                    | yes | yes | yes |
+| command reference                | yes | no  | n/a |
 
 =explore= is the listing without a query; =repo search= is the one with.
+=search= is both plus issue and merge request titles, over everything
+the caller can read; the web serves it at =/search= with a field in the
+rail, and an anonymous visitor gets the public rows from the same query.
+Titles only — body search wants FTS5 and belongs with krz/gitbay#114.
+=repo grep= remains the per-repository file-contents search.
 
 About text renders as markdown or org-mode per the =about_format= it
 was stored with. The iOS =Profile= decoder lists its keys explicitly,
@@ -200,9 +208,18 @@ client has no use for one (krz/gitbay#57).
 | PGP keys: list, add, remove | yes | yes | yes |
 | email add and verify        | yes | yes | yes |
 | dashboard aggregate         | yes | yes | yes |
+| notification inbox          | yes | yes | no  |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | no  | no  |
 | profile set                 | yes | no  | no  |
+
+Notifications land in an inbox row per recipient whether or not the
+instance sends mail, and mail is the second half when SMTP is
+configured. =notifications list= reads it, unread by default;
+=notifications read <id>... | --all= clears it; the dashboard and the
+web rail carry the unread count. =repo watch= adds you to a
+repository's notifications and =repo unwatch= mutes it, and a mute wins
+over owning the repository or having written the thread.
 
 =profile set= carries description, website, about and links. It is not
 =SSHOnly= — nothing about a bio is a credential, and the JSON API runs
@@ -225,8 +242,8 @@ missing UI rather than a rule.
 =issue list=, =mr list=, =repo list=, and =feed= take =--limit <n>=
 and =--cursor <c>=. Cursors are opaque; each page carries the next
 one. Without the flags a list stays complete, so existing scripts are
-unchanged. The web renders server-side and does not paginate; iOS
-pages with the cursors.
+unchanged. The web pages the issue and merge request lists at fifty
+with the same cursors; iOS pages with them too.
 
 * SSH only, by design
 
