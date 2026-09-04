@@ -2,6 +2,8 @@ package httpd
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -30,6 +32,7 @@ import (
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 
 	"gitbay.org/gitbay/internal/autolink"
 	"gitbay.org/gitbay/internal/control"
@@ -61,7 +64,23 @@ func (s *Server) siteName() string {
 	return strings.TrimSuffix(h, "/")
 }
 
+// stylesheetETag is the hash of what stylesheet serves, computed once:
+// a browser revalidates with If-None-Match and gets a 304 until a deploy
+// changes the bytes (#132).
+var stylesheetETag = func() string {
+	h := sha256.New()
+	h.Write(web.StyleCSS)
+	h.Write(chromaCSS)
+	return `"` + hex.EncodeToString(h.Sum(nil))[:16] + `"`
+}()
+
 func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("ETag", stylesheetETag)
+	w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
+	if r.Header.Get("If-None-Match") == stylesheetETag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Write(web.StyleCSS)
 	w.Write(chromaCSS)
@@ -1011,8 +1030,12 @@ func pickReadme(entries []gitutil.TreeEntry) string {
 // task lists) on top of CommonMark, with class-based fence highlighting
 // (the palette lives in the stylesheet, per scheme). Raw HTML is still
 // dropped.
-var markdown = goldmark.New(goldmark.WithExtensions(extension.GFM,
-	highlighting.NewHighlighting(highlighting.WithFormatOptions(html.WithClasses(true)))))
+// Headings carry ids so a README or wiki section can be linked to, the
+// way org headings already are (#132).
+var markdown = goldmark.New(
+	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
+	goldmark.WithExtensions(extension.GFM,
+		highlighting.NewHighlighting(highlighting.WithFormatOptions(html.WithClasses(true)))))
 
 // fenceHighlight renders one code block with chroma classes, for org and
 // anything else outside goldmark. Unknown languages fall back to plain.

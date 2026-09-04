@@ -763,6 +763,9 @@ button.linklike:hover { text-decoration: underline; filter: none; }
 
 /* rendered markdown / org / html */
 .rendered { max-width: 100%; overflow-wrap: anywhere; }
+/* GFM task lists: the box sits in the line, sized to the prose. */
+.rendered li input[type="checkbox"] { width: 0.9em; height: 0.9em; margin: 0 0.35em 0 0; vertical-align: -0.05em; accent-color: var(--accent); }
+.rendered li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }
 /* line length is a reading constraint, so it applies to prose only —
    tables, code blocks and images keep the full column */
 .rendered > p,
