@@ -153,18 +153,13 @@ func (s *Server) dispatchIntoStdin(u store.User, argv []string, stdin string, ta
 	return protocol.ExitOK, ""
 }
 
-// runControlJSON runs a command in JSON mode and returns its data object.
-// In JSON mode a failure is an envelope carrying the message rather than
-// stderr text, so both paths are read from the same envelope.
-func (s *Server) runControlJSON(u store.User, argv []string) (data map[string]any, msg string, ok bool) {
-	code, data, msg := s.dispatchJSON(u, argv, "")
-	return data, msg, code == protocol.ExitOK
-}
-
-// dispatchJSON runs a command in JSON mode with stdin, and returns its
-// exit code with the decoded data or the failure message. Handlers that
-// answer a form use the code to pick an HTTP status.
-func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code int, data map[string]any, msg string) {
+// dispatchJSON runs a command in JSON mode with stdin and returns its exit
+// code and, on failure, the message. In JSON mode a failure is an envelope
+// carrying the message rather than stderr text, so both paths are read
+// from the same envelope. A handler that wants the payload uses
+// runControlInto, which decodes into the command's own type instead of a
+// map nothing type-checks.
+func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code int, msg string) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -180,8 +175,7 @@ func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code i
 	}
 	code = control.Dispatch(ctx, argv)
 	var env struct {
-		Data  map[string]any `json:"data"`
-		Error string         `json:"error"`
+		Error string `json:"error"`
 	}
 	json.Unmarshal(stdout.Bytes(), &env)
 	if code != protocol.ExitOK {
@@ -192,9 +186,9 @@ func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code i
 		if m == "" {
 			m = "the command failed"
 		}
-		return code, nil, m
+		return code, m
 	}
-	return code, env.Data, ""
+	return code, ""
 }
 
 // authorNames maps commit author addresses to account names for one

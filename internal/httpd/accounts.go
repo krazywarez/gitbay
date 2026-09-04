@@ -289,7 +289,7 @@ func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	n := r.PathValue("n")
 	title := strings.TrimSpace(r.FormValue("title"))
-	code, _, msg := s.dispatchJSON(u, []string{"issue", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
+	code, msg := s.dispatchJSON(u, []string{"issue", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return
@@ -322,7 +322,7 @@ func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.Us
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	n := r.PathValue("n")
 	title := strings.TrimSpace(r.FormValue("title"))
-	code, _, msg := s.dispatchJSON(u, []string{"mr", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
+	code, msg := s.dispatchJSON(u, []string{"mr", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return
@@ -341,7 +341,7 @@ func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store
 func (s *Server) commentSubmit(w http.ResponseWriter, r *http.Request, u store.User, noun, segment string) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	n := r.PathValue("n")
-	code, _, msg := s.dispatchJSON(u, []string{noun, "comment", repoPath, n, "--file", "-"}, strings.TrimSpace(r.FormValue("body")))
+	code, msg := s.dispatchJSON(u, []string{noun, "comment", repoPath, n, "--file", "-"}, strings.TrimSpace(r.FormValue("body")))
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return

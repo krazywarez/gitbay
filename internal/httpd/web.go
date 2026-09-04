@@ -375,43 +375,23 @@ func crumbs(p repoPage, kind, filePath string) []crumb {
 // profileView is profile show's payload, shaped for the templates. The
 // repo rows carry the same names the reporow partial reads, so a profile
 // listing renders identically to explore's.
+// profileView is profile show's payload with the repository rows wrapped
+// so the reporow partial can reach them. The fields themselves are the
+// command's: a field it gains appears here without being re-declared.
 type profileView struct {
-	Name        string              `json:"name"`
-	Kind        string              `json:"kind"`
-	Description string              `json:"description"`
-	Website     string              `json:"website"`
-	About       string              `json:"about"`
-	AboutFormat string              `json:"about_format"`
-	Links       []store.ProfileLink `json:"links"`
-	Orgs        []profileMember     `json:"orgs"`
-	Members     []profileMember     `json:"members"`
-	Repos       []profileRepoRow    `json:"repos"`
-	Activity    []struct {
-		Date  string `json:"date"`
-		Count int    `json:"count"`
-	} `json:"activity"`
+	control.ProfileOut
+	Repos []profileRepoRow `json:"repos"`
 }
 
-type profileMember struct {
-	Name string `json:"name"`
-	Role string `json:"role"`
-}
-
-// profileRepoRow is one repository row on a profile. Path arrives as
-// owner/name; OwnerName and Name are split out for the partial.
+// profileRepoRow is one repository row on a profile. The partial asks for
+// OwnerName, Name and Desc; the payload carries a path and a description.
 type profileRepoRow struct {
-	Path          string   `json:"path"`
-	Visibility    string   `json:"visibility"`
-	Desc          string   `json:"description"`
-	DefaultBranch string   `json:"default_branch"`
-	Topics        []string `json:"topics"`
-	License       string   `json:"license"`
-	Updated       string   `json:"updated"`
-	Archived      bool     `json:"archived"`
+	control.ProfileRepo
 }
 
 func (p profileRepoRow) OwnerName() string { owner, _, _ := strings.Cut(p.Path, "/"); return owner }
 func (p profileRepoRow) Name() string      { _, name, _ := strings.Cut(p.Path, "/"); return name }
+func (p profileRepoRow) Desc() string      { return p.Description }
 
 // ownerPage renders /{owner} for users and orgs: the repositories the
 // viewer may see, org membership either direction. Owner names are not
@@ -454,8 +434,8 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Profile       store.Profile
 		AboutHTML     template.HTML
 		Repos         []profileRepoRow
-		Members       []profileMember
-		Orgs          []profileMember
+		Members       []control.ProfileMember
+		Orgs          []control.ProfileMember
 		Activity      []activityWeek
 		ActivityTotal int
 		Teams         []teamView

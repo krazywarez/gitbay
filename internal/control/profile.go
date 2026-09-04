@@ -162,7 +162,7 @@ func applyProfile(p store.Profile, e profileEdit) (store.Profile, error) {
 	return p, nil
 }
 
-type profileOut struct {
+type ProfileOut struct {
 	Name        string `json:"name"`
 	Kind        string `json:"kind"`
 	Description string `json:"description,omitempty"`
@@ -176,24 +176,24 @@ type profileOut struct {
 	// they own that you can see, and how active they have been. The web
 	// read these straight out of the store, which kept them off every
 	// other surface.
-	Orgs     []profileMember `json:"orgs,omitempty"`    // for a user
-	Members  []profileMember `json:"members,omitempty"` // for an org
-	Repos    []profileRepo   `json:"repos"`
-	Activity []activityDay   `json:"activity,omitempty"`
+	Orgs     []ProfileMember `json:"orgs,omitempty"`    // for a user
+	Members  []ProfileMember `json:"members,omitempty"` // for an org
+	Repos    []ProfileRepo   `json:"repos"`
+	Activity []ActivityDay   `json:"activity,omitempty"`
 	// ActivityTotal counts the same window the days cover.
 	ActivityTotal int `json:"activity_total"`
 }
 
-type profileMember struct {
+type ProfileMember struct {
 	Name string `json:"name"`
 	Role string `json:"role,omitempty"`
 }
 
-// profileRepo is one repository as a profile lists it. The listing
+// ProfileRepo is one repository as a profile lists it. The listing
 // metadata — topics, license, last commit — is here because a profile is
 // a listing: a client that renders repositories without it is showing
 // less than the web does, which is why the web kept its own copy.
-type profileRepo struct {
+type ProfileRepo struct {
 	Path          string   `json:"path"`
 	Visibility    string   `json:"visibility"`
 	Description   string   `json:"description,omitempty"`
@@ -204,9 +204,9 @@ type profileRepo struct {
 	Archived      bool     `json:"archived,omitempty"`
 }
 
-// activityDay is one day's contribution count. Days with nothing are
+// ActivityDay is one day's contribution count. Days with nothing are
 // omitted; a client fills the calendar it wants to draw.
-type activityDay struct {
+type ActivityDay struct {
 	Date  string `json:"date"`
 	Count int    `json:"count"`
 }
@@ -219,7 +219,7 @@ func ActivityWindow() string {
 	return end.AddDate(0, 0, -53*7+1).Format("2006-01-02")
 }
 
-func emitProfile(c *Ctx, d profileOut) int {
+func emitProfile(c *Ctx, d ProfileOut) int {
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "%s (%s)\n", d.Name, d.Kind)
 		if d.Description != "" {
@@ -268,8 +268,8 @@ func runProfileShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	d := profileOut{Name: name, Kind: kind, Description: p.Description, Website: p.Website,
-		About: p.About, AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}}
+	d := ProfileOut{Name: name, Kind: kind, Description: p.Description, Website: p.Website,
+		About: p.About, AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}}
 
 	// Who they work with. Both lists are public on a profile — the web
 	// has always shown them — and neither exposes anything a member
@@ -280,7 +280,7 @@ func runProfileShow(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		for _, o := range orgs {
-			d.Orgs = append(d.Orgs, profileMember{Name: o.Username, Role: o.Role})
+			d.Orgs = append(d.Orgs, ProfileMember{Name: o.Username, Role: o.Role})
 		}
 	} else {
 		members, err := c.Store.OrgMembers(id)
@@ -288,7 +288,7 @@ func runProfileShow(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		for _, m := range members {
-			d.Members = append(d.Members, profileMember{Name: m.Username, Role: m.Role})
+			d.Members = append(d.Members, ProfileMember{Name: m.Username, Role: m.Role})
 		}
 	}
 
@@ -311,7 +311,7 @@ func runProfileShow(c *Ctx, args []string) int {
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-		d.Repos = append(d.Repos, profileRepo{
+		d.Repos = append(d.Repos, ProfileRepo{
 			Path:          repo.Path(),
 			Visibility:    repo.Visibility,
 			Description:   gitutil.ReadDescription(dir),
@@ -338,7 +338,7 @@ func runProfileShow(c *Ctx, args []string) int {
 	}
 	sort.Strings(days)
 	for _, day := range days {
-		d.Activity = append(d.Activity, activityDay{Date: day, Count: counts[day]})
+		d.Activity = append(d.Activity, ActivityDay{Date: day, Count: counts[day]})
 		d.ActivityTotal += counts[day]
 	}
 	return emitProfile(c, d)
@@ -367,9 +367,9 @@ func runProfileSet(c *Ctx, args []string) int {
 	if err := c.Store.SetOwnerProfile("user", c.User.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitProfile(c, profileOut{Name: c.User.Username, Kind: "user",
+	return emitProfile(c, ProfileOut{Name: c.User.Username, Kind: "user",
 		Description: p.Description, Website: p.Website, About: p.About,
-		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}})
+		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}})
 }
 
 func runOrgProfile(c *Ctx, args []string) int {
@@ -400,7 +400,7 @@ func runOrgProfile(c *Ctx, args []string) int {
 	if err := c.Store.SetOwnerProfile("org", org.ID, p); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitProfile(c, profileOut{Name: org.Name, Kind: "org",
+	return emitProfile(c, ProfileOut{Name: org.Name, Kind: "org",
 		Description: p.Description, Website: p.Website, About: p.About,
-		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []profileRepo{}})
+		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}})
 }

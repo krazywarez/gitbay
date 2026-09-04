@@ -24,9 +24,9 @@ func init() {
 		ReadOnly: true, Run: runFeed})
 }
 
-// dashboardItem is one open issue or MR row, with its repo resolved so a
+// DashboardItem is one open issue or MR row, with its repo resolved so a
 // client renders the aggregate without further reads.
-type dashboardItem struct {
+type DashboardItem struct {
 	Repo      string `json:"repo"`
 	Number    int64  `json:"number"`
 	Title     string `json:"title"`
@@ -35,51 +35,60 @@ type dashboardItem struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// PinnedOut is one pinned repository on the dashboard.
+type PinnedOut struct {
+	Path        string `json:"path"`
+	Visibility  string `json:"visibility"`
+	Description string `json:"description,omitempty"`
+	Archived    bool   `json:"archived,omitempty"`
+}
+
+// DashboardBuild is a build with its repository resolved, which is what
+// separates it from BuildOut: the dashboard spans repositories.
+type DashboardBuild struct {
+	Repo       string `json:"repo"`
+	Number     int64  `json:"number"`
+	Job        string `json:"job"`
+	Status     string `json:"status"`
+	SHA        string `json:"sha"`
+	Ref        string `json:"ref"`
+	CreatedAt  string `json:"created_at"`
+	FinishedAt string `json:"finished_at,omitempty"`
+}
+
+// ServerOut is admin-only. The exact build a host is running narrows down
+// which known issues apply to it, so it is not everyone's to read; the
+// person who needs it is the operator.
+type ServerOut struct {
+	Commit string `json:"commit"`
+}
+
+// DashboardOut is what dashboard emits: the whole account aggregate in
+// one read.
+type DashboardOut struct {
+	Reviews  []DashboardItem  `json:"review_queue"`
+	Assigned []DashboardItem  `json:"assigned_issues"`
+	MRs      []DashboardItem  `json:"open_mrs"`
+	Issues   []DashboardItem  `json:"open_issues"`
+	Pinned   []PinnedOut      `json:"pinned"`
+	Activity []FeedOut        `json:"recent_activity"`
+	Builds   []DashboardBuild `json:"builds"`
+	// Unread is the notification inbox badge, so a client showing one
+	// does not need a second read to fill it.
+	Unread int        `json:"unread"`
+	Server *ServerOut `json:"server,omitempty"`
+	// Queues is admin-only: every background worker's backlog and
+	// failures, the operator's view of what is stuck.
+	Queues *store.Queues `json:"queues,omitempty"`
+}
+
 func runDashboard(c *Ctx, args []string) int {
 	if len(args) != 0 {
 		return c.fail(protocol.ExitUsage, "usage: dashboard")
 	}
-	type pinnedOut struct {
-		Path        string `json:"path"`
-		Visibility  string `json:"visibility"`
-		Description string `json:"description,omitempty"`
-		Archived    bool   `json:"archived,omitempty"`
-	}
-	type buildOut struct {
-		Repo       string `json:"repo"`
-		Number     int64  `json:"number"`
-		Job        string `json:"job"`
-		Status     string `json:"status"`
-		SHA        string `json:"sha"`
-		Ref        string `json:"ref"`
-		CreatedAt  string `json:"created_at"`
-		FinishedAt string `json:"finished_at,omitempty"`
-	}
-	// serverOut is admin-only. The exact build a host is running narrows down
-	// which known issues apply to it, so it is not everyone's to read; the
-	// person who needs it is the operator.
-	type serverOut struct {
-		Commit string `json:"commit"`
-	}
-	type out struct {
-		Reviews  []dashboardItem `json:"review_queue"`
-		Assigned []dashboardItem `json:"assigned_issues"`
-		MRs      []dashboardItem `json:"open_mrs"`
-		Issues   []dashboardItem `json:"open_issues"`
-		Pinned   []pinnedOut     `json:"pinned"`
-		Activity []feedOut       `json:"recent_activity"`
-		Builds   []buildOut      `json:"builds"`
-		// Unread is the notification inbox badge, so a client showing one
-		// does not need a second read to fill it.
-		Unread int        `json:"unread"`
-		Server *serverOut `json:"server,omitempty"`
-		// Queues is admin-only: every background worker's backlog and
-		// failures, the operator's view of what is stuck.
-		Queues *store.Queues `json:"queues,omitempty"`
-	}
-	d := out{
-		Reviews: []dashboardItem{}, Assigned: []dashboardItem{}, MRs: []dashboardItem{},
-		Issues: []dashboardItem{}, Pinned: []pinnedOut{}, Activity: []feedOut{}, Builds: []buildOut{},
+	d := DashboardOut{
+		Reviews: []DashboardItem{}, Assigned: []DashboardItem{}, MRs: []DashboardItem{},
+		Issues: []DashboardItem{}, Pinned: []PinnedOut{}, Activity: []FeedOut{}, Builds: []DashboardBuild{},
 	}
 
 	pinned, err := c.Store.PinnedRepos(c.User.ID)
@@ -95,7 +104,7 @@ func runDashboard(c *Ctx, args []string) int {
 			continue
 		}
 		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
-		d.Pinned = append(d.Pinned, pinnedOut{r.Path(), r.Visibility, desc, r.Settings.Archived})
+		d.Pinned = append(d.Pinned, PinnedOut{r.Path(), r.Visibility, desc, r.Settings.Archived})
 	}
 
 	mrs, err := c.Store.DashboardMRs(c.User.ID)
@@ -103,7 +112,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, m := range mrs {
-		d.MRs = append(d.MRs, dashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
+		d.MRs = append(d.MRs, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
 	}
 
 	reviews, err := c.Store.ReviewQueue(c.User.ID)
@@ -111,7 +120,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, m := range reviews {
-		d.Reviews = append(d.Reviews, dashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
+		d.Reviews = append(d.Reviews, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
 	}
 
 	assigned, err := c.Store.AssignedIssues(c.User.ID)
@@ -119,7 +128,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, i := range assigned {
-		d.Assigned = append(d.Assigned, dashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
+		d.Assigned = append(d.Assigned, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
 	}
 
 	issues, err := c.Store.DashboardIssues(c.User.ID)
@@ -127,7 +136,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, i := range issues {
-		d.Issues = append(d.Issues, dashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
+		d.Issues = append(d.Issues, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
 	}
 
 	events, err := c.Store.RecentEvents(c.User.ID, 20, 0)
@@ -141,11 +150,11 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, b := range builds {
-		d.Builds = append(d.Builds, buildOut{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
+		d.Builds = append(d.Builds, DashboardBuild{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
 	}
 	d.Unread = c.Store.UnreadNotices(c.User.ID)
 	if c.User.IsAdmin {
-		d.Server = &serverOut{Commit: buildinfo.String()}
+		d.Server = &ServerOut{Commit: buildinfo.String()}
 		q, err := c.Store.QueueStatus()
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
@@ -210,7 +219,7 @@ func runDashboard(c *Ctx, args []string) int {
 	})
 }
 
-func printDashboardItems(w io.Writer, items []dashboardItem, marker string) {
+func printDashboardItems(w io.Writer, items []DashboardItem, marker string) {
 	for _, item := range items {
 		fmt.Fprintf(w, "  %s%s%d\t%s\t%s\n", item.Repo, marker, item.Number, item.Title, item.Author)
 	}
@@ -220,7 +229,7 @@ func printDashboardItems(w io.Writer, items []dashboardItem, marker string) {
 // back.
 const feedDefaultLimit = 50
 
-type feedOut struct {
+type FeedOut struct {
 	ID        int64           `json:"id"`
 	Repo      string          `json:"repo"`
 	Actor     string          `json:"actor,omitempty"`
@@ -229,10 +238,10 @@ type feedOut struct {
 	CreatedAt string          `json:"created_at"`
 }
 
-func feedOutputs(events []store.FeedEvent) []feedOut {
-	ds := make([]feedOut, 0, len(events))
+func feedOutputs(events []store.FeedEvent) []FeedOut {
+	ds := make([]FeedOut, 0, len(events))
 	for _, e := range events {
-		d := feedOut{ID: e.ID, Repo: e.RepoPath, Actor: e.Actor, Kind: e.Kind, CreatedAt: e.CreatedAt}
+		d := FeedOut{ID: e.ID, Repo: e.RepoPath, Actor: e.Actor, Kind: e.Kind, CreatedAt: e.CreatedAt}
 		if json.Valid([]byte(e.Data)) {
 			d.Data = json.RawMessage(e.Data)
 		}

@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"gitbay.org/gitbay/internal/control"
 	"strings"
 	"testing"
 
@@ -22,18 +23,18 @@ func TestBuildsPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
 	err := web.Render(&sb, "builds.html", struct {
 		repoPage
-		Builds   []buildView
-		Jobs     []jobView
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
 		CanWrite bool
 		Notice   string
 	}{
 		testRepoPage(),
-		[]buildView{{
+		[]control.BuildOut{{
 			Number: 60, Job: "build", Status: "success",
 			SHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b",
 			Ref: "cli-coverage", CreatedAt: "2026-08-28T04:42:54Z",
 		}},
-		[]jobView{{Name: "build"}, {Name: "nightly", Schedule: "0 3 * * *"}},
+		[]control.JobOut{{Name: "build"}, {Name: "nightly", Schedule: "0 3 * * *"}},
 		true, "",
 	})
 	if err != nil {
@@ -54,11 +55,11 @@ func TestBuildPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
 	err := web.Render(&sb, "build.html", struct {
 		repoPage
-		Build buildView
+		Build control.BuildOut
 		Log   string
 	}{
 		testRepoPage(),
-		buildView{
+		control.BuildOut{
 			Number: 60, Job: "build", Status: "success",
 			SHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b", Ref: "cli-coverage",
 			CreatedAt: "2026-08-28T04:42:54Z", FinishedAt: "2026-08-28T04:43:06Z",

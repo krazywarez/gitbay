@@ -3,6 +3,7 @@ package httpd
 import (
 	"net/http"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -15,20 +16,25 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, viewer store.
 		s.notFound(w, r)
 		return
 	}
-	var d struct {
-		Server struct {
-			Commit string `json:"commit"`
-		} `json:"server"`
-		Queues store.Queues `json:"queues"`
-	}
+	var d control.DashboardOut
 	if msg, ok := s.runControlInto(viewer, []string{"dashboard"}, &d); !ok {
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
+	}
+	// Both blocks are admin-only and this handler is admin-gated, so they
+	// are present; the payload types them as optional because everyone
+	// else's dashboard omits them.
+	commit, queues := "", store.Queues{}
+	if d.Server != nil {
+		commit = d.Server.Commit
+	}
+	if d.Queues != nil {
+		queues = *d.Queues
 	}
 	s.render(w, "admin.html", struct {
 		basePage
 		Tab    string
 		Commit string
 		Queues store.Queues
-	}{s.baseFor(viewer), "admin", d.Server.Commit, d.Queues})
+	}{s.baseFor(viewer), "admin", commit, queues})
 }

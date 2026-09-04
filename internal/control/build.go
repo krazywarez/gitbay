@@ -69,7 +69,7 @@ func init() {
 		Usage:   "runner done <build-id> success|failure", SSHOnly: true, Run: runRunnerDone})
 }
 
-type buildOut struct {
+type BuildOut struct {
 	Number     int64  `json:"number"`
 	Job        string `json:"job"`
 	Status     string `json:"status"`
@@ -79,8 +79,8 @@ type buildOut struct {
 	FinishedAt string `json:"finished_at,omitempty"`
 }
 
-func buildToOut(b store.Build) buildOut {
-	return buildOut{b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt}
+func buildToOut(b store.Build) BuildOut {
+	return BuildOut{b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt}
 }
 
 func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
@@ -114,7 +114,7 @@ func runBuildList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	var ds []buildOut
+	var ds []BuildOut
 	for _, b := range builds {
 		ds = append(ds, buildToOut(b))
 	}
@@ -153,7 +153,7 @@ func runBuildLog(c *Ctx, args []string) int {
 	return protocol.ExitOK
 }
 
-type jobOut struct {
+type JobOut struct {
 	Name     string `json:"name"`
 	Schedule string `json:"schedule,omitempty"`
 	Tags     string `json:"tags,omitempty"`
@@ -192,9 +192,9 @@ func runBuildJobs(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	out := make([]jobOut, 0, len(jobs))
+	out := make([]JobOut, 0, len(jobs))
 	for _, j := range jobs {
-		out = append(out, jobOut{Name: j.Name, Schedule: j.Schedule, Tags: j.Tags})
+		out = append(out, JobOut{Name: j.Name, Schedule: j.Schedule, Tags: j.Tags})
 	}
 	return c.emit(out, func(w io.Writer) {
 		for _, j := range out {
