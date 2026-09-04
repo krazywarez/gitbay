@@ -45,33 +45,39 @@ func (s *Store) dashboardQuery(q string, userID int64) ([]DashboardItem, error) 
 	return out, rows.Err()
 }
 
+// The dashboard's four list queries are named so the plan test can assert
+// each still walks the 0035 index that supplies its ORDER BY.
+const dashboardMRsQuery = `
+	SELECT COALESCE(u.username, o.name) || '/' || r.name,
+	       x.number, x.title, au.username, x.state, x.updated_at
+	FROM merge_requests x
+	JOIN repos r ON r.id = x.repo_id
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	JOIN users au ON au.id = x.author_id
+	WHERE x.state IN ('open', 'source_gone') AND ` + involvedCond + `
+	ORDER BY x.updated_at DESC LIMIT 50`
+
 // DashboardMRs returns open merge requests involving the user: on their
 // repositories (owned, granted, org) or authored by them anywhere.
 func (s *Store) DashboardMRs(userID int64) ([]DashboardItem, error) {
-	return s.dashboardQuery(`
-		SELECT COALESCE(u.username, o.name) || '/' || r.name,
-		       x.number, x.title, au.username, x.state, x.updated_at
-		FROM merge_requests x
-		JOIN repos r ON r.id = x.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		JOIN users au ON au.id = x.author_id
-		WHERE x.state IN ('open', 'source_gone') AND `+involvedCond+`
-		ORDER BY x.updated_at DESC LIMIT 50`, userID)
+	return s.dashboardQuery(dashboardMRsQuery, userID)
 }
 
 // DashboardIssues is the issue counterpart of DashboardMRs.
+const dashboardIssuesQuery = `
+	SELECT COALESCE(u.username, o.name) || '/' || r.name,
+	       x.number, x.title, au.username, x.state, x.updated_at
+	FROM issues x
+	JOIN repos r ON r.id = x.repo_id
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	JOIN users au ON au.id = x.author_id
+	WHERE x.state = 'open' AND ` + involvedCond + `
+	ORDER BY x.updated_at DESC LIMIT 50`
+
 func (s *Store) DashboardIssues(userID int64) ([]DashboardItem, error) {
-	return s.dashboardQuery(`
-		SELECT COALESCE(u.username, o.name) || '/' || r.name,
-		       x.number, x.title, au.username, x.state, x.updated_at
-		FROM issues x
-		JOIN repos r ON r.id = x.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		JOIN users au ON au.id = x.author_id
-		WHERE x.state = 'open' AND `+involvedCond+`
-		ORDER BY x.updated_at DESC LIMIT 50`, userID)
+	return s.dashboardQuery(dashboardIssuesQuery, userID)
 }
 
 func (s *Store) PinRepo(userID, repoID int64) error {
@@ -124,22 +130,24 @@ func (s *Store) PinnedRepos(userID int64) ([]Repo, error) {
 // ReviewQueue returns open merge requests the user is involved in, has not
 // authored, and has not reviewed at the current head — what the rail shows
 // as waiting on them. Ordered most recently touched first.
+const reviewQueueQuery = `
+	SELECT COALESCE(u.username, o.name) || '/' || r.name,
+	       x.number, x.title, au.username, x.state, x.updated_at
+	FROM merge_requests x
+	JOIN repos r ON r.id = x.repo_id
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	JOIN users au ON au.id = x.author_id
+	WHERE x.state IN ('open', 'source_gone')
+	  AND x.author_id <> ?1
+	  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
+	                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
+	                    AND rv.head_sha = x.head_sha)
+	  AND ` + involvedCond + `
+	ORDER BY x.updated_at DESC LIMIT 8`
+
 func (s *Store) ReviewQueue(userID int64) ([]DashboardItem, error) {
-	return s.dashboardQuery(`
-		SELECT COALESCE(u.username, o.name) || '/' || r.name,
-		       x.number, x.title, au.username, x.state, x.updated_at
-		FROM merge_requests x
-		JOIN repos r ON r.id = x.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		JOIN users au ON au.id = x.author_id
-		WHERE x.state IN ('open', 'source_gone')
-		  AND x.author_id <> ?1
-		  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
-		                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
-		                    AND rv.head_sha = x.head_sha)
-		  AND `+involvedCond+`
-		ORDER BY x.updated_at DESC LIMIT 8`, userID)
+	return s.dashboardQuery(reviewQueueQuery, userID)
 }
 
 // OpenCounts returns the repo's open issue and open merge request counts,
@@ -155,19 +163,24 @@ func (s *Store) OpenCounts(repoID int64) (issues, mrs int) {
 // AssignedIssues returns open issues assigned to the user, wherever they
 // live. Assignment is a direct request for someone's attention, so it is
 // not narrowed by the involvement rule the other lists use.
+//
+// It drives from issue_assignees rather than testing EXISTS against every
+// issue: the assignee rows for one user are a handful, the issues table
+// is the whole instance.
+const assignedIssuesQuery = `
+	SELECT COALESCE(u.username, o.name) || '/' || r.name,
+	       x.number, x.title, au.username, x.state, x.updated_at
+	FROM issue_assignees ia
+	JOIN issues x ON x.id = ia.issue_id
+	JOIN repos r ON r.id = x.repo_id
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	JOIN users au ON au.id = x.author_id
+	WHERE ia.user_id = ?1 AND x.state = 'open'
+	ORDER BY x.updated_at DESC LIMIT 20`
+
 func (s *Store) AssignedIssues(userID int64) ([]DashboardItem, error) {
-	return s.dashboardQuery(`
-		SELECT COALESCE(u.username, o.name) || '/' || r.name,
-		       x.number, x.title, au.username, x.state, x.updated_at
-		FROM issues x
-		JOIN repos r ON r.id = x.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		JOIN users au ON au.id = x.author_id
-		WHERE x.state = 'open'
-		  AND EXISTS (SELECT 1 FROM issue_assignees ia
-		              WHERE ia.issue_id = x.id AND ia.user_id = ?1)
-		ORDER BY x.updated_at DESC LIMIT 20`, userID)
+	return s.dashboardQuery(assignedIssuesQuery, userID)
 }
 
 // DashboardBuild is one build row on the dashboard, with its repo resolved.
