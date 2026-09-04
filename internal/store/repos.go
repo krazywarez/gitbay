@@ -100,6 +100,21 @@ func (s *Store) SetRepoSettings(repoID int64, settings RepoSettings) error {
 	return err
 }
 
+// CreateFork is CreateRepo with fork_of set in the same insert, so a fork
+// never exists for a moment as a plain repository (#108).
+func (s *Store) CreateFork(ownerKind string, ownerID int64, name, visibility string, forkOf int64) (int64, error) {
+	res, err := s.DB.Exec(
+		"INSERT INTO repos (owner_kind, owner_id, name, visibility, fork_of) VALUES (?, ?, ?, ?, ?)",
+		ownerKind, ownerID, name, visibility, forkOf)
+	if err != nil {
+		if isUniqueErr(err) {
+			return 0, fmt.Errorf("repository %q already exists", name)
+		}
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
 func (s *Store) SetForkOf(repoID, parentID int64) error {
 	_, err := s.DB.Exec("UPDATE repos SET fork_of = ? WHERE id = ?", parentID, repoID)
 	return err

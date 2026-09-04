@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/gitutil"
@@ -60,6 +61,11 @@ func limitsOf(c *Ctx) configLimits {
 }
 
 // checkRepoQuota refuses a new user-owned repository past the cap.
+// repoCreateMu serialises the quota check with the insert that follows
+// it, so two concurrent creates cannot both pass the count (#108). One
+// process serves the instance, so a process-wide lock is the whole story.
+var repoCreateMu sync.Mutex
+
 func checkRepoQuota(c *Ctx) int {
 	limit := RepoLimit(c.Store, limitsOf(c), c.User.ID)
 	if limit == 0 {

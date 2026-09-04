@@ -113,7 +113,17 @@ func runRepoImport(c *Ctx, args []string) int {
 	if private {
 		visibility = "private"
 	}
+	// The early check above fails fast; this one holds the lock across
+	// the insert so a concurrent create cannot slip past the count.
+	repoCreateMu.Lock()
+	if ownerKind == "user" {
+		if code := checkRepoQuota(c); code >= 0 {
+			repoCreateMu.Unlock()
+			return code
+		}
+	}
 	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
+	repoCreateMu.Unlock()
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

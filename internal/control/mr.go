@@ -86,14 +86,14 @@ func runRepoFork(c *Ctx, args []string) int {
 	if err := policy.ValidateName(name); err != nil {
 		return c.failErr(err)
 	}
+	repoCreateMu.Lock()
 	if code := checkRepoQuota(c); code >= 0 {
+		repoCreateMu.Unlock()
 		return code
 	}
-	id, err := c.Store.CreateRepo("user", c.User.ID, name, src.Visibility)
+	id, err := c.Store.CreateFork("user", c.User.ID, name, src.Visibility, src.ID)
+	repoCreateMu.Unlock()
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if err := c.Store.SetForkOf(id, src.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	dstDir := RepoDir(c.Cfg.Server.Root, c.User.Username, name)
@@ -773,7 +773,17 @@ func runMRMerge(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if upToDate {
-		return c.fail(protocol.ExitUsage, "target already contains the MR head")
+		// The head is already on the target: merged by hand and pushed, or
+		// a merge whose ref update landed and whose record did not. Record
+		// it rather than refuse, so a merge request cannot be stuck open
+		// with no way to close it as merged (#108).
+		if err := c.Store.MarkMerged(mr.ID, targetSHA, c.User.ID, ""); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d}`, mr.Number))
+		return c.emit(map[string]any{"number": mr.Number, "strategy": "recorded", "sha": headSHA}, func(w io.Writer) {
+			fmt.Fprintf(w, "%s already contains !%d; recorded as merged at %.10s\n", mr.TargetRef, mr.Number, headSHA)
+		})
 	}
 	ffPossible, err := gitutil.IsAncestor(dir, targetSHA, headSHA)
 	if err != nil {

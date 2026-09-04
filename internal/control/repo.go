@@ -176,12 +176,15 @@ func runRepoCreate(c *Ctx, args []string) int {
 		}
 		ownerKind, ownerID = "org", org.ID
 	}
+	repoCreateMu.Lock()
 	if ownerKind == "user" {
 		if code := checkRepoQuota(c); code >= 0 {
+			repoCreateMu.Unlock()
 			return code
 		}
 	}
 	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
+	repoCreateMu.Unlock()
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -378,8 +381,12 @@ func runRepoTransfer(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if err := os.Rename(oldDir, newDir); err != nil {
-		// Keep name and disk consistent: revert the database change.
-		c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID)
+		// Keep name and disk consistent: revert the database change, and
+		// say so if even that fails, since the operator then has a row
+		// pointing at a directory that is not there.
+		if rerr := c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID); rerr != nil {
+			return c.fail(protocol.ExitFailure, "moving repository: %v; and reverting the record failed: %v (the record now names %s but the directory is still %s)", err, rerr, newOwner+"/"+repo.Name, repo.Path())
+		}
 		return c.fail(protocol.ExitFailure, "moving repository: %v", err)
 	}
 	// The wiki companion follows its repo.
