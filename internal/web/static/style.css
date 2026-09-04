@@ -51,6 +51,7 @@
   --accent: #0000f0;         /* links, focus — 9.30:1 on white */
   --accent-fg: #ffffff;
   --fill: #0000f0;           /* button grounds; white on it is 9.30:1 */
+  --fill-edge: transparent; /* light: the fill is its own boundary */
 
   /* orange: where you are, what wants you */
   --mark: #e4572e;           /* bars and underlines — non-text, 3.0 bar */
@@ -118,6 +119,7 @@
                                 there and 5.06:1 on the page. */
     --accent-fg: #ffffff;
     --fill: #0000f0;         /* fills stay pure; white on it clears 9:1 */
+    --fill-edge: #7d8cff;    /* a button's boundary: #0000f0 on #0a0a0a is 1.3:1 (#120) */
     --mark: #ff6b3d;
     --warn: #ff6b3d;
     --ok: #3fce7a;
@@ -1291,7 +1293,7 @@ input:user-invalid, textarea:user-invalid {
 button {
   background: var(--fill);
   color: #ffffff;
-  border: none;
+  border: 1px solid var(--fill-edge);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-4);
   font-weight: 600;

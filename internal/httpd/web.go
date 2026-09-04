@@ -9,6 +9,7 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -1506,6 +1507,51 @@ var labelPalette = []string{
 
 var hexColorPat = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
+// clampChip keeps a user-set label colour legible as text on both
+// grounds. Contrast is defined on relative luminance, so that is what is
+// held: between 0.12 and 0.28, where the chip clears 3:1 against white
+// and against the dark ground alike, and where the palette's own colours
+// sit. The hue is kept; the channels are scaled in linear light (#120).
+func clampChip(hex string) string {
+	lin := func(c int64) float64 {
+		v := float64(c) / 255
+		if v <= 0.04045 {
+			return v / 12.92
+		}
+		return math.Pow((v+0.055)/1.055, 2.4)
+	}
+	r, g, b := lin(hexByte(hex[1:3])), lin(hexByte(hex[3:5])), lin(hexByte(hex[5:7]))
+	y := 0.2126*r + 0.7152*g + 0.0722*b
+	const lo, hi = 0.12, 0.28
+	if y >= lo && y <= hi {
+		return strings.ToLower(hex)
+	}
+	target := hi
+	if y < lo {
+		target = lo
+	}
+	if y == 0 {
+		r, g, b = target, target, target
+	} else {
+		k := target / y
+		r, g, b = math.Min(1, r*k), math.Min(1, g*k), math.Min(1, b*k)
+	}
+	enc := func(v float64) int {
+		if v <= 0.0031308 {
+			v *= 12.92
+		} else {
+			v = 1.055*math.Pow(v, 1/2.4) - 0.055
+		}
+		return int(math.Round(v * 255))
+	}
+	return fmt.Sprintf("#%02x%02x%02x", enc(r), enc(g), enc(b))
+}
+
+func hexByte(s string) int64 {
+	n, _ := strconv.ParseInt(s, 16, 32)
+	return n
+}
+
 // labelColors returns a complete label-name -> chip color map for a repo:
 // the stored labels.color when it is a valid hex color, otherwise a
 // stable default picked from the palette by name hash.
@@ -1518,7 +1564,7 @@ func (s *Server) labelColors(repoID int64) map[string]template.CSS {
 			h.Write([]byte(name))
 			color = labelPalette[h.Sum32()%uint32(len(labelPalette))]
 		}
-		out[name] = template.CSS("--chip:" + color)
+		out[name] = template.CSS("--chip:" + clampChip(color))
 	}
 	return out
 }
