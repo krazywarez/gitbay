@@ -26,6 +26,9 @@ func init() {
 	register(Command{Path: []string{"repo", "settings", "require-resolved"},
 		Summary: "require all review threads resolved to merge",
 		Usage:   "repo settings require-resolved <owner/name> on|off", Run: runRequireResolved})
+	register(Command{Path: []string{"repo", "settings", "require-codeowners"},
+		Summary: "require an owner's approval for every file CODEOWNERS covers",
+		Usage:   "repo settings require-codeowners <owner/name> on|off", Run: runRequireCodeowners})
 	register(Command{Path: []string{"repo", "settings", "require-checks"},
 		Summary: "gate merges on green statuses",
 		Usage:   "repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
@@ -155,6 +158,24 @@ func runRequireResolved(c *Ctx, args []string) int {
 	}
 	return c.emit(s, func(w io.Writer) {
 		fmt.Fprintf(w, "require_resolved %s on %s\n", args[1], repo.Path())
+	})
+}
+
+func runRequireCodeowners(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: repo settings require-codeowners <owner/name> on|off")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	s := repo.Settings
+	s.RequireCodeowners = args[1] == "on"
+	if err := c.Store.SetRepoSettings(repo.ID, s); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(s, func(w io.Writer) {
+		fmt.Fprintf(w, "require_codeowners %s on %s\n", args[1], repo.Path())
 	})
 }
 
@@ -1019,8 +1040,7 @@ func runMRMerge(c *Ctx, args []string) int {
 }
 
 // reviewGates enforces require_approvals (fresh, non-author, latest review
-// per reviewer; a fresh request-changes blocks), CODEOWNERS coverage
-// whenever the target branch carries a CODEOWNERS file, and
+// per reviewer; a fresh request-changes blocks), require_codeowners, and
 // require_resolved. Returns -1 to proceed.
 func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA string) int {
 	set := repo.Settings
@@ -1060,13 +1080,19 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 	}
 
 	// CODEOWNERS: every owned changed file needs an approval from one of
-	// its owners. The file's presence is the opt-in; it does not wait on
-	// require_approvals (#99).
-	content, err := gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, "CODEOWNERS", 1<<20)
-	if err != nil {
-		content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
-	}
-	if err == nil && len(content) > 0 {
+	// its owners. require_codeowners is the opt-in — a repository can
+	// carry the file as documentation of who to ask without it gating
+	// merges — and it does not wait on require_approvals (#99).
+	if set.RequireCodeowners {
+		content, err := gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, "CODEOWNERS", 1<<20)
+		if err != nil {
+			content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
+		}
+		if err != nil || len(content) == 0 {
+			return c.fail(protocol.ExitDenied,
+				"%s requires CODEOWNERS approval but %s carries no CODEOWNERS file",
+				repo.Path(), mr.TargetRef)
+		}
 		rules := policy.ParseCodeowners(string(content))
 		base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
 		if err != nil {

@@ -26,6 +26,7 @@ type RepoSettings struct {
 	RequireChecks        bool     `json:"require_checks,omitempty"`
 	RequireApprovals     int      `json:"require_approvals,omitempty"`
 	RequireResolved      bool     `json:"require_resolved,omitempty"`
+	RequireCodeowners    bool     `json:"require_codeowners,omitempty"`
 	GitDaemon            bool     `json:"git_daemon,omitempty"`
 	Archived             bool     `json:"archived,omitempty"`
 	Website              string   `json:"website,omitempty"`

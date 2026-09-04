@@ -52,6 +52,9 @@ func TestMergeRequirements(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-approvals", "alice/svc", "1"); code != 0 {
 		t.Fatal("require-approvals failed")
 	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-codeowners", "alice/svc", "on"); code != 0 {
+		t.Fatal("require-codeowners failed")
+	}
 
 	// No approvals: refused. The author's own approval does not count.
 	_, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1")
@@ -137,10 +140,11 @@ func TestMergeRequirements(t *testing.T) {
 	}
 }
 
-// A CODEOWNERS file gates on its own. It used to be read only inside the
-// require-approvals branch, so a repository with owners and the default
-// settings had no owner gating at all (#99).
-func TestCodeownersWithoutRequiredApprovals(t *testing.T) {
+// require_codeowners is the opt-in, not the file's presence: a repository
+// can carry CODEOWNERS as documentation of who to ask without it gating
+// merges. When it is on, it gates independently of require_approvals —
+// the coupling that left owners unenforced under default settings (#99).
+func TestCodeownersToggle(t *testing.T) {
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	carolKey := inst.newKey(t, "carol")
@@ -158,14 +162,15 @@ func TestCodeownersWithoutRequiredApprovals(t *testing.T) {
 	dir := filepath.Join(work, "w")
 	os.WriteFile(filepath.Join(dir, "CODEOWNERS"), []byte("*.go @carol\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "svc.go"), []byte("package svc\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "lib.go"), []byte("package svc\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "README"), []byte("svc\n"), 0o644)
 	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "base")
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
 
-	// One MR touches an owned file, one does not.
-	for i, f := range []string{"svc.go", "README"} {
+	// !1 and !3 touch owned files, !2 does not.
+	for i, f := range []string{"svc.go", "README", "lib.go"} {
 		mustGit(t, dir, env, "checkout", "-q", "-b", fmt.Sprintf("feat%d", i), "main")
 		os.WriteFile(filepath.Join(dir, f), []byte("changed\n"), 0o644)
 		mustGit(t, dir, env, "add", ".")
@@ -177,7 +182,17 @@ func TestCodeownersWithoutRequiredApprovals(t *testing.T) {
 		}
 	}
 
-	// Default settings, no approvals: the owned file is gated, the other is not.
+	// Toggle off, which is the default: the file is present and gates
+	// nothing, so an owned file merges without its owner.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "3"); code != 0 {
+		t.Fatalf("owned file gated with the toggle off: %s", errOut)
+	}
+
+	// Toggle on with require_approvals still 0: the owned file is gated,
+	// the unowned one is not.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-codeowners", "alice/svc", "on"); code != 0 {
+		t.Fatalf("require-codeowners: %s", errOut)
+	}
 	_, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1")
 	if code != 4 || !strings.Contains(errOut, "CODEOWNERS") || !strings.Contains(errOut, "carol") {
 		t.Fatalf("codeowners gate with require-approvals off: exit %d, %s", code, errOut)
@@ -190,5 +205,33 @@ func TestCodeownersWithoutRequiredApprovals(t *testing.T) {
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1"); code != 0 {
 		t.Fatalf("owner-approved merge refused: %s", errOut)
+	}
+
+	// The toggle on a repository with no CODEOWNERS file says so rather
+	// than silently gating nothing.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/bare"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-codeowners", "alice/bare", "on"); code != 0 {
+		t.Fatal("require-codeowners on alice/bare failed")
+	}
+	bare := t.TempDir()
+	mustGit(t, bare, env, "clone", inst.sshURL("alice/bare"), "b")
+	bdir := filepath.Join(bare, "b")
+	os.WriteFile(filepath.Join(bdir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, bdir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, bdir, env, "add", ".")
+	mustGit(t, bdir, env, "commit", "-q", "-m", "base")
+	mustGit(t, bdir, env, "push", "-q", "origin", "main")
+	mustGit(t, bdir, env, "checkout", "-q", "-b", "feat")
+	mustGit(t, bdir, env, "commit", "-q", "--allow-empty", "-m", "work")
+	mustGit(t, bdir, env, "push", "-q", "origin", "feat")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/bare",
+		"--source", "feat", "--target", "main", "--title", "'work'"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+	_, errOut, code = inst.ssh(t, aliceKey, "", "mr", "merge", "alice/bare", "1")
+	if code != 4 || !strings.Contains(errOut, "no CODEOWNERS file") {
+		t.Fatalf("missing CODEOWNERS file: exit %d, %s", code, errOut)
 	}
 }

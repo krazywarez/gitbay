@@ -64,6 +64,12 @@
   <button type="submit">Save</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-codeowners">
+  <label for="require-codeowners">Require CODEOWNERS approval</label>
+  <input type="checkbox" id="require-codeowners" name="require-codeowners" value="on"{{if .Repo.Settings.RequireCodeowners}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-signed">
   <label for="require-signed">Require signed commits</label>
   <input type="checkbox" id="require-signed" name="require-signed" value="on"{{if .Repo.Settings.RequireSignedCommits}} checked{{end}}>

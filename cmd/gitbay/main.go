@@ -434,6 +434,7 @@ func repoCmd() *cobra.Command {
 			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
 			pass("require-approvals", "require N fresh approvals to merge: <n>", passOpts{server: []string{"repo", "settings", "require-approvals"}, needsRepo: true}),
 			pass("require-resolved", "require threads resolved to merge: on|off", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),
+			pass("require-codeowners", "require an owner's approval per covered file: on|off", passOpts{server: []string{"repo", "settings", "require-codeowners"}, needsRepo: true}),
 			pass("require-checks", "gate merges on green statuses: ... on|off", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
 			pass("visibility", "set repository visibility: public|private", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
 			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
