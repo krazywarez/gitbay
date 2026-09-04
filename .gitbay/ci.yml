@@ -23,3 +23,35 @@ jobs:
   vuln:
     steps:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+  # SonarCloud static analysis. Report-only: unlike vuln this does not
+  # gate, so a first scan of an existing codebase does not turn every
+  # build red before anyone has read what it says. Flip the trailing
+  # `|| true` off to make the quality gate binding.
+  #
+  # One step, because each step runs in its own `sh -c` and an export
+  # would not survive to the next. The scanner is cached under the
+  # runner's home rather than re-downloading ~50MB per build, and the
+  # linux-x64 bundle carries its own JRE, which is why the host needs no
+  # Java.
+  sonar:
+    steps:
+      - |
+        set -eu
+        if [ -z "${SONAR_TOKEN:-}" ]; then
+          echo "no SONAR_TOKEN in this build's environment; skipping."
+          echo "A merge request from a fork is built without secrets on purpose,"
+          echo "so this is expected there and is not a failure."
+          exit 0
+        fi
+        VERSION=8.1.0.6389
+        HOME_DIR="${HOME:-/var/lib/gitbay-runner}"
+        SCANNER="$HOME_DIR/.sonar/sonar-scanner-$VERSION-linux-x64"
+        if [ ! -x "$SCANNER/bin/sonar-scanner" ]; then
+          echo "installing sonar-scanner $VERSION"
+          curl --create-dirs -fsSLo "$HOME_DIR/.sonar/sonar-scanner.zip" \
+            "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$VERSION-linux-x64.zip"
+          unzip -q -o "$HOME_DIR/.sonar/sonar-scanner.zip" -d "$HOME_DIR/.sonar/"
+          rm -f "$HOME_DIR/.sonar/sonar-scanner.zip"
+        fi
+        SONAR_HOST_URL=https://sonarcloud.io \
+        "$SCANNER/bin/sonar-scanner" -Dsonar.scm.revision="${GITBAY_SHA:-}" || true
