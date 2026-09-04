@@ -4,6 +4,76 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.13.0 — 2026-09-04
+
+Collaboration. A review is composed and submitted as one thing, a merge
+request can say it is not asking yet and can show what changed since you
+last looked, issues are searched by their text, and the events half the
+mutations never recorded now exist.
+
+- A review is composed as a unit. =mr diff-comment --pending= holds a
+  comment back; =mr review= publishes the batch with the verdict and says
+  how many went with it; =mr review --discard= throws away what was never
+  submitted. A pending comment notifies nobody when written — the review
+  is the announcement, and it names its own size — and does not gate a
+  merge, since a thread only its author can see is one nobody else could
+  resolve. #111
+- =mr create --draft=, =mr draft=, =mr ready=. A draft does not merge and
+  does not appear in anyone's review queue; marking it ready is the
+  request for review. Draft is a flag rather than a fifth state, so every
+  =state = 'open'= rule still means what it did, and the merge refusal is
+  unconditional: every other gate is a setting an admin turns on, and
+  this one is the author's own statement about their own work. #111
+- =mr range-diff= shows what changed between two revisions of a merge
+  request, and =mr revisions= lists them. A push stales every review and
+  nothing said what had moved; a diff of the two heads cannot answer it,
+  and the previous head was overwritten in place. Each side of the
+  comparison carries the merge base it had at the time, since measuring
+  both against today's would attribute every commit that landed on the
+  target in between to this merge request's author. #111
+- Issues and merge requests are searched by their title and body, over
+  FTS5. =issue list --search= and =mr list --search= narrow one
+  repository; the instance-wide =search= reaches bodies now, and both
+  list pages carry a search box. What someone types is quoted term by
+  term, so an FTS5 operator — =c++=, =AND=, a lone quote — is a word to
+  match rather than a syntax error. #114
+- Ten mutations that changed a repository silently now record an event:
+  =mr.closed=, =mr.reviewed=, =mr.edited=, =mr.retargeted=, =mr.draft=,
+  =issue.edited=, =issue.labeled=, =issue.assigned=, =issue.milestoned=,
+  =mr.milestoned=, =release.deleted=. =mr close= and =issue edit= also
+  notify participants, which they did not. The full list is on the API
+  wiki page and =webhook add --events= refuses a name that is not on it,
+  since a subscription to a typo would never fire and nothing would say
+  so. #112
+- =gitbay-runner -jobs N= runs N builds at once. Claiming was always a
+  single transaction that selects and updates, and each build already
+  worked in its own directory, so several workers were safe the whole
+  time; the runner never used more than one. #115
+- A merge request replayed from a migration bundle has a diff. The bundle
+  carried no head at all, and =mr diff= resolves through the head ref, so
+  a merged merge request — which has no source branch left — could only
+  fail. Re-running an import after the git push sets the head it could
+  not set the first time. The GitHub import fetches =refs/pull/*/head=,
+  which a mirror made with the default refspecs does not carry. #128
+- The review loop is driven end to end by three accounts in the test
+  suite: draft, ready, thread, approval, resolve, merge, with approvals,
+  CODEOWNERS and require-resolved all on at once. Every one of those had
+  its own test and none of them met. #139
+- A bare =go test ./...= says the timeout is too short instead of
+  panicking eleven minutes in and blaming whichever test was running.
+  =make test= is what CONTRIBUTING asks for now. #143
+
+Migrations 0036 through 0039 add the search index, the draft flag,
+pending review comments and merge request head history; 0036 and 0039
+backfill from what is already there. They run on daemon start.
+
+Two things this does not do. There is still no way to ask a particular
+person for a review — the queue is computed from involvement, so a
+collaborator with write access who has not touched a thread hears nothing
+(krz/gitbay#145). And a CI build still runs as the runner's own user with
+no container; the runner on this instance is scoped to one repository,
+which is what keeps that narrow (krz/gitbay#144). Both are v1.14.0.
+
 * v1.12.0 — 2026-09-04
 
 The store and the push path. Dashboard queries walk an index instead of
