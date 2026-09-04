@@ -4,6 +4,31 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.13.1 — 2026-09-04
+
+A command that reads its payload from stdin says so, and SonarCloud runs
+alongside the vulnerability scan.
+
+- =repo secret set= blocked with nothing printed, which is
+  indistinguishable from a hung connection, and pressing Enter did not
+  end it because the server reads to EOF — so it looked the same before
+  and after the value had been typed, and the secret echoed into the
+  scrollback on the way. A terminal is now told what is wanted and that
+  Ctrl-D ends it; a secret is read without echo and takes one line, so
+  Enter is enough. Piped input is unchanged, byte for byte: =printf %s
+  "$TOKEN" | gitbay repo secret set ...= still sends exactly the token.
+  Applies to =keys add=, =auth pgp add=, =repo deploy-key add= and
+  =release asset add= as well; public keys keep echoing, since they are
+  public. #150
+- A =sonar= CI job reports to SonarCloud, alongside =vuln=. Report-only:
+  it does not gate a build, unlike the vulnerability scan. A merge
+  request from a fork builds without secrets by design, so the job says
+  why it is skipping there rather than failing on a missing credential.
+  Only =SONAR_TOKEN= is secret and it is a build secret; the
+  organization, project key and host are checked in. Ref #149
+
+Replace the binary and reinstall the CLI. No migration.
+
 * v1.13.0 — 2026-09-04
 
 Collaboration. A review is composed and submitted as one thing, a merge
