@@ -103,7 +103,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if ck, err := r.Cookie(sessionCookie); err == nil {
 		s.st.DeleteWebSession(store.HashToken(ck.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, s.clearCookie(sessionCookie, http.SameSiteStrictMode))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
