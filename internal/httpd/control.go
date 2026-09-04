@@ -113,6 +113,12 @@ func (s *Server) runControlIntoCode(u store.User, argv []string, target any) (co
 }
 
 func (s *Server) dispatchInto(u store.User, argv []string, target any) (int, string) {
+	return s.dispatchIntoStdin(u, argv, "", target)
+}
+
+// dispatchIntoStdin is dispatchInto with a body on stdin, decoding the
+// command's named payload rather than a map (#126).
+func (s *Server) dispatchIntoStdin(u store.User, argv []string, stdin string, target any) (int, string) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -120,7 +126,7 @@ func (s *Server) dispatchInto(u store.User, argv []string, target any) (int, str
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
-		Stdin:  strings.NewReader(""),
+		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,
 		JSON:   true,

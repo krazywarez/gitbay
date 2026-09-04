@@ -110,7 +110,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 		notifyUsers(c, parts, subject,
 			notifyBody(c, fmt.Sprintf("commented on %s%d", t.symbol, number), body, fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)))
 	}
-	return c.emit(map[string]any{"number": number}, func(w io.Writer) {
+	return c.emit(Created{Number: number}, func(w io.Writer) {
 		fmt.Fprintf(w, "commented on %s%s%d\n", repo.Path(), t.symbol, number)
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -191,11 +192,10 @@ func (s *Server) mrCreateSubmit(w http.ResponseWriter, r *http.Request, u store.
 	if body != "" {
 		argv = append(argv, "--body", body)
 	}
-	data, msg, ok := s.runControlJSON(u, argv)
-	if !ok {
+	var created control.MRCreated
+	if msg, ok := s.runControlInto(u, argv, &created); !ok {
 		back(msg)
 		return
 	}
-	n, _ := data["number"].(float64)
-	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", p.Repo.Path(), int64(n)), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/mrs/%d", p.Repo.Path(), created.Number), http.StatusSeeOther)
 }

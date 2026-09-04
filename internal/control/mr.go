@@ -281,16 +281,14 @@ func runMRCreate(c *Ctx, args []string) int {
 		notifyUsers(c, targets, mrSubject(repo, n, title),
 			notifyBody(c, fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target), b, fmt.Sprintf("%s/mrs/%d", repo.Path(), n)))
 	}
-	out := map[string]any{"number": n, "head_sha": headSHA}
-	var parent *stackRef
+	out := MRCreated{Number: n, HeadSHA: headSHA}
 	if p, ok, err := c.Store.OpenMRBySource(repo.ID, target); err == nil && ok {
-		parent = &stackRef{p.Number, p.Title}
-		out["stacked_on"] = parent
+		out.StackedOn = &stackRef{p.Number, p.Title}
 	}
 	return c.emit(out, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s!%d (%s -> %s)\n", repo.Path(), n, source, target)
-		if parent != nil {
-			fmt.Fprintf(w, "stacked on !%d %s\n", parent.Number, parent.Title)
+		if out.StackedOn != nil {
+			fmt.Fprintf(w, "stacked on !%d %s\n", out.StackedOn.Number, out.StackedOn.Title)
 		}
 	})
 }
@@ -449,22 +447,9 @@ func runMRShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	type reviewOut struct {
-		Reviewer  string `json:"reviewer"`
-		Verdict   string `json:"verdict"`
-		Stale     bool   `json:"stale"`
-		CreatedAt string `json:"created_at"`
-	}
-	type checkOut struct {
-		Context   string `json:"context"`
-		State     string `json:"state"`
-		URL       string `json:"url,omitempty"`
-		UpdatedAt string `json:"updated_at"`
-		Duration  string `json:"duration,omitempty"` // CI checks only, once finished
-	}
-	var checks []checkOut
+	var checks []CheckOut
 	for _, st := range statuses {
-		out := checkOut{Context: st.Context, State: st.State, URL: st.TargetURL, UpdatedAt: st.UpdatedAt}
+		out := CheckOut{Context: st.Context, State: st.State, URL: st.TargetURL, UpdatedAt: st.UpdatedAt}
 		if st.Duration > 0 {
 			out.Duration = st.Duration.String()
 		}
@@ -474,16 +459,12 @@ func runMRShow(c *Ctx, args []string) int {
 	for _, cm := range comments {
 		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
 	}
-	var rs []reviewOut
+	var rs []ReviewOut
 	for _, r := range reviews {
-		rs = append(rs, reviewOut{r.Reviewer, r.Verdict, r.Stale, r.CreatedAt})
+		rs = append(rs, ReviewOut{r.Reviewer, r.Verdict, r.Stale, r.CreatedAt})
 	}
 	// The commits this MR carries: base..head, the diff's range.
-	type commitOut struct {
-		SHA     string `json:"sha"`
-		Subject string `json:"subject"`
-	}
-	var commits []commitOut
+	var commits []CommitOut
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	base := mr.MergedBase
 	if base == "" {
@@ -500,19 +481,12 @@ func runMRShow(c *Ctx, args []string) int {
 						subject = parsed.Subject
 					}
 				}
-				commits = append(commits, commitOut{sha, subject})
+				commits = append(commits, CommitOut{sha, subject})
 			}
 		}
 	}
-	d := struct {
-		mrOut
-		Checks            []checkOut   `json:"checks,omitempty"`
-		Combined          string       `json:"checks_combined,omitempty"`
-		UnresolvedThreads int          `json:"unresolved_threads,omitempty"`
-		Commits           []commitOut  `json:"commits,omitempty"`
-		Comments          []commentOut `json:"comments,omitempty"`
-		Reviews           []reviewOut  `json:"reviews,omitempty"`
-	}{mrToOut(repo, mr, true), checks, combined, unresolved, commits, cs, rs}
+	d := MRShow{mrOut: mrToOut(repo, mr, true), Checks: checks, Combined: combined,
+		UnresolvedThreads: unresolved, Commits: commits, Comments: cs, Reviews: rs}
 	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, d.State, d.Author, d.Source, d.TargetRef, d.HeadSHA)

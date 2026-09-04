@@ -153,7 +153,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 		notifyUsers(c, targets, issueSubject(repo, n, title),
 			notifyBody(c, fmt.Sprintf("opened issue #%d", n), b, fmt.Sprintf("%s/issues/%d", repo.Path(), n)))
 	}
-	return c.emit(map[string]any{"number": n}, func(w io.Writer) {
+	return c.emit(Created{Number: n}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s#%d\n", repo.Path(), n)
 	})
 }
@@ -216,10 +216,7 @@ func runIssueShow(c *Ctx, args []string) int {
 	for _, cm := range comments {
 		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
 	}
-	d := struct {
-		issueOut
-		Comments []commentOut `json:"comments,omitempty"`
-	}{issueToOut(issue, true), cs}
+	d := IssueShow{issueOut: issueToOut(issue, true), Comments: cs}
 	_ = repo
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "#%d %s [%s] by %s\n", d.Number, d.Title, d.State, d.Author)

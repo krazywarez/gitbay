@@ -268,12 +268,13 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	title := strings.TrimSpace(r.FormValue("title"))
-	code, data, msg := s.dispatchJSON(u, []string{"issue", "create", repoPath, "--title", title, "--file", "-"}, r.FormValue("body"))
+	var created control.Created
+	code, msg := s.dispatchIntoStdin(u, []string{"issue", "create", repoPath, "--title", title, "--file", "-"}, r.FormValue("body"), &created)
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return
 	}
-	n := int64(data["number"].(float64))
+	n := created.Number
 	// Labels need write access, matching the SSH rule; the command refuses
 	// otherwise and the issue stands without them.
 	if args := fieldArgs("--add", r.FormValue("labels")); len(args) > 0 {
