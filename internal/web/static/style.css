@@ -420,6 +420,9 @@ nav.tabs a i {
   .railpinned { border-top: 0; padding: 0; }
   .content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   .repohead { padding: var(--sp-3) var(--sp-4) 0; }
+  /* seven tabs do not fit a phone in one row; a hidden scrollbar made
+     the ones past the edge look absent. Two rows show all of them. */
+  nav.tabs { flex-wrap: wrap; overflow: visible; }
 }
 
 /* tables */
@@ -740,6 +743,10 @@ pre.quickstart {
   margin: 0 0 var(--sp-4);
 }
 .landing .explorelink { font-weight: 550; }
+.landing .facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); margin: var(--sp-5) 0; }
+.landing .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
+.landing .facets p { margin: 0; color: var(--muted); font-size: var(--fs-2); line-height: 1.6; }
+@media (max-width: 40rem) { .landing .facets { grid-template-columns: 1fr; gap: var(--sp-4); } }
 
 /* index toolbar */
 p.toolbar { color: var(--muted); font-size: var(--fs-2); margin-top: var(--sp-4); }

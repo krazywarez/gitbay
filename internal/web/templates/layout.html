@@ -61,13 +61,16 @@
     <span class="grow"></span>
     {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>{{end}}
   </div>
+  {{$top := topTab (str $ "Tab")}}
+  {{/* The header is the same on every tab: it sits above the tab bar,
+       and anything shown on one tab and not another would move the
+       navigation between clicks of that navigation. */}}
   {{with field $ "Desc"}}<p class="repodesc">{{.}}</p>{{end}}
   {{with field $ "Topics"}}<p class="topics">{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
   {{with $.Repo.Settings.Website}}<p class="repometa"><a href="{{.}}" rel="nofollow">{{.}}</a></p>{{end}}
   {{range field $ "Mirrors"}}<p class="repometa">{{if eq .Direction "push"}}Mirrors to{{else}}Mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="bad">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
   {{end}}
   <nav class="tabs" aria-label="Repository">
-    {{$top := topTab (str $ "Tab")}}
     <a {{if eq $top "code"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}">Code</a>
     <a {{if eq $top "issues"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">Issues{{with field $ "OpenIssues"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>
     <a {{if eq $top "mrs"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/mrs">Merge requests{{with field $ "OpenMRs"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>

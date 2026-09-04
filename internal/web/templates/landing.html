@@ -7,6 +7,11 @@ merge requests are managed from your terminal with nothing but OpenSSH —
 the web is a fast, readable rendering of that state.</p>
 <pre class="quickstart">ssh git@{{.Host}} help                # every command, no client needed
 git clone ssh://git@{{.Host}}/owner/repo.git</pre>
+<div class="facets">
+  <section><h2>Read</h2><p>Browse and clone any public repository, over HTTPS or <code>git://</code>, with no account. Every commit shows whether its signature was verified.</p></section>
+  <section><h2>Write</h2><p>Push over SSH with the key you already have. <code>ssh git@{{.Host}} repo create you/project</code> is the whole onboarding; issues, merge requests and reviews are commands too.</p></section>
+  <section><h2>Review</h2><p>The web is a rendering of the same state: read a diff, comment on a line, approve, merge. Everything it can do, the terminal can do first.</p></section>
+</div>
 <p><a class="explorelink" href="/explore">explore public repositories →</a></p>
 {{if .Accounts}}<p class="meta">have an account? mint a browser session from your terminal: <code>gitbay web login</code>{{if .Signup}} · new here? <a href="/register">create an account</a>{{end}}</p>{{end}}
 </div>
