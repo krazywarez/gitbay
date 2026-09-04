@@ -4,6 +4,74 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.11.0 — 2026-09-04
+
+The web catches up with the rest of the forge: search across the
+instance, a notification inbox, a compare view, linkable diff lines,
+and a pass over contrast, heading structure and the stylesheet.
+
+- Notifications are no longer mail or nothing. An =inbox= table holds a
+  row per recipient whether or not the instance has SMTP;
+  =notifications list= reads it, unread by default, and =notifications
+  read <id>... | --all= clears it. =repo watch= adds you to a
+  repository's notifications and =repo unwatch= mutes it, with a mute
+  beating every other reason to be told, including owning the
+  repository or having written the thread. The unread count rides on
+  =dashboard= and in the web rail. #113
+- =search= matches repository paths, descriptions and topics, and issue
+  and merge request titles, across everything the caller can read;
+  =/search= renders it with a field in the rail on every page, and an
+  anonymous visitor gets the public rows from the same query. Titles
+  only — body search is #114. #118
+- =/{owner}/{repo}/compare/{a}...{b}= shows what one ref adds on top of
+  another. Diff rows, files and review threads carry ids, so a line can
+  be linked to. The issue and merge request lists page at fifty with
+  the cursors the commands already emit. #118
+- CODEOWNERS gating is a setting rather than a file that happens to
+  exist: =repo settings require-codeowners <owner/name> on|off=, off by
+  default, still independent of =require-approvals=. A repository can
+  carry the file as documentation of who to ask without it gating
+  merges. #142
+- A failed form action's reason rides a one-shot cookie instead of
+  =?e=<message>=, so it no longer survives a reload or lands in
+  history. #119
+- A diff cut at 4 MiB cuts on a line boundary and says so, the
+  diffstat says its counts are partial, and a merge request's commit
+  list says "first 100 of N". #117
+- Page templates parse once with the layout at start-up, so a template
+  that does not parse fails the process rather than the first visit to
+  its page. #116
+- Markdown headings carry ids, matching org pages, and the stylesheet
+  serves a hash ETag with a day's lifetime and answers a matching
+  =If-None-Match= with 304. #132
+- Dark-mode buttons carry a visible edge (a 1 px border was 1.3:1
+  against the 3:1 non-text contrast floor), and a stored label colour
+  is held between 0.12 and 0.28 relative luminance so it clears 3:1 on
+  both grounds while keeping its hue. #120
+- Accessibility: the pin star is decoration and the word carries the
+  meaning, the refs and release asset tables have scoped column
+  headers, state filters carry =aria-current= rather than marking the
+  active one by colour alone, and a rendered README or wiki page's
+  headings move down one level so they sit under the page's own. #133
+- The stylesheet drops rules no template reaches, folds two off-scale
+  values onto the type scale, and resolves the classes templates asked
+  for and it never defined. #131
+- On a phone the tab bar wraps to a second row instead of scrolling
+  sideways with its scrollbar hidden, and the landing page says in
+  three sections what a reader, a writer and a reviewer can do. #134
+
+Migration 0034 adds =inbox= and =repo_watchers=; it runs on daemon
+start. Reinstall the CLI for =search=, =notifications= and =repo
+watch/unwatch=.
+
+Two upgrade notes beyond replacing the binary. A repository that
+relied on a CODEOWNERS file gating merges by its presence alone loses
+that gate until =require-codeowners= is set: nothing back-fills it,
+since the database cannot say which branches carry the file. And
+=search= and =notifications= are now reserved top-level routes, so a
+user or organization already holding either name keeps it but its
+profile page is shadowed by the route.
+
 * v1.10.0 — 2026-09-04
 
 Every command parses its arguments the same way, the web answers by
