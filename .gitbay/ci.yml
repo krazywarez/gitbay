@@ -53,5 +53,16 @@ jobs:
           unzip -q -o "$HOME_DIR/.sonar/sonar-scanner.zip" -d "$HOME_DIR/.sonar/"
           rm -f "$HOME_DIR/.sonar/sonar-scanner.zip"
         fi
+        # Analyse each branch as itself. Without this every branch is
+        # recorded against the project's main branch, so a feature branch
+        # replaces main's results — a branch that removes findings makes
+        # main look clean before its fix is merged, and one that adds
+        # findings makes main look broken when it is not (#154).
+        BRANCH="${GITBAY_REF:-}"
+        BRANCH="${BRANCH#refs/heads/}"
+        BRANCH_ARG=""
+        if [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ]; then
+          BRANCH_ARG="-Dsonar.branch.name=$BRANCH"
+        fi
         SONAR_HOST_URL=https://sonarcloud.io \
-        "$SCANNER/bin/sonar-scanner" -Dsonar.scm.revision="${GITBAY_SHA:-}" || true
+        "$SCANNER/bin/sonar-scanner" -Dsonar.scm.revision="${GITBAY_SHA:-}" $BRANCH_ARG || true
