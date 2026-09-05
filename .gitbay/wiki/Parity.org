@@ -166,9 +166,13 @@ status= lists what is behind and has no web view because the report
 itself is an issue the worker opens, rewrites and closes, which every
 surface already reads.
 
-The wiki row covers reading. Editing a wiki is a push to
-=<repo>.wiki.git= on every surface, including the web, so there is no
-edit row to have parity on.
+The wiki row covers reading. A wiki lives at =.gitbay/wiki/= on the
+default branch, so editing one is editing a file in the repository —
+a push, or =repo commit-file= — and there is no wiki-specific edit row
+to have parity on. The web editor reaches it on any repository that
+permits server-authored commits; one requiring verified signatures
+does not, because the server signs nothing on a user's behalf, so
+those wikis are push-only.
 
 =n/a= marks a capability deliberately absent from a surface rather than
 missing from it. Archive download is =n/a= on iOS: the read API carries
