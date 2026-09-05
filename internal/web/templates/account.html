@@ -4,6 +4,22 @@
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if .Message}}<p class="notice" role="status">{{.Message}}</p>{{end}}
 
+<h2>Profile</h2>
+<p class="meta">Shown on your profile page, <a href="/{{.Viewer}}">/{{.Viewer}}</a>.</p>
+<form method="post" action="/settings" class="setform stack">
+  <input type="hidden" name="field" value="profile">
+  <label for="p-description">Description</label>
+  <input type="text" id="p-description" name="description" value="{{.Profile.Description}}" placeholder="one line, shown in listings">
+  <label for="p-website">Website</label>
+  <input type="text" id="p-website" name="website" value="{{.Profile.Website}}" placeholder="https://example.org">
+  <label for="p-links">Links</label>
+  <textarea id="p-links" name="links" rows="3" placeholder="one per line: label|https://... or a bare https://... (at most 5)">{{.LinksText}}</textarea>
+  <label for="p-about">About</label>
+  <textarea id="p-about" name="about" rows="8" placeholder="longer, shown below your repositories">{{.Profile.About}}</textarea>
+  {{template "formatpicker" .Profile.AboutFormat}}
+  <button type="submit">Save profile</button>
+</form>
+
 <h2>SSH keys</h2>
 <p class="meta">Your keys are your identity here. A <code>full</code> key can run
 commands and push; a <code>git</code> key can only move git data, which is what

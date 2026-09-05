@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -46,21 +47,58 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	}
 	emails, _ := s.st.ListEmails(u.ID)
 
+	var profile control.ProfileOut
+	s.runControlInto(u, []string{"profile", "show"}, &profile)
+
 	s.render(w, "account.html", struct {
 		basePage
-		Tab     string // marks the rail's Settings row as current
-		Keys    []accountKey
-		PGP     []accountPGP
-		Emails  []store.Email
-		Host    string
-		Notice  string
-		Message string
-	}{s.baseFor(u), "account", keys, pgp, emails, s.cfg.SiteHost(),
+		Tab       string // marks the rail's Settings row as current
+		Keys      []accountKey
+		PGP       []accountPGP
+		Emails    []store.Email
+		Profile   control.ProfileOut
+		LinksText string
+		Host      string
+		Notice    string
+		Message   string
+	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
 		s.takeFlash(w, r), r.URL.Query().Get("m")})
 }
 
-// accountSubmit routes the account forms to their commands. Everything
-// here is a public key or an address — no secret is accepted over the web.
+// profileLinksText turns a profile's links into the form the textarea
+// shows and reads back: one per line, "label|url" when there is a label
+// and the bare url otherwise.
+func profileLinksText(links []store.ProfileLink) string {
+	lines := make([]string, len(links))
+	for i, l := range links {
+		if l.Label != "" {
+			lines[i] = l.Label + "|" + l.URL
+		} else {
+			lines[i] = l.URL
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// profileLinkArgs turns the textarea back into the --link values profile
+// set expects: one per non-blank line, or a single empty one to clear the
+// list when the field was emptied.
+func profileLinkArgs(raw string) []string {
+	var links []string
+	for _, line := range strings.Split(raw, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			links = append(links, line)
+		}
+	}
+	if links == nil {
+		return []string{""}
+	}
+	return links
+}
+
+// accountSubmit routes the account forms to their commands. Keys,
+// addresses and the profile are the whole surface — no secret is accepted
+// over the web.
 func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	back := func(msg, note string) {
 		q := ""
@@ -122,6 +160,25 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "address verified")
+	case "profile":
+		format := r.FormValue("format")
+		if format != "org" {
+			format = "md"
+		}
+		argv := []string{"profile", "set",
+			"--description", r.FormValue("description"),
+			"--website", r.FormValue("website"),
+			"--about-format", format,
+			"--file", "-",
+		}
+		for _, link := range profileLinkArgs(r.FormValue("links")) {
+			argv = append(argv, "--link", link)
+		}
+		if msg, ok := s.runControlStdin(u, argv, r.FormValue("about")); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "profile updated")
 	default:
 		back("unknown form", "")
 	}
