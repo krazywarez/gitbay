@@ -20,7 +20,7 @@ type mrPageData struct {
 	Checks          []store.Check
 	Combined        string
 	Comments        []renderedComment
-	Reviews         []store.MRReview
+	Reviews         []reviewRow
 	DiffFiles       []diffFile
 	Stat            diffStat
 	Commits         []struct{}
@@ -34,11 +34,17 @@ type mrPageData struct {
 }
 
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
+	rows := make([]reviewRow, 0, len(reviews))
+	for _, r := range reviews {
+		// The page test renders reviews that count; whether a given
+		// reviewer's does is decided by access, which e2e covers.
+		rows = append(rows, reviewRow{MRReview: r, Counts: true})
+	}
 	t.Helper()
 	var sb strings.Builder
 	if err := web.Render(&sb, "mr.html", mrPageData{
 		repoPage: testRepoPage(), MR: m, View: "conversation",
-		Reviews: reviews, Checks: checks, Combined: "",
+		Reviews: rows, Checks: checks, Combined: "",
 	}); err != nil {
 		t.Fatalf("render: %v", err)
 	}

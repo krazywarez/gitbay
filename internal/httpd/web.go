@@ -1746,6 +1746,13 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	}
 	comments, _ := s.st.ListMRComments(m.ID)
 	reviews, _ := s.st.ListMRReviews(m.ID)
+	// The same rule the merge gates apply, so the page cannot show an
+	// approval the gate ignores (#147).
+	reviewCounts := control.ReviewersWhoCount(s.st, p.Repo, reviews)
+	reviewRows := make([]reviewRow, 0, len(reviews))
+	for _, r := range reviews {
+		reviewRows = append(reviewRows, reviewRow{MRReview: r, Counts: reviewCounts[r.Reviewer]})
+	}
 	checks, combined, _ := s.st.ChecksForCommit(p.Repo.ID, m.HeadSHA)
 	// The viewer sees their own unsubmitted review comments and nobody
 	// else's.
@@ -1833,7 +1840,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Checks          []store.Check
 		Combined        string
 		Comments        []renderedComment
-		Reviews         []store.MRReview
+		Reviews         []reviewRow
 		DiffFiles       []diffFile
 		DiffTruncated   bool
 		Stat            diffStat
@@ -1849,7 +1856,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		StackedOn       *store.MR
 		Stacked         []store.MR
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
-		reviews, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
+		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked})
 }
 
@@ -1894,4 +1901,12 @@ func policyCanAdmin(u store.User, repo store.Repo, grant string) bool {
 
 func policyCanRead(u store.User, repo store.Repo, grant string) bool {
 	return policy.CanRead(u, repo, grant)
+}
+
+// reviewRow is a review with whether the merge gates count it, which
+// depends on the reviewer's access and so is not a property of the
+// review row itself.
+type reviewRow struct {
+	store.MRReview
+	Counts bool
 }

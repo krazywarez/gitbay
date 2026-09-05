@@ -37,9 +37,15 @@ type MRShow struct {
 
 // ReviewOut is one review on a merge request.
 type ReviewOut struct {
-	Reviewer  string `json:"reviewer"`
-	Verdict   string `json:"verdict"`
-	Stale     bool   `json:"stale"`
+	Reviewer string `json:"reviewer"`
+	Verdict  string `json:"verdict"`
+	Stale    bool   `json:"stale"`
+	// Counts reports whether this verdict decides the merge gates. A
+	// reader may review a public merge request; only someone who can
+	// write to the repository decides whether it merges. Without this the
+	// page would show an approval the gate ignores, and the difference
+	// would be invisible until a merge was refused (#147).
+	Counts    bool   `json:"counts"`
 	CreatedAt string `json:"created_at"`
 }
 

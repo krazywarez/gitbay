@@ -505,8 +505,9 @@ func runMRShow(c *Ctx, args []string) int {
 		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
 	}
 	var rs []ReviewOut
+	counts := ReviewersWhoCount(c.Store, repo, reviews)
 	for _, r := range reviews {
-		rs = append(rs, ReviewOut{r.Reviewer, r.Verdict, r.Stale, r.CreatedAt})
+		rs = append(rs, ReviewOut{r.Reviewer, r.Verdict, r.Stale, counts[r.Reviewer], r.CreatedAt})
 	}
 	// The commits this MR carries: base..head, the diff's range.
 	var commits []CommitOut
@@ -572,7 +573,11 @@ func runMRShow(c *Ctx, args []string) int {
 			if r.Stale {
 				stale = " (stale)"
 			}
-			fmt.Fprintf(w, "review: %s %s%s at %s\n", r.Reviewer, r.Verdict, stale, r.CreatedAt)
+			advisory := ""
+			if !r.Counts {
+				advisory = " (advisory: no write access)"
+			}
+			fmt.Fprintf(w, "review: %s %s%s%s at %s\n", r.Reviewer, r.Verdict, stale, advisory, r.CreatedAt)
 		}
 		for _, cm := range cs {
 			fmt.Fprintf(w, "\n--- %s at %s\n%s\n", cm.Author, cm.CreatedAt, cm.Body)
@@ -1112,10 +1117,16 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	// Latest fresh review per reviewer decides their stance.
+	// Latest fresh review per reviewer decides their stance — but only
+	// from someone the repository trusts to write to it. Reviewing is
+	// open to any reader, which is what makes an outside opinion on a
+	// public change possible; deciding a merge gate is not the same
+	// thing, and counting every verdict let anyone with an account
+	// satisfy require_approvals or block a merge indefinitely (#147).
+	counts := ReviewersWhoCount(c.Store, repo, reviews)
 	latest := map[string]string{}
 	for _, r := range reviews {
-		if r.Stale || r.Reviewer == mr.Author {
+		if r.Stale || r.Reviewer == mr.Author || !counts[r.Reviewer] {
 			continue
 		}
 		latest[r.Reviewer] = r.Verdict
@@ -1441,4 +1452,36 @@ func runMRRangeDiff(c *Ctx, args []string) int {
 		fmt.Fprintln(c.Stderr, "range-diff truncated at 4 MiB")
 	}
 	return protocol.ExitOK
+}
+
+// reviewersWhoCount is the set of reviewers whose verdict decides a merge
+// gate: those with write access to the repository.
+//
+// Write, rather than a separate reviewer role, because it is the same
+// question the gates already answer — a person who could push this change
+// themselves is the person whose approval means the repository accepts
+// it. Someone named in CODEOWNERS without write is a misconfiguration the
+// owner should fix rather than a case to special-case here: they could
+// not merge what they approved.
+// Exported because the web renders the same distinction: a page that
+// showed an approval the gate ignores would differ from the gate, and the
+// difference would only surface when a merge was refused.
+func ReviewersWhoCount(st *store.Store, repo store.Repo, reviews []store.MRReview) map[string]bool {
+	counts := map[string]bool{}
+	for _, r := range reviews {
+		if _, done := counts[r.Reviewer]; done {
+			continue
+		}
+		counts[r.Reviewer] = false
+		u, err := st.UserByUsername(r.Reviewer)
+		if err != nil {
+			continue
+		}
+		grant, err := st.AccessRole(repo.ID, u.ID)
+		if err != nil {
+			continue
+		}
+		counts[r.Reviewer] = policy.CanWrite(u, repo, grant)
+	}
+	return counts
 }
