@@ -502,13 +502,15 @@ func runRunnerDone(c *Ctx, args []string) int {
 // the merge path for a merge, which updates the ref directly and so never
 // reaches a hook. old is the branch's sha before this update, the diff
 // base a job's path filters run against; a new branch has no prior
-// commit and sends old as empty or all zeros, either of which cannot be
-// diffed and runs every job.
+// commit and sends old as empty or all zeros. queueJobs falls back to
+// the merge base with the default branch in that case, so a filter
+// still applies to a branch's first push — the shape most changes have,
+// since branch-then-MR is the normal workflow here.
 func QueueBranchBuilds(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID int64, branch, old, sha string, now time.Time,
 ) {
-	queueJobs(st, root, siteURL, repo, userID, branch, old, sha, now, true, branch == repo.DefaultBranch)
+	queueJobs(st, root, siteURL, repo, userID, branch, old, sha, now, true, branch == repo.DefaultBranch, true)
 }
 
 // QueueMRBuilds queues the push jobs for a merge request head fetched
@@ -522,15 +524,18 @@ func QueueMRBuilds(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID, n int64, sha string,
 ) {
-	// No old sha: fails open and runs every job, matching today's
-	// behaviour for a merge request head.
-	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), "", sha, time.Now(), false, false)
+	// No old sha, and unlike QueueBranchBuilds, no merge-base fallback
+	// either: this deliberately keeps failing open and running every
+	// job. require_checks refuses a merge when an MR head has no
+	// statuses at all (mr.go), so filtering a head down to zero jobs
+	// would make it unmergeable rather than just unfiltered (#172).
+	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), "", sha, time.Now(), false, false, false)
 }
 
 func queueJobs(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID int64, ref, old, sha string, now time.Time,
-	trusted, syncSchedules bool,
+	trusted, syncSchedules, deriveMergeBase bool,
 ) {
 	dir := RepoDir(root, repo.OwnerName, repo.Name)
 	raw, err := gitutil.ReadBlob(dir, sha, ci.ConfigPath, 1<<16)
@@ -556,14 +561,29 @@ func queueJobs(
 	// base does not exist or the diff itself fails, filtered stays
 	// false and every job runs: a filter that cannot be evaluated must
 	// not silently skip CI.
+	//
+	// A branch's first push has no old sha, but a diff base still
+	// exists: the merge base with the default branch. Without deriving
+	// one, every job runs on every new branch, and since branch-then-MR
+	// is the normal workflow, that is the push path filters matter most
+	// for. The merge base of the default branch's tip with itself is
+	// the tip, carrying no diff — that covers the default branch's own
+	// first push on a fresh repository, and must fail open rather than
+	// read as "nothing changed".
 	filtered := false
 	var changed []string
 	for _, j := range jobs {
 		if len(j.Paths) == 0 && len(j.PathsIgnore) == 0 {
 			continue
 		}
-		if ci.HasDiffBase(old) {
-			if files, err := gitutil.DiffFiles(dir, old, sha); err == nil {
+		diffOld := old
+		if !ci.HasDiffBase(diffOld) && deriveMergeBase {
+			if base, err := gitutil.MergeBase(dir, "refs/heads/"+repo.DefaultBranch, sha); err == nil && base != sha {
+				diffOld = base
+			}
+		}
+		if ci.HasDiffBase(diffOld) {
+			if files, err := gitutil.DiffFiles(dir, diffOld, sha); err == nil {
 				changed, filtered = files, true
 			}
 		}
