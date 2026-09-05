@@ -16,8 +16,10 @@ stranded a capability where only it can reach.
 A capability lands over SSH first. If it belongs to the
 triage/review/respond loop, it lands on the web in the same merge
 request. Anything whose input is a credential — secrets, mirror
-tokens, API tokens, session minting — stays SSH-only by design: the
-web dispatcher refuses =SSHOnly= commands outright.
+tokens, API tokens — stays SSH-only by design: the web dispatcher
+refuses =SSHOnly= commands outright. Session minting is not one of
+them: what a browser submits to ask for a login link is a username or
+an address, and the credential it gets back travels by mail.
 
 Rows are one page or one action each. Grouped rows hide gaps, twice
 now: "browse, log, blame, search" read as covered while blame had no
@@ -228,6 +230,7 @@ client has no use for one (krz/gitbay#57).
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | no  | no  |
 | profile set                 | yes | no  | no  |
+| request a login link        | n/a | yes | no  |
 
 Notifications land in an inbox row per recipient whether or not the
 instance sends mail, and mail is the second half when SMTP is
@@ -236,6 +239,15 @@ configured. =notifications list= reads it, unread by default;
 web rail carry the unread count. =repo watch= adds you to a
 repository's notifications and =repo unwatch= mutes it, and a mute wins
 over owning the repository or having written the thread.
+
+A login link is requested from the login page by username or verified
+address, and arrives by mail: it works once and expires in fifteen
+minutes. The row is =n/a= for the CLI because a terminal with a
+registered key runs =web login=, which mints a link directly and needs
+no mail. It exists because an account with no SSH key had no way into
+the web at all (krz/gitbay#155). The page offers the form only when the
+instance has SMTP configured; there is no separate switch. The response
+never says whether the account exists.
 
 =profile set= carries description, website, about and links. It is not
 =SSHOnly= — nothing about a bio is a credential, and the JSON API runs
@@ -264,8 +276,7 @@ with the same cursors; iOS pages with them too.
 * SSH only, by design
 
 Build secrets, mirror configuration and tokens, custom domain claims,
-API token minting, web session minting, deploy keys, account and
-instance administration. Deleting or transferring a repository is also
+API token minting, deploy keys, account and instance administration. Deleting or transferring a repository is also
 CLI-only: both want a typed confirmation, not a button.
 
 These are the only rows where a =no= is intended. Everywhere else a
