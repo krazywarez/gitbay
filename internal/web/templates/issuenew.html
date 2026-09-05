@@ -6,6 +6,7 @@
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new" class="commentform">
 <p><input type="text" name="title" aria-label="Title" placeholder="title" required></p>
 <p><textarea name="body" aria-label="Description" rows="12">{{.Body}}</textarea></p>
+{{template "formatpicker" .Format}}
 <p><input type="text" name="labels" aria-label="Labels" placeholder="labels, space-separated (write access)"></p>
 <p><button type="submit">Open issue</button></p>
 </form>

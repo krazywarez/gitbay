@@ -122,6 +122,17 @@
 
 {{define "authorname"}}{{if .User}}<a class="authorlink" href="/{{.User}}" title="{{.Email}}">{{.Name}}</a>{{else}}<span title="{{.Email}}">{{.Name}}</span>{{end}}{{end}}
 
+{{/* formatpicker is the md/org choice on a body: issue and MR create, and
+     a profile's about text. The argument is the currently selected
+     format; empty selects Markdown, today's default. */}}
+{{define "formatpicker"}}<p class="branchpick">
+  <label for="format">Body markup</label>
+  <select id="format" name="format">
+    <option value="md"{{if ne . "org"}} selected{{end}}>Markdown</option>
+    <option value="org"{{if eq . "org"}} selected{{end}}>Org</option>
+  </select>
+</p>{{end}}
+
 {{/* difffiles renders a parsed diff: one foldable section per file, with
      line-number gutters and review threads inline. Base is the MR's
      endpoint and Viewer the signed-in account; the commit page passes

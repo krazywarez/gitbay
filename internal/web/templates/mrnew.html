@@ -16,6 +16,7 @@
 </p>
 <p><input type="text" name="title" aria-label="Title" placeholder="title" value="{{.Title}}" required></p>
 <p><textarea name="body" aria-label="Description" rows="10" placeholder="what changes, and why">{{.Body}}</textarea></p>
+{{template "formatpicker" .Format}}
 <p><button type="submit">Open merge request</button></p>
 </form>
 <p class="meta">A branch in a fork opens from the CLI:

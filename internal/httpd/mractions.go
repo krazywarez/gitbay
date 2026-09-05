@@ -151,6 +151,7 @@ type mrNewPage struct {
 	Target   string
 	Title    string
 	Body     string
+	Format   string
 	Notice   string
 }
 
@@ -166,10 +167,14 @@ func (s *Server) mrCreateForm(w http.ResponseWriter, r *http.Request, u store.Us
 	if target == "" {
 		target = p.Repo.DefaultBranch
 	}
+	format := q.Get("format")
+	if format != "org" {
+		format = "md"
+	}
 	s.render(w, "mrnew.html", mrNewPage{
 		repoPage: p, Branches: branches,
 		Source: q.Get("source"), Target: target,
-		Title: q.Get("title"), Body: q.Get("body"), Notice: s.takeFlash(w, r),
+		Title: q.Get("title"), Body: q.Get("body"), Format: format, Notice: s.takeFlash(w, r),
 	})
 }
 
@@ -182,9 +187,13 @@ func (s *Server) mrCreateSubmit(w http.ResponseWriter, r *http.Request, u store.
 	target := strings.TrimSpace(r.FormValue("target"))
 	title := strings.TrimSpace(r.FormValue("title"))
 	body := strings.TrimSpace(r.FormValue("body"))
+	format := r.FormValue("format")
+	if format != "org" {
+		format = "md"
+	}
 
 	back := func(msg string) {
-		q := url.Values{"source": {source}, "target": {target}, "title": {title}, "body": {body}}
+		q := url.Values{"source": {source}, "target": {target}, "title": {title}, "body": {body}, "format": {format}}
 		s.setFlash(w, msg)
 		http.Redirect(w, r, fmt.Sprintf("/%s/mrs/new?%s", p.Repo.Path(), q.Encode()), http.StatusSeeOther)
 	}
@@ -192,7 +201,7 @@ func (s *Server) mrCreateSubmit(w http.ResponseWriter, r *http.Request, u store.
 		back("pick a source branch and give the merge request a title")
 		return
 	}
-	argv := []string{"mr", "create", p.Repo.Path(), "--source", source, "--title", title}
+	argv := []string{"mr", "create", p.Repo.Path(), "--source", source, "--title", title, "--format", format}
 	if target != "" {
 		argv = append(argv, "--target", target)
 	}

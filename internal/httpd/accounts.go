@@ -311,12 +311,17 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 			}
 		}
 	}
+	format := r.URL.Query().Get("format")
+	if format != "org" {
+		format = "md"
+	}
 	s.render(w, "issuenew.html", struct {
 		repoPage
 		Body      string
+		Format    string
 		Template  string
 		Templates []control.IssueTemplate
-	}{p, body, tplName, templates})
+	}{p, body, format, tplName, templates})
 }
 
 // Issue and merge request writes run the command the CLI runs, so the
@@ -326,8 +331,13 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	title := strings.TrimSpace(r.FormValue("title"))
+	format := r.FormValue("format")
+	if format != "org" {
+		format = "md"
+	}
 	var created control.Created
-	code, msg := s.dispatchIntoStdin(u, []string{"issue", "create", repoPath, "--title", title, "--file", "-"}, r.FormValue("body"), &created)
+	argv := []string{"issue", "create", repoPath, "--title", title, "--format", format, "--file", "-"}
+	code, msg := s.dispatchIntoStdin(u, argv, r.FormValue("body"), &created)
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return
