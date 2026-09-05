@@ -2,10 +2,24 @@
 {{define "content"}}
 <h1>Log in</h1>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{if .Sent}}
+<p>If that account exists, a login link is on its way. It works once and
+expires in fifteen minutes.</p>
+{{else}}
+{{if .EmailLogin}}
+<form method="post" action="/login">
+  <label for="identifier">Username or email address</label>
+  <input type="text" id="identifier" name="identifier" autocomplete="username" required>
+  <button type="submit">Email me a link</button>
+</form>
+<p>Or, from a machine with your registered key:</p>
+{{else}}
 <p>Browser sessions are minted over SSH — there is no password. From a machine
 with your registered key:</p>
+{{end}}
 <pre class="message">ssh git@{{.Host}} web login</pre>
 <p>then open the printed URL within five minutes.</p>
+{{end}}
 <h2>New here?</h2>
 {{if eq .Mode "open"}}<p><a href="/register">Create an account</a> — pick a username, paste your SSH
 public key, verify your email. Or from the terminal:</p>

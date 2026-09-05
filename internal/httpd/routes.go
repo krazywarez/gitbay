@@ -98,6 +98,8 @@ func (s *Server) Routes() []Route {
 	if s.cfg.Web.Mode == "accounts" {
 		routes = append(routes,
 			Route{Method: "GET", Pattern: "/login", Handler: s.login, Mutating: true}, // consumes a one-time token
+			Route{Method: "POST", Pattern: "/login", Mutating: true,
+				Handler: s.checkOrigin(s.loginSubmit)},
 			Route{Method: "POST", Pattern: "/logout", Mutating: true,
 				Handler: s.checkOrigin(s.logout)},
 			Route{Method: "GET", Pattern: "/new", Handler: s.requireUser(s.newRepoForm)},

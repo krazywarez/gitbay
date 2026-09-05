@@ -2,8 +2,10 @@ package httpd
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -66,24 +68,56 @@ func (s *Server) checkOrigin(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // renderLogin draws the login page. Mode carries the registration mode so
-// the page can tell a brand-new visitor how to get an account.
-func (s *Server) renderLogin(w http.ResponseWriter, errMsg string) {
+// the page can tell a brand-new visitor how to get an account. EmailLogin
+// says whether this instance can mail a link; Sent switches the page to the
+// confirmation that follows a request.
+func (s *Server) renderLogin(w http.ResponseWriter, errMsg string, sent bool) {
 	s.render(w, "login.html", struct {
 		basePage
-		Mode  string // closed | invite | open
-		Error string
-	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, s.cfg.Registration.Mode, errMsg})
+		Mode       string // closed | invite | open
+		Error      string
+		EmailLogin bool
+		Sent       bool
+	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()},
+		s.cfg.Registration.Mode, errMsg, s.emailLoginEnabled(), sent})
+}
+
+// emailLoginEnabled reports whether a link can be mailed at all. There is no
+// separate switch: the capability is exactly the SMTP the instance already
+// configured for verification and notification mail.
+func (s *Server) emailLoginEnabled() bool {
+	return s.cfg.Web.Mode == "accounts" && s.cfg.Mail.SMTPHost != ""
+}
+
+// loginSubmit mails a one-time login link. The response is the same page
+// whatever happened, including when nothing happened.
+func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
+	if !s.emailLoginEnabled() {
+		s.notFound(w, r)
+		return
+	}
+	// The per-account bound lives in the store and survives a restart; this
+	// one stops a single source from spending every account's budget.
+	if allowed, wait := s.apiLimit.allow("login"+s.clientIP(r), true); !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		http.Error(w, "too many login requests; wait a moment", http.StatusTooManyRequests)
+		return
+	}
+	if err := control.RequestLoginLink(s.cfg, s.st, r.FormValue("identifier")); err != nil {
+		log.Printf("login link: %v", err)
+	}
+	s.renderLogin(w, "", true)
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		s.renderLogin(w, "")
+		s.renderLogin(w, "", false)
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
-		s.renderLogin(w, "that login link is invalid, expired, or already used — mint a new one")
+		s.renderLogin(w, "that login link is invalid, expired, or already used — mint a new one", false)
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()
