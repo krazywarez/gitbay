@@ -18,6 +18,7 @@ import (
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type Server struct {
@@ -74,7 +75,7 @@ func (s *Server) infoRefs(w http.ResponseWriter, r *http.Request) {
 		pktLine(w, "# service=git-upload-pack\n")
 		pktFlush(w)
 		dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-		cmd := exec.CommandContext(r.Context(), "git", "upload-pack", "--stateless-rpc", "--advertise-refs", dir)
+		cmd := exec.CommandContext(r.Context(), toolpath.Look("git"), "upload-pack", "--stateless-rpc", "--advertise-refs", dir)
 		cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
 		cmd.Stdout = w
 		cmd.Run()
@@ -112,7 +113,7 @@ func (s *Server) uploadPack(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
 	w.Header().Set("Cache-Control", "no-cache")
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	cmd := exec.CommandContext(r.Context(), "git", "upload-pack", "--stateless-rpc", dir)
+	cmd := exec.CommandContext(r.Context(), toolpath.Look("git"), "upload-pack", "--stateless-rpc", dir)
 	cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
 	cmd.Stdin = body
 	cmd.Stdout = w
