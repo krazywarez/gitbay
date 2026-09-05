@@ -4,6 +4,56 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.13.2 — 2026-09-04
+
+The first SonarCloud scan's findings: eight fixed, the rest triaged and
+dismissed with reasons.
+
+- A pages directory redirect could leave the site. Both redirects passed
+  the raw request path to =http.Redirect= while the cleaned path sat a
+  line above; =net/url= keeps a leading =//=, and Go emits
+  =Location: //evil.example/= unchanged, which a browser reads as
+  protocol-relative. Reaching it needed a public repository named like a
+  host under the subdomain's own owner — repository names permit dots —
+  so it was narrow rather than impossible. The destination is built from
+  the cleaned path through =url.URL= now, which also settles the two
+  spellings the first fix missed: a =..= that escapes to the root, and a
+  backslash, which browsers following the WHATWG rules treat as a
+  separator. #153
+- The runner's default workspace was =<tmp>/gitbay-runner=: a fixed name
+  in a world-writable directory, created with =MkdirAll=, which succeeds
+  against a directory whoever already owns it. bay1 was never exposed —
+  its unit names a workspace — but the default is what anyone running the
+  binary by hand gets, and this is the process that clones repositories
+  and exports build secrets. The default moves under the user's cache
+  directory, the workspace is created 0700, and a symlink or a directory
+  owned by someone else is refused. One we own that is merely too
+  permissive is tightened rather than refused, since every runner before
+  this one made it 0755 and refusing would take the runner down on
+  upgrade. #153
+- Logout and flash consumption expire their cookies with the attributes
+  the setting calls used. Deletion worked either way; the difference was
+  a reviewer's puzzle, and four findings. #153
+- The topics-remove field has a label. A placeholder is not an accessible
+  name. TestEveryInputHasAnAccessibleName is the guard that was missing,
+  and it knows both associations — six inputs use
+  =<label>Name <input></label>=, which is as good as for/id. #153
+- git and ssh are resolved once at start-up rather than searched on every
+  spawn, and gitbayd refuses to start when one is absent instead of
+  failing on whichever request first needed it. This was 74 of the 118
+  findings; a dashboard that is mostly permanent noise is one nobody
+  reads. #153
+
+Also: SQLite migrations are excluded from analysis. They were read as
+PL/SQL, where ='' is NULL=, so =WHERE col = ''= on a =NOT NULL DEFAULT ''=
+column — correct SQLite, and the shape used throughout — read as a
+null-comparison bug.
+
+Replace the binary and reinstall the CLI. No migration. A runner whose
+workspace is group- or world-readable will have it tightened to 0700 on
+next start, and will refuse to start if that workspace is a symlink or
+belongs to another user.
+
 * v1.13.1 — 2026-09-04
 
 A command that reads its payload from stdin says so, and SonarCloud runs
