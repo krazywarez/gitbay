@@ -17,18 +17,39 @@ import (
 // wikiTreePath is where wiki pages live in a repository's tree.
 const wikiTreePath = ".gitbay/wiki"
 
+// wikiExts are the page formats that count as wiki content.
+var wikiExts = []string{".md", ".org", ".markdown"}
+
 // wikiDir returns repo's directory and default branch, where wiki pages
 // are resolved from .gitbay/wiki.
 func (s *Server) wikiDir(repo store.Repo) (dir, branch string) {
 	return control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name), repo.DefaultBranch
 }
 
-// hasWiki reports whether repo's default branch holds a non-empty
-// .gitbay/wiki tree.
+// hasWiki reports whether repo's default branch holds a wiki page.
 func (s *Server) hasWiki(repo store.Repo) bool {
 	dir, branch := s.wikiDir(repo)
 	entries, err := gitutil.ListTree(dir, branch, wikiTreePath)
-	return err == nil && len(entries) > 0
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.Type == "blob" && wikiExtMatch(e.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// wikiExtMatch reports whether name has one of the wiki page extensions.
+func wikiExtMatch(name string) bool {
+	ext := strings.ToLower(path.Ext(name))
+	for _, want := range wikiExts {
+		if ext == want {
+			return true
+		}
+	}
+	return false
 }
 
 // wiki renders a page from the repo's .gitbay/wiki tree. The home page is
@@ -94,7 +115,12 @@ func (s *Server) wikiRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir, branch := s.wikiDir(p.Repo)
-	data, err := gitutil.ReadBlob(dir, branch, path.Join(wikiTreePath, strings.Trim(r.PathValue("path"), "/")), s.cfg.Limits.MaxBlobBytes)
+	rel := path.Join(wikiTreePath, strings.Trim(r.PathValue("path"), "/"))
+	if !strings.HasPrefix(rel, wikiTreePath+"/") {
+		s.notFound(w, r)
+		return
+	}
+	data, err := gitutil.ReadBlob(dir, branch, rel, s.cfg.Limits.MaxBlobBytes)
 	if err != nil {
 		s.notFound(w, r)
 		return

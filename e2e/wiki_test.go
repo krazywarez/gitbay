@@ -47,6 +47,7 @@ func TestWikis(t *testing.T) {
 		"# welcome\n\nsee [Setup](Setup.md) and ![shot](shot.png)\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, ".gitbay", "wiki", "Setup.org"), []byte("* setup\n\nsteps here\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, ".gitbay", "wiki", "shot.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644)
+	os.WriteFile(filepath.Join(dir, "top.txt"), []byte("not part of the wiki\n"), 0o644)
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "wiki start")
 	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/app"), "main")
@@ -79,6 +80,13 @@ func TestWikis(t *testing.T) {
 	status, raw := inst.get(t, "/alice/app/wiki/_raw/shot.png")
 	if status != 200 || !strings.HasPrefix(raw, "\x89PNG") {
 		t.Fatalf("wiki raw: %d", status)
+	}
+	// The raw route cannot climb out of .gitbay/wiki. A literal ".." is
+	// caught by the mux's own path cleaning, which would make this pass
+	// vacuously; percent-encoding it reaches the handler with real ".."
+	// segments in PathValue, which is what the guard has to refuse.
+	if status, body := inst.get(t, "/alice/app/wiki/_raw/%2e%2e/%2e%2e/top.txt"); status == 200 {
+		t.Fatalf("wiki raw escaped .gitbay/wiki: %d\n%s", status, body)
 	}
 
 	// A wiki is readable from every surface, not just a browser: the

@@ -2,7 +2,7 @@
 {{define "content"}}
 <h1 class="vh">Wiki{{if .Page}}: {{.Page}}{{end}}</h1>
 {{if .Missing}}<p class="empty-note">no wiki yet — add pages under <code>.gitbay/wiki/</code> on the default branch:<br>
-push <code>.gitbay/wiki/Home.md</code> (or .org), or use the file editor.</p>
+push <code>.gitbay/wiki/Home.md</code> (or .org).</p>
 {{else}}
 <div class="wikilayout">
 <div class="wikipage">
@@ -14,7 +14,7 @@ push <code>.gitbay/wiki/Home.md</code> (or .org), or use the file editor.</p>
 <nav class="wikinav">
 <p class="meta">pages</p>
 <ul>{{range .Pages}}<li><a {{if eq . $.Page}}class="active" {{end}}href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/wiki/{{.}}">{{.}}</a></li>{{end}}</ul>
-<p class="meta">edit under <code>.gitbay/wiki/</code> — push, or the file editor.</p>
+<p class="meta">edit under <code>.gitbay/wiki/</code> by push.</p>
 </nav>
 </div>
 {{end}}

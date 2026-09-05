@@ -15,6 +15,8 @@ jobs:
     steps:
       - missing=""; for t in git git-lfs gpg; do command -v "$t" >/dev/null || missing="$missing $t"; done; test -x /usr/sbin/sshd || missing="$missing sshd"; test -z "$missing" || { echo "runner is missing:$missing"; exit 1; }
       - go test ./... -count=1 -timeout 20m
+    paths-ignore:
+      - .gitbay/wiki/**
   # Vulnerability scanning, separate from test so a newly published advisory
   # against unchanged code does not mask a real test failure. It fails the
   # build on purpose: an advisory that only lands in a report nobody reads is
@@ -23,6 +25,8 @@ jobs:
   vuln:
     steps:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+    paths-ignore:
+      - .gitbay/wiki/**
   # SonarCloud static analysis. Report-only: unlike vuln this does not
   # gate, so a first scan of an existing codebase does not turn every
   # build red before anyone has read what it says. Flip the trailing
@@ -66,3 +70,5 @@ jobs:
         fi
         SONAR_HOST_URL=https://sonarcloud.io \
         "$SCANNER/bin/sonar-scanner" -Dsonar.scm.revision="${GITBAY_SHA:-}" $BRANCH_ARG || true
+    paths-ignore:
+      - .gitbay/wiki/**

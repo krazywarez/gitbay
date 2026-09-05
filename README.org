@@ -104,8 +104,7 @@ via =gitbay man=, completions via =gitbay completion <shell>=.
 
 * Documentation
 
-Docs live in [[https://gitbay.org/krz/gitbay/wiki][the wiki]] — itself a git repository
-(=git clone ssh://git@gitbay.org/krz/gitbay.wiki.git=), dogfooding the
+Docs live in [[https://gitbay.org/krz/gitbay/wiki][the wiki]], dogfooding the
 wiki feature:
 
 - [[https://gitbay.org/krz/gitbay/wiki/Users][user guide]] — accounts, keys, verified commits, repos, issues, MRs, scripting
