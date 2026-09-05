@@ -87,6 +87,11 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 	browser := newBrowser(t)
 	real1, bodyReal := browserPost(t, browser, inst.base()+"/login",
 		url.Values{"identifier": {"dana@example.test"}})
+	// Pin the reference. Without this the comparison below passes just as
+	// well if renderLogin regressed and every case returned an error page.
+	if !strings.Contains(bodyReal, "on its way") {
+		t.Fatalf("a real address did not get the confirmation: %s", bodyReal)
+	}
 	absent, bodyAbsent := browserPost(t, browser, inst.base()+"/login",
 		url.Values{"identifier": {"nobody@example.test"}})
 	unver, bodyUnver := browserPost(t, browser, inst.base()+"/login",
@@ -159,5 +164,40 @@ func TestEmailLoginThrottled(t *testing.T) {
 	}
 	if n != 5 {
 		t.Fatalf("sent %d login mails in an hour, want exactly 5", n)
+	}
+}
+
+// A suspended account still controls its verified address, so it can mail
+// itself a link. It must not get a session out of it: read access to the
+// private repos it is a member of is what suspension takes away.
+func TestEmailLoginRefusesDisabledAccount(t *testing.T) {
+	smtp := startFakeSMTP(t)
+	inst := startInstanceWith(t, fmt.Sprintf(
+		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
+		smtp.addr))
+	inst.admin(t, "admin", "user", "create", "dana",
+		"--email", "dana@example.test", "--verified")
+	inst.admin(t, "admin", "user", "disable", "dana")
+
+	browser := newBrowser(t)
+	status, body := browserPost(t, browser, inst.base()+"/login",
+		url.Values{"identifier": {"dana@example.test"}})
+	if status != 200 || !strings.Contains(body, "on its way") {
+		t.Fatalf("the response gave the suspension away: %d %s", status, body)
+	}
+	// Nothing should be mailed at all, but the assertion that matters is
+	// that no link completes a session, so wait long enough to catch one.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(smtp.mailTo("dana@example.test")) == 0 {
+		time.Sleep(25 * time.Millisecond)
+	}
+	if n := len(smtp.mailTo("dana@example.test")); n != 0 {
+		t.Errorf("mailed a login link to a disabled account: %d mails", n)
+	}
+
+	// Same check as the single-use one: the client follows the logged-out
+	// redirect to /login, which is a 200 either way, so read the body.
+	if _, body := browserGet(t, browser, inst.base()+"/settings"); strings.Contains(body, "dana@example.test") {
+		t.Error("a disabled account got a browser session")
 	}
 }

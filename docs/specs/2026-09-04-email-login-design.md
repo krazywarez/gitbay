@@ -52,10 +52,13 @@ precedent is `control.RegisterAccount`, a plain exported function that
 New file `internal/control/loginlink.go`:
 
 ```go
-func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) (msg, errMsg string, code int)
+func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) error
 ```
 
-Same return triple as `RegisterAccount`. No registry entry, so
+The error is for the server log only, and every miss — no such account, no
+verified address, disabled, pending, over the throttle — returns nil. A return
+triple like `RegisterAccount`'s would hand the caller the distinction the
+enumeration rule below forbids it from rendering. No registry entry, so
 `TestEveryCommandIsReachable` is unaffected and no CLI passthrough is needed —
 anyone at a terminal has SSH and already has `web login`.
 
@@ -89,9 +92,8 @@ Two layers.
 
 The response is identical whether the account exists, exists without a verified
 address, or is over its throttle: "if that account exists, a link is on its
-way." `RequestLoginLink` returns a generic `msg` and keeps the distinction
-internal. Differences in status code, body, or redirect target all count as a
-leak.
+way." `RequestLoginLink` reports nothing about which case it took.
+Differences in status code, body, or redirect target all count as a leak.
 
 ### Cookie SameSite
 

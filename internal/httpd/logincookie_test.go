@@ -12,13 +12,27 @@ import (
 // cookie through the redirect that follows, so the visitor lands logged out
 // (#155). Cross-site POSTs stay protected: Lax withholds the cookie from them,
 // and checkOrigin refuses them besides.
-func TestSessionCookieIsLax(t *testing.T) {
-	s := &Server{cfg: config.Config{}}
-	s.cfg.HTTP.TLS = "acme"
-	if got := s.clearCookie(sessionCookie, sessionSameSite); got.SameSite != http.SameSiteLaxMode {
-		t.Errorf("clearing cookie SameSite = %v, want Lax", got.SameSite)
-	}
+//
+// The other two attributes are what keep the token out of a script's reach
+// and off the wire in clear, so they are asserted on the same literal login
+// hands to http.SetCookie.
+func TestSessionCookieAttributes(t *testing.T) {
 	if sessionSameSite != http.SameSiteLaxMode {
 		t.Errorf("sessionSameSite = %v, want Lax", sessionSameSite)
+	}
+	for _, tls := range []string{"acme", "off"} {
+		s := &Server{cfg: config.Config{}}
+		s.cfg.HTTP.TLS = tls
+		c := s.sessionCookieFor("tok")
+
+		if c.SameSite != http.SameSiteLaxMode {
+			t.Errorf("tls=%s: SameSite = %v, want Lax", tls, c.SameSite)
+		}
+		if !c.HttpOnly {
+			t.Errorf("tls=%s: session cookie is not HttpOnly", tls)
+		}
+		if want := tls != "off"; c.Secure != want {
+			t.Errorf("tls=%s: Secure = %v, want %v", tls, c.Secure, want)
+		}
 	}
 }

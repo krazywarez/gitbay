@@ -1,7 +1,6 @@
 package httpd
 
 import (
-	"net/http"
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
@@ -15,7 +14,7 @@ func TestClearCookieMirrorsTheSettingCall(t *testing.T) {
 	for _, tls := range []string{"acme", "off"} {
 		s := &Server{cfg: config.Config{}}
 		s.cfg.HTTP.TLS = tls
-		c := s.clearCookie(sessionCookie, http.SameSiteStrictMode)
+		c := s.clearCookie(sessionCookie, sessionSameSite)
 
 		if c.Value != "" || c.MaxAge >= 0 {
 			t.Errorf("tls=%s: not an expiring cookie: value=%q maxage=%d", tls, c.Value, c.MaxAge)
@@ -23,8 +22,8 @@ func TestClearCookieMirrorsTheSettingCall(t *testing.T) {
 		if !c.HttpOnly {
 			t.Errorf("tls=%s: clearing cookie is not HttpOnly", tls)
 		}
-		if c.SameSite != http.SameSiteStrictMode {
-			t.Errorf("tls=%s: SameSite = %v, want Strict", tls, c.SameSite)
+		if c.SameSite != sessionSameSite {
+			t.Errorf("tls=%s: SameSite = %v, want %v", tls, c.SameSite, sessionSameSite)
 		}
 		if c.Path != "/" {
 			t.Errorf("tls=%s: Path = %q, want /", tls, c.Path)

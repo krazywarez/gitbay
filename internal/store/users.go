@@ -167,8 +167,9 @@ func (s *Store) ListEmails(userID int64) ([]Email, error) {
 	return out, rows.Err()
 }
 
-// SetUserDisabled suspends or restores an account. Disabling also drops
-// the user's web sessions; their keys and tokens stay registered but are
+// SetUserDisabled suspends or restores an account. Disabling drops every
+// credential that would grant a session on its own — web sessions, API
+// tokens, unclaimed login links — and leaves the SSH keys registered but
 // refused at every entry point until re-enabled.
 func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 	v := 0
@@ -183,9 +184,9 @@ func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 		return ErrNotFound
 	}
 	if disabled {
-		// Every credential the account holds goes with it: browser
-		// sessions and API tokens. Re-enabling means minting again.
-		for _, table := range []string{"web_sessions", "api_tokens"} {
+		// A pending login link is a session in waiting, so it goes with
+		// the sessions and API tokens. Re-enabling means minting again.
+		for _, table := range []string{"web_sessions", "api_tokens", "login_tokens"} {
 			if _, err = s.DB.Exec("DELETE FROM "+table+" WHERE user_id = ?", userID); err != nil {
 				return err
 			}

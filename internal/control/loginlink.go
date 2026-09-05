@@ -46,14 +46,18 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 		return nil
 	}
 
-	var userID int64
+	var user store.User
 	var address string
 	if strings.Contains(identifier, "@") {
 		id, ok := st.UserIDByVerifiedEmail(identifier)
 		if !ok {
 			return nil
 		}
-		userID, address = id, identifier
+		u, err := st.UserByID(id)
+		if err != nil {
+			return nil
+		}
+		user, address = u, identifier
 	} else {
 		u, err := st.UserByUsername(identifier)
 		if err != nil {
@@ -63,10 +67,17 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 		if err != nil || addr == "" {
 			return nil
 		}
-		userID, address = u.ID, addr
+		user, address = u, addr
+	}
+	// Dispatch refuses both of these, so a session they reach only renders
+	// read paths — which is the whole of what suspension prevents, and more
+	// than pendingAllowed grants an unverified account. Returning nil rather
+	// than an error keeps the response identical to a miss.
+	if user.Disabled || user.Pending {
+		return nil
 	}
 
-	n, err := st.CountLoginTokensSince(userID, time.Now().Add(-time.Hour))
+	n, err := st.CountLoginTokensSince(user.ID, time.Now().Add(-time.Hour))
 	if err != nil {
 		return err
 	}
@@ -78,7 +89,7 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 	if err != nil {
 		return err
 	}
-	if err := st.CreateLoginToken(userID, hash, loginLinkTTL); err != nil {
+	if err := st.CreateLoginToken(user.ID, hash, loginLinkTTL); err != nil {
 		return err
 	}
 	host := siteHost(cfg)
@@ -96,7 +107,7 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 	// response time cannot answer what the response body is built not to.
 	go func() {
 		if err := mail.Send(cfg, address, subject, body); err != nil {
-			slog.Error("login link mail", "address", address, "err", err)
+			slog.Error("login link mail", "user", user.ID, "err", err)
 		}
 	}()
 	return nil

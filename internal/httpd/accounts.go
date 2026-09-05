@@ -25,6 +25,10 @@ const sessionCookie = "gitbay_session"
 // checkOrigin and carry no Lax cookie anyway.
 const sessionSameSite = http.SameSiteLaxMode
 
+// badLoginToken is what every refused /login?token= gets, whatever the
+// reason. The reasons differ in whether the account exists.
+const badLoginToken = "that login link is invalid, expired, or already used — mint a new one"
+
 // viewer returns the logged-in user, or a zero User for anonymous visitors.
 // Only meaningful in accounts mode; in view_only no session route exists so
 // every request is anonymous.
@@ -52,8 +56,9 @@ func (s *Server) requireUser(h func(http.ResponseWriter, *http.Request, store.Us
 	}
 }
 
-// checkOrigin rejects cross-site POSTs. Sessions also use SameSite=Strict;
-// this is the second layer.
+// checkOrigin rejects cross-site POSTs. It is the primary CSRF defense:
+// sessions use SameSite=Lax, which withholds the cookie from a cross-site
+// POST but not from a cross-site top-level GET.
 func (s *Server) checkOrigin(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
@@ -117,7 +122,15 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
-		s.renderLogin(w, "that login link is invalid, expired, or already used — mint a new one", false)
+		s.renderLogin(w, badLoginToken, false)
+		return
+	}
+	// A token minted before the account was suspended is still consumable,
+	// and the session it would create renders every page the account can
+	// read. Checking here covers every mint path. The message is the one a
+	// bad token gets: a distinct one would confirm the account exists.
+	if u, err := s.st.UserByID(userID); err != nil || u.Disabled {
+		s.renderLogin(w, badLoginToken, false)
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()
@@ -129,13 +142,19 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: sessionCookie, Value: sessTok, Path: "/",
+	http.SetCookie(w, s.sessionCookieFor(sessTok))
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// sessionCookieFor is the cookie a new session ships in. Secure follows TLS
+// the way clearCookie does, so a plain-HTTP deployment still works.
+func (s *Server) sessionCookieFor(tok string) *http.Cookie {
+	return &http.Cookie{
+		Name: sessionCookie, Value: tok, Path: "/",
 		HttpOnly: true, SameSite: sessionSameSite,
 		Secure: s.cfg.HTTP.TLS != "off",
 		MaxAge: 7 * 24 * 3600,
-	})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
