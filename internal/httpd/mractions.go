@@ -54,6 +54,17 @@ func (s *Server) mrReviewSubmit(w http.ResponseWriter, r *http.Request, u store.
 	s.done(w, r, code, msg, s.mrRedirect)
 }
 
+func (s *Server) mrReviewRequestSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	args := append(fieldArgs("--add", r.FormValue("add")), fieldArgs("--remove", r.FormValue("remove"))...)
+	if len(args) == 0 {
+		s.mrRedirect(w, r, "name at least one person")
+		return
+	}
+	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
+	_, msg, code := s.runControlCode(u, append([]string{"mr", "review", "request", repo, r.PathValue("n")}, args...))
+	s.done(w, r, code, msg, s.mrRedirect)
+}
+
 func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	args := []string{}
 	if st := strings.TrimSpace(r.FormValue("strategy")); st != "" && st != "auto" {

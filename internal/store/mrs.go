@@ -31,6 +31,9 @@ type MR struct {
 	ClosedBy   string
 	CreatedAt  string
 	UpdatedAt  string
+	// ReviewRequests is who has been asked, directly, for a review — the
+	// mr review request counterpart of Issue.Assignees.
+	ReviewRequests []string
 }
 
 type MRReview struct {
@@ -112,7 +115,39 @@ func (s *Store) MRByNumber(repoID, number int64) (MR, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return m, ErrNotFound
 	}
+	if err != nil {
+		return m, err
+	}
+	m.ReviewRequests, err = s.issueStrings(m.ID, `
+		SELECT u.username FROM mr_review_requests rr JOIN users u ON u.id = rr.user_id
+		WHERE rr.mr_id = ? ORDER BY u.username`)
 	return m, err
+}
+
+// SetMRReviewRequest adds or removes a review request by user id — the
+// mr review request counterpart of SetIssueAssignee.
+func (s *Store) SetMRReviewRequest(mrID, userID int64, add bool) error {
+	if add {
+		_, err := s.DB.Exec(
+			"INSERT INTO mr_review_requests (mr_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+			mrID, userID)
+		return err
+	}
+	res, err := s.DB.Exec(
+		"DELETE FROM mr_review_requests WHERE mr_id = ? AND user_id = ?", mrID, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// MRReviewRequestIDs returns who has been asked for a review, by id — for
+// notifying them without a username round trip.
+func (s *Store) MRReviewRequestIDs(mrID int64) ([]int64, error) {
+	return s.idQuery("SELECT user_id FROM mr_review_requests WHERE mr_id = ?", mrID)
 }
 
 // ListMRs returns merge requests for a repo. limit 0 means everything;

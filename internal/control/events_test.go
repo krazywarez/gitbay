@@ -12,7 +12,7 @@ import (
 // recordEventKind pulls the kind out of a RecordEvent call. The kind is
 // either a literal or a literal prefix concatenated with a variable, and
 // the second shape is why this reads source rather than trusting a list.
-var recordEventKind = regexp.MustCompile(`RecordEvent\([^,]+,\s*[^,]+,\s*"([a-z.]+)"`)
+var recordEventKind = regexp.MustCompile(`RecordEvent\([^,]+,\s*[^,]+,\s*"([a-z._]+)"`)
 
 // TestEventKindsAreRecorded keeps the published list and the code
 // together: an event added without documenting it, or documented without

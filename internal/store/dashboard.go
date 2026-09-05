@@ -1,5 +1,7 @@
 package store
 
+import "sort"
+
 // DashboardItem is one open issue or MR row on the logged-in homepage.
 type DashboardItem struct {
 	RepoPath  string
@@ -127,9 +129,9 @@ func (s *Store) PinnedRepos(userID int64) ([]Repo, error) {
 	return out, rows.Err()
 }
 
-// ReviewQueue returns open merge requests the user is involved in, has not
-// authored, and has not reviewed at the current head — what the rail shows
-// as waiting on them. Ordered most recently touched first.
+// reviewQueueQuery is ReviewQueue's involved half: open merge requests the
+// user is involved in, has not authored, and has not reviewed at the
+// current head.
 const reviewQueueQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
 	       x.number, x.title, au.username, x.state, x.updated_at
@@ -147,8 +149,67 @@ const reviewQueueQuery = `
 	  AND ` + involvedCond + `
 	ORDER BY x.updated_at DESC LIMIT 8`
 
+// requestedReviewsQuery is ReviewQueue's other half: MRs where the user was
+// asked directly, regardless of involvement — the same exemption
+// AssignedIssues gives assignment, and for the same reason (dashboard.go
+// above). It drives from mr_review_requests rather than testing EXISTS
+// against every merge request: one user's requests are a handful, the
+// merge_requests table is the whole instance.
+const requestedReviewsQuery = `
+	SELECT COALESCE(u.username, o.name) || '/' || r.name,
+	       x.number, x.title, au.username, x.state, x.updated_at
+	FROM mr_review_requests rr
+	JOIN merge_requests x ON x.id = rr.mr_id
+	JOIN repos r ON r.id = x.repo_id
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	JOIN users au ON au.id = x.author_id
+	WHERE rr.user_id = ?1
+	  AND x.state IN ('open', 'source_gone')
+	  AND x.draft = 0
+	  AND x.author_id <> ?1
+	  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
+	                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
+	                    AND rv.head_sha = x.head_sha)
+	ORDER BY x.updated_at DESC LIMIT 8`
+
+// ReviewQueue returns open merge requests the user is involved in, has not
+// authored, and has not reviewed at the current head — what the rail shows
+// as waiting on them — unioned with merge requests where they were asked
+// directly. Both halves drop an MR once its current head has been
+// reviewed, so a requested reviewer's queue empties the same way an
+// involved one's does. Ordered most recently touched first.
 func (s *Store) ReviewQueue(userID int64) ([]DashboardItem, error) {
-	return s.dashboardQuery(reviewQueueQuery, userID)
+	involved, err := s.dashboardQuery(reviewQueueQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	requested, err := s.dashboardQuery(requestedReviewsQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	type key struct {
+		repo string
+		n    int64
+	}
+	seen := make(map[key]bool, len(involved))
+	out := make([]DashboardItem, 0, len(involved)+len(requested))
+	for _, d := range involved {
+		seen[key{d.RepoPath, d.Number}] = true
+		out = append(out, d)
+	}
+	for _, d := range requested {
+		k := key{d.RepoPath, d.Number}
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, d)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].UpdatedAt > out[j].UpdatedAt })
+	if len(out) > 8 {
+		out = out[:8]
+	}
+	return out, nil
 }
 
 // OpenCounts returns the repo's open issue and open merge request counts,

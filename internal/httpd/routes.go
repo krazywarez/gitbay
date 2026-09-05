@@ -167,6 +167,8 @@ func (s *Server) Routes() []Route {
 			// Review loop: each runs the matching mr command.
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/review", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrReviewSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/review-request", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.mrReviewRequestSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/merge", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrMergeSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/close", Mutating: true,

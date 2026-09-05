@@ -87,12 +87,13 @@ func TestTwoAccountReviewLoop(t *testing.T) {
 	if q := reviewQueue(t, inst, reviewerKey); len(q) != 1 || q[0] != 1 {
 		t.Fatalf("review queue = %v, want !1", q)
 	}
-	// The queue is how a reviewer finds out, and the only way: there is
-	// no "request review from <user>", so nothing is pushed to someone
-	// who is neither an owner nor already in the thread. Writing this
-	// test is what surfaced that — see #145.
+	// The queue is how this reviewer finds out: nobody ran "mr review
+	// request" for them, so being an owner or already in the thread is
+	// the only other way in, and this reviewer is neither. Writing this
+	// test is what surfaced the gap — see #145; TestMRReviewRequest covers
+	// the case where someone has been asked directly.
 	if got := inbox(t, inst, reviewerKey); strings.Contains(got, "ready for review") {
-		t.Fatalf("a reviewer is notified after all; #145 and this comment are stale:\n%s", got)
+		t.Fatalf("a reviewer is notified without being asked or involved:\n%s", got)
 	}
 
 	// The author cannot approve their own work past the gate.

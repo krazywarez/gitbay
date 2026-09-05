@@ -54,6 +54,7 @@ func TestDashboardQueriesUseIndexes(t *testing.T) {
 		{"DashboardMRs", queryPlan(t, s, dashboardMRsQuery, int64(1)), "merge_requests_recent", true},
 		{"ReviewQueue", queryPlan(t, s, reviewQueueQuery, int64(1)), "merge_requests_recent", true},
 		{"AssignedIssues", queryPlan(t, s, assignedIssuesQuery, int64(1)), "issue_assignees_user", false},
+		{"RequestedReviews", queryPlan(t, s, requestedReviewsQuery, int64(1)), "mr_review_requests_user", false},
 	}
 	for _, tc := range cases {
 		if !strings.Contains(tc.plan, tc.want) {

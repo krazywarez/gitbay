@@ -76,6 +76,9 @@ func init() {
 	register(Command{Path: []string{"mr", "review"},
 		Summary: "review",
 		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard", Run: runMRReview})
+	register(Command{Path: []string{"mr", "review", "request"},
+		Summary: "ask specific people for a review",
+		Usage:   "mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runMRReviewRequest})
 	register(Command{Path: []string{"mr", "merge"},
 		Summary: "merge",
 		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
@@ -339,6 +342,8 @@ type mrOut struct {
 	Body       string `json:"body,omitempty"`
 	BodyFormat string `json:"body_format,omitempty"`
 	Milestone  string `json:"milestone,omitempty"`
+	// ReviewRequests is who has been asked, directly, for a review.
+	ReviewRequests []string `json:"review_requests,omitempty"`
 	// StackedOn is the open merge request whose source branch this one
 	// targets; Stacked are the open ones targeting this one's source.
 	StackedOn *stackRef  `json:"stacked_on,omitempty"`
@@ -391,7 +396,8 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 	}
 	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Draft: m.Draft, Author: m.Author,
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
-		CreatedAt: m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
+		ReviewRequests: m.ReviewRequests,
+		CreatedAt:      m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
 		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy}
 	if withBody {
 		o.Body = m.Body
@@ -540,6 +546,9 @@ func runMRShow(c *Ctx, args []string) int {
 			state = "draft"
 		}
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, state, d.Author, d.Source, d.TargetRef, d.HeadSHA)
+		if len(d.ReviewRequests) > 0 {
+			fmt.Fprintf(w, "reviewers: %s\n", strings.Join(d.ReviewRequests, ", "))
+		}
 		if d.StackedOn != nil {
 			fmt.Fprintf(w, "stacked on !%d %s\n", d.StackedOn.Number, d.StackedOn.Title)
 		}
@@ -770,6 +779,93 @@ func runMRReview(c *Ctx, args []string) int {
 			fmt.Fprintf(w, " (%d comment(s))", published)
 		}
 		fmt.Fprintln(w)
+	})
+}
+
+// runMRReviewRequest is issue assign's counterpart for merge requests: it
+// pushes a merge request into a specific person's review queue and inbox
+// directly, rather than waiting for them to be otherwise involved (#145).
+func runMRReviewRequest(c *Ctx, args []string) int {
+	rest, adds, removes, err := addRemoveFlags(args)
+	if err != nil {
+		return c.failErr(err)
+	}
+	if len(adds)+len(removes) == 0 {
+		return c.fail(protocol.ExitUsage, "usage: mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...")
+	}
+	repo, mr, code := mrRef(c, rest, policy.CanWrite)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	resolve := func(name string) (store.User, int) {
+		u, err := c.Store.UserByUsername(name)
+		if errors.Is(err, store.ErrNotFound) {
+			return u, c.fail(protocol.ExitNotFound, "no such user %q", name)
+		}
+		if err != nil {
+			return u, c.fail(protocol.ExitFailure, "%v", err)
+		}
+		return u, -1
+	}
+	// Notified on every return, not just success: a name later in --add
+	// that fails to resolve or lacks access must not silence the people
+	// already added earlier in the same call.
+	var added []store.User
+	defer func() {
+		if len(added) == 0 {
+			return
+		}
+		ids := make([]int64, len(added))
+		for i, u := range added {
+			ids[i] = u.ID
+		}
+		notify(c, ids, notice{repo: repo, kind: "mr",
+			subject: mrSubject(repo, mr.Number, mr.Title),
+			action:  fmt.Sprintf("asked for a review on !%d", mr.Number),
+			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
+	}()
+	for _, name := range adds {
+		u, code := resolve(name)
+		if code >= 0 {
+			return code
+		}
+		// A review request that lands nowhere the recipient can see it is
+		// worse than useless: it looks like the ask went through.
+		grant, err := c.Store.AccessRole(repo.ID, u.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !policy.CanRead(u, repo, grant) {
+			return c.fail(protocol.ExitDenied, "%s cannot read %s", name, repo.Path())
+		}
+		if err := c.Store.SetMRReviewRequest(mr.ID, u.ID, true); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		added = append(added, u)
+	}
+	for _, name := range removes {
+		u, code := resolve(name)
+		if code >= 0 {
+			return code
+		}
+		if err := c.Store.SetMRReviewRequest(mr.ID, u.ID, false); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return c.fail(protocol.ExitNotFound, "%s is not a requested reviewer", name)
+			}
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	updated, err := c.Store.MRByNumber(repo.ID, mr.Number)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.review_requested",
+		fmt.Sprintf(`{"number":%d,"reviewers":%s}`, mr.Number, jsonStrings(updated.ReviewRequests)))
+	return c.emit(map[string]any{"number": mr.Number, "reviewers": updated.ReviewRequests}, func(w io.Writer) {
+		fmt.Fprintf(w, "requested reviewers on %s!%d: %s\n", repo.Path(), mr.Number, strings.Join(updated.ReviewRequests, ", "))
 	})
 }
 
@@ -1269,11 +1365,14 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 	// author, who is the actor and excluded — so notifying participants
 	// here reaches nobody, which is exactly what opening it as a draft
 	// and then marking it ready would do. Opening a merge request tells
-	// the repository; so does saying it is finally asking.
+	// the repository; so does saying it is finally asking. A review
+	// request made before ready — or on an earlier revision — reaches its
+	// target here too: they are exactly who else is being asked.
 	if !draft {
 		if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
 			parts, _ := c.Store.MRParticipants(mr.ID)
-			notify(c, append(targets, parts...), notice{repo: repo, kind: "mr",
+			reviewers, _ := c.Store.MRReviewRequestIDs(mr.ID)
+			notify(c, append(append(targets, parts...), reviewers...), notice{repo: repo, kind: "mr",
 				subject: mrSubject(repo, mr.Number, mr.Title),
 				action:  fmt.Sprintf("marked !%d ready for review", mr.Number),
 				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})

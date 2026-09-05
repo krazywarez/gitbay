@@ -524,6 +524,8 @@ func milestoneCmd() *cobra.Command {
 }
 
 func mrCmd() *cobra.Command {
+	review := pass("review", "submit a review: --approve|--request-changes|--comment, or --discard a pending batch", passOpts{server: []string{"mr", "review"}, needsRepo: true})
+	review.AddCommand(pass("request", "ask specific people for review: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"mr", "review", "request"}, needsRepo: true}))
 	return group("mr", "merge requests",
 		pass("create", "open a merge request: --source <branch> --target <branch> --title <t>",
 			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
@@ -536,7 +538,7 @@ func mrCmd() *cobra.Command {
 		pass("threads", "review threads on an MR", passOpts{server: []string{"mr", "threads"}, needsRepo: true}),
 		pass("resolve", "resolve a review thread: <n> <thread-id>", passOpts{server: []string{"mr", "resolve"}, needsRepo: true}),
 		pass("unresolve", "reopen a review thread: <n> <thread-id>", passOpts{server: []string{"mr", "unresolve"}, needsRepo: true}),
-		pass("review", "submit a review: --approve|--request-changes|--comment, or --discard a pending batch", passOpts{server: []string{"mr", "review"}, needsRepo: true}),
+		review,
 		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
 		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
 		pass("revisions", "the heads this merge request has had", passOpts{server: []string{"mr", "revisions"}, needsRepo: true}),
