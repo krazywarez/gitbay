@@ -31,12 +31,7 @@ func TestEmailLogin(t *testing.T) {
 		t.Fatalf("no confirmation in body: %s", body)
 	}
 
-	msg := smtp.waitFor(t, "dana@example.test", "/login?token=")
-	i := strings.Index(msg, "/login?token=")
-	link := msg[i:]
-	if j := strings.IndexAny(link, " \r\n"); j >= 0 {
-		link = link[:j]
-	}
+	link := loginLinkIn(smtp.waitFor(t, "dana@example.test", "/login?token="))
 
 	if status, _ := browserGet(t, browser, inst.base()+link); status != 200 {
 		t.Fatalf("following the link: %d", status)
@@ -200,4 +195,49 @@ func TestEmailLoginRefusesDisabledAccount(t *testing.T) {
 	if _, body := browserGet(t, browser, inst.base()+"/settings"); strings.Contains(body, "dana@example.test") {
 		t.Error("a disabled account got a browser session")
 	}
+}
+
+// The other ordering: the link is minted while the account is in good
+// standing and followed after it is suspended. Suspension drops the pending
+// login tokens, and login() refuses a disabled account after consuming one,
+// so neither the window nor a token that somehow survives it opens a session.
+func TestEmailLoginRefusesLinkMintedBeforeSuspension(t *testing.T) {
+	smtp := startFakeSMTP(t)
+	inst := startInstanceWith(t, fmt.Sprintf(
+		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
+		smtp.addr))
+	inst.admin(t, "admin", "user", "create", "dana",
+		"--email", "dana@example.test", "--verified")
+
+	browser := newBrowser(t)
+	if status, _ := browserPost(t, browser, inst.base()+"/login",
+		url.Values{"identifier": {"dana@example.test"}}); status != 200 {
+		t.Fatalf("POST /login: %d", status)
+	}
+	link := loginLinkIn(smtp.waitFor(t, "dana@example.test", "/login?token="))
+
+	inst.admin(t, "admin", "user", "disable", "dana")
+
+	_, body := browserGet(t, browser, inst.base()+link)
+	if !strings.Contains(body, "invalid, expired, or already used") {
+		t.Errorf("no refusal on the login page: %s", body)
+	}
+	// A refusal that reads differently from an ordinary bad token says the
+	// account exists and is suspended, which is the leak the endpoint is
+	// built to avoid.
+	if _, bogus := browserGet(t, browser, inst.base()+"/login?token=notatoken"); body != bogus {
+		t.Error("a suspended account's refusal differs from a bad token's")
+	}
+	if _, body := browserGet(t, browser, inst.base()+"/settings"); strings.Contains(body, "dana@example.test") {
+		t.Error("a link minted before suspension still opened a session")
+	}
+}
+
+// loginLinkIn pulls the /login?token=... path out of a login mail.
+func loginLinkIn(msg string) string {
+	link := msg[strings.Index(msg, "/login?token="):]
+	if j := strings.IndexAny(link, " \r\n"); j >= 0 {
+		link = link[:j]
+	}
+	return link
 }
