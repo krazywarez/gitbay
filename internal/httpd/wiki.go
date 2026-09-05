@@ -3,7 +3,6 @@ package httpd
 import (
 	"html/template"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 
@@ -15,16 +14,24 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
-// wikiDir returns the companion repo path, or "" when the repo has none.
-func (s *Server) wikiDir(owner, name string) string {
-	dir := control.RepoDir(s.cfg.Server.Root, owner, name+".wiki")
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	return dir
+// wikiTreePath is where wiki pages live in a repository's tree.
+const wikiTreePath = ".gitbay/wiki"
+
+// wikiDir returns repo's directory and default branch, where wiki pages
+// are resolved from .gitbay/wiki.
+func (s *Server) wikiDir(repo store.Repo) (dir, branch string) {
+	return control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name), repo.DefaultBranch
 }
 
-// wiki renders a page from the repo's wiki companion. The home page is
+// hasWiki reports whether repo's default branch holds a non-empty
+// .gitbay/wiki tree.
+func (s *Server) hasWiki(repo store.Repo) bool {
+	dir, branch := s.wikiDir(repo)
+	entries, err := gitutil.ListTree(dir, branch, wikiTreePath)
+	return err == nil && len(entries) > 0
+}
+
+// wiki renders a page from the repo's .gitbay/wiki tree. The home page is
 // Home.<ext> (or README.<ext>); /wiki/<name> resolves <name> with .md and
 // .org fallbacks. Rendering reuses the same sanitized pipeline as READMEs.
 func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
@@ -33,17 +40,6 @@ func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "wiki"
-	dir := s.wikiDir(p.Repo.OwnerName, p.Repo.Name)
-	if dir == "" {
-		s.render(w, "wiki.html", struct {
-			repoPage
-			Page     string
-			PageHTML template.HTML
-			Pages    []string
-			Missing  bool
-		}{repoPage: p, Missing: true})
-		return
-	}
 	var listing struct {
 		Home  string   `json:"home"`
 		Pages []string `json:"pages"`
@@ -97,12 +93,8 @@ func (s *Server) wikiRaw(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	dir := s.wikiDir(p.Repo.OwnerName, p.Repo.Name)
-	if dir == "" {
-		s.notFound(w, r)
-		return
-	}
-	data, err := gitutil.ReadBlob(dir, "main", strings.Trim(r.PathValue("path"), "/"), s.cfg.Limits.MaxBlobBytes)
+	dir, branch := s.wikiDir(p.Repo)
+	data, err := gitutil.ReadBlob(dir, branch, path.Join(wikiTreePath, strings.Trim(r.PathValue("path"), "/")), s.cfg.Limits.MaxBlobBytes)
 	if err != nil {
 		s.notFound(w, r)
 		return

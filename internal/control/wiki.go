@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"strings"
 
@@ -31,39 +30,36 @@ func init() {
 	})
 }
 
-// A wiki lives in a companion bare repo beside its parent, so prose
-// edits stay out of the code repository's history, its protected
-// branches and its builds. The companion has no store row of its own —
-// access derives from the parent, exactly as it does for git over SSH —
-// which is why it needs commands rather than being addressable as a
-// repository.
+// Wiki pages are files under .gitbay/wiki on the repository's default
+// branch, alongside ci.yml and CODEOWNERS. They have no store row of
+// their own — access derives from the parent, exactly as it does for any
+// other path in the repository.
 //
-// Editing stays a push to <repo>.wiki.git. That is the whole write
-// interface, on every surface, and there is nothing for a command to
-// add.
+// Writing is a push, or repo commit-file, like any other file in the
+// repository. There is no wiki-specific write command.
 
 // wikiExts are the page formats the web renders, in resolution order.
 var wikiExts = []string{".md", ".org", ".markdown"}
 
-// wikiDir resolves the parent, checks read access, and returns the
-// companion's path. A parent you cannot read has no wiki you can read.
-func wikiDir(c *Ctx, spec string) (repo store.Repo, dir string, code int) {
+// wikiTreePath is where wiki pages live in a repository's tree.
+const wikiTreePath = ".gitbay/wiki"
+
+// wikiDir resolves the parent, checks read access, and returns its
+// directory and default branch. A parent you cannot read has no wiki you
+// can read.
+func wikiDir(c *Ctx, spec string) (repo store.Repo, dir, branch string, code int) {
 	parent, code := resolveRepo(c, spec, policy.CanRead)
 	if code >= 0 {
-		return store.Repo{}, "", code
+		return store.Repo{}, "", "", code
 	}
-	d := RepoDir(c.Cfg.Server.Root, parent.OwnerName, parent.Name+".wiki")
-	if _, err := os.Stat(d); err != nil {
-		return store.Repo{}, "", c.fail(protocol.ExitNotFound, "%s has no wiki", parent.Path())
-	}
-	return parent, d, -1
+	return parent, RepoDir(c.Cfg.Server.Root, parent.OwnerName, parent.Name), parent.DefaultBranch, -1
 }
 
-// wikiPages lists the page names in the companion, without extensions.
-func wikiPages(dir string) []string {
-	entries, err := gitutil.ListTree(dir, "main", "")
+// wikiPages lists the page names under .gitbay/wiki, without extensions.
+func wikiPages(dir, branch string) []string {
+	entries, err := gitutil.ListTree(dir, branch, wikiTreePath)
 	if err != nil {
-		return nil // the companion exists but has no commits yet
+		return nil // no .gitbay/wiki tree on this branch
 	}
 	var pages []string
 	for _, e := range entries {
@@ -85,11 +81,11 @@ func runWikiList(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.fail(protocol.ExitUsage, "usage: wiki list <owner/name>")
 	}
-	repo, dir, code := wikiDir(c, args[0])
+	repo, dir, branch, code := wikiDir(c, args[0])
 	if code >= 0 {
 		return code
 	}
-	pages := wikiPages(dir)
+	pages := wikiPages(dir, branch)
 	type out struct {
 		Path  string   `json:"path"`
 		Home  string   `json:"home,omitempty"`
@@ -126,11 +122,11 @@ func runWikiShow(c *Ctx, args []string) int {
 	if len(args) < 1 || len(args) > 2 {
 		return c.fail(protocol.ExitUsage, "usage: wiki show <owner/name> [<page>]")
 	}
-	repo, dir, code := wikiDir(c, args[0])
+	repo, dir, branch, code := wikiDir(c, args[0])
 	if code >= 0 {
 		return code
 	}
-	pages := wikiPages(dir)
+	pages := wikiPages(dir, branch)
 	page := wikiHome(pages)
 	if len(args) == 2 {
 		page = strings.TrimSuffix(args[1], path.Ext(args[1]))
@@ -144,7 +140,7 @@ func runWikiShow(c *Ctx, args []string) int {
 	}
 
 	for _, ext := range wikiExts {
-		raw, err := gitutil.ReadBlob(dir, "main", page+ext, c.Cfg.Limits.MaxBlobBytes)
+		raw, err := gitutil.ReadBlob(dir, branch, wikiTreePath+"/"+page+ext, c.Cfg.Limits.MaxBlobBytes)
 		if err != nil {
 			continue
 		}

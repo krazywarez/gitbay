@@ -267,7 +267,7 @@ func verifyBackup(path string) error {
 		return fmt.Errorf("%s: %d repositories the database names are not in the archive: %s", path, len(missing), strings.Join(missing, ", "))
 	}
 	if extra > 0 {
-		fmt.Printf("%d repositories in the archive that the database does not name (deleted after the snapshot, or a wiki)\n", extra)
+		fmt.Printf("%d repositories in the archive that the database does not name (deleted after the snapshot)\n", extra)
 	}
 	return nil
 }

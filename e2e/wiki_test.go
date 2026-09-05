@@ -11,7 +11,8 @@ func TestWikis(t *testing.T) {
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
-	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
 	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
 		t.Fatal("repo create failed")
@@ -20,8 +21,8 @@ func TestWikis(t *testing.T) {
 		t.Fatal("private repo create failed")
 	}
 
-	// No wiki yet: the tab is absent, the page shows the push hint, and
-	// cloning the companion says so.
+	// No wiki yet: the tab is absent, the page shows the missing hint, and
+	// listing reports no wiki rather than erroring.
 	_, body := inst.get(t, "/alice/app")
 	if strings.Contains(body, ">Wiki<") {
 		t.Fatal("wiki tab shown with no wiki")
@@ -30,26 +31,29 @@ func TestWikis(t *testing.T) {
 	if !strings.Contains(body, "no wiki yet") {
 		t.Fatal("missing-wiki hint absent")
 	}
-	env := inst.gitEnv(aliceKey)
-	if out, code := gitRun(t, t.TempDir(), env, "clone", inst.sshURL("alice/app.wiki"), "w"); code == 0 || !strings.Contains(out, "no wiki yet") {
-		t.Fatalf("clone of absent wiki: %d\n%s", code, out)
+	if out, errOut, code := inst.ssh(t, aliceKey, "", "wiki", "list", "alice/app", "--json"); code != 0 {
+		t.Fatalf("wiki list on a repo without one: %s", errOut)
+	} else if !strings.Contains(out, `"pages":[]`) {
+		t.Errorf("wiki list on a repo without one returned pages: %s", out)
 	}
 
-	// First push creates the wiki. A reader without write cannot push it.
+	// Pages are ordinary files: pushing them creates the wiki.
+	env := inst.gitEnv(aliceKey)
 	work := t.TempDir()
 	mustGit(t, work, env, "init", "-q", "-b", "main", "w")
 	dir := filepath.Join(work, "w")
-	os.WriteFile(filepath.Join(dir, "Home.md"), []byte(
+	os.MkdirAll(filepath.Join(dir, ".gitbay", "wiki"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "wiki", "Home.md"), []byte(
 		"# welcome\n\nsee [Setup](Setup.md) and ![shot](shot.png)\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "Setup.org"), []byte("* setup\n\nsteps here\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "shot.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "wiki", "Setup.org"), []byte("* setup\n\nsteps here\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "wiki", "shot.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644)
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "wiki start")
-	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/app.wiki"), "main")
+	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/app"), "main")
 
 	benv := inst.gitEnv(bobKey)
-	if out, code := gitRun(t, dir, benv, "push", inst.sshURL("alice/app.wiki"), "main"); code == 0 && !strings.Contains(out, "denied") {
-		t.Fatalf("reader pushed the wiki: %d\n%s", code, out)
+	if out, code := gitRun(t, dir, benv, "push", inst.sshURL("alice/app"), "main"); code == 0 && !strings.Contains(out, "denied") {
+		t.Fatalf("reader pushed the repository: %d\n%s", code, out)
 	}
 
 	// Rendering: home resolves, tab appears, links rewrite to wiki pages
@@ -115,10 +119,12 @@ func TestWikis(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "../../etc/passwd"); code == 0 {
 		t.Error("wiki show escaped the repository")
 	}
-	// A repository with no wiki says so rather than failing oddly.
-	if _, errOut, code := inst.ssh(t, aliceKey, "", "wiki", "list", "alice/secretive"); code == 0 ||
-		!strings.Contains(errOut, "no wiki") {
-		t.Errorf("wiki list on a repo without one: %d %s", code, errOut)
+	// A repository with no wiki says so rather than failing oddly, even
+	// for its owner.
+	if out, errOut, code := inst.ssh(t, aliceKey, "", "wiki", "list", "alice/secretive", "--json"); code != 0 {
+		t.Fatalf("wiki list on a repo without one: %s", errOut)
+	} else if !strings.Contains(out, `"pages":[]`) {
+		t.Errorf("wiki list on a repo without one returned pages: %s", out)
 	}
 	// Wiki access derives from the parent: a stranger gets nothing.
 	if _, _, code := inst.ssh(t, bobKey, "", "wiki", "list", "alice/secretive"); code == 0 {
@@ -126,24 +132,45 @@ func TestWikis(t *testing.T) {
 	}
 
 	// 404-parity: a private repo's wiki is invisible, over web and git.
-	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/secretive.wiki"), "main")
 	if status, _ := inst.get(t, "/alice/secretive/wiki"); status != 404 {
 		t.Fatalf("private wiki page: %d", status)
 	}
-	if out, code := gitRun(t, t.TempDir(), benv, "clone", inst.sshURL("alice/secretive.wiki"), "x"); code == 0 || !strings.Contains(out, "not found") {
-		t.Fatalf("private wiki clone by outsider: %d\n%s", code, out)
+
+	// Pushing to <name>.wiki.git is refused now that the companion route
+	// is gone; there is no such repository.
+	if out, code := gitRun(t, t.TempDir(), env, "clone", inst.sshURL("alice/app.wiki"), "x"); code == 0 {
+		t.Fatalf("cloned a nonexistent companion: %s", out)
+	} else if !strings.Contains(out, "not found") {
+		t.Fatalf("clone of alice/app.wiki: %s", out)
 	}
 
-	// Repo names ending .wiki are refused (companion namespace).
-	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/notes.wiki"); code != 2 || !strings.Contains(errOut, "reserved") {
-		t.Fatalf(".wiki name allowed: %d %s", code, errOut)
+	// A repository may now be named something.wiki: the suffix is no
+	// longer reserved.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/notes.wiki"); code != 0 {
+		t.Fatalf("something.wiki repo name refused: %s", errOut)
 	}
 
-	// Deleting the repo removes the wiki companion.
-	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "delete", "alice/secretive", "--yes"); code != 0 {
-		t.Fatal("repo delete failed")
+	// repo commit-file writes a page on a repository that permits
+	// server-authored commits: it is the command behind the web editor,
+	// and there is no wiki-specific write command.
+	if _, errOut, code := inst.ssh(t, aliceKey, "written by commit-file\n",
+		"repo", "commit-file", "alice/app", ".gitbay/wiki/Extra.md",
+		"--ref", "main", "--message", "'add a page'", "--file", "-"); code != 0 {
+		t.Fatalf("repo commit-file: %s", errOut)
 	}
-	if _, err := os.Stat(filepath.Join(inst.root, "repos", "alice", "secretive.wiki.git")); err == nil {
-		t.Fatal("wiki survived repo delete")
+	out, _, code = inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "Extra", "--json")
+	if code != 0 || !strings.Contains(out, "written by commit-file") {
+		t.Errorf("wiki show Extra: %s", out)
+	}
+
+	// A repository requiring verified signatures refuses repo commit-file,
+	// since the server cannot sign on the user's behalf.
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "settings", "require-signed", "alice/app", "on"); code != 0 {
+		t.Fatal("require-signed failed")
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "blocked\n",
+		"repo", "commit-file", "alice/app", ".gitbay/wiki/Blocked.md",
+		"--ref", "main", "--file", "-"); code == 0 || !strings.Contains(errOut, "requires signed commits") {
+		t.Errorf("repo commit-file not refused on a signed-commits repo: %d %s", code, errOut)
 	}
 }

@@ -333,7 +333,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		Mirrors:    mirrors,
 		Pinned:     pinned,
 		Watch:      watch,
-		HasWiki:    s.wikiDir(repo.OwnerName, repo.Name) != "",
+		HasWiki:    s.hasWiki(repo),
 		Host:       s.cfg.SiteHost(),
 		Desc:       gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
 		Repo:       repo,

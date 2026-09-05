@@ -392,11 +392,6 @@ func runRepoTransfer(c *Ctx, args []string) int {
 		}
 		return c.fail(protocol.ExitFailure, "moving repository: %v", err)
 	}
-	// The wiki companion follows its repo.
-	oldWiki := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name+".wiki")
-	if _, err := os.Stat(oldWiki); err == nil {
-		os.Rename(oldWiki, RepoDir(c.Cfg.Server.Root, newOwner, repo.Name+".wiki"))
-	}
 	newPath := newOwner + "/" + repo.Name
 	return c.emit(map[string]string{"repo": newPath, "was": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "transferred %s to %s — clone URLs now use %s\n", repo.Path(), newPath, newPath)
@@ -429,7 +424,7 @@ func runRepoDelete(c *Ctx, args []string) int {
 }
 
 // deleteRepo removes a repository the caller has already been cleared to
-// delete: the database row, then the directory and its wiki companion.
+// delete: the database row, then the directory.
 //
 // There is deliberately no repo.deleted event. events.repo_id and
 // webhooks.repo_id both cascade from repos, so recording one would delete
@@ -449,7 +444,6 @@ func deleteRepo(c *Ctx, repo store.Repo) int {
 	if err := os.RemoveAll(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)); err != nil {
 		return c.fail(protocol.ExitFailure, "database row removed but disk cleanup failed: %v", err)
 	}
-	os.RemoveAll(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name+".wiki"))
 	return c.emit(map[string]string{"deleted": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "deleted %s\n", repo.Path())
 	})

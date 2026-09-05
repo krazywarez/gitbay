@@ -152,7 +152,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"wiki show":            {"alice/app"},
 	}
 	// Reads whose subject legitimately does not exist in this fixture.
-	notFoundOK := map[string]bool{"wiki list": true, "wiki show": true, "repo deps status": true}
+	notFoundOK := map[string]bool{"wiki show": true, "repo deps status": true}
 
 	dbPath := filepath.Join(inst.root, "gitbay.db")
 	before := dbFingerprint(t, dbPath)
