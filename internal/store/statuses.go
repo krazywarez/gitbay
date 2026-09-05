@@ -7,7 +7,7 @@ import (
 
 type CommitStatus struct {
 	Context     string
-	State       string // pending | success | failure | error
+	State       string // pending | success | failure | error | skipped
 	Description string
 	TargetURL   string
 	Creator     string

@@ -57,3 +57,29 @@ func TestChecksForCommit(t *testing.T) {
 		}
 	}
 }
+
+// A job a path filter excluded records "skipped" rather than nothing at
+// all (#172). It must satisfy require_checks like any other green state,
+// without a failure or pending status elsewhere being masked by it.
+func TestCombinedStatusTreatsSkippedAsGreen(t *testing.T) {
+	only := []CommitStatus{{Context: "ci/unit", State: "skipped"}}
+	if got := CombinedStatus(only); got != "success" {
+		t.Fatalf("all-skipped combined status: %s", got)
+	}
+
+	withPending := []CommitStatus{
+		{Context: "ci/unit", State: "skipped"},
+		{Context: "ci/lint", State: "pending"},
+	}
+	if got := CombinedStatus(withPending); got != "pending" {
+		t.Fatalf("skipped plus pending combined status: %s", got)
+	}
+
+	withFailure := []CommitStatus{
+		{Context: "ci/unit", State: "skipped"},
+		{Context: "ci/lint", State: "failure"},
+	}
+	if got := CombinedStatus(withFailure); got != "failure" {
+		t.Fatalf("skipped plus failure combined status: %s", got)
+	}
+}

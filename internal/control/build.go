@@ -532,6 +532,26 @@ func QueueMRBuilds(
 	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), "", sha, time.Now(), false, false, false)
 }
 
+// skipReason names why a job's path filters excluded this push, mirroring
+// the order ci.Selected checks them in: an unmatched paths list rules a
+// job out before paths-ignore is even considered.
+func skipReason(j ci.Job, changed []string) string {
+	if len(j.Paths) > 0 {
+		hit := false
+		for _, f := range changed {
+			for _, p := range j.Paths {
+				if ci.Match(p, f) {
+					hit = true
+				}
+			}
+		}
+		if !hit {
+			return "no changed file matches paths"
+		}
+	}
+	return "every changed file matched paths-ignore"
+}
+
 func queueJobs(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID int64, ref, old, sha string, now time.Time,
@@ -609,7 +629,11 @@ func queueJobs(
 			}
 			continue
 		}
+		// A filter that excludes this push is not silence: it satisfies
+		// require_checks with a skipped status instead of leaving the
+		// commit with none at all, which the gate refuses outright (#172).
 		if filtered && !ci.Selected(j, changed) {
+			st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "skipped", skipReason(j, changed), "", userID)
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)

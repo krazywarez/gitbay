@@ -109,3 +109,25 @@ func TestMRAsideTimestamps(t *testing.T) {
 		}
 	}
 }
+
+// A job a path filter excluded has no build behind its status: the page
+// must show it as skipped rather than linking to a build that never ran
+// (#172).
+func TestMRChecksRenderSkippedWithoutBuildLink(t *testing.T) {
+	out := renderMR(t, testMR("open"), nil, []store.Check{
+		{CommitStatus: store.CommitStatus{Context: "ci/unit", State: "skipped",
+			Description: "every changed file matched paths-ignore", UpdatedAt: "2026-08-27T14:05:00.000Z"}},
+	})
+	row := ""
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "ci/unit") {
+			row = line
+		}
+	}
+	if row == "" || !strings.Contains(row, ">skipped<") {
+		t.Fatalf("skipped check not rendered:\n%s", out)
+	}
+	if strings.Contains(row, "<a href") {
+		t.Errorf("skipped check with no build linked anyway: %s", row)
+	}
+}

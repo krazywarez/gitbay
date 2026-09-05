@@ -301,6 +301,156 @@ func TestQueueBranchBuildsOrdinaryPushStillFilters(t *testing.T) {
 	}
 }
 
+// A job a path filter excludes records a ci/<job> status of "skipped"
+// naming the reason, rather than leaving the commit with no status for
+// that job at all (#172).
+func TestQueueBranchBuildsFilteredJobRecordsSkippedStatus(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.MkdirAll(filepath.Join(src, "docs"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  unit:\n    paths-ignore:\n      - docs/**\n    steps:\n      - echo hi\n"), 0o644)
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+	oldSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x changed\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "docs only")
+	newSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", oldSHA, newSHA, time.Now())
+
+	statuses, err := st.ListCommitStatuses(repo.ID, newSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 1 || statuses[0].Context != "ci/unit" {
+		t.Fatalf("statuses on %s: %+v", newSHA, statuses)
+	}
+	if statuses[0].State != "skipped" {
+		t.Fatalf("filtered job status: got %q, want skipped", statuses[0].State)
+	}
+	if statuses[0].Description == "" {
+		t.Fatal("skipped status carries no reason")
+	}
+}
+
+// A tag job and a scheduled job are not push jobs at all: neither records
+// a skipped status, filtered push or not. Only the ordinary job that a
+// path filter actually excluded does.
+func TestQueueBranchBuildsTagAndScheduledJobsRecordNoSkippedStatus(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.MkdirAll(filepath.Join(src, "docs"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(strings.Join([]string{
+		"jobs:",
+		"  unit:",
+		"    paths-ignore:",
+		"      - docs/**",
+		"    steps:",
+		"      - echo hi",
+		"  release:",
+		"    tags: 'v*'",
+		"    steps:",
+		"      - echo release",
+		"  nightly:",
+		"    schedule: '0 0 * * *'",
+		"    steps:",
+		"      - echo nightly",
+		"",
+	}, "\n")), 0o644)
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+	oldSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x changed\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "docs only")
+	newSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", oldSHA, newSHA, time.Now())
+
+	statuses, err := st.ListCommitStatuses(repo.ID, newSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 1 || statuses[0].Context != "ci/unit" || statuses[0].State != "skipped" {
+		t.Fatalf("statuses on %s: %+v", newSHA, statuses)
+	}
+}
+
+// A job already built for this commit on another branch is a fact about
+// the commit, not something a filter excluded: it keeps whatever status
+// that build reported (or none, if the run is still queued elsewhere) and
+// must not be overwritten with "skipped".
+func TestQueueBranchBuildsAlreadyBuiltJobRecordsNoSkippedStatus(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.MkdirAll(filepath.Join(src, "docs"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  unit:\n    paths-ignore:\n      - docs/**\n    steps:\n      - echo hi\n"), 0o644)
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+	oldSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x changed\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "docs only")
+	newSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	// The same commit already has a build for "unit" from another branch,
+	// still pending. Its filter would exclude this push too, so the only
+	// way to tell the two paths apart is that this one must record nothing.
+	if _, err := st.CreateBuild(repo.ID, "unit", newSHA, "other", `["echo hi"]`, true); err != nil {
+		t.Fatal(err)
+	}
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", oldSHA, newSHA, time.Now())
+
+	statuses, err := st.ListCommitStatuses(repo.ID, newSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 0 {
+		t.Fatalf("already-built job recorded a status: %+v", statuses)
+	}
+	builds, err := st.ListBuilds(repo.ID, 10)
+	if err != nil || len(builds) != 1 {
+		t.Fatalf("expected only the pre-existing build: %v %v", builds, err)
+	}
+}
+
 // QueueMRBuilds keeps failing open with no diff base at all: deriving a
 // merge base for the MR head is deliberately out of scope here (#172 —
 // filtering a head down to zero jobs leaves it with no statuses, which
