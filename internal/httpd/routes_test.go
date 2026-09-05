@@ -77,7 +77,11 @@ func TestAccountsModeHasLoginRoute(t *testing.T) {
 // unclaimable username.
 func TestTopLevelRouteWordsAreReserved(t *testing.T) {
 	cfg := config.Default()
-	cfg.Web.Mode = "accounts" // superset of routes
+	cfg.Web.Mode = "accounts" // superset of accounts-mode routes
+	// /register only registers when registration.mode != "closed"
+	// (config.Default() leaves it "closed"); open it so this walk actually
+	// reaches the route the production instance runs with.
+	cfg.Registration.Mode = "open"
 	s := New(cfg, nil)
 	for _, r := range s.Routes() {
 		seg := strings.TrimPrefix(r.Pattern, "/")

@@ -30,8 +30,16 @@ var checkOriginAllowlist = map[string]string{
 
 func TestMutatingRoutesRequireCheckOrigin(t *testing.T) {
 	cfg := config.Default()
-	cfg.Web.Mode = "accounts" // superset of routes
+	cfg.Web.Mode = "accounts" // superset of accounts-mode routes
 	cfg.API.Enabled = true
+	// /register is gated on registration.mode != "closed" (routes.go), which
+	// config.Default() leaves at "closed" — the production instance runs
+	// "open", and that is the one deployed value the route table hides its
+	// routes behind if this test's cfg does not open it too. "open" and
+	// "invite" gate the route identically (both are just != "closed"), so
+	// there is no second code path in routes.go for looping over both to
+	// reach; "open" alone matches production and is enough.
+	cfg.Registration.Mode = "open"
 	s := New(cfg, nil)
 
 	for _, r := range s.Routes() {
