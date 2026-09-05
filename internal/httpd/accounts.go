@@ -18,6 +18,11 @@ import (
 
 const sessionCookie = "gitbay_session"
 
+// sessionSameSite is Lax so a login link followed from a mail client keeps
+// its session through the redirect. Cross-site POSTs are refused by
+// checkOrigin and carry no Lax cookie anyway.
+const sessionSameSite = http.SameSiteLaxMode
+
 // viewer returns the logged-in user, or a zero User for anonymous visitors.
 // Only meaningful in accounts mode; in view_only no session route exists so
 // every request is anonymous.
@@ -92,7 +97,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: sessTok, Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteStrictMode,
+		HttpOnly: true, SameSite: sessionSameSite,
 		Secure: s.cfg.HTTP.TLS != "off",
 		MaxAge: 7 * 24 * 3600,
 	})
@@ -103,7 +108,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if ck, err := r.Cookie(sessionCookie); err == nil {
 		s.st.DeleteWebSession(store.HashToken(ck.Value))
 	}
-	http.SetCookie(w, s.clearCookie(sessionCookie, http.SameSiteStrictMode))
+	http.SetCookie(w, s.clearCookie(sessionCookie, sessionSameSite))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
