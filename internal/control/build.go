@@ -501,8 +501,9 @@ func runRunnerDone(c *Ctx, args []string) int {
 // Both paths that move a branch call this: post-receive for a push, and
 // the merge path for a merge, which updates the ref directly and so never
 // reaches a hook. old is the branch's sha before this update, the diff
-// base a job's path filters run against; an empty old, from a new
-// branch, cannot be diffed and runs every job.
+// base a job's path filters run against; a new branch has no prior
+// commit and sends old as empty or all zeros, either of which cannot be
+// diffed and runs every job.
 func QueueBranchBuilds(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID int64, branch, old, sha string, now time.Time,

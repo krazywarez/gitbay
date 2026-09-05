@@ -31,10 +31,12 @@ const (
 var jobName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)
 
 type Job struct {
-	Name        string
-	Steps       []string
-	Schedule    string   // cron expression; scheduled jobs run on schedule, not on push
-	Tags        string   // tag glob (e.g. "v*"); tag jobs run on matching tag pushes only
+	Name     string
+	Steps    []string
+	Schedule string // cron expression; scheduled jobs run on schedule, not on push
+	Tags     string // tag glob (e.g. "v*"); tag jobs run on matching tag pushes only
+	// Paths and PathsIgnore only gate a job queued on push; a scheduled
+	// or tag job ignores them.
 	Paths       []string // globs; the job runs only when a changed file matches one
 	PathsIgnore []string // globs; the job is skipped when every changed file matches one
 }
