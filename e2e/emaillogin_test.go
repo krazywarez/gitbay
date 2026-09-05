@@ -68,6 +68,43 @@ func TestEmailLogin(t *testing.T) {
 	}
 }
 
+// A verified secondary address stands in for an unverified primary:
+// resolution by username must not stop at the primary (#158).
+func TestEmailLoginResolvesVerifiedSecondary(t *testing.T) {
+	smtp := startFakeSMTP(t)
+	inst := startInstanceWith(t, fmt.Sprintf(
+		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
+		smtp.addr))
+
+	key := inst.newKey(t, "gus")
+	inst.admin(t, "admin", "user", "create", "gus", "--key", key+".pub",
+		"--email", "gus@primary.test") // primary added, left unverified
+	if _, errOut, code := inst.ssh(t, key, "", "email", "add", "gus@secondary.test"); code != 0 {
+		t.Fatalf("email add: exit %d %s", code, errOut)
+	}
+	verifyCode := extractCode(t, smtp.waitMail(t, 0))
+	if _, errOut, code := inst.ssh(t, key, "", "email", "verify", verifyCode); code != 0 {
+		t.Fatalf("email verify: exit %d %s", code, errOut)
+	}
+
+	browser := newBrowser(t)
+	status, body := browserPost(t, browser, inst.base()+"/login", url.Values{"identifier": {"gus"}})
+	if status != 200 || !strings.Contains(body, "on its way") {
+		t.Fatalf("POST /login by username with an unverified primary: %d %s", status, body)
+	}
+
+	link := loginLinkIn(smtp.waitFor(t, "gus@secondary.test", "/login?token="))
+	if status, _ := browserGet(t, browser, inst.base()+link); status != 200 {
+		t.Fatalf("following the link: %d", status)
+	}
+	if _, body := browserGet(t, browser, inst.base()+"/settings"); !strings.Contains(body, "gus@secondary.test") {
+		t.Fatal("not logged in via the verified secondary address")
+	}
+	if len(smtp.mailTo("gus@primary.test")) != 0 {
+		t.Error("mailed the unverified primary")
+	}
+}
+
 // The response must not say whether an account exists. A different status,
 // body, or destination answers "is this person here?" to anyone who asks.
 func TestEmailLoginDoesNotEnumerate(t *testing.T) {
@@ -80,6 +117,18 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 	// An account whose address was never verified must look like an absent
 	// one, or an unverified address becomes an oracle.
 	inst.admin(t, "admin", "user", "create", "eve", "--email", "eve@example.test")
+	// An unverified primary with a verified secondary resolves the same as
+	// a normal hit (#158) — this must be indistinguishable too.
+	frankKey := inst.newKey(t, "frank")
+	inst.admin(t, "admin", "user", "create", "frank", "--key", frankKey+".pub",
+		"--email", "frank@example.test")
+	if _, errOut, code := inst.ssh(t, frankKey, "", "email", "add", "frank2@example.test"); code != 0 {
+		t.Fatalf("email add: exit %d %s", code, errOut)
+	}
+	if _, errOut, code := inst.ssh(t, frankKey, "", "email", "verify",
+		extractCode(t, smtp.waitMail(t, 0))); code != 0 {
+		t.Fatalf("email verify: exit %d %s", code, errOut)
+	}
 
 	browser := newBrowser(t)
 	real1, bodyReal := browserPost(t, browser, inst.base()+"/login",
@@ -97,6 +146,8 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 		url.Values{"identifier": {""}})
 	absentUser, bodyAbsentUser := browserPost(t, browser, inst.base()+"/login",
 		url.Values{"identifier": {"nosuchuser"}})
+	unverPrimary, bodyUnverPrimary := browserPost(t, browser, inst.base()+"/login",
+		url.Values{"identifier": {"frank"}})
 
 	for _, c := range []struct {
 		name   string
@@ -107,6 +158,7 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 		{"unverified", unver, bodyUnver},
 		{"empty", empty, bodyEmpty},
 		{"absent-username", absentUser, bodyAbsentUser},
+		{"unverified-primary-verified-secondary", unverPrimary, bodyUnverPrimary},
 	} {
 		if c.status != real1 || c.body != bodyReal {
 			t.Errorf("%s differs from a real address: status %d vs %d", c.name, c.status, real1)

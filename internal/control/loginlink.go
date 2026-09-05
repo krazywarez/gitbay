@@ -61,7 +61,7 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 		if err != nil {
 			return nil
 		}
-		addr, err := st.PrimaryVerifiedEmail(u.ID)
+		addr, err := st.PreferredVerifiedEmail(u.ID)
 		if err != nil || addr == "" {
 			return nil
 		}

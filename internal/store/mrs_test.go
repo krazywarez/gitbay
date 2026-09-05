@@ -71,3 +71,74 @@ func TestResolutionStampImported(t *testing.T) {
 		t.Fatalf("imported merge stamp: %+v", mr)
 	}
 }
+
+// PreferredVerifiedEmail falls back to a verified secondary when the
+// primary is not verified, unlike PrimaryVerifiedEmail (#158).
+func TestPreferredVerifiedEmail(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("gus", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if addr, err := s.PreferredVerifiedEmail(uid); err != nil || addr != "" {
+		t.Fatalf("no addresses at all: %q, %v", addr, err)
+	}
+
+	if err := s.AddEmail(uid, "primary@example.test", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if addr, err := s.PreferredVerifiedEmail(uid); err != nil || addr != "" {
+		t.Fatalf("unverified primary only: %q, %v", addr, err)
+	}
+	if addr, err := s.PrimaryVerifiedEmail(uid); err != nil || addr != "" {
+		t.Fatalf("PrimaryVerifiedEmail on an unverified primary: %q, %v", addr, err)
+	}
+
+	if err := s.AddEmail(uid, "secondary@example.test", "smtp", false); err != nil {
+		t.Fatal(err)
+	}
+	if addr, err := s.PreferredVerifiedEmail(uid); err != nil || addr != "secondary@example.test" {
+		t.Fatalf("unverified primary, verified secondary: %q, %v", addr, err)
+	}
+	// PrimaryVerifiedEmail keeps meaning exactly what it says: still "",
+	// because the primary itself is still unverified.
+	if addr, err := s.PrimaryVerifiedEmail(uid); err != nil || addr != "" {
+		t.Fatalf("PrimaryVerifiedEmail with only the secondary verified: %q, %v", addr, err)
+	}
+
+	if err := s.VerifyEmail(uid, "primary@example.test", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if addr, err := s.PreferredVerifiedEmail(uid); err != nil || addr != "primary@example.test" {
+		t.Fatalf("both verified, primary should win: %q, %v", addr, err)
+	}
+}
+
+// With no verified primary, the choice among verified secondaries must not
+// depend on insertion or row order.
+func TestPreferredVerifiedEmailDeterministicTiebreak(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("gus", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEmail(uid, "primary@example.test", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEmail(uid, "zzz@example.test", "smtp", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddEmail(uid, "aaa@example.test", "smtp", false); err != nil {
+		t.Fatal(err)
+	}
+	if addr, err := s.PreferredVerifiedEmail(uid); err != nil || addr != "aaa@example.test" {
+		t.Fatalf("tiebreak should be alphabetical: %q, %v", addr, err)
+	}
+}

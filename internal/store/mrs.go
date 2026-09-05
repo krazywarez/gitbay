@@ -447,3 +447,20 @@ func (s *Store) PrimaryVerifiedEmail(userID int64) (string, error) {
 	}
 	return addr, err
 }
+
+// PreferredVerifiedEmail returns the primary address if it is verified,
+// otherwise the account's other verified address that sorts first by
+// address; "" if none is verified. Unlike PrimaryVerifiedEmail, a verified
+// secondary counts: an account that verified one address but not its
+// primary still has somewhere to send a login link.
+func (s *Store) PreferredVerifiedEmail(userID int64) (string, error) {
+	var addr string
+	err := s.DB.QueryRow(
+		`SELECT address FROM emails WHERE user_id = ? AND verified_at IS NOT NULL
+		 ORDER BY is_primary DESC, address LIMIT 1`,
+		userID).Scan(&addr)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return addr, err
+}
