@@ -500,12 +500,14 @@ func runRunnerDone(c *Ctx, args []string) int {
 //
 // Both paths that move a branch call this: post-receive for a push, and
 // the merge path for a merge, which updates the ref directly and so never
-// reaches a hook.
+// reaches a hook. old is the branch's sha before this update, the diff
+// base a job's path filters run against; an empty old, from a new
+// branch, cannot be diffed and runs every job.
 func QueueBranchBuilds(
 	st *store.Store, root, siteURL string,
-	repo store.Repo, userID int64, branch, sha string, now time.Time,
+	repo store.Repo, userID int64, branch, old, sha string, now time.Time,
 ) {
-	queueJobs(st, root, siteURL, repo, userID, branch, sha, now, true, branch == repo.DefaultBranch)
+	queueJobs(st, root, siteURL, repo, userID, branch, old, sha, now, true, branch == repo.DefaultBranch)
 }
 
 // QueueMRBuilds queues the push jobs for a merge request head fetched
@@ -519,12 +521,14 @@ func QueueMRBuilds(
 	st *store.Store, root, siteURL string,
 	repo store.Repo, userID, n int64, sha string,
 ) {
-	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), sha, time.Now(), false, false)
+	// No old sha: fails open and runs every job, matching today's
+	// behaviour for a merge request head.
+	queueJobs(st, root, siteURL, repo, userID, mrHeadRef(n), "", sha, time.Now(), false, false)
 }
 
 func queueJobs(
 	st *store.Store, root, siteURL string,
-	repo store.Repo, userID int64, ref, sha string, now time.Time,
+	repo store.Repo, userID int64, ref, old, sha string, now time.Time,
 	trusted, syncSchedules bool,
 ) {
 	dir := RepoDir(root, repo.OwnerName, repo.Name)
@@ -546,6 +550,24 @@ func queueJobs(
 	if err != nil {
 		built = nil
 	}
+	// The changed-file list a job's path filters run against, computed
+	// once and only if some job actually declares one. When the diff
+	// base does not exist or the diff itself fails, filtered stays
+	// false and every job runs: a filter that cannot be evaluated must
+	// not silently skip CI.
+	filtered := false
+	var changed []string
+	for _, j := range jobs {
+		if len(j.Paths) == 0 && len(j.PathsIgnore) == 0 {
+			continue
+		}
+		if ci.HasDiffBase(old) {
+			if files, err := gitutil.DiffFiles(dir, old, sha); err == nil {
+				changed, filtered = files, true
+			}
+		}
+		break
+	}
 	var schedules []store.Schedule
 	for _, j := range jobs {
 		// Tag jobs run on matching tag pushes only.
@@ -564,6 +586,9 @@ func queueJobs(
 					NextRun: ci.NextRun(j.Schedule, now),
 				})
 			}
+			continue
+		}
+		if filtered && !ci.Selected(j, changed) {
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)

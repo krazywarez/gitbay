@@ -1089,7 +1089,7 @@ func runMRMerge(c *Ctx, args []string) int {
 		`{"ref":%q,"old":%q,"new":%q,"forced":false,"deleted":false}`,
 		targetRef, targetSHA, newSHA))
 	QueueBranchBuilds(c.Store, c.Cfg.Server.Root, c.Cfg.Server.SiteURL,
-		repo, c.User.ID, mr.TargetRef, newSHA, time.Now())
+		repo, c.User.ID, mr.TargetRef, targetSHA, newSHA, time.Now())
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",

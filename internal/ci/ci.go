@@ -25,15 +25,18 @@ const (
 	maxJobs     = 10
 	maxSteps    = 50
 	maxStepSize = 4096
+	maxPaths    = 50
 )
 
 var jobName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)
 
 type Job struct {
-	Name     string
-	Steps    []string
-	Schedule string // cron expression; scheduled jobs run on schedule, not on push
-	Tags     string // tag glob (e.g. "v*"); tag jobs run on matching tag pushes only
+	Name        string
+	Steps       []string
+	Schedule    string   // cron expression; scheduled jobs run on schedule, not on push
+	Tags        string   // tag glob (e.g. "v*"); tag jobs run on matching tag pushes only
+	Paths       []string // globs; the job runs only when a changed file matches one
+	PathsIgnore []string // globs; the job is skipped when every changed file matches one
 }
 
 // Parse returns the jobs in name order, or an error describing the first
@@ -41,9 +44,11 @@ type Job struct {
 func Parse(raw []byte) ([]Job, error) {
 	var doc struct {
 		Jobs map[string]struct {
-			Steps    []string `yaml:"steps"`
-			Schedule string   `yaml:"schedule"`
-			Tags     string   `yaml:"tags"`
+			Steps       []string `yaml:"steps"`
+			Schedule    string   `yaml:"schedule"`
+			Tags        string   `yaml:"tags"`
+			Paths       []string `yaml:"paths"`
+			PathsIgnore []string `yaml:"paths-ignore"`
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
@@ -84,7 +89,26 @@ func Parse(raw []byte) ([]Job, error) {
 				return nil, fmt.Errorf("job %q: schedule and tags are mutually exclusive", name)
 			}
 		}
-		jobs = append(jobs, Job{Name: name, Steps: j.Steps, Schedule: j.Schedule, Tags: j.Tags})
+		if len(j.Paths) > maxPaths {
+			return nil, fmt.Errorf("job %q has %d path patterns; max %d", name, len(j.Paths), maxPaths)
+		}
+		for _, p := range j.Paths {
+			if _, err := path.Match(p, "x"); err != nil {
+				return nil, fmt.Errorf("job %q: bad path pattern %q", name, p)
+			}
+		}
+		if len(j.PathsIgnore) > maxPaths {
+			return nil, fmt.Errorf("job %q has %d paths-ignore patterns; max %d", name, len(j.PathsIgnore), maxPaths)
+		}
+		for _, p := range j.PathsIgnore {
+			if _, err := path.Match(p, "x"); err != nil {
+				return nil, fmt.Errorf("job %q: bad paths-ignore pattern %q", name, p)
+			}
+		}
+		jobs = append(jobs, Job{
+			Name: name, Steps: j.Steps, Schedule: j.Schedule, Tags: j.Tags,
+			Paths: j.Paths, PathsIgnore: j.PathsIgnore,
+		})
 	}
 	sort.Slice(jobs, func(i, k int) bool { return jobs[i].Name < jobs[k].Name })
 	return jobs, nil

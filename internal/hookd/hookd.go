@@ -214,7 +214,7 @@ func (s *Server) postReceive(req Request) {
 		}
 		// A branch push with a .gitbay/ci.yml queues one build per job.
 		if pushedRepoErr == nil && !u.IsDelete {
-			s.queueBuilds(pushedRepo, req.UserID, branch, u.New)
+			s.queueBuilds(pushedRepo, req.UserID, branch, u.Old, u.New)
 		}
 		if u.IsForce {
 			s.st.Audit(req.UserID, "push.forced", map[string]any{
@@ -271,10 +271,10 @@ func (s *Server) postReceive(req Request) {
 
 // queueBuilds queues the push jobs for a branch update. The work is
 // shared with the merge path, which moves a ref without reaching a hook.
-func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, sha string) {
+func (s *Server) queueBuilds(repo store.Repo, userID int64, branch, old, sha string) {
 	control.QueueBranchBuilds(
 		s.st, s.cfg.Server.Root, s.cfg.Server.SiteURL,
-		repo, userID, branch, sha, time.Now())
+		repo, userID, branch, old, sha, time.Now())
 }
 
 // queueTagBuilds runs the jobs whose tag pattern matches a pushed tag.
