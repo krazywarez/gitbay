@@ -35,6 +35,17 @@ func (s *Store) CreateLoginToken(userID int64, hash string, ttl time.Duration) e
 	return err
 }
 
+// CountLoginTokensSince counts the login tokens minted for a user within a
+// window. An unauthenticated request can ask for a login link, so the mint
+// needs a durable per-account bound the way email verification does (#136).
+func (s *Store) CountLoginTokensSince(userID int64, since time.Time) (int, error) {
+	var n int
+	err := s.DB.QueryRow(
+		"SELECT count(*) FROM login_tokens WHERE user_id = ? AND created_at > ?",
+		userID, fmtTime(since)).Scan(&n)
+	return n, err
+}
+
 // ConsumeLoginToken redeems a token exactly once; expired or used tokens
 // fail identically.
 func (s *Store) ConsumeLoginToken(hash string) (int64, error) {
