@@ -315,6 +315,16 @@ func requireRunner(c *Ctx) int {
 	return -1
 }
 
+// maxOrphanSkip bounds how many claimed builds runRunnerNext will find
+// unreachable and cancel in one call before giving up. Only fast-forward
+// merges are allowed here, so any branch whose target advances gets
+// rebased and force-pushed, and a stack of branches can do that repeatedly
+// in one sitting — the issue this guards saw five in an afternoon. The cap
+// is well above that, so a real backlog is never cut short, while a
+// repository whose queue is orphaned end to end still returns rather than
+// walking it forever.
+const maxOrphanSkip = 50
+
 func runRunnerNext(c *Ctx, args []string) int {
 	if code := requireRunner(c); code >= 0 {
 		return code
@@ -330,18 +340,44 @@ func runRunnerNext(c *Ctx, args []string) int {
 		}
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	b, ok, err := c.Store.ClaimBuild(repoIDs)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+	var b store.Build
+	var repo store.Repo
+	var ok bool
+	var err error
+	for attempt := 0; attempt < maxOrphanSkip; attempt++ {
+		b, ok, err = c.Store.ClaimBuild(repoIDs)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !ok {
+			break
+		}
+		repo, err = c.Store.RepoByID(b.RepoID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		// Only fast-forward merges are allowed here, so a target that
+		// advances gets rebased and force-pushed, orphaning whatever was
+		// queued for the old head: the runner would clone the repo and
+		// fail at checkout with a git internal error that reads exactly
+		// like a real failure. Catch it here instead. A check that itself
+		// fails is not evidence of anything — the build runs for real and
+		// is left to fail on its own terms, never cancelled on a guess.
+		reachable, err := gitutil.Reachable(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name), b.SHA)
+		if err != nil || reachable {
+			break
+		}
+		if code := cancelOrphanedBuild(c, repo, b); code >= 0 {
+			return code
+		}
+		// Cancelled, not claimed: if the cap is hit right here, the runner
+		// heartbeat below must not record this build as the one handed out.
+		b, ok = store.Build{}, false
 	}
 	// The poll itself is the runner's heartbeat: admin runners reads it.
 	c.Store.TouchRunner(c.User.ID, strings.Join(args, ","), b.ID)
 	if !ok {
 		return c.emit(map[string]any{}, func(w io.Writer) { fmt.Fprintln(w, "no pending builds") })
-	}
-	repo, err := c.Store.RepoByID(b.RepoID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	var steps []string
 	json.Unmarshal([]byte(b.Steps), &steps)
@@ -652,6 +688,38 @@ func queueJobs(
 	}
 }
 
+// resolveCancelledCommitStatus sets the commit status for a build that was
+// just cancelled: if the commit already passed this job on another ref,
+// that result stands again; otherwise the context reports the
+// cancellation as an error, so the queued status left behind is never
+// pending forever.
+func resolveCancelledCommitStatus(c *Ctx, repo store.Repo, b store.Build) {
+	if prev, ok, err := c.Store.SuccessBuildFor(repo.ID, b.SHA, b.Job); err == nil && ok {
+		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), prev.Number)
+		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "success",
+			fmt.Sprintf("passed in build %d on %s", prev.Number, prev.Ref), url, c.User.ID)
+		return
+	}
+	url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)
+	c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "error", "cancelled", url, c.User.ID)
+}
+
+// cancelOrphanedBuild withdraws a build runRunnerNext claimed and then
+// found unreachable. It leaves the same shape behind as a build cancel a
+// person runs by hand: CancelBuild's status, a log line saying why, and
+// the commit status resolved rather than left pending. Returns -1 to mean
+// "handled, keep going"; anything else is the exit code to return.
+func cancelOrphanedBuild(c *Ctx, repo store.Repo, b store.Build) int {
+	if err := c.Store.CancelBuild(b.ID); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf(
+		"cancelled: %.10s is not reachable from any ref; the sha was likely orphaned by a force-push\n", b.SHA)))
+	resolveCancelledCommitStatus(c, repo, b)
+	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+	return -1
+}
+
 func runBuildCancel(c *Ctx, args []string) int {
 	repo, b, code := buildRef(c, args)
 	if code >= 0 {
@@ -675,17 +743,8 @@ func runBuildCancel(c *Ctx, args []string) int {
 	} else {
 		c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf("cancelled by %s before a runner claimed it\n", c.User.Username)))
 	}
-	// The queued status replaced whatever the commit had for this job. If
-	// the commit passed the job on another ref, that result stands again;
-	// otherwise the context says it was withdrawn.
-	if prev, ok, err := c.Store.SuccessBuildFor(repo.ID, b.SHA, b.Job); err == nil && ok {
-		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), prev.Number)
-		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "success",
-			fmt.Sprintf("passed in build %d on %s", prev.Number, prev.Ref), url, c.User.ID)
-	} else {
-		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)
-		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "error", "cancelled", url, c.User.ID)
-	}
+	// The queued status replaced whatever the commit had for this job.
+	resolveCancelledCommitStatus(c, repo, b)
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
 	return c.emit(map[string]any{"number": b.Number, "job": b.Job, "status": "cancelled", "was": b.Status}, func(w io.Writer) {
 		if b.Status == "running" {
