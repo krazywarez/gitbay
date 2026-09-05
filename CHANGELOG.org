@@ -4,6 +4,42 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.13.3 — 2026-09-05
+
+Only a writer's review decides a merge gate, and a scan of one branch
+stops overwriting another's results.
+
+- =mr review= resolves with =CanRead= and applied no further check, and
+  the merge gates counted every fresh verdict. On a public repository
+  that let anyone with an account satisfy =require_approvals= — defeating
+  four-eyes review by holding two accounts, which on an instance with
+  open registration means defeating it outright — and equally let a
+  passer-by block a merge the owner wanted, with no override and only a
+  force-push to clear it. Both were confirmed against a running instance.
+  Reviewing stays open to every reader, because an outside opinion on a
+  public change is worth having; it no longer decides the gate. What
+  does is write access, the same question the gates already answer. An
+  uncounted review is marked advisory by =mr show= and by the merge
+  request page, both reading the same rule, so the page cannot show an
+  approval the gate ignores. #147
+- The two =git upload-pack= spawns behind the smart HTTP transport now
+  resolve git at start-up like everything else. The v1.13.2 rewrite
+  matched a plain identifier for the context and these pass
+  =r.Context()=, so it skipped them. #153
+- CI analyses each branch as itself. Every scan was recorded against the
+  project's main branch whatever branch produced it, so a feature branch
+  replaced main's results — a branch that removes findings made main look
+  clean before the fix merged, and one that added them made main look
+  broken when it was not. #154
+
+Replace the binary and reinstall the CLI. No migration.
+
+A repository relying on approvals from accounts without write access
+will find those merges now refused. That was the defect: such an approval
+never meant the repository accepted the change. Grant write, or name the
+reviewer in CODEOWNERS and grant write, if their approval is meant to
+count.
+
 * v1.13.2 — 2026-09-04
 
 The first SonarCloud scan's findings: eight fixed, the rest triaged and
