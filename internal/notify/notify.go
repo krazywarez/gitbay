@@ -13,6 +13,16 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
+// DefaultMaxAttempts and DefaultRetryBase are the retry parameters gitbayd
+// wires up in production (cmd/gitbayd/main.go), named so anything that
+// needs to reason about the mailer's worst-case delivery time — such as
+// checking it against a login link's TTL — computes it from the numbers
+// actually in force rather than a copy of them.
+const (
+	DefaultMaxAttempts = 5
+	DefaultRetryBase   = 30 * time.Second
+)
+
 type Mailer struct {
 	St          *store.Store
 	Cfg         config.Config
@@ -21,7 +31,7 @@ type Mailer struct {
 }
 
 func New(st *store.Store, cfg config.Config, retryBase time.Duration) *Mailer {
-	return &Mailer{St: st, Cfg: cfg, RetryBase: retryBase, MaxAttempts: 5}
+	return &Mailer{St: st, Cfg: cfg, RetryBase: retryBase, MaxAttempts: DefaultMaxAttempts}
 }
 
 // Run polls for due mail until ctx is done.

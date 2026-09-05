@@ -2,12 +2,10 @@ package control
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
-	"gitbay.org/gitbay/internal/mail"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -100,15 +98,13 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 		host, strings.TrimSuffix(cfg.Server.SiteURL, "/"), token)
 	subject := "log in to " + host
 
-	// Sent in the background: mail.Send is a synchronous SMTP round trip to
-	// the relay, tens to hundreds of milliseconds against the sub-millisecond
-	// a miss takes to answer. Returning before it completes keeps every case
-	// — hit, miss, unverified, throttled — on the same DB-bound path, so
-	// response time cannot answer what the response body is built not to.
-	go func() {
-		if err := mail.Send(cfg, address, subject, body); err != nil {
-			slog.Error("login link mail", "user", user.ID, "err", err)
-		}
-	}()
-	return nil
+	// Queued rather than sent inline: the INSERT is sub-millisecond, the
+	// same order of cost as the miss path's SELECT, so every case — hit,
+	// miss, unverified, throttled — still resolves on the same DB-bound
+	// path. notify.Mailer drains the queue with retries (30s, 60s, 120s,
+	// 240s, then dead-lettered) that top out at 450s, comfortably inside
+	// the 15-minute link TTL, so a retried delivery cannot outlive the
+	// link it carries. Unlike the goroutine this replaces, a crash mid
+	// delivery does not lose the mail.
+	return st.EnqueueMail(address, subject, body)
 }

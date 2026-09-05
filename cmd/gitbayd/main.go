@@ -160,9 +160,11 @@ func serveCmd() *cobra.Command {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
-			// Outbound webhook deliveries. The retry base is overridable
-			// for tests via GITBAY_WEBHOOK_RETRY_BASE.
-			retryBase := 30 * time.Second
+			// Outbound webhook deliveries, and the mail queue when SMTP is
+			// configured, share one retry base. It is overridable for
+			// tests via GITBAY_WEBHOOK_RETRY_BASE; notify.DefaultRetryBase
+			// names the production default so nothing else has to guess it.
+			retryBase := notify.DefaultRetryBase
 			if v := os.Getenv("GITBAY_WEBHOOK_RETRY_BASE"); v != "" {
 				if d, err := time.ParseDuration(v); err == nil {
 					retryBase = d

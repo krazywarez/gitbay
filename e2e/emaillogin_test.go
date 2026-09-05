@@ -57,7 +57,9 @@ func TestEmailLogin(t *testing.T) {
 	if status != 200 || !strings.Contains(body, "on its way") {
 		t.Fatalf("POST /login by username: %d", status)
 	}
-	deadline := time.Now().Add(2 * time.Second)
+	// Mail goes out through the notification queue, not on the request
+	// path, so give the mailer's poll tick time to pick it up.
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) && len(smtp.mailTo("dana@example.test")) < 2 {
 		time.Sleep(25 * time.Millisecond)
 	}
@@ -146,10 +148,10 @@ func TestEmailLoginThrottled(t *testing.T) {
 		t.Error("the throttled response differs from the first")
 	}
 
-	// Mail goes out from a goroutine, not on the request path, so give the
-	// last permitted one time to land before counting.
+	// Mail goes out through the notification queue, not on the request
+	// path, so give the last permitted one time to land before counting.
 	var n int
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		n = len(smtp.mailTo("dana@example.test"))
 		if n >= 5 {
