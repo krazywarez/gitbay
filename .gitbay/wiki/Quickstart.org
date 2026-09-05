@@ -1,0 +1,8 @@
+#+title: Quickstart
+
+1. Install the CLI: =go install gitbay.org/gitbay/cmd/gitbay@latest=
+2. =ssh git@gitbay.org whoami= — your key is your identity
+3. =gitbay repo create you/hello= then push
+4. =gitbay issue create --title "first"= from inside the clone
+
+Everything works from stock OpenSSH too: =ssh git@gitbay.org help=.

@@ -1,0 +1,284 @@
+#+title: Parity
+
+Which surface can do what. The CLI is meant to be the complete
+interface: every capability exists over SSH, and the other surfaces
+dispatch the same control commands rather than reimplementing them, so
+they cannot drift. This page is updated in the merge request that
+changes a row.
+
+Three surfaces now: the CLI over SSH, the web, and the iOS client
+(krz/gitbay-ios). A =no= in the cli column is a defect, not a
+preference — it means some surface reached around the registry and
+stranded a capability where only it can reach.
+
+* Rule
+
+A capability lands over SSH first. If it belongs to the
+triage/review/respond loop, it lands on the web in the same merge
+request. Anything whose input is a credential — secrets, mirror
+tokens, API tokens — stays SSH-only by design: the web dispatcher
+refuses =SSHOnly= commands outright. Session minting is not one of
+them: what a browser submits to ask for a login link is a username or
+an address, and the credential it gets back travels by mail.
+
+Rows are one page or one action each. Grouped rows hide gaps, twice
+now: "browse, log, blame, search" read as covered while blame had no
+command at all, and "build list, log" read as covered while the job
+list a trigger can name had none (krz/gitbay#50), leaving the picker
+browser-only and the iOS build screen unable to say more than the log.
+
+* Merge requests
+
+| capability             | cli | web | ios |
+|------------------------+-----+-----+-----|
+| read, diff, commits    | yes | yes | yes |
+| review and check times | yes | yes | yes |
+| who resolved it, when  | yes | yes | yes |
+| comment                | yes | yes | yes |
+| edit title and body    | yes | yes | yes |
+| review (approve etc.)  | yes | yes | yes |
+| resolve a thread       | yes | yes | yes |
+| comment on a diff line | yes | yes | yes |
+| merge (all strategies) | yes | yes | yes |
+| close                  | yes | yes | yes |
+| create                 | yes | yes | yes |
+| draft, ready           | yes | yes | no  |
+| search title and body  | yes | yes | no  |
+| create from a fork     | yes | no  | yes |
+| retarget               | yes | yes | no  |
+| milestone              | yes | yes | yes |
+| choose body markup     | yes | no  | no  |
+| stacked merge requests | yes | yes | no  |
+
+Reviews and checks carry the time they last said something, and a
+=ci/<job>= check carries how long its build ran, so a merge request
+reads without opening the build. Statuses posted through =status set=
+have no build and report only the time. A merged or closed merge
+request names who resolved it and when; a row without that stamp — a
+=migrate= import, or one merged before krz/gitbay!137 with no
+=mr.merged= event to backfill from — says neither rather than
+inventing a time.
+
+A merge request whose target is another open merge request's source
+branch is stacked on it: =mr show= and the page say so both ways, and
+when the lower one merges, everything stacked on it is retargeted onto
+what it merged into with its reviews kept. A squash or rebase merge is
+refused while anything is stacked on the merge request, since it would
+rewrite the commits the stack builds on. The iOS client renders the
+retarget but has no stack view yet.
+
+A draft merge request is open but not asking: it does not merge, and it
+does not appear in anyone's review queue. Draft is a flag rather than a
+fifth state, so every =state = 'open'= rule still means what it did.
+Batched review and range-diff (krz/gitbay#111) are not built.
+
+Nothing asks a *particular* person for a review. The review queue is
+computed from involvement — what you own, are granted, or reach through
+an org or team — so a collaborator with write access who has not touched
+a thread hears nothing until they do (krz/gitbay#145).
+
+Creating from a fork works anywhere the source can be typed as
+=owner/name:branch=; only the web lacks it. Retargeting moves an open
+merge request onto another branch of the same repository and stales the
+reviews, since an approval was of the diff against the old branch.
+
+* Issues
+
+| capability          | cli | web | ios |
+|---------------------+-----+-----+-----|
+| read, list, filter  | yes | yes | yes |
+| filter by label, assignee, author, milestone | yes | yes | no |
+| search title and body | yes | yes | no |
+| create              | yes | yes | yes |
+| comment             | yes | yes | yes |
+| edit title and body | yes | yes | yes |
+| close and reopen    | yes | yes | yes |
+| labels, assignees   | yes | yes | yes |
+| milestone           | yes | yes | yes |
+| milestone list      | yes | yes | yes |
+| labels: list, colour | yes | no  | no  |
+| choose body markup  | yes | no  | no  |
+
+Labels are created on the fly by =issue label --add= and managed by
+=label list=, =label set <label> --color rrggbb= and =label remove=,
+which takes the label off every issue. The web paints the stored colour
+on every chip and derives one from the name when none is set; it has no
+form for setting one yet.
+
+Issue, MR and release bodies, and their comments, carry the markup they
+were written in — =--format md|org= on create, comment and edit, stored
+alongside the text so changing a preference later cannot reinterpret
+prose that already exists. Every surface *renders* the stored format;
+the =no= above is the absence of a picker on the web form and in the iOS
+composer, both of which write markdown. Diff-line comments have no
+format column and are always markdown.
+
+* Repositories
+
+| capability                  | cli | web | ios |
+|-----------------------------+-----+-----+-----|
+| browse files                | yes | yes | yes |
+| read a file                 | yes | yes | yes |
+| commit log                  | yes | yes | yes |
+| commit log at a ref         | yes | yes | yes |
+| one commit with its patch   | yes | yes | yes |
+| blame                       | yes | yes | yes |
+| search file contents        | yes | yes | yes |
+| compare two refs            | yes | yes | no  |
+| branches and tags           | yes | yes | yes |
+| wiki (read)                 | yes | yes | yes |
+| download an archive         | yes | yes | n/a |
+| edit a file                 | yes | yes | yes |
+| create                      | yes | yes | yes |
+| pin                         | yes | yes | yes |
+| watch, mute                 | yes | yes | no  |
+| settings, protection        | yes | yes | yes |
+| topics, website             | yes | yes | yes |
+| visibility                  | yes | yes | yes |
+| archive (read-only flag)    | yes | yes | yes |
+| release list, show          | yes | yes | yes |
+| release create, edit        | yes | yes | yes |
+| build list                  | yes | yes | yes |
+| build show (one build)      | yes | yes | yes |
+| build log                   | yes | yes | yes |
+| build jobs                  | yes | yes | yes |
+| build trigger               | yes | yes | yes |
+| build cancel                | yes | no  | no  |
+| dependency checks on/off    | yes | yes | no  |
+| dependency status           | yes | no  | no  |
+| delete, transfer            | yes | no  | no  |
+| release delete              | yes | no  | no  |
+
+No row is web-only any more. Blame, file editing, log at a ref,
+archive, the public listing and the wiki were all in that state — a
+handler reading git or the store directly instead of dispatching a
+command — until krz/gitbay!99, !101 and !102 gave them commands.
+
+=build cancel= withdraws a queued build, or ends a running one: the
+server closes the runner's log session and the runner kills the step
+within a couple of seconds. Cancelling a duplicate of a commit that
+already passed the job puts that result back on the commit. No button
+on the build page yet.
+
+Dependency checks are off until a repository's admin turns them on: the
+check tells a public registry what the repository depends on. =repo deps
+status= lists what is behind and has no web view because the report
+itself is an issue the worker opens, rewrites and closes, which every
+surface already reads.
+
+The wiki row covers reading. Editing a wiki is a push to
+=<repo>.wiki.git= on every surface, including the web, so there is no
+edit row to have parity on.
+
+=n/a= marks a capability deliberately absent from a surface rather than
+missing from it. Archive download is =n/a= on iOS: the read API carries
+a command's stdout as a JSON string, so a gzip stream cannot survive it,
+and the app has nowhere useful to put a tarball — the brief rules out
+local git, so there is no clone, checkout or build to feed. The web's
+route stays the way to get one.
+
+A README or wiki page's org renders per surface: the web through
+go-org, the iOS client through the shared OrgSwift package
+(=krz/org-swift=). OrgSwift is held to orgo's output by the
+=krz/org-conformance= corpus — golden renderings from orgo, itself
+diffed against Emacs =ox-html= — so constructs the iOS client used to
+approximate (tables, footnotes, timestamps, heading tags, nested lists)
+now render the way the reference does. go-org is not yet on the corpus.
+
+* Discovery
+
+| capability                       | cli | web | ios |
+|----------------------------------+-----+-----+-----|
+| search repositories              | yes | yes | yes |
+| search issues and merge requests | yes | yes | no  |
+| browse all public repositories   | yes | yes | yes |
+| profile page                     | yes | yes | yes |
+| profile about and links          | yes | yes | no  |
+| activity feed                    | yes | yes | yes |
+| command reference                | yes | no  | n/a |
+
+=explore= is the listing without a query; =repo search= is the one with.
+=search= is both plus the title and body of every issue and merge
+request the caller can read, over FTS5; the web serves it at =/search=
+with a field in the rail, and an anonymous visitor gets the public rows
+from the same query. =issue list --search= and =mr list --search= narrow
+one repository. What someone types is quoted term by term, so an FTS5
+operator — =c++=, =AND=, a lone quote — is a word to match and never a
+syntax error. =repo grep= remains the per-repository file-contents
+search.
+
+About text renders as markdown or org-mode per the =about_format= it
+was stored with. The iOS =Profile= decoder lists its keys explicitly,
+so it ignores =about= and =links= rather than breaking on them.
+
+=help= lists the command registry. Bare it is an index, one line per
+command, sorted. With a prefix (=help mr=) it adds each command's
+argument syntax, which is the only place flags are written down;
+=gitbay <cmd> --help= asks the server for the same thing, and =--json=
+returns ={path, summary, usage}=. No web page renders it, and a native
+client has no use for one (krz/gitbay#57).
+
+* Accounts
+
+| capability                  | cli | web | ios |
+|-----------------------------+-----+-----+-----|
+| SSH keys: list, add, remove | yes | yes | yes |
+| PGP keys: list, add, remove | yes | yes | yes |
+| email add and verify        | yes | yes | yes |
+| dashboard aggregate         | yes | yes | yes |
+| notification inbox          | yes | yes | no  |
+| API token mint              | yes | no  | no  |
+| account export bundle       | yes | no  | no  |
+| profile set                 | yes | no  | no  |
+| request a login link        | n/a | yes | no  |
+
+Notifications land in an inbox row per recipient whether or not the
+instance sends mail, and mail is the second half when SMTP is
+configured. =notifications list= reads it, unread by default;
+=notifications read <id>... | --all= clears it; the dashboard and the
+web rail carry the unread count. =repo watch= adds you to a
+repository's notifications and =repo unwatch= mutes it, and a mute wins
+over owning the repository or having written the thread.
+
+A login link is requested from the login page by username or verified
+address, and arrives by mail: it works once and expires in fifteen
+minutes. The row is =n/a= for the CLI because a terminal with a
+registered key runs =web login=, which mints a link directly and needs
+no mail. It exists because an account with no SSH key had no way into
+the web at all (krz/gitbay#155). The page offers the form only when the
+instance has SMTP configured; there is no separate switch. The response
+never says whether the account exists.
+
+=profile set= carries description, website, about and links. It is not
+=SSHOnly= — nothing about a bio is a credential, and the JSON API runs
+it — but no surface has ever offered a form, so the =no= above is
+missing UI rather than a rule.
+
+* Organizations
+
+| capability                | cli | web | ios |
+|---------------------------+-----+-----+-----|
+| read members and teams    | yes | yes | yes |
+| members add, remove, role | yes | yes | yes |
+| teams create, delete      | yes | yes | yes |
+| team members              | yes | yes | yes |
+| team repo grants          | yes | yes | yes |
+| create, rename, delete    | yes | no  | no  |
+
+* Pagination
+
+=issue list=, =mr list=, =repo list=, and =feed= take =--limit <n>=
+and =--cursor <c>=. Cursors are opaque; each page carries the next
+one. Without the flags a list stays complete, so existing scripts are
+unchanged. The web pages the issue and merge request lists at fifty
+with the same cursors; iOS pages with them too.
+
+* SSH only, by design
+
+Build secrets, mirror configuration and tokens, custom domain claims,
+API token minting, deploy keys, account and instance administration. Deleting or transferring a repository is also
+CLI-only: both want a typed confirmation, not a button.
+
+These are the only rows where a =no= is intended. Everywhere else a
+=no= is work outstanding, and =n/a= means a surface cannot usefully
+carry the capability at all — see the archive note above.

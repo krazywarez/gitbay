@@ -1,0 +1,49 @@
+#+title: Performance
+
+Results from a stress test of gitbay.org (2026-08-25): a server-side
+import of the Git project's own repository — 82,056 commits, 1,016
+refs, 167MB packed — followed by timed requests against every page
+type. The instance is a single 1 vCPU / 1GB VPS that was concurrently
+running the CI runner, the mirror worker, and the scheduler.
+
+* Summary
+
+The import took 41.5 seconds end to end. Every core page rendered in
+under a second against the full history; the heaviest operations —
+blame on a 7,000-line file and full-clone pack generation — cost what
+git itself costs, and nothing else. Load peaked at 0.42 and memory
+held near 190MB through the entire run. A full anonymous HTTPS clone
+of all 82,056 commits completed in 17 seconds and round-tripped with
+an identical commit count.
+
+* Numbers
+
+| operation                                      |  time |
+|------------------------------------------------+-------|
+| server-side import (=repo import=)             | 41.5s |
+| repo tree + README render                      | 0.56s |
+| log page (50 commits, signature checks)        | 0.68s |
+| per-file history (=?path=diff.c=)              | 0.61s |
+| directory history (=?path=Documentation=)      | 0.55s |
+| refs page (1,016 refs)                         | 0.61s |
+| blob of diff.c (7k lines, 3MB highlighted)     | 1.57s |
+| blame on diff.c across the full history        | 2.20s |
+| content grep                                   | 0.70s |
+| archive tar.gz (12MB)                          | 2.46s |
+| signed-tag commit page (unknown-key path)      | 0.29s |
+| shallow HTTPS clone                            |  3.8s |
+| full HTTPS clone (82,056 commits)              | 17.2s |
+
+* Why it holds
+
+gitbay keeps no object database of its own: transports stream through
+=git upload-pack=, object reads go through =git cat-file --batch=, and
+blame, grep, and archives are the git binary doing what it already does
+well. The forge's own work — auth, policy, rendering — is milliseconds
+around that. Metadata lives in one SQLite file in WAL mode, which at
+this scale never appears in a profile.
+
+The practical ceiling on this hardware is concurrent pack generation:
+full clones of large repositories are CPU-bound in git itself (the 17s
+clone ran git at ~156% CPU). A busier instance would scale that with
+cores, not with changes to gitbay.
