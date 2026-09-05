@@ -169,24 +169,22 @@ Expected: PASS — the new migration must not break existing store tests.
 
 - [ ] **Step 6: Confirm the index is actually used**
 
-Run:
-```bash
-cd /Users/cmc/git/krz/gitbay && cat > /tmp/plan_explain_test.go <<'EOF'
-EOF
-go test ./internal/store/ -run TestDashboardQueriesUseIndexes -v
-```
-Expected: PASS (unrelated, but proves the migration did not disturb existing
-plans). Then verify by hand that the count uses the index:
+The count runs on every anonymous request, so a sequential scan here would
+make the throttle its own denial-of-service vector. Verify the plan names the
+index:
 
 ```bash
-sqlite3 "$(mktemp -d)/x.db" <<'EOF'
+sqlite3 "$SCRATCH/plan.db" <<'EOF'
 CREATE TABLE login_tokens (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL,
   created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT);
 CREATE INDEX login_tokens_user_created ON login_tokens(user_id, created_at);
 EXPLAIN QUERY PLAN SELECT count(*) FROM login_tokens WHERE user_id = 1 AND created_at > 'x';
 EOF
 ```
-Expected: the plan names `login_tokens_user_created`, not `SCAN login_tokens`.
+
+Expected: the output names `login_tokens_user_created`. A line reading
+`SCAN login_tokens` means the index is not being used and the migration is
+wrong.
 
 - [ ] **Step 7: Commit**
 
@@ -317,7 +315,7 @@ together because none of them is testable without the others.
 - Create: `e2e/emaillogin_test.go`
 
 **Interfaces:**
-- Consumes: `store.UserIDByVerifiedEmail(address string) (int64, bool)` (`internal/store/activity.go:11`); `store.PrimaryVerifiedEmail(userID int64) (string, error)` (`internal/store/mrs.go:440`); `store.UserByName`; `store.CountLoginTokensSince` (Task 1); `store.NewToken`; `store.CreateLoginToken`; `mail.Send(cfg config.Config, to, subject, body string) error`; `Server.apiLimit.allow(key string, write bool) (bool, time.Duration)`; `Server.clientIP(r)`.
+- Consumes: `store.UserIDByVerifiedEmail(address string) (int64, bool)` (`internal/store/activity.go:11`); `store.PrimaryVerifiedEmail(userID int64) (string, error)` (`internal/store/mrs.go:440`); `store.UserByUsername`; `store.CountLoginTokensSince` (Task 1); `store.NewToken`; `store.CreateLoginToken`; `mail.Send(cfg config.Config, to, subject, body string) error`; `Server.apiLimit.allow(key string, write bool) (bool, time.Duration)`; `Server.clientIP(r)`.
 - Produces: `func control.RequestLoginLink(cfg config.Config, st *store.Store, identifier string) error`
 
 - [ ] **Step 1: Write the failing e2e test**
@@ -511,7 +509,7 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 		}
 		userID, address = id, identifier
 	} else {
-		u, err := st.UserByName(identifier)
+		u, err := st.UserByUsername(identifier)
 		if err != nil {
 			return nil
 		}
@@ -547,9 +545,7 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 }
 ```
 
-Check `st.UserByName`'s real name and signature before writing this — if the
-store spells it differently, use the store's spelling rather than adding a
-wrapper. Run: `grep -n "func (s \*Store) UserByName" internal/store/users.go`
+`UserByUsername(name string) (User, error)` is at `internal/store/users.go:109`.
 
 - [ ] **Step 4: Write the handler**
 
@@ -781,7 +777,6 @@ triple to a single `error`, recorded above under "Change from the spec".
 Each is used with that signature everywhere it appears. `sessionSameSite` is
 declared in Task 2 and used in Task 2 only.
 
-**Unverified at plan time.** `store.UserByName` is used in Task 3 Step 3 but
-its exact name and signature were not confirmed; Step 3 carries an explicit
-instruction to check before writing. `Parity.org`'s table format is likewise
-read at execution rather than guessed.
+**Unverified at plan time.** `Parity.org`'s table format is read at execution
+rather than guessed, which is why Task 4 Step 2 says to read neighbouring rows
+first rather than giving the row verbatim.
