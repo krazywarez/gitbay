@@ -62,7 +62,8 @@ anyone at a terminal has SSH and already has `web login`.
 Resolution: an identifier containing `@` goes to `store.UserIDByVerifiedEmail`;
 otherwise look up the username and take `store.PrimaryVerifiedEmail`. Both
 exist. Only verified addresses resolve; an unverified one is treated as no
-match.
+match. An empty or whitespace-only identifier resolves to no match by the same
+path, so it draws the same response as everything else.
 
 The body follows `sendVerification` (`internal/control/register.go:41`) and
 ends in `mail.Send`.
@@ -126,7 +127,7 @@ separate policy question that widens the open-registration spam surface.
 | Path | Change |
 |---|---|
 | `internal/control/loginlink.go` | new — `RequestLoginLink` |
-| `internal/store/` | new — `CountLoginTokensSince` |
+| `internal/store/sessions.go` | new — `CountLoginTokensSince`, beside `CreateLoginToken` |
 | `internal/httpd/accounts.go` | `loginSubmit` handler; cookie `SameSite` |
 | `internal/httpd/routes.go` | `POST /login` |
 | `internal/web/templates/login.html` | the request form |
