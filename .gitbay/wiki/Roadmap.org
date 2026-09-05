@@ -91,11 +91,25 @@ Bigger bets, each valuable independently; order by appetite.
   the domain)
 - [[https://gitbay.org/krz/gitbay/issues/11][#11]] iOS app (hutch-based) and [[https://gitbay.org/krz/gitbay/issues/12][#12]] Android
 - [[https://gitbay.org/krz/gitbay/issues/21][#21]] teams within orgs — done 2026-08-25 (members-role scoping + per-repo team grants)
-- [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis — done 2026-08-25 (push-edited .wiki companions; krz/gitbay has one)
+- [[https://gitbay.org/krz/gitbay/issues/25][#25]] wikis — done 2026-08-25, moved into the repository 2026-09-05 ([[https://gitbay.org/krz/gitbay/issues/170][#170]])
 
 Done for the wiki half (2026-08-25): the docs now live in this wiki,
 dogfooding #25. When #15 (pages) lands they can graduate to a published
 site.
+
+A wiki was a companion bare repo at =<name>.wiki.git= with no row in the
+store, invisible to backups, quotas, search and the activity feed, and
+writable only by push. Since [[https://gitbay.org/krz/gitbay/issues/170][#170]] pages live at =.gitbay/wiki/= on the
+default branch, beside =ci.yml= and =CODEOWNERS=: one repository, one
+clone, one backup, one permission model. This page's own history came
+across intact. The companion path is gone rather than deprecated —
+cloning =krz/gitbay.wiki= now fails with =repository not found=.
+
+The trade is that prose edits are commits on the default branch, so they
+go through a branch and a merge request like any other file, and they
+would queue every CI job. [[https://gitbay.org/krz/gitbay/issues/169][#169]] added =paths= and =paths-ignore= to
+=.gitbay/ci.yml= for that, and [[https://gitbay.org/krz/gitbay/issues/171][#171]] made the filter apply to a branch's
+first push, which is the shape every change here has.
 
 * Phase 5 — the web grows up [COMPLETE 2026-08-26; v0.5.0 and v1.0.0, [[https://gitbay.org/krz/gitbay/issues/35][#35]]]
 
