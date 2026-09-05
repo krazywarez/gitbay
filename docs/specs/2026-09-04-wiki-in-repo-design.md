@@ -57,12 +57,22 @@ but the parity gain is conditional and should not be claimed otherwise.
 
 ### Phase 1 — path filters (#169)
 
-`ci.Job` gains `Paths` and `PathsIgnore`, each a list of globs matched with
-`path.Match` against the changed-file list from `gitutil.DiffFiles(dir, old,
-new)`, which already exists (`internal/gitutil/merge.go:276`).
+`ci.Job` gains `Paths` and `PathsIgnore`, each a list of globs matched against
+the changed-file list from `gitutil.DiffFiles(dir, old, new)`, which already
+exists (`internal/gitutil/merge.go:276`).
 
-A job runs when its `Paths` is empty or at least one changed file matches it,
-and no `PathsIgnore` pattern matches every changed file.
+**Matching.** `path.Match` alone is not enough: Go's `*` does not cross `/`, so
+`.gitbay/wiki/**` matches `.gitbay/wiki/Home.md` but not
+`.gitbay/wiki/sub/Page.md` — a filter that appears to work and quietly misses
+nested files. Define it explicitly: a pattern ending in `/**` matches that
+directory and everything beneath it at any depth, implemented as a prefix
+check; every other pattern goes to `path.Match` against the full path. A test
+must cover the nested case, since that is the one a reader will assume works.
+
+**Selection.** A job runs when `Paths` is empty or at least one changed file
+matches one of its patterns. It is then skipped only when every changed file
+matches at least one `PathsIgnore` pattern. A push touching one ignored file
+and one other file runs the job.
 
 **Fail open.** A job runs whenever the filter cannot be evaluated: a new branch
 with no diff base (`old` is empty or all zeros), a `DiffFiles` error, or a job
