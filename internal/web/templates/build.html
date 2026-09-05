@@ -1,7 +1,14 @@
 {{define "title"}}build {{.Build.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 <div class="headrow">
 <h1>Build {{.Build.Number}} <span class="chip check-{{.Build.Status}}">{{.Build.Status}}</span></h1>
+<span class="spacer"></span>
+{{if and .CanWrite (or (eq .Build.Status "pending") (eq .Build.Status "running"))}}
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds/{{.Build.Number}}/cancel" class="actions">
+  <button type="submit">{{if eq .Build.Status "running"}}Cancel (stops at the runner's next check){{else}}Cancel{{end}}</button>
+</form>
+{{end}}
 </div>
 <p class="meta">{{.Build.Job}} on {{.Build.Ref}} · <code><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/commit/{{.Build.SHA}}">{{printf "%.10s" .Build.SHA}}</a></code> · queued {{when .Build.CreatedAt}}{{if .Build.FinishedAt}} · finished {{when .Build.FinishedAt}}{{end}}</p>
 {{if .Log}}<pre class="code buildlog">{{.Log}}</pre>{{else}}<p class="empty-note">no log yet</p>{{end}}

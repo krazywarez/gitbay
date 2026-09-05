@@ -55,8 +55,10 @@ func TestBuildPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
 	err := web.Render(&sb, "build.html", struct {
 		repoPage
-		Build control.BuildOut
-		Log   string
+		Build    control.BuildOut
+		Log      string
+		CanWrite bool
+		Notice   string
 	}{
 		testRepoPage(),
 		control.BuildOut{
@@ -65,6 +67,7 @@ func TestBuildPageRendersCommandOutput(t *testing.T) {
 			CreatedAt: "2026-08-28T04:42:54Z", FinishedAt: "2026-08-28T04:43:06Z",
 		},
 		"step 1 ok",
+		true, "",
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -77,5 +80,9 @@ func TestBuildPageRendersCommandOutput(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("build.html missing %q", want)
 		}
+	}
+	// A finished build offers no cancel control, even to a writer.
+	if strings.Contains(out, "/cancel") {
+		t.Error("build.html offers cancel on a finished build")
 	}
 }

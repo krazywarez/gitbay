@@ -54,7 +54,9 @@ func (s *Server) build(w http.ResponseWriter, r *http.Request) {
 
 	s.render(w, "build.html", struct {
 		repoPage
-		Build control.BuildOut
-		Log   string
-	}{p, b, log})
+		Build    control.BuildOut
+		Log      string
+		CanWrite bool
+		Notice   string
+	}{p, b, log, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }

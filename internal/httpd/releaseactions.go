@@ -53,3 +53,17 @@ func (s *Server) buildTriggerSubmit(w http.ResponseWriter, r *http.Request, u st
 	_, msg, code := s.runControlCode(u, []string{"build", "trigger", repo, job})
 	s.done(w, r, code, msg, func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "builds", msg) })
 }
+
+// buildCancelSubmit withdraws a build. The page only offers the control
+// while a build is still queued; the command decides for real, so a stale
+// page posting against a build that has since finished sees the refusal
+// instead of a silent no-op.
+func (s *Server) buildCancelSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
+	n := r.PathValue("n")
+	back := func(w http.ResponseWriter, r *http.Request, msg string) {
+		s.backTo(w, r, "builds/"+n, msg)
+	}
+	_, msg, code := s.runControlCode(u, []string{"build", "cancel", repo, n})
+	s.done(w, r, code, msg, back)
+}

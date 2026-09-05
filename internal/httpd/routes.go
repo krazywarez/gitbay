@@ -150,6 +150,8 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.releaseSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/builds", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.buildTriggerSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/builds/{n}/cancel", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.buildCancelSubmit))},
 			Route{Method: "GET", Pattern: "/{owner}/{repo}/settings",
 				Handler: s.requireUser(s.settingsForm)},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/settings", Mutating: true,
