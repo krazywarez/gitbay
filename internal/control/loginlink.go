@@ -2,6 +2,7 @@ package control
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,7 +13,11 @@ import (
 
 // maxLoginLinksPerHour bounds what one account's address can be made to
 // receive. It matches maxEmailAddsPerHour: enough for a person who mistypes
-// and retries, nothing for a script.
+// and retries, nothing for a script. The counter is shared with SSH-minted
+// links, not just these: CountLoginTokensSince counts every row in
+// login_tokens, and "web login" over SSH inserts into that same table
+// without consulting this bound, so five "ssh git@host web login" calls in
+// an hour also spend an account's budget here.
 const maxLoginLinksPerHour = 5
 
 // loginLinkTTL is longer than the five minutes an SSH-minted link gets.
@@ -82,5 +87,17 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 			"Open this link within 15 minutes. It works once:\n\n    %s/login?token=%s\n\n"+
 			"If this wasn't you, ignore this mail. Nothing has changed on the account.\n",
 		host, strings.TrimSuffix(cfg.Server.SiteURL, "/"), token)
-	return mail.Send(cfg, address, "log in to "+host, body)
+	subject := "log in to " + host
+
+	// Sent in the background: mail.Send is a synchronous SMTP round trip to
+	// the relay, tens to hundreds of milliseconds against the sub-millisecond
+	// a miss takes to answer. Returning before it completes keeps every case
+	// — hit, miss, unverified, throttled — on the same DB-bound path, so
+	// response time cannot answer what the response body is built not to.
+	go func() {
+		if err := mail.Send(cfg, address, subject, body); err != nil {
+			slog.Error("login link mail", "address", address, "err", err)
+		}
+	}()
+	return nil
 }

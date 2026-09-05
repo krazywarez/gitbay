@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A person with no SSH key can still get into the web UI: they ask for a
@@ -53,6 +54,21 @@ func TestEmailLogin(t *testing.T) {
 	if _, body := browserGet(t, second, inst.base()+"/settings"); strings.Contains(body, "dana@example.test") {
 		t.Error("login link worked twice")
 	}
+
+	// The identifier can also be a bare username; it resolves to the
+	// account's verified address the same way an email address does.
+	status, body = browserPost(t, browser, inst.base()+"/login",
+		url.Values{"identifier": {"dana"}})
+	if status != 200 || !strings.Contains(body, "on its way") {
+		t.Fatalf("POST /login by username: %d", status)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(smtp.mailTo("dana@example.test")) < 2 {
+		time.Sleep(25 * time.Millisecond)
+	}
+	if n := len(smtp.mailTo("dana@example.test")); n != 2 {
+		t.Fatalf("login by username did not mail a second link: got %d mails, want 2", n)
+	}
 }
 
 // The response must not say whether an account exists. A different status,
@@ -77,6 +93,8 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 		url.Values{"identifier": {"eve@example.test"}})
 	empty, bodyEmpty := browserPost(t, browser, inst.base()+"/login",
 		url.Values{"identifier": {""}})
+	absentUser, bodyAbsentUser := browserPost(t, browser, inst.base()+"/login",
+		url.Values{"identifier": {"nosuchuser"}})
 
 	for _, c := range []struct {
 		name   string
@@ -86,6 +104,7 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 		{"absent", absent, bodyAbsent},
 		{"unverified", unver, bodyUnver},
 		{"empty", empty, bodyEmpty},
+		{"absent-username", absentUser, bodyAbsentUser},
 	} {
 		if c.status != real1 || c.body != bodyReal {
 			t.Errorf("%s differs from a real address: status %d vs %d", c.name, c.status, real1)
@@ -110,11 +129,35 @@ func TestEmailLoginThrottled(t *testing.T) {
 		"--email", "dana@example.test", "--verified")
 
 	browser := newBrowser(t)
+	var first, sixth string
 	for i := 0; i < 6; i++ {
-		browserPost(t, browser, inst.base()+"/login",
+		_, body := browserPost(t, browser, inst.base()+"/login",
 			url.Values{"identifier": {"dana@example.test"}})
+		switch i {
+		case 0:
+			first = body
+		case 5:
+			sixth = body
+		}
 	}
-	if n := len(smtp.mailTo("dana@example.test")); n > 5 {
-		t.Fatalf("sent %d login mails in an hour, want at most 5", n)
+	// Being over the throttle is one more class whose response must not
+	// differ from an ordinary request.
+	if sixth != first {
+		t.Error("the throttled response differs from the first")
+	}
+
+	// Mail goes out from a goroutine, not on the request path, so give the
+	// last permitted one time to land before counting.
+	var n int
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		n = len(smtp.mailTo("dana@example.test"))
+		if n >= 5 {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if n != 5 {
+		t.Fatalf("sent %d login mails in an hour, want exactly 5", n)
 	}
 }
