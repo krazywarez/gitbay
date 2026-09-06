@@ -206,7 +206,7 @@ now render the way the reference does. go-org is not yet on the corpus.
 | search issues and merge requests | yes | yes | no  |
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
-| profile about and links          | yes | yes | no  |
+| profile about and links          | yes | yes | yes |
 | activity feed                    | yes | yes | yes |
 | command reference                | yes | no  | n/a |
 
@@ -221,8 +221,8 @@ syntax error. =repo grep= remains the per-repository file-contents
 search.
 
 About text renders as markdown or org-mode per the =about_format= it
-was stored with. The iOS =Profile= decoder lists its keys explicitly,
-so it ignores =about= and =links= rather than breaking on them.
+was stored with. The iOS client decodes and renders both,
+through the same OrgSwift path a README takes.
 
 =help= lists the command registry. Bare it is an index, one line per
 command, sorted. With a prefix (=help mr=) it adds each command's
@@ -241,9 +241,9 @@ client has no use for one (krz/gitbay#57).
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | no  |
 | API token mint              | yes | no  | no  |
-| account export bundle       | yes | yes | no  |
+| account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | no  |
-| request a login link        | n/a | yes | no  |
+| request a login link        | n/a | yes | n/a |
 
 Notifications land in an inbox row per recipient whether or not the
 instance sends mail, and mail is the second half when SMTP is
@@ -260,7 +260,14 @@ registered key runs =web login=, which mints a link directly and needs
 no mail. It exists because an account with no SSH key had no way into
 the web at all (krz/gitbay#155). The page offers the form only when the
 instance has SMTP configured; there is no separate switch. The response
-never says whether the account exists.
+never says whether the account exists. It is =n/a= on iOS for the same
+reason it is on the CLI, from the other end: the app authenticates with
+a bearer token pasted at sign-in, so a one-time link into the web
+unlocks nothing it can use.
+
+The account export bundle is =n/a= on iOS on the archive-download
+argument above — a JSON bundle has nowhere useful to land on a phone,
+and the web route stays the way to get one.
 
 =profile set= carries description, website, about and links. It is not
 =SSHOnly= — nothing about a bio is a credential, and the JSON API runs
