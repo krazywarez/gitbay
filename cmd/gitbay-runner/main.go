@@ -203,6 +203,24 @@ func (r *runner) run(j job) bool {
 	dir := filepath.Join(r.workdir, fmt.Sprintf("build-%d", j.ID))
 	defer os.RemoveAll(dir)
 
+	// A build's HOME. Not the workspace, which is removed after every
+	// build: the Go module cache, the sonar scanner and every other tool
+	// cache live under HOME, so a per-build one re-downloads the world
+	// each time. Not the runner's own home either, where its SSH key and
+	// credential dotfiles are. A directory beside the workspaces is
+	// neither.
+	//
+	// It is shared by every build on this runner, so a step can poison a
+	// cache another repository's build will read. That is already true of
+	// anything a step can reach as this user — see the wiki's
+	// Threat-Model on the runner — and is what container isolation (#144)
+	// is for; -repos is the control until then.
+	buildHome := filepath.Join(r.workdir, "home")
+	if err := os.MkdirAll(buildHome, 0o700); err != nil {
+		log.Printf("build %d: build home: %v", j.ID, err)
+		return false
+	}
+
 	// One long-lived `runner log` session receives the whole stream.
 	logCmd := exec.Command(toolpath.Look("ssh"), append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
 	pipe, err := logCmd.StdinPipe()
@@ -304,7 +322,7 @@ func (r *runner) run(j job) bool {
 		}
 	}
 
-	env := stepEnv(j, dir)
+	env := stepEnv(j, buildHome)
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
 		cmd := exec.Command(toolpath.Look("sh"), "-c", step)
@@ -324,21 +342,22 @@ func (r *runner) run(j job) bool {
 // the runner's entire environment, including anything an operator set on
 // the service (#144).
 //
-// HOME is the workspace, not the runner's home. Tools read credentials
-// out of dotfiles — .netrc, .npmrc, .gitconfig — and a build has no
-// business finding the runner's. It also means a build's caches land in
-// the workspace and go away with it.
+// HOME is a build home shared by this runner's builds, not the runner's
+// own: tools read credentials out of dotfiles — .netrc, .npmrc,
+// .gitconfig — and a build has no business finding the runner's. It is
+// not the workspace either, because the workspace is deleted after every
+// build and every tool cache lives under HOME.
 //
 // PATH is the one thing carried over: without it a step cannot find the
 // tools the host was provisioned with.
-func stepEnv(j job, dir string) []string {
+func stepEnv(j job, home string) []string {
 	path := os.Getenv("PATH")
 	if path == "" {
 		path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	}
 	env := []string{
 		"PATH=" + path,
-		"HOME=" + dir,
+		"HOME=" + home,
 		"LANG=C.UTF-8",
 		"CI=true",
 		"GITBAY_REPO=" + j.Repo,

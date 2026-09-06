@@ -130,9 +130,13 @@ runner, polling over SSH, clones the commit and runs its steps.
   no secrets, so a stranger's branch cannot read the target's deploy
   credentials. The step environment is *constructed*, not inherited: a
   build gets =PATH=, =HOME=, =LANG=, =CI=, its own variables and its
-  secrets, and nothing the operator set on the service. =HOME= is the
-  workspace, so a build cannot read the runner's =.netrc=, =.npmrc= or
-  =.gitconfig=, where tools keep credentials.
+  secrets, and nothing the operator set on the service. =HOME= is a build
+  home under the runner's =-workdir=, not the runner's own home, so a
+  build cannot read the =.netrc=, =.npmrc= or =.gitconfig= where tools
+  keep credentials. That home is shared by every build on the runner —
+  one build can poison a cache another reads, which is no more than
+  anything a step can already do as this user, and is what isolation
+  (krz/gitbay#144) is for.
 - *Where it runs.* Steps run as the runner's own user on the runner
   host, with no container; the systemd drop-in adds =NoNewPrivileges=,
   =ProtectSystem=full= and the kernel and cgroup protections. =-repos=
