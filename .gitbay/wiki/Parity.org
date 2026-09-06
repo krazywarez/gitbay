@@ -47,7 +47,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | create from a fork     | yes | yes | yes |
 | retarget               | yes | yes | no  |
 | milestone              | yes | yes | yes |
-| choose body markup     | yes | no  | no  |
+| request a review       | yes | yes | no  |
+| choose body markup     | yes | yes | no  |
 | stacked merge requests | yes | yes | no  |
 
 Reviews and checks carry the time they last said something, and a
@@ -72,10 +73,12 @@ does not appear in anyone's review queue. Draft is a flag rather than a
 fifth state, so every =state = 'open'= rule still means what it did.
 Batched review and range-diff (krz/gitbay#111) are not built.
 
-Nothing asks a *particular* person for a review. The review queue is
-computed from involvement — what you own, are granted, or reach through
-an org or team — so a collaborator with write access who has not touched
-a thread hears nothing until they do (krz/gitbay#145).
+=mr review request --add <user>= asks a *particular* person, who then
+carries the merge request in their queue and is notified; =--remove=
+withdraws the ask. Without one the queue is computed from involvement —
+what you own, are granted, or reach through an org or team — so a
+collaborator with write access who has not touched a thread hears
+nothing until they do (krz/gitbay#145).
 
 Creating from a fork works anywhere the source can be typed as
 =owner/name:branch=. The web's source picker offers the branches of
@@ -100,7 +103,7 @@ reviews, since an approval was of the diff against the old branch.
 | milestone           | yes | yes | yes |
 | milestone list      | yes | yes | yes |
 | labels: list, colour | yes | yes | no  |
-| choose body markup  | yes | no  | no  |
+| choose body markup  | yes | yes | no  |
 
 Labels are created on the fly by =issue label --add= and managed by
 =label list=, =label set <label> --color rrggbb= and =label remove=,
@@ -113,9 +116,9 @@ Issue, MR and release bodies, and their comments, carry the markup they
 were written in — =--format md|org= on create, comment and edit, stored
 alongside the text so changing a preference later cannot reinterpret
 prose that already exists. Every surface *renders* the stored format;
-the =no= above is the absence of a picker on the web form and in the iOS
-composer, both of which write markdown. Diff-line comments have no
-format column and are always markdown.
+the web's create forms offer the choice, and the =no= above is the iOS
+composer, which writes markdown. Diff-line comments have no format
+column and are always markdown.
 
 * Repositories
 
@@ -148,7 +151,7 @@ format column and are always markdown.
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
-| build cancel                | yes | no  | no  |
+| build cancel                | yes | yes | no  |
 | dependency checks on/off    | yes | yes | no  |
 | dependency status           | yes | yes | no  |
 | delete, transfer            | yes | no  | no  |
@@ -162,8 +165,8 @@ command — until krz/gitbay!99, !101 and !102 gave them commands.
 =build cancel= withdraws a queued build, or ends a running one: the
 server closes the runner's log session and the runner kills the step
 within a couple of seconds. Cancelling a duplicate of a commit that
-already passed the job puts that result back on the commit. No button
-on the build page yet.
+already passed the job puts that result back on the commit. The build
+page carries the button while a build is still cancellable.
 
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps
@@ -239,7 +242,7 @@ client has no use for one (krz/gitbay#57).
 | notification inbox          | yes | yes | no  |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | no  |
-| profile set                 | yes | no  | no  |
+| profile set                 | yes | yes | no  |
 | request a login link        | n/a | yes | no  |
 
 Notifications land in an inbox row per recipient whether or not the
@@ -261,8 +264,8 @@ never says whether the account exists.
 
 =profile set= carries description, website, about and links. It is not
 =SSHOnly= — nothing about a bio is a credential, and the JSON API runs
-it — but no surface has ever offered a form, so the =no= above is
-missing UI rather than a rule.
+it — and the account settings page has the form; the =no= above is the
+iOS client.
 
 * Organizations
 
