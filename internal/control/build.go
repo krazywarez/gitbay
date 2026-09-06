@@ -633,6 +633,20 @@ func queueJobs(
 			continue
 		}
 		diffOld := old
+		// A force-push rewrote the branch, so the old tip is not an
+		// ancestor of the new one and old..new is not "what this push
+		// changed" — it is the difference between two histories. After a
+		// rebase that is whatever the new base added, typically nothing
+		// the branch itself touched, so every path filter concludes its
+		// job is unnecessary and the branch reads as green without its
+		// suite having run (#176). The merge base is the honest base:
+		// the filter is deciding about the branch's relationship to its
+		// target, which is what the merge base expresses.
+		if ci.HasDiffBase(diffOld) && deriveMergeBase {
+			if ok, err := gitutil.IsAncestor(dir, diffOld, sha); err != nil || !ok {
+				diffOld = ""
+			}
+		}
 		if !ci.HasDiffBase(diffOld) && deriveMergeBase {
 			if base, err := gitutil.MergeBase(dir, "refs/heads/"+repo.DefaultBranch, sha); err == nil && base != sha {
 				diffOld = base

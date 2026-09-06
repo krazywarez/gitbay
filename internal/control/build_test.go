@@ -489,3 +489,63 @@ func TestQueueMRBuildsStillFailsOpen(t *testing.T) {
 		t.Fatalf("expected the MR head to fail open and queue a build: %v %v", builds, err)
 	}
 }
+
+// A force-push that rewrote the branch must not filter against the old
+// tip. After a rebase, old..new is the difference between two histories
+// — whatever the new base added — so a branch whose own commits touch
+// code looks like a docs-only push and its jobs are skipped. It then
+// reads as green without having run (#176).
+func TestQueueBranchBuildsRebaseFiltersAgainstMergeBase(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.MkdirAll(filepath.Join(src, "docs"), 0o755)
+	os.MkdirAll(filepath.Join(src, "app"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  unit:\n    paths-ignore:\n      - docs/**\n    steps:\n      - echo hi\n"), 0o644)
+	os.WriteFile(filepath.Join(src, "app", "a.go"), []byte("package a\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+
+	// A branch that changes code — the kind of change the filter must
+	// never skip.
+	git(src, "checkout", "-q", "-b", "feat")
+	os.WriteFile(filepath.Join(src, "app", "a.go"), []byte("package a\n\nvar X = 1\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "code change")
+	oldTip := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	// main moves on with a docs-only commit, and the branch is rebased
+	// onto it — exactly what a fast-forward-only repository forces.
+	git(src, "checkout", "-q", "main")
+	os.WriteFile(filepath.Join(src, "docs", "x.md"), []byte("# x\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "docs only")
+	git(src, "checkout", "-q", "feat")
+	git(src, "rebase", "-q", "main")
+	newTip := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	// The trap: between the two tips lies only the docs commit.
+	if diff := git(src, "diff", "--name-only", oldTip, newTip); !strings.Contains(diff, "docs/x.md") ||
+		strings.Contains(diff, "app/a.go") {
+		t.Fatalf("fixture does not reproduce the trap; old..new = %q", diff)
+	}
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "feat", oldTip, newTip, time.Now())
+
+	builds, err := st.ListBuilds(repo.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(builds) == 0 {
+		t.Fatal("a rebased branch whose commits change code queued no build")
+	}
+}
