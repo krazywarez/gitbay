@@ -13,6 +13,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// DefaultWriteRate is the per-account write budget when the config leaves
+// write_rate at zero: generous for a person at a terminal, and a bound on
+// what one account can enqueue — every write also queues notification mail
+// and webhook deliveries.
+const DefaultWriteRate = 60
+
 type Config struct {
 	Server       Server       `toml:"server"`
 	SSH          SSH          `toml:"ssh"`
@@ -175,6 +181,10 @@ type Limits struct {
 	// APIRate is sustained JSON-API requests per minute per caller; writes
 	// draw on a tenth of it. 0 uses the default.
 	APIRate int `toml:"api_rate"`
+	// WriteRate is sustained mutating commands per minute per account,
+	// counted in the dispatcher so every surface shares one budget. 0 uses
+	// the default; a negative value turns the limit off.
+	WriteRate int `toml:"write_rate"`
 	// Per-account quotas on what a user owns directly (organizations are
 	// not capped). 0 means unlimited; admin user limits overrides per
 	// account.

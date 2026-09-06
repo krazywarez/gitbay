@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/protocol"
@@ -120,6 +121,9 @@ func Dispatch(c *Ctx, argv []string) int {
 		return c.fail(protocol.ExitDenied,
 			"your account is not active yet: verify your email first (email verify <code>, or ask for the mail again with email add)")
 	}
+	if code := limitWrites(c, cmd); code >= 0 {
+		return code
+	}
 	if !cmd.ReadsStdin {
 		c.Stdin = emptyReader{}
 	}
@@ -165,6 +169,32 @@ func auditArgs(args []string) []string {
 }
 
 // pendingAllowed lists what an unverified self-registered account may do.
+// limitWrites spends one token of the account's write budget, and refuses
+// with the wait when it is empty. Returns -1 when the command may run.
+//
+// Exempt: read-only commands, which cost the instance nothing to serve
+// twice; the runner protocol, which streams a build's log in many small
+// writes and would throttle CI; and the host CLI on the server, which has
+// no account to key on and is already root-equivalent.
+func limitWrites(c *Ctx, cmd Command) int {
+	if cmd.ReadOnly || cmd.Path[0] == "runner" || c.Source == "host" || c.User.ID == 0 {
+		return -1
+	}
+	perMinute := c.Cfg.Limits.WriteRate
+	if perMinute == 0 {
+		perMinute = config.DefaultWriteRate
+	}
+	if perMinute < 0 {
+		return -1
+	}
+	if ok, wait := writes.allow(c.User.ID, perMinute); !ok {
+		return c.fail(protocol.ExitDenied,
+			"too many writes: %d a minute per account; try again in %s",
+			perMinute, wait.Round(time.Second))
+	}
+	return -1
+}
+
 func pendingAllowed(path []string) bool {
 	key := joinPath(path)
 	return key == "email verify" || key == "email add" || key == "whoami" || key == "help"

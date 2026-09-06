@@ -221,6 +221,18 @@ per minute — successful auths never count and clear the slate.
 =limits.max_pack_bytes= is enforced as =receive.maxInputSize= on every
 push.
 
+=limits.write_rate= (60) bounds *mutating commands per account per
+minute*. It is counted in the dispatcher, so SSH, the JSON API and the
+web spend one budget and a caller cannot refresh it by changing surface;
+=limits.api_rate= stays in front of it, bounding a network source rather
+than an account. A command is one token whatever it writes, so a bundle
+import costs one and only a loop of separate commands spends the budget.
+Read-only commands, the runner protocol (a build streams its log in many
+small writes) and the host CLI are exempt. Refusals exit 4 and say when
+to retry. A negative value turns the limit off; it matters most with
+=registration = "open"=, where every write also queues notification mail
+and webhook deliveries.
+
 * Queues
 
 Every background worker keeps a backlog and a failure state. An instance
@@ -436,7 +448,8 @@ trusts and refuses to do. Operational checklist:
   auto-reboot 04:30 if required).
 - *Admin sshd (2222)* is throttled by =MaxStartups=/=MaxAuthTries= and
   watched by =fail2ban=; gitbayd's own port 22 is throttled by
-  =limits.ssh_auth_rate= (auth failures per IP per minute).
+  =limits.ssh_auth_rate= (auth failures per IP per minute), and every
+  account's writes by =limits.write_rate=.
 - *Monitoring.* =gitbay-monitor.timer= writes a reading hourly to
 journald and, when =/etc/gitbay/monitor.url= exists, posts it to that
 webhook: disk, service, the daemon's own =/healthz= answer, certificate
