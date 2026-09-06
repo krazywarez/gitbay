@@ -88,3 +88,19 @@ func TestStepEnvHomeIsNotTheWorkspace(t *testing.T) {
 		}
 	}
 }
+
+// podman runs from a system service, where the systemd cgroup manager
+// has no user slice to work in. Every invocation must say so, or crun
+// fails creating the container's scope (#144).
+func TestPodmanUsesCgroupfs(t *testing.T) {
+	got := podmanGlobal()
+	found := false
+	for _, f := range got {
+		if f == "--cgroup-manager=cgroupfs" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("podmanGlobal() = %v, missing the cgroupfs manager", got)
+	}
+}

@@ -104,13 +104,13 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	name := fmt.Sprintf("gitbay-build-%d", j.ID)
 	// --rm so a container cannot outlive its build; the explicit rm below
 	// covers the case where the daemon-less run itself fails.
-	start := exec.Command(podman, "run", "--detach", "--rm",
+	start := exec.Command(podman, append(podmanGlobal(), "run", "--detach", "--rm",
 		"--name", name,
 		"--env-file", envFile,
 		"--volume", dir+":/workspace:rw",
 		"--workdir", "/workspace",
 		"--entrypoint", "sh",
-		image, "-c", "sleep infinity")
+		image, "-c", "sleep infinity")...)
 	start.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 	if out, err := start.CombinedOutput(); err != nil {
 		// A pull failure lands here. Fail the build with what podman
@@ -118,11 +118,11 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		fmt.Fprintf(sink, "starting the build container from %s failed:\n%s\n", image, strings.TrimSpace(string(out)))
 		return false
 	}
-	defer exec.Command(podman, "rm", "--force", name).Run()
+	defer exec.Command(podman, append(podmanGlobal(), "rm", "--force", name)...).Run()
 
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
-		cmd := exec.Command(podman, "exec", "--workdir", "/workspace", name, "sh", "-c", step)
+		cmd := exec.Command(podman, append(podmanGlobal(), "exec", "--workdir", "/workspace", name, "sh", "-c", step)...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
@@ -131,6 +131,19 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		}
 	}
 	return true
+}
+
+// podmanGlobal are the flags every podman invocation needs, before the
+// subcommand.
+//
+// The cgroup manager is cgroupfs, not systemd: the runner is a *system*
+// service, so there is no user session and no user@<uid>.service slice
+// for podman to create a scope under. With the systemd manager crun
+// fails with "create directory .../libpod-<id>.scope/container: No such
+// file or directory". The service's own cgroup is delegated
+// (Delegate=yes in the drop-in), which is what cgroupfs needs (#144).
+func podmanGlobal() []string {
+	return []string{"--cgroup-manager=cgroupfs"}
 }
 
 // podmanHome is where podman keeps its own storage: the runner's home,
