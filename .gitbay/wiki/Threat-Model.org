@@ -141,6 +141,32 @@ Treat the runner host as executing untrusted code: keep it off the
 daemon's host where the database lives, or scope it to repositories
 whose writers you trust.
 
+* What has not been audited
+
+The 2026-09 sweep (krz/gitbay#149) read this repository against the
+claims above. Its two findings — review verdicts from accounts without
+write access deciding merge gates (#147), and control commands having no
+write rate limit while the API had one (#148) — are fixed, as is #173,
+found afterwards in the same milestone. What it did not reach, and why,
+is recorded here rather than in a closed issue:
+
+- *The host.* systemd sandboxing, sshd on 2222, the firewall,
+  unattended-upgrades, fail2ban, disk and file modes, restic append-only
+  credentials. Reading production configuration is a separate exercise
+  from auditing the source, and needs doing against bay1.
+- *The supply chain beyond =govulncheck=.* No review of what the
+  dependency set is, who maintains it, or what a compromised release of
+  any of it would reach.
+- *The runner host as an execution environment.* Nobody has tried to
+  escape what is there. #144 covers the missing isolation.
+- *Timing and traffic analysis.* Token comparison is a hash index lookup
+  by design, but nothing has been measured.
+- *Denial of service by resource exhaustion* beyond rate: large pushes,
+  pathological diffs, deep histories, zip bombs in LFS.
+
+A sweep is a point in time. This section says what a reader should not
+assume has been checked.
+
 * Residual risks, accepted
 
 - External images in rendered READMEs and profile about text load from
