@@ -533,6 +533,7 @@ func mrCmd() *cobra.Command {
 		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
 		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
 		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),
+		local("rebase", "replay the MR's branch onto its target and re-push: gitbay mr rebase <n>", cmdMRRebase),
 		pass("comment", "comment on a merge request", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("diff-comment", "comment on a diff line: --path <f> --line <l> [--old] [--pending] [--reply <id>]", passOpts{server: []string{"mr", "diff-comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("threads", "review threads on an MR", passOpts{server: []string{"mr", "threads"}, needsRepo: true}),

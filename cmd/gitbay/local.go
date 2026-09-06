@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -316,4 +317,99 @@ func hasFlag(args []string, flag string) bool {
 		}
 	}
 	return false
+}
+
+// cmdMRRebase implements `gitbay mr rebase <n>`: replay the merge
+// request's source branch onto its target and re-push it.
+//
+// A repository requiring signed commits accepts only fast-forward merges,
+// because a squash or merge commit is server-created and unsigned. The
+// refusal names the manual procedure — rebase locally, re-push, merge
+// again — and this is that procedure. The git work is local so the
+// replayed commits are signed by whatever key the user's own git config
+// signs with; the server is never asked to vouch for a commit it did not
+// receive already signed (#175).
+func cmdMRRebase(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: gitbay mr rebase <n>")
+		return protocol.ExitUsage
+	}
+	n := args[0]
+	// Cheapest check first: a dirty tree stops the rebase anyway, and
+	// saying so costs no round trip.
+	if dirty, err := worktreeDirty(); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitFailure
+	} else if dirty {
+		fmt.Fprintln(os.Stderr, "gitbay: working tree has uncommitted changes; commit or stash them first")
+		return protocol.ExitFailure
+	}
+	t, err := resolveTarget()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitFailure
+	}
+	if t.repo == "" {
+		fmt.Fprintln(os.Stderr, "gitbay: run this in a clone of the repository the merge request targets")
+		return protocol.ExitUsage
+	}
+	out, code := captureSSH(t, []string{"mr", "show", t.repo, n, "--json"})
+	if code != 0 {
+		return code
+	}
+	var env struct {
+		Data struct {
+			Source    string `json:"source"`
+			TargetRef string `json:"target_ref"`
+			State     string `json:"state"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay: reading merge request:", err)
+		return protocol.ExitProtocol
+	}
+	source, target, state := env.Data.Source, env.Data.TargetRef, env.Data.State
+	if state != "open" {
+		fmt.Fprintf(os.Stderr, "gitbay: !%s is %s\n", n, state)
+		return protocol.ExitUsage
+	}
+	// A fork's branch lives in a repository this clone does not push to,
+	// and guessing which remote that is would be worse than saying so.
+	if strings.Contains(source, ":") {
+		fmt.Fprintf(os.Stderr,
+			"gitbay: !%s comes from %s; rebase it in a clone of that repository and push there\n", n, source)
+		return protocol.ExitUsage
+	}
+	// git talks to origin here, so it needs the instance's ssh options the
+	// same way `repo clone` does — without them a configured key or port
+	// is used by the CLI and not by the fetch and push it runs.
+	if len(t.inst.SSHOptions) > 0 {
+		os.Setenv("GIT_SSH_COMMAND", "ssh "+strings.Join(quoteAll(t.inst.SSHOptions), " "))
+	}
+	if code := runGitLocal("fetch", "origin"); code != 0 {
+		return code
+	}
+	// git rebase checks the branch out itself, so a conflict leaves the
+	// rebase in progress on the right branch for the person to finish.
+	if code := runGitLocal("rebase", "origin/"+target, source); code != 0 {
+		fmt.Fprintf(os.Stderr,
+			"gitbay: rebase stopped; resolve it, then: git push --force-with-lease origin %s\n", source)
+		return code
+	}
+	if code := runGitLocal("push", "--force-with-lease", "origin", source); code != 0 {
+		return code
+	}
+	fmt.Printf("rebased %s onto %s; merge with: gitbay mr merge %s\n", source, target, n)
+	return 0
+}
+
+// worktreeDirty reports whether the working tree has changes a rebase
+// would refuse to run over.
+func worktreeDirty() (bool, error) {
+	cmd := exec.Command(toolpath.Look("git"), "status", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("git status: %w", err)
+	}
+	return strings.TrimSpace(string(out)) != "", nil
 }

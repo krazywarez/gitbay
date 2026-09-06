@@ -341,7 +341,12 @@ Semantics worth knowing:
   *is* one (original commits and signatures land untouched).
 - on =require_signed_commits= branches only fast-forwards of fully
   verified commits merge; everything server-created is refused with
-  instructions to rebase locally.
+  instructions to rebase locally. =gitbay mr rebase <n>= is those
+  instructions: in a clone of the target it replays the source branch
+  onto the target and force-pushes it, then =mr merge <n>= fast-forwards.
+  The replay is local, so the commits carry your signature and not the
+  server's — it holds no key. A branch living in a fork is refused, with
+  the repository to run it in; rebase it there.
 
 Repo admins can gate merges (=repo settings ...=): =require-approvals
 <n>= (fresh, non-author approvals; each reviewer's latest review is
