@@ -1,0 +1,30 @@
+# The image gitbay's own CI jobs run in, once the runner isolates builds
+# (#144). Without it a job runs in the runner's default image, which has
+# no toolchain, and the suite's prerequisite check fails immediately.
+#
+# Build it on the runner host, where podman keeps it:
+#
+#   ssh -p 2222 root@bay1 'su - ci-runner -s /bin/sh -c \
+#     "podman build -t localhost/gitbay-ci:1 -f - ." ' < deploy/Containerfile.ci
+#
+# Tagged, not :latest, so a change to this file is a deliberate bump in
+# .gitbay/ci.yml rather than a silent change under a running branch.
+FROM docker.io/library/golang:1.27-trixie
+
+# The suite drives real git, ssh, sshd and gpg rather than mocking them,
+# and asserts they are present before running. git-lfs has its own tests;
+# sshd must be the binary at /usr/sbin/sshd that the tests exec.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        git-lfs \
+        gnupg \
+        openssh-server \
+        openssh-client \
+        ca-certificates \
+        curl \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# A build runs as this image's root inside its own user namespace, mapped
+# to the runner's unprivileged user on the host. The workspace arrives
+# bind mounted at /workspace.
+WORKDIR /workspace

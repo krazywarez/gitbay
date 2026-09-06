@@ -2,6 +2,7 @@ jobs:
   # Fast feedback: this finishes in seconds, so it is not held behind the
   # suite.
   build:
+    image: localhost/gitbay-ci:1
     steps:
       - go build ./...
       - go vet ./...
@@ -12,6 +13,7 @@ jobs:
   # The 20m is under the runner's own 30m limit, so go times out first and
   # says which test hung instead of the runner killing it blind.
   test:
+    image: localhost/gitbay-ci:1
     steps:
       - missing=""; for t in git git-lfs gpg; do command -v "$t" >/dev/null || missing="$missing $t"; done; test -x /usr/sbin/sshd || missing="$missing sshd"; test -z "$missing" || { echo "runner is missing:$missing"; exit 1; }
       - go test ./... -count=1 -timeout 20m
@@ -31,6 +33,7 @@ jobs:
   # `build trigger krz/gitbay vuln` runs it on demand before a release
   # (#177).
   vuln:
+    image: localhost/gitbay-ci:1
     schedule: "0 3 * * *"
     steps:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
@@ -53,6 +56,7 @@ jobs:
   # linux-x64 bundle carries its own JRE, which is why the host needs no
   # Java.
   sonar:
+    image: localhost/gitbay-ci:1
     schedule: "30 3 * * *"
     steps:
       - |

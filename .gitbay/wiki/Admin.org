@@ -416,6 +416,22 @@ where every repository is trusted. There is no automatic fallback: a
 runner started with =-isolation podman= that cannot find a working
 podman exits rather than running a build unsandboxed.
 
+gitbay's own jobs name =localhost/gitbay-ci:1=, built from
+=deploy/Containerfile.ci= on the runner host. A job's image must carry
+what its steps need: the suite drives real git, git-lfs, gpg and sshd and
+asserts they exist before running, so the stock runner default would fail
+it immediately. Build or rebuild it with:
+
+#+begin_src sh
+ssh -p 2222 root@<host> 'cat > /tmp/Containerfile.ci' < deploy/Containerfile.ci
+ssh -p 2222 root@<host> 'su - ci-runner -s /bin/sh -c \
+  "podman build -t localhost/gitbay-ci:1 -f /tmp/Containerfile.ci /tmp"'
+#+end_src
+
+The tag is deliberate rather than =:latest=: changing the file means
+bumping the tag in =.gitbay/ci.yml=, so a running branch's image does not
+change under it.
+
 =-image= sets the default image for jobs that name none
 (=docker.io/library/debian:stable-slim= if unset); a job overrides it
 with =image:= in =.gitbay/ci.yml=, validated as a reference so a config
