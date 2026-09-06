@@ -42,14 +42,14 @@ browser-only and the iOS build screen unable to say more than the log.
 | merge (all strategies) | yes | yes | yes |
 | close                  | yes | yes | yes |
 | create                 | yes | yes | yes |
-| draft, ready           | yes | yes | no  |
+| draft, ready           | yes | yes | yes |
 | search title and body  | yes | yes | yes |
 | create from a fork     | yes | yes | yes |
-| retarget               | yes | yes | no  |
+| retarget               | yes | yes | yes |
 | milestone              | yes | yes | yes |
-| request a review       | yes | yes | no  |
+| request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | no  |
-| stacked merge requests | yes | yes | no  |
+| stacked merge requests | yes | yes | yes |
 
 Reviews and checks carry the time they last said something, and a
 =ci/<job>= check carries how long its build ran, so a merge request
