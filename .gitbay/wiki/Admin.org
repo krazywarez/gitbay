@@ -252,6 +252,12 @@ no =queues= key at all.
 In accounts mode the same read renders at =/admin=, linked from the rail
 for admins. Anyone else gets a 404 there.
 
+A dead-lettered mail is logged as =notification dead-lettered mail=<id>=,
+with the address redacted out of the relay's error. The id is the queue
+row: find it in the Mail table on =/admin=, or in =dashboard --json=,
+where the recipient and the unredacted error are. That is deliberate —
+see the Threat-Model page.
+
 * Maintenance
 
 #+begin_src sh

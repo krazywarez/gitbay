@@ -20,6 +20,13 @@ log and hardening notes in [[Admin]].
   registration invites, and API tokens travel on stdin or in request
   bodies, never as command arguments (visible in =/proc=) or query
   strings. Tokens are stored only as SHA-256 hashes.
+- *Name a mail recipient in the log.* A queued mail is logged by its
+  queue row id, never by address, and the relay's own error is redacted
+  before it is logged because a rejection usually quotes the address it
+  rejected. The unredacted error and the address stay on the row, which
+  an instance admin reads on =/admin=: the database holds who, the log
+  holds which. One rule for every mail type — notifications, dependency
+  reports and login links all drain the same queue (krz/gitbay#173).
 - *Confirm the existence of private repositories.* Every surface answers
   "not found" identically for a private repo and a nonexistent one — web
   pages, git transport, control commands, release asset downloads.

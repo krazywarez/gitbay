@@ -14,8 +14,8 @@
 {{with .Queues.Mail}}
 <h2>Mail <span class="count">{{.Pending}}</span></h2>
 <p class="meta">{{.Pending}} pending · {{.Retrying}} retrying · {{.Failed}} failed{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
-{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Recipient</th><th>Subject</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
-{{range .Items}}<tr><td>{{.Recipient}}</td><td>{{.Subject}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}failed {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{.LastError}}</td></tr>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Mail</th><th>Recipient</th><th>Subject</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
+{{range .Items}}<tr><td class="mono">{{.ID}}</td><td>{{.Recipient}}</td><td>{{.Subject}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}failed {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{.LastError}}</td></tr>
 {{end}}</tbody></table></div>{{else}}<p class="none">Nothing retrying or failed</p>{{end}}
 {{end}}
 

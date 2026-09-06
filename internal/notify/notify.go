@@ -6,6 +6,7 @@ package notify
 import (
 	"context"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
@@ -53,7 +54,8 @@ func (m *Mailer) Run(ctx context.Context) {
 					attempt := q.Attempts + 1
 					if attempt >= m.MaxAttempts {
 						m.St.MarkMailFailed(q.ID, err.Error(), nil)
-						slog.Warn("notification dead-lettered", "recipient", q.Recipient, "err", err)
+						slog.Warn("notification dead-lettered",
+							"mail", q.ID, "attempts", attempt, "err", redactAddresses(err.Error()))
 					} else {
 						next := time.Now().Add(m.RetryBase << (attempt - 1))
 						m.St.MarkMailFailed(q.ID, err.Error(), &next)
@@ -64,4 +66,17 @@ func (m *Mailer) Run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// A relay's rejection usually quotes the address it rejected — "550 5.1.1
+// <x@y>: Recipient address rejected" — so dropping the recipient field
+// alone would not keep an address out of the log.
+var addressPat = regexp.MustCompile(`[^\s<>@,;:"]+@[^\s<>@,;:"]+`)
+
+// redactAddresses removes mail addresses from text bound for the log. The
+// unredacted error is still recorded on the queue row, where an instance
+// admin reads it on /admin: the database holds the address, the log does
+// not (#173).
+func redactAddresses(s string) string {
+	return addressPat.ReplaceAllString(s, "<address>")
 }
