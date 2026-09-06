@@ -102,7 +102,7 @@ reviews, since an approval was of the diff against the old branch.
 | labels, assignees   | yes | yes | yes |
 | milestone           | yes | yes | yes |
 | milestone list      | yes | yes | yes |
-| labels: list, colour | yes | yes | no  |
+| labels: list, colour | yes | yes | yes |
 | choose body markup  | yes | yes | no  |
 
 Labels are created on the fly by =issue label --add= and managed by
