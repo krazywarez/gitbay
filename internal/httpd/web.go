@@ -440,10 +440,13 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		ActivityTotal int
 		Teams         []teamView
 		CanAdmin      bool
+		Self          bool
 		Notice        string
 	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
 		d.Repos, d.Members, d.Orgs,
-		weeks, activityTotal, teams, canAdmin, s.takeFlash(w, r)})
+		weeks, activityTotal, teams, canAdmin,
+		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
+		s.takeFlash(w, r)})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {

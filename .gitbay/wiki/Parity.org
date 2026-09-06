@@ -269,7 +269,8 @@ missing UI rather than a rule.
 | teams create, delete      | yes | yes | yes |
 | team members              | yes | yes | yes |
 | team repo grants          | yes | yes | yes |
-| create, rename, delete    | yes | no  | no  |
+| create, rename            | yes | yes | no  |
+| delete                    | yes | n/a | n/a |
 
 * Pagination
 
@@ -283,7 +284,8 @@ with the same cursors; iOS pages with them too.
 
 Build secrets, mirror configuration and tokens, custom domain claims,
 API token minting, deploy keys, account and instance administration. Deleting or transferring a repository is also
-CLI-only: both want a typed confirmation, not a button.
+CLI-only, as is deleting an organization: each wants a typed
+confirmation, not a button.
 
 These are the only rows where a =no= is intended. Everywhere else a
 =no= is work outstanding, and =n/a= means a surface cannot usefully

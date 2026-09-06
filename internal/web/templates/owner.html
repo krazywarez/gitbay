@@ -23,6 +23,20 @@
 {{else}}<li class="empty">no visible repositories</li>{{end}}
 </ul>
 
+{{if .Self}}
+<h2>organizations</h2>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+<details class="editbox">
+  <summary>New organization</summary>
+  <form method="post" action="/{{.Owner}}" class="setform">
+    <input type="hidden" name="field" value="org-create">
+    <label for="orgname">Name</label>
+    <input type="text" id="orgname" name="name" required>
+    <button type="submit">Create</button>
+  </form>
+</details>
+{{end}}
+
 {{if .CanAdmin}}{{$org := .Owner}}
 <h2>people <span class="count">{{len .Members}}</span></h2>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
@@ -96,5 +110,20 @@ of a team get its role on every repository it is granted.</p>
     <button type="submit">Create</button>
   </form>
 </details>
+
+<h2>organization</h2>
+<details class="editbox">
+  <summary>Rename</summary>
+  <form method="post" action="/{{$org}}" class="setform">
+    <input type="hidden" name="field" value="org-rename">
+    <label for="orgrename">New name</label>
+    <input type="text" id="orgrename" name="name" value="{{$org}}" required>
+    <button type="submit">Rename</button>
+  </form>
+  <p class="meta">Every clone URL under this organization changes with the name.</p>
+</details>
+<p class="meta">Deleting an organization is a CLI operation, like deleting a
+repository: it wants a typed confirmation rather than a button.</p>
+<pre class="message">gitbay org delete {{$org}} --yes</pre>
 {{end}}
 {{end}}

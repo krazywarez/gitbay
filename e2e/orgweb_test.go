@@ -130,3 +130,58 @@ func orgMembers(t *testing.T, inst *instance, key string) []string {
 	}
 	return names
 }
+
+// The organization lifecycle from a browser: create from your own page,
+// rename from the org's. Delete stays on the CLI, where a typed
+// confirmation is the norm (#167).
+func TestOrgLifecycleWeb(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
+	alice := loginBrowser(t, inst, aliceKey)
+	bob := loginBrowser(t, inst, bobKey)
+
+	// The create form is on your own page and nobody else's.
+	if _, body := browserGet(t, alice, inst.base()+"/alice"); !strings.Contains(body, `value="org-create"`) {
+		t.Fatalf("no create form on your own page:\n%s", body)
+	}
+	if _, body := browserGet(t, bob, inst.base()+"/alice"); strings.Contains(body, `value="org-create"`) {
+		t.Fatal("create form on someone else's page")
+	}
+
+	if status, _ := browserPost(t, alice, inst.base()+"/alice", url.Values{
+		"field": {"org-create"}, "name": {"acmeco"}}); status != 200 {
+		t.Fatal("org create failed")
+	}
+	if out, _, _ := inst.ssh(t, aliceKey, "", "org", "list", "--json"); !strings.Contains(out, "acmeco") {
+		t.Fatalf("org not created:\n%s", out)
+	}
+
+	// Rename is offered to its admin, and the org moves.
+	_, body := browserGet(t, alice, inst.base()+"/acmeco")
+	if !strings.Contains(body, `value="org-rename"`) {
+		t.Fatalf("no rename form for the org admin:\n%s", body)
+	}
+	if !strings.Contains(body, "gitbay org delete") || strings.Contains(body, `value="org-delete"`) {
+		t.Error("delete is not recorded as a CLI operation")
+	}
+	if status, _ := browserPost(t, alice, inst.base()+"/acmeco", url.Values{
+		"field": {"org-rename"}, "name": {"acmeltd"}}); status != 200 {
+		t.Fatal("org rename failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "org", "show", "acmeltd"); code != 0 {
+		t.Fatal("renamed org not found under its new name")
+	}
+	if status, _ := browserGet(t, alice, inst.base()+"/acmeco"); status != http.StatusNotFound {
+		t.Errorf("old org name still resolves: %d", status)
+	}
+
+	// A non-admin cannot rename it, form or no form.
+	browserPost(t, bob, inst.base()+"/acmeltd", url.Values{
+		"field": {"org-rename"}, "name": {"bobsltd"}})
+	if _, _, code := inst.ssh(t, aliceKey, "", "org", "show", "acmeltd"); code != 0 {
+		t.Fatal("a non-admin renamed the organization")
+	}
+}

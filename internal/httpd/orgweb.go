@@ -51,6 +51,23 @@ func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 	team := strings.TrimSpace(r.FormValue("team"))
 	user := strings.TrimSpace(r.FormValue("user"))
 
+	// Create and rename land on a different page than the one they were
+	// posted from: a new org has no page yet, and a renamed one has moved.
+	switch field {
+	case "org-create", "org-rename":
+		name := strings.TrimSpace(r.FormValue("name"))
+		argv := []string{"org", "create", name}
+		if field == "org-rename" {
+			argv = []string{"org", "rename", owner, name}
+		}
+		if _, msg, ok := s.runControl(u, argv); !ok {
+			back(msg)
+			return
+		}
+		http.Redirect(w, r, "/"+name, http.StatusSeeOther)
+		return
+	}
+
 	var argv []string
 	switch field {
 	case "member-add":
