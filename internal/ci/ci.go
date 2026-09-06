@@ -30,6 +30,14 @@ const (
 
 var jobName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)
 
+// imageRef matches an OCI image reference conservatively: registry path
+// segments, an optional :tag and an optional @sha256: digest. This string
+// becomes an argument to `podman run`, and a repository's config file must
+// not be able to turn it into anything else — so the pattern allows only
+// what a reference needs and refuses whitespace and every shell character
+// rather than trying to escape them (#144).
+var imageRef = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-]*(:[0-9]+)?(/[a-zA-Z0-9][a-zA-Z0-9._\-]*)*(:[a-zA-Z0-9][a-zA-Z0-9._\-]{0,127})?(@sha256:[a-f0-9]{64})?$`)
+
 type Job struct {
 	Name     string
 	Steps    []string
@@ -39,6 +47,9 @@ type Job struct {
 	// or tag job ignores them.
 	Paths       []string // globs; the job runs only when a changed file matches one
 	PathsIgnore []string // globs; the job is skipped when every changed file matches one
+	// Image is the container image the job's steps run in. Empty means
+	// the runner's configured default (#144).
+	Image string
 }
 
 // Parse returns the jobs in name order, or an error describing the first
@@ -51,6 +62,7 @@ func Parse(raw []byte) ([]Job, error) {
 			Tags        string   `yaml:"tags"`
 			Paths       []string `yaml:"paths"`
 			PathsIgnore []string `yaml:"paths-ignore"`
+			Image       string   `yaml:"image"`
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
@@ -107,9 +119,13 @@ func Parse(raw []byte) ([]Job, error) {
 				return nil, fmt.Errorf("job %q: bad paths-ignore pattern %q", name, p)
 			}
 		}
+		if j.Image != "" && !imageRef.MatchString(j.Image) {
+			return nil, fmt.Errorf("job %q: bad image %q: a reference like "+
+				"docker.io/library/alpine:3.20, not a command line", name, j.Image)
+		}
 		jobs = append(jobs, Job{
 			Name: name, Steps: j.Steps, Schedule: j.Schedule, Tags: j.Tags,
-			Paths: j.Paths, PathsIgnore: j.PathsIgnore,
+			Paths: j.Paths, PathsIgnore: j.PathsIgnore, Image: j.Image,
 		})
 	}
 	sort.Slice(jobs, func(i, k int) bool { return jobs[i].Name < jobs[k].Name })
