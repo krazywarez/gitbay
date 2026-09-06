@@ -480,7 +480,10 @@ trusts and refuses to do. Operational checklist:
   (the module list is deliberately short — review it on each release),
   and a short fuzz pass over every attacker-facing parser (pkt-line,
   commit, SSHSIG armor, OpenPGP key, SSH tokenizer). Run it before
-  tagging a release.
+  tagging a release. CI's own =vuln= job runs =govulncheck= nightly
+  against main rather than per push, because =@latest= scans today's
+  advisory database and an advisory lands without anyone pushing;
+  =build trigger krz/gitbay vuln= runs it on demand.
 - *Web responses* carry a scripts-forbidden CSP, =X-Frame-Options:
   DENY=, =nosniff=, =no-referrer=, and HSTS when TLS is on — no
   configuration needed.

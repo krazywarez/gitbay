@@ -22,15 +22,30 @@ jobs:
   # build on purpose: an advisory that only lands in a report nobody reads is
   # the state this replaced. @latest matches deploy/audit.sh, so a run scans
   # against the database as it is today, not as it was at commit time.
+  #
+  # Nightly rather than per-push, because that last sentence is the whole
+  # job: the trigger is the advisory database, not the code. An advisory
+  # published against code nobody touched was invisible until someone
+  # happened to push, while a rebase that changed nothing re-scanned it.
+  # A schedule asks the question on the cadence the answer changes.
+  # `build trigger krz/gitbay vuln` runs it on demand before a release
+  # (#177).
   vuln:
+    schedule: "0 3 * * *"
     steps:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-    paths-ignore:
-      - .gitbay/wiki/**
   # SonarCloud static analysis. Report-only: unlike vuln this does not
   # gate, so a first scan of an existing codebase does not turn every
   # build red before anyone has read what it says. Flip the trailing
   # `|| true` off to make the quality gate binding.
+  #
+  # Also nightly (#177). Report-only means it cannot fail a build, so
+  # analysing every push of a branch that is about to be squashed away
+  # informs nobody, and a stack being rebased analysed the same tree four
+  # times. A scheduled job is registered by a default-branch push, so
+  # this now tracks main — which is what the per-branch handling in the
+  # step below was protecting in the first place (#154). It still works
+  # on a branch when triggered by hand.
   #
   # One step, because each step runs in its own `sh -c` and an export
   # would not survive to the next. The scanner is cached under the
@@ -38,6 +53,7 @@ jobs:
   # linux-x64 bundle carries its own JRE, which is why the host needs no
   # Java.
   sonar:
+    schedule: "30 3 * * *"
     steps:
       - |
         set -eu
@@ -70,5 +86,3 @@ jobs:
         fi
         SONAR_HOST_URL=https://sonarcloud.io \
         "$SCANNER/bin/sonar-scanner" -Dsonar.scm.revision="${GITBAY_SHA:-}" $BRANCH_ARG || true
-    paths-ignore:
-      - .gitbay/wiki/**
