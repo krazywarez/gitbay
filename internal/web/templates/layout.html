@@ -22,6 +22,7 @@
       {{if .Viewer}}<li><a href="/">Dashboard</a></li>{{end}}
       <li><a {{if eq (str . "Tab") "explore"}}aria-current="page" {{end}}href="/explore">Explore</a></li>
       {{if .Viewer}}<li><a {{if eq (str . "Tab") "notifications"}}aria-current="page" {{end}}href="/notifications">Notifications{{with .Rail.Unread}} <b class="count">{{.}}</b>{{end}}</a></li>
+      <li><a {{if eq (str . "Tab") "bookmarks"}}aria-current="page" {{end}}href="/bookmarks">Bookmarks</a></li>
       <li><a href="/new">New repository</a></li>{{end}}
     </ul>
     {{with .Rail.Pinned}}
@@ -65,6 +66,7 @@
     <span class="grow"></span>
     {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>
     <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/bookmark" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Marked"}}true{{else}}false{{end}}">{{if field $ "Marked"}}Bookmarked{{else}}Bookmark{{end}}</button></form>
     <form method="post" action="/{{.OwnerName}}/{{.Name}}/fork" class="inline"><button type="submit" class="btn">Fork</button></form>{{end}}
   </div>
   {{$top := topTab (str $ "Tab")}}

@@ -247,6 +247,7 @@ type repoPage struct {
 	Tab      string // active tab in the repo header
 	Topics   []string
 	Pinned   bool   // by the viewer
+	Marked   bool   // bookmarked by the viewer
 	Watch    string // the viewer's watch state: watching, muted, or ""
 	HasWiki  bool
 	Host     string
@@ -307,9 +308,10 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		ref = repo.DefaultBranch
 	}
 	topics, _ := s.st.ListTopics(repo.ID)
-	pinned, watch := false, ""
+	pinned, marked, watch := false, false, ""
 	if viewer.ID != 0 {
 		pinned = s.st.IsPinned(viewer.ID, repo.ID)
+		marked = s.st.IsBookmarked(viewer.ID, repo.ID)
 		watch = s.st.RepoWatchState(repo.ID, viewer.ID)
 	}
 	canAdmin := viewer.ID != 0 && policy.CanAdmin(viewer, repo, grant)
@@ -332,6 +334,7 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 		CanAdmin:   canAdmin,
 		Mirrors:    mirrors,
 		Pinned:     pinned,
+		Marked:     marked,
 		Watch:      watch,
 		HasWiki:    s.hasWiki(repo),
 		Host:       s.cfg.SiteHost(),

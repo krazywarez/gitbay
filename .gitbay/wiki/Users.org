@@ -89,6 +89,13 @@ key, author line claims someone else), =signed_key_expired= /
 (web edits, merge commits) are always =unsigned= — the server holds no
 signing key on principle.
 
+=repo bookmark <owner/name>= saves a repository to come back to and
+=repo unbookmark= drops it; =repo bookmarks= lists yours, each with how
+many people have bookmarked it. The web has the control on the
+repository header, the count in the facts bar, and the list at
+=/bookmarks=. Bookmarks are public and counted; pins are private and
+drive the rail. Read access is all a bookmark needs.
+
 * Profiles
 
 A profile is what =/{owner}= shows: a one-line description, a website, a

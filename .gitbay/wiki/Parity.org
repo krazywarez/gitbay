@@ -139,6 +139,7 @@ column and are always markdown.
 | create                      | yes | yes | yes |
 | fork                        | yes | yes | no  |
 | pin                         | yes | yes | yes |
+| bookmark, bookmark list     | yes | yes | no  |
 | watch, mute                 | yes | yes | no  |
 | settings, protection        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
@@ -167,6 +168,15 @@ server closes the runner's log session and the runner kills the step
 within a couple of seconds. Cancelling a duplicate of a commit that
 already passed the job puts that result back on the commit. The build
 page carries the button while a build is still cancellable.
+
+A pin and a bookmark are different things and are stored separately. A
+pin is private quick access to what you are working on, and drives the
+rail; a bookmark is public, says a repository is worth coming back to,
+and its count is the only popularity signal on the instance. Bookmarking
+needs read access only — it is something you do to someone else's
+repository — and a repository bookmarked while public and since made
+private drops out of the listing rather than leaking that it exists
+(krz/gitbay#146).
 
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps

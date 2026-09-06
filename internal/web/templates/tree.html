@@ -16,6 +16,7 @@
     <a href="{{$r}}/log/{{.Ref}}"><strong>{{.Facts.Commits}}</strong> commit{{if ne .Facts.Commits 1}}s{{end}}</a>
     <a href="{{$r}}/refs"><strong>{{.Facts.Branches}}</strong> branch{{if ne .Facts.Branches 1}}es{{end}}</a>
     <a href="{{$r}}/refs"><strong>{{.Facts.Tags}}</strong> tag{{if ne .Facts.Tags 1}}s{{end}}</a>
+    {{if .Facts.Bookmarks}}<span><strong>{{.Facts.Bookmarks}}</strong> bookmark{{if ne .Facts.Bookmarks 1}}s{{end}}</span>{{end}}
     {{with .Facts.License}}<span class="fact">{{.}}</span>{{end}}
     {{with .Facts.Release}}<a href="{{$r}}/releases">latest <strong>{{.}}</strong></a>{{end}}
     {{with .Facts.Build}}<a href="{{$r}}/builds">build <span class="badge badge-{{.}}">{{.}}</span></a>{{end}}

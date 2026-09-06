@@ -1,0 +1,16 @@
+{{define "title"}}bookmarks · {{.Site}}{{end}}
+{{define "content"}}
+<h1>Bookmarks</h1>
+<p class="meta">Repositories you saved to come back to. A pin is private quick
+access to your own work; a bookmark says something is worth returning to, and
+its count is public.</p>
+<ul class="repolist">
+{{range .Bookmarks}}<li>
+  <p class="title"><a href="/{{.Path}}">{{.Path}}</a>
+    {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
+    <span class="count">{{.Bookmarks}}</span></p>
+  {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
+</li>
+{{else}}<li class="empty">nothing bookmarked yet — open a repository and press Bookmark</li>{{end}}
+</ul>
+{{end}}

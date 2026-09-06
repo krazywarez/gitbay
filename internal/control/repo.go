@@ -99,6 +99,15 @@ func init() {
 	register(Command{Path: []string{"repo", "unpin"},
 		Summary: "unpin a repository",
 		Usage:   "repo unpin <owner/name>", Run: runRepoUnpin})
+	register(Command{Path: []string{"repo", "bookmark"},
+		Summary: "bookmark a repository to come back to",
+		Usage:   "repo bookmark <owner/name>", Run: runRepoBookmark})
+	register(Command{Path: []string{"repo", "unbookmark"},
+		Summary: "remove a bookmark",
+		Usage:   "repo unbookmark <owner/name>", Run: runRepoUnbookmark})
+	register(Command{Path: []string{"repo", "bookmarks"},
+		Summary: "list the repositories you have bookmarked",
+		Usage:   "repo bookmarks", ReadOnly: true, Run: runRepoBookmarks})
 }
 
 const (
@@ -878,6 +887,83 @@ func setPinned(c *Ctx, args []string, pin bool) int {
 	}
 	return c.emit(map[string]string{verb + "ned": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "%sned %s\n", verb, repo.Path())
+	})
+}
+
+func runRepoBookmark(c *Ctx, args []string) int   { return setBookmarked(c, args, true) }
+func runRepoUnbookmark(c *Ctx, args []string) int { return setBookmarked(c, args, false) }
+
+// setBookmarked mirrors setPinned. A bookmark needs only read access —
+// bookmarking is something you do to someone else's repository, which is
+// the whole point of it — and a private repository you cannot read is
+// not found, as everywhere.
+func setBookmarked(c *Ctx, args []string, on bool) int {
+	verb := "bookmark"
+	if !on {
+		verb = "unbookmark"
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if on {
+		if err := c.Store.BookmarkRepo(c.User.ID, repo.ID); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	} else if err := c.Store.UnbookmarkRepo(c.User.ID, repo.ID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "%s is not bookmarked", repo.Path())
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{verb + "ed": repo.Path()}, func(w io.Writer) {
+		fmt.Fprintf(w, "%sed %s\n", verb, repo.Path())
+	})
+}
+
+// BookmarkOut is one row of `repo bookmarks`: the repository and how many
+// people have bookmarked it.
+type BookmarkOut struct {
+	Path        string `json:"path"`
+	Description string `json:"description,omitempty"`
+	Visibility  string `json:"visibility"`
+	Bookmarks   int    `json:"bookmarks"`
+}
+
+func runRepoBookmarks(c *Ctx, args []string) int {
+	if len(args) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: repo bookmarks")
+	}
+	repos, err := c.Store.ListBookmarks(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	out := []BookmarkOut{}
+	for _, r := range repos {
+		// A repository bookmarked while public and since made private
+		// stays in the table and drops out of the listing, the same way
+		// it disappears from every other surface.
+		grant, err := c.Store.AccessRole(r.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !policy.CanRead(c.User, r, grant) {
+			continue
+		}
+		out = append(out, BookmarkOut{
+			Path:        r.Path(),
+			Description: gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name)),
+			Visibility:  r.Visibility,
+			Bookmarks:   c.Store.BookmarkCount(r.ID),
+		})
+	}
+	return c.emit(out, func(w io.Writer) {
+		for _, b := range out {
+			fmt.Fprintf(w, "%s\t%d\t%s\n", b.Path, b.Bookmarks, b.Description)
+		}
 	})
 }
 

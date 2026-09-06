@@ -19,6 +19,7 @@ type repoFacts struct {
 	License      string
 	Release      string // newest release tag, if any
 	Build        string // latest build status on the default branch
+	Bookmarks    int    // how many people saved it, the popularity signal (#146)
 }
 
 type factContributor struct {
@@ -88,5 +89,6 @@ func (s *Server) factsFor(p repoPage) repoFacts {
 	if builds, err := s.st.ListBuilds(p.Repo.ID, 1); err == nil && len(builds) > 0 {
 		f.Build = builds[0].Status
 	}
+	f.Bookmarks = s.st.BookmarkCount(p.Repo.ID)
 	return f
 }

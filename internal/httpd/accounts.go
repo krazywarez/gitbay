@@ -221,6 +221,35 @@ func (s *Server) pinToggle(w http.ResponseWriter, r *http.Request, u store.User)
 	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }
 
+// bookmarkToggle saves or unsaves a repository for the viewer. Read
+// access is all a bookmark needs — it is something you do to someone
+// else's repository — and repoForUser 404s a private one either way.
+func (s *Server) bookmarkToggle(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	verb := "bookmark"
+	if s.st.IsBookmarked(u.ID, repo.ID) {
+		verb = "unbookmark"
+	}
+	if _, msg, ok := s.runControl(u, []string{"repo", verb, repo.Path()}); !ok {
+		s.setFlash(w, msg)
+	}
+	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
+}
+
+// bookmarksPage lists what the viewer has saved.
+func (s *Server) bookmarksPage(w http.ResponseWriter, r *http.Request, u store.User) {
+	var rows []control.BookmarkOut
+	s.runControlInto(u, []string{"repo", "bookmarks"}, &rows)
+	s.render(w, "bookmarks.html", struct {
+		basePage
+		Tab       string
+		Bookmarks []control.BookmarkOut
+	}{s.baseFor(u), "bookmarks", rows})
+}
+
 // forkSubmit forks the repository under the viewer's account and sends
 // them to it. The command decides everything that matters — read access,
 // quota, name collisions — so a refusal comes back as its own message on

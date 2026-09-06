@@ -14,6 +14,7 @@ var reservedNames = map[string]bool{
 	"admin":         true,
 	"api":           true,
 	"archive":       true,
+	"bookmarks":     true,
 	"explore":       true,
 	"favicon.svg":   true,
 	"gitbay":        true, // vanity go-import path on gitbay.org
