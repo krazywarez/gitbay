@@ -88,7 +88,25 @@ func TestReleaseAndBuildWeb(t *testing.T) {
 	if _, p := browserGet(t, bob, base+"/builds"); strings.Contains(p, "Run a job now") {
 		t.Fatal("reader sees the trigger control")
 	}
-	if _, p := browserGet(t, bob, base+"/releases"); strings.Contains(p, "New release") {
-		t.Fatal("reader sees the release form")
+	if _, p := browserGet(t, bob, base+"/releases"); strings.Contains(p, "New release") ||
+		strings.Contains(p, "Delete release") {
+		t.Fatal("reader sees a release control")
+	}
+
+	// Delete is offered to a repo admin and removes the release; the tag
+	// survives, so it is offered for creation again (#165).
+	if _, p := browserGet(t, alice, base+"/releases"); !strings.Contains(p, "Delete release") {
+		t.Fatalf("owner is not offered the delete control:\n%s", p)
+	}
+	if status, _ := browserPost(t, alice, base+"/releases", url.Values{
+		"action": {"delete"}, "tag": {"v1.0"}}); status != 200 {
+		t.Fatal("release delete failed")
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "release", "list", "alice/app", "--json")
+	if strings.Contains(out, "v1.0") {
+		t.Fatalf("release still listed after delete:\n%s", out)
+	}
+	if _, p := browserGet(t, alice, base+"/releases"); !strings.Contains(p, `<option value="v1.0"`) {
+		t.Fatalf("tag not free again after delete:\n%s", p)
 	}
 }

@@ -31,7 +31,13 @@
     <p><input type="text" name="title" aria-label="Title" value="{{$rel.Title}}"></p>
     <p><textarea name="notes" aria-label="Notes" rows="6">{{$rel.Notes}}</textarea></p>
     <p><button type="submit">Save</button></p>
-  </form></details>{{end}}
+  </form>
+  {{if $.CanAdmin}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases" class="commentform">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="tag" value="{{$rel.Tag}}">
+    <p class="meta">Deleting is permanent and takes the assets with it. The tag stays.</p>
+    <p><button type="submit" class="linklike">Delete release</button></p>
+  </form>{{end}}</details>{{end}}
   {{if $rel.Assets}}<table class="assets">
   <thead><tr><th scope="col">File</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead>
   {{range $rel.Assets}}<tr>

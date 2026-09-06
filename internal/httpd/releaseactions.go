@@ -27,6 +27,15 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		s.backTo(w, r, "releases", "pick a tag")
 		return
 	}
+	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) }
+	// The CLI's --yes guards against a mistyped tag; here the tag comes from
+	// the page and the button sits behind a disclosure, so the click is the
+	// deliberate act.
+	if r.FormValue("action") == "delete" {
+		_, msg, code := s.runControlCode(u, []string{"release", "delete", repo, tag, "--yes"})
+		s.done(w, r, code, msg, back)
+		return
+	}
 	verb := "create"
 	if r.FormValue("action") == "edit" {
 		verb = "edit"
@@ -40,7 +49,7 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		argv = append(argv, "--notes", notes)
 	}
 	_, msg, code := s.runControlCode(u, argv)
-	s.done(w, r, code, msg, func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) })
+	s.done(w, r, code, msg, back)
 }
 
 func (s *Server) buildTriggerSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
