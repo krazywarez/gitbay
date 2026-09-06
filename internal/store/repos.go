@@ -354,6 +354,25 @@ func (s *Store) ListPublicRepos() ([]Repo, error) {
 	return out, rows.Err()
 }
 
+// ListForks returns the repositories forked from one repo. The caller
+// filters by what the viewer may see.
+func (s *Store) ListForks(repoID int64) ([]Repo, error) {
+	rows, err := s.DB.Query(repoSelect+" WHERE r.fork_of = ? ORDER BY 4, r.name", repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Repo
+	for rows.Next() {
+		r, err := scanRepo(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) UpdateDefaultBranch(repoID int64, branch string) error {
 	_, err := s.DB.Exec("UPDATE repos SET default_branch = ? WHERE id = ?", branch, repoID)
 	return err

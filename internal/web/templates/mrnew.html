@@ -7,7 +7,7 @@
   <label for="source">Merge</label>
   <select id="source" name="source" required>
     <option value="">Choose a branch…</option>
-    {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.Source}} selected{{end}}>{{.Name}}</option>{{end}}
+    {{range .Sources}}<option value="{{.}}"{{if eq . $.Source}} selected{{end}}>{{.}}</option>{{end}}
   </select>
   <label for="target">into</label>
   <select id="target" name="target">
@@ -19,6 +19,7 @@
 {{template "formatpicker" .Format}}
 <p><button type="submit">Open merge request</button></p>
 </form>
-<p class="meta">A branch in a fork opens from the CLI:
-<code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source owner/fork:branch --target {{.Repo.DefaultBranch}} --title "…"</code></p>
+<p class="meta">Branches of a fork you can push to are offered as
+<code>owner/name:branch</code>. Fork this repository to propose a change
+without write access here: <code>gitbay repo fork {{.Repo.OwnerName}}/{{.Repo.Name}}</code></p>
 {{end}}

@@ -44,7 +44,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | create                 | yes | yes | yes |
 | draft, ready           | yes | yes | no  |
 | search title and body  | yes | yes | no  |
-| create from a fork     | yes | no  | yes |
+| create from a fork     | yes | yes | yes |
 | retarget               | yes | yes | no  |
 | milestone              | yes | yes | yes |
 | choose body markup     | yes | no  | no  |
@@ -78,7 +78,9 @@ an org or team — so a collaborator with write access who has not touched
 a thread hears nothing until they do (krz/gitbay#145).
 
 Creating from a fork works anywhere the source can be typed as
-=owner/name:branch=; only the web lacks it. Retargeting moves an open
+=owner/name:branch=. The web's source picker offers the branches of
+every fork the viewer can push to in that form; forking itself is still
+a CLI operation. Retargeting moves an open
 merge request onto another branch of the same repository and stales the
 reviews, since an approval was of the diff against the old branch.
 

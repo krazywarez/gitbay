@@ -9,6 +9,7 @@ import (
 
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -158,12 +159,42 @@ func (s *Server) mrThreadSubmit(w http.ResponseWriter, r *http.Request, u store.
 type mrNewPage struct {
 	repoPage
 	Branches []gitutil.Ref
+	Sources  []string
 	Source   string
 	Target   string
 	Title    string
 	Body     string
 	Format   string
 	Notice   string
+}
+
+// mrSources lists the branches a merge request may be opened from, in the
+// form the command takes: this repository's branches by name, and those of
+// any fork of it the viewer can push to as "owner/name:branch".
+// Write is the filter because a contributor proposes from a fork they
+// own; the command still checks the source for itself (#168).
+func (s *Server) mrSources(u store.User, p repoPage) []string {
+	var out []string
+	branches, _ := gitutil.Refs(p.Dir, "heads")
+	for _, b := range branches {
+		out = append(out, b.Name)
+	}
+	if u.ID == 0 {
+		return out
+	}
+	forks, _ := s.st.ListForks(p.Repo.ID)
+	for _, f := range forks {
+		grant, _ := s.st.AccessRole(f.ID, u.ID)
+		if !policy.CanWrite(u, f, grant) {
+			continue
+		}
+		dir := control.RepoDir(s.cfg.Server.Root, f.OwnerName, f.Name)
+		refs, _ := gitutil.Refs(dir, "heads")
+		for _, b := range refs {
+			out = append(out, f.Path()+":"+b.Name)
+		}
+	}
+	return out
 }
 
 func (s *Server) mrCreateForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -183,7 +214,7 @@ func (s *Server) mrCreateForm(w http.ResponseWriter, r *http.Request, u store.Us
 		format = "md"
 	}
 	s.render(w, "mrnew.html", mrNewPage{
-		repoPage: p, Branches: branches,
+		repoPage: p, Branches: branches, Sources: s.mrSources(u, p),
 		Source: q.Get("source"), Target: target,
 		Title: q.Get("title"), Body: q.Get("body"), Format: format, Notice: s.takeFlash(w, r),
 	})
