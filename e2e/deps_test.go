@@ -20,7 +20,7 @@ type depsStatus struct {
 // can turn it on: the check tells a public registry what the repository
 // depends on.
 func TestDepsEnableDisable(t *testing.T) {
-	inst := startInstance(t)
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",
 		"--email", "alice@example.test", "--verified")
@@ -70,6 +70,13 @@ func TestDepsEnableDisable(t *testing.T) {
 	// Enabling twice is not an error.
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "deps", "enable", "alice/app"); code != 0 {
 		t.Fatalf("second deps enable: %s", errOut)
+	}
+
+	// The settings page reports the same state the command does (#164).
+	alice := inst.login(t, aliceKey)
+	_, page := browserGet(t, alice, inst.base()+"/alice/app/settings")
+	if !strings.Contains(page, "Last checked") || !strings.Contains(page, "Nothing behind") {
+		t.Errorf("settings page does not report the check state:\n%s", page)
 	}
 
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "deps", "disable", "alice/app"); code != 0 {

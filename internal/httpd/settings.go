@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -19,6 +20,7 @@ type settingsPage struct {
 	Topics      []string
 	Branches    []gitutil.Ref
 	DepsEnabled bool
+	Deps        control.DepsOut
 	Notice      string
 }
 
@@ -34,11 +36,15 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.Us
 	p.Tab = "settings"
 	topics, _ := s.st.ListTopics(repo.ID)
 	branches, _ := gitutil.Refs(p.Dir, "heads")
-	_, depsErr := s.st.DepCheckFor(repo.ID)
+	// The toggle's state comes from the store; what the last run found
+	// comes from the command, so the page shows the same report the CLI
+	// prints (#164).
+	var deps control.DepsOut
+	s.runControlInto(u, []string{"repo", "deps", "status", repo.Path()}, &deps)
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
-		DepsEnabled: depsErr == nil,
-		Notice:      s.takeFlash(w, r),
+		DepsEnabled: deps.Enabled, Deps: deps,
+		Notice: s.takeFlash(w, r),
 	})
 }
 

@@ -146,7 +146,7 @@ format column and are always markdown.
 | build trigger               | yes | yes | yes |
 | build cancel                | yes | no  | no  |
 | dependency checks on/off    | yes | yes | no  |
-| dependency status           | yes | no  | no  |
+| dependency status           | yes | yes | no  |
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | yes | no  |
 
@@ -163,9 +163,10 @@ on the build page yet.
 
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps
-status= lists what is behind and has no web view because the report
-itself is an issue the worker opens, rewrites and closes, which every
-surface already reads.
+status= lists what is behind; the repository's settings page renders the
+same report under the toggle — last check, last error, the tracking
+issue, and the rows. The issue the worker opens, rewrites and closes is
+still the copy every other surface reads.
 
 The wiki row covers reading. A wiki lives at =.gitbay/wiki/= on the
 default branch, so editing one is editing a file in the repository —

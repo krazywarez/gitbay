@@ -25,6 +25,25 @@ func init() {
 		Usage:   "repo deps status <owner/name>", ReadOnly: true, Run: runDepsStatus})
 }
 
+// DepsOut is what `repo deps status` emits: the check's state and what
+// the last run found behind. Named so the web decodes the same struct
+// the command writes.
+type DepsOut struct {
+	Enabled     bool        `json:"enabled"`
+	LastCheck   string      `json:"last_check,omitempty"`
+	LastError   string      `json:"last_error,omitempty"`
+	IssueNumber int64       `json:"issue_number,omitempty"`
+	Behind      []DepBehind `json:"behind"`
+}
+
+// DepBehind is one dependency with a newer release than the manifest pins.
+type DepBehind struct {
+	Ecosystem string `json:"ecosystem"`
+	Name      string `json:"name"`
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+}
+
 func runDepsEnable(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.fail(protocol.ExitUsage, "usage: repo deps enable <owner/name>")
@@ -78,22 +97,10 @@ func runDepsStatus(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	type behind struct {
-		Ecosystem string `json:"ecosystem"`
-		Name      string `json:"name"`
-		Current   string `json:"current"`
-		Latest    string `json:"latest"`
-	}
-	out := struct {
-		Enabled     bool     `json:"enabled"`
-		LastCheck   string   `json:"last_check,omitempty"`
-		LastError   string   `json:"last_error,omitempty"`
-		IssueNumber int64    `json:"issue_number,omitempty"`
-		Behind      []behind `json:"behind"`
-	}{Enabled: true, LastCheck: check.LastCheck, LastError: check.LastError,
-		IssueNumber: check.IssueNumber, Behind: []behind{}}
+	out := DepsOut{Enabled: true, LastCheck: check.LastCheck, LastError: check.LastError,
+		IssueNumber: check.IssueNumber, Behind: []DepBehind{}}
 	for _, r := range reports {
-		out.Behind = append(out.Behind, behind{r.Ecosystem, r.Name, r.Current, r.Latest})
+		out.Behind = append(out.Behind, DepBehind{r.Ecosystem, r.Name, r.Current, r.Latest})
 	}
 	return c.emit(out, func(w io.Writer) {
 		fmt.Fprintf(w, "checks on, last %s\n", orDash(check.LastCheck))

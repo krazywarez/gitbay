@@ -109,6 +109,19 @@
 proxy.golang.org, npm, crates.io, and PyPI once a day, and tracks what is behind
 in an issue. Checking a private repository tells those registries what it
 depends on.</p>
+{{if .DepsEnabled}}
+<p class="meta">Last checked {{if .Deps.LastCheck}}{{.Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · tracked in <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
+{{if .Deps.LastError}}<p class="error" role="alert">{{.Deps.LastError}}</p>{{end}}
+{{if .Deps.Behind}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">dependency</th><th scope="col">pinned</th><th scope="col">latest</th></tr>
+{{range .Deps.Behind}}<tr>
+  <td class="mono">{{.Ecosystem}} {{.Name}}</td>
+  <td class="mono">{{.Current}}</td>
+  <td class="mono">{{.Latest}}</td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">Nothing behind{{if not .Deps.LastCheck}} — the first check has not run yet{{end}}.</p>{{end}}
+{{end}}
 
 <h2>Lifecycle</h2>
 <form method="post" action="{{$base}}" class="setform">

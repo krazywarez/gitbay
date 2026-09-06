@@ -16,7 +16,7 @@ func TestNamedPayloadsRoundTrip(t *testing.T) {
 		&Created{}, &MRCreated{}, &IssueShow{}, &MRShow{},
 		&BuildOut{}, &JobOut{}, &ProfileOut{}, &ProfileRepo{}, &ProfileMember{},
 		&DashboardOut{}, &DashboardItem{}, &DashboardBuild{}, &PinnedOut{},
-		&FeedOut{}, &ActivityDay{}, &SearchResult{}, &ReviewOut{}, &CheckOut{}, &CommitOut{},
+		&FeedOut{}, &ActivityDay{}, &DepsOut{}, &DepBehind{}, &SearchResult{}, &ReviewOut{}, &CheckOut{}, &CommitOut{},
 	}
 	for _, p := range payloads {
 		name := reflect.TypeOf(p).Elem().Name()
@@ -39,7 +39,7 @@ func TestPayloadFieldsAreTagged(t *testing.T) {
 	types := []any{
 		Created{}, MRCreated{}, BuildOut{}, JobOut{}, ProfileOut{}, ProfileRepo{},
 		ProfileMember{}, DashboardOut{}, DashboardItem{}, DashboardBuild{},
-		PinnedOut{}, FeedOut{}, ActivityDay{}, SearchResult{}, ReviewOut{},
+		PinnedOut{}, FeedOut{}, ActivityDay{}, DepsOut{}, DepBehind{}, SearchResult{}, ReviewOut{},
 		CheckOut{}, CommitOut{}, ServerOut{},
 	}
 	for _, v := range types {
