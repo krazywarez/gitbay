@@ -304,15 +304,12 @@ func (r *runner) run(j job) bool {
 		}
 	}
 
+	env := stepEnv(j, dir)
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
 		cmd := exec.Command(toolpath.Look("sh"), "-c", step)
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GITBAY_REPO="+j.Repo, "GITBAY_SHA="+j.SHA, "GITBAY_REF="+j.Ref, "GITBAY_JOB="+j.Job, "CI=true")
-		for name, value := range j.Secrets {
-			cmd.Env = append(cmd.Env, name+"="+value)
-		}
+		cmd.Env = env
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
 			fmt.Fprintf(sink, "%s\n", why)
@@ -322,7 +319,43 @@ func (r *runner) run(j job) bool {
 	return true
 }
 
-// ssh runs one control command against the server and returns stdout.
+// stepEnv builds the environment a build step runs with. It is
+// constructed, not inherited: os.Environ() would hand repository content
+// the runner's entire environment, including anything an operator set on
+// the service (#144).
+//
+// HOME is the workspace, not the runner's home. Tools read credentials
+// out of dotfiles — .netrc, .npmrc, .gitconfig — and a build has no
+// business finding the runner's. It also means a build's caches land in
+// the workspace and go away with it.
+//
+// PATH is the one thing carried over: without it a step cannot find the
+// tools the host was provisioned with.
+func stepEnv(j job, dir string) []string {
+	path := os.Getenv("PATH")
+	if path == "" {
+		path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	}
+	env := []string{
+		"PATH=" + path,
+		"HOME=" + dir,
+		"LANG=C.UTF-8",
+		"CI=true",
+		"GITBAY_REPO=" + j.Repo,
+		"GITBAY_SHA=" + j.SHA,
+		"GITBAY_REF=" + j.Ref,
+		"GITBAY_JOB=" + j.Job,
+	}
+	// The server sends secrets only for a trusted build — a merge request
+	// head from a fork arrives with none — so this loop is empty exactly
+	// when it should be.
+	for name, value := range j.Secrets {
+		env = append(env, name+"="+value)
+	}
+	return env
+}
+
+// ssh runs one control command against the server and returns stdout.// ssh runs one control command against the server and returns stdout.
 func (r *runner) ssh(stdin io.Reader, args ...string) (string, error) {
 	cmd := exec.Command(toolpath.Look("ssh"), append(append(r.sshOpts, r.remote), args...)...)
 	if stdin != nil {
