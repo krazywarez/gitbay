@@ -1,0 +1,13 @@
+# Podman's image store grows without bound: every `image:` a repository
+# names is pulled and kept. On a 40GB host that is a slow outage, so
+# prune weekly (#144).
+[Unit]
+Description=Prune unused podman images on the CI runner
+
+[Timer]
+OnCalendar=Sun 04:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+# Paired with gitbay-runner-prune.timer. Runs as the runner's own user,
+# because rootless podman's store belongs to that user and root's prune
+# would not see it.
+[Unit]
+Description=Prune unused podman images on the CI runner
+
+[Service]
+Type=oneshot
+User=ci-runner
+# Images not used by a container and older than a week. A build that
+# names an image again re-pulls it; the cost is one pull, not a failure.
+ExecStart=/usr/bin/podman image prune --all --force --filter until=168h
+ExecStart=/usr/bin/podman container prune --force

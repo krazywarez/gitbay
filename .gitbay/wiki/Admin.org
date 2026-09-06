@@ -406,6 +406,45 @@ deploy, an archive publish, an automated MR branch — needs an explicit
 grant on that repo: =repo access grant <owner/name> ci write=. Private
 repos likewise need at least read for the clone.
 
+** Container isolation
+
+Builds currently run as the runner's own user with no container; the
+service drop-in and =-repos= are the controls (krz/gitbay#144). The step
+environment is constructed rather than inherited, so a build sees =PATH=,
+=HOME= (its workspace), =LANG=, =CI=, its =GITBAY_*= variables and its
+secrets and nothing else — but a step can still read what that user can
+read, and concurrent builds share a =-workdir=.
+
+Rootless podman is the chosen remedy; the host preparation ships ahead of
+the runner that uses it, so the order is fixed:
+
+#+begin_src sh
+ssh -p 2222 root@<host> 'sh -s' < deploy/runner-podman-setup.sh
+make deploy-runner
+#+end_src
+
+The script installs podman, delegates a subuid/subgid range to
+=ci-runner=, checks that user namespaces are enabled rather than
+assuming, enables lingering, and verifies rootless podman actually runs
+as that user. It is idempotent.
+
+*Do not deploy an isolating runner to a host that has not been
+prepared.* The runner is specified to refuse to start without a working
+podman rather than fall back to running builds unsandboxed — a fallback
+that silently drops isolation is worse than a stopped runner, because
+nothing surfaces it. On an unprepared host that refusal stops every
+build on the instance.
+
+The service drop-in carries =Delegate=yes= for rootless cgroup
+management and =ReadWritePaths= for podman's store under
+=/var/lib/gitbay-runner=, which =ProtectSystem=full= would otherwise
+make read-only. Those paths are prefixed =-= so they are ignored when
+absent: the drop-in installs on unprepared hosts too, and a unit that
+refused to start would stop every build.
+=gitbay-runner-prune.timer= prunes unused images weekly, as the runner's
+user: rootless storage belongs to that user, and root's prune would not
+see it. An unpruned image store on a 40GB host is a slow outage.
+
 * LFS storage
 
 Objects live content-addressed under =[lfs] root= (default
