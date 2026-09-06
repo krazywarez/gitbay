@@ -87,6 +87,13 @@ func init() {
 		Usage:   "mr close <owner/name> <n>", Run: runMRClose})
 }
 
+// ForkOut is what `repo fork` emits: where the fork landed, and what it
+// came from. Named so the web can send a person to the new repository.
+type ForkOut struct {
+	Path   string `json:"path"`
+	ForkOf string `json:"fork_of"`
+}
+
 func runRepoFork(c *Ctx, args []string) int {
 	f, err := parseFlags(args, flagSpec{Values: []string{"--name"}, MaxPos: 1, Usage: "repo fork <owner/name> [--name <n>]"})
 	if err != nil {
@@ -133,7 +140,7 @@ func runRepoFork(c *Ctx, args []string) int {
 		}
 	}
 	forkPath := c.User.Username + "/" + name
-	return c.emit(map[string]string{"path": forkPath, "fork_of": src.Path()}, func(w io.Writer) {
+	return c.emit(ForkOut{Path: forkPath, ForkOf: src.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "forked %s to %s\n", src.Path(), forkPath)
 	})
 }

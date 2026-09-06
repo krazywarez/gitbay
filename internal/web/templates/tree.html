@@ -1,5 +1,6 @@
 {{define "title"}}{{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if .DirPath}}<h1 class="vh">{{.DirPath}}</h1>{{end}}
 <div class="pathbar">
   {{template "refmenu" .}}

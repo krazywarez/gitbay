@@ -221,6 +221,24 @@ func (s *Server) pinToggle(w http.ResponseWriter, r *http.Request, u store.User)
 	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }
 
+// forkSubmit forks the repository under the viewer's account and sends
+// them to it. The command decides everything that matters — read access,
+// quota, name collisions — so a refusal comes back as its own message on
+// the page the button was pressed from (#174).
+func (s *Server) forkSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	var fork control.ForkOut
+	if msg, ok := s.runControlInto(u, []string{"repo", "fork", repo.Path()}, &fork); !ok {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/"+fork.Path, http.StatusSeeOther)
+}
+
 // repoForUser is repoFor with a write/read permission requirement for a
 // logged-in user.
 func (s *Server) repoForUser(w http.ResponseWriter, r *http.Request, u store.User,

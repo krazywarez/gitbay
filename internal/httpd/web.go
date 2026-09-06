@@ -483,12 +483,13 @@ type treePage struct {
 	LastCommits map[string]namedCommit
 	Tip         namedCommit
 	Facts       repoFacts
+	Notice      string
 }
 
 func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, dirPath string) {
 	if _, err := gitutil.ResolveRef(p.Dir, p.Ref); err != nil {
 		// Empty repo: render the page with no entries rather than 404.
-		s.render(w, "tree.html", treePage{repoPage: p, RefKind: "tree"})
+		s.render(w, "tree.html", treePage{repoPage: p, RefKind: "tree", Notice: s.takeFlash(w, r)})
 		return
 	}
 	entries, err := gitutil.ListTree(p.Dir, p.Ref, dirPath)
@@ -529,7 +530,7 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	s.render(w, "tree.html", treePage{p, crumbs(p, "tree", dirPath), prefix, dirPath, "tree", entries, branches,
 		readmeName, readmeHTML,
 		s.namedCommits(gitutil.LastCommits(p.Dir, p.Ref, dirPath, names)),
-		s.namedTip(gitutil.TipCommit(p.Dir, p.Ref)), facts})
+		s.namedTip(gitutil.TipCommit(p.Dir, p.Ref)), facts, s.takeFlash(w, r)})
 }
 
 func (s *Server) blob(w http.ResponseWriter, r *http.Request) {

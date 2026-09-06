@@ -64,7 +64,8 @@
     {{if .Settings.Archived}}<span class="chip">Archived</span>{{end}}
     <span class="grow"></span>
     {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>
-    <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>{{end}}
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/fork" class="inline"><button type="submit" class="btn">Fork</button></form>{{end}}
   </div>
   {{$top := topTab (str $ "Tab")}}
   {{/* The header is the same on every tab: it sits above the tab bar,

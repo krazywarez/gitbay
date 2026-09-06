@@ -79,8 +79,9 @@ a thread hears nothing until they do (krz/gitbay#145).
 
 Creating from a fork works anywhere the source can be typed as
 =owner/name:branch=. The web's source picker offers the branches of
-every fork the viewer can push to in that form; forking itself is still
-a CLI operation. Retargeting moves an open
+every fork the viewer can push to in that form, and the repository
+header has the fork control, so the whole path — fork, edit a file,
+propose — runs in a browser. Retargeting moves an open
 merge request onto another branch of the same repository and stales the
 reviews, since an approval was of the diff against the old branch.
 
@@ -133,6 +134,7 @@ format column and are always markdown.
 | download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
 | create                      | yes | yes | yes |
+| fork                        | yes | yes | no  |
 | pin                         | yes | yes | yes |
 | watch, mute                 | yes | yes | no  |
 | settings, protection        | yes | yes | yes |
