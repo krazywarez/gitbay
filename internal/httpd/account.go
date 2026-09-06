@@ -2,11 +2,14 @@ package httpd
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -63,6 +66,22 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		Message   string
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
 		s.takeFlash(w, r), r.URL.Query().Get("m")})
+}
+
+// accountExport hands the browser the same bundle `account export`
+// writes. The command is ReadOnly, so a GET is enough; the response is an
+// attachment rather than a page because the bundle is a file to keep.
+func (s *Server) accountExport(w http.ResponseWriter, r *http.Request, u store.User) {
+	out, msg, code := s.runControlCode(u, []string{"account", "export"})
+	if code != protocol.ExitOK {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", u.Username+".bundle"))
+	io.WriteString(w, out)
 }
 
 // profileLinksText turns a profile's links into the form the textarea

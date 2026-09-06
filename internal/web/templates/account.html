@@ -96,11 +96,16 @@ account, and where notifications go.</p>
   </form>
 </details>
 
+<h2>Export</h2>
+<p class="meta">Your profile, repositories, issues and merge requests as one
+JSON bundle, the same one <code>gitbay account export</code> writes. Keys are
+never included; a replayed bundle's emails arrive unverified.</p>
+<p><a href="/settings/export">Download bundle</a></p>
+
 <h2>On SSH only</h2>
 <p class="meta">Anything whose input is a credential stays on the command line,
 where it can be piped instead of pasted:</p>
 <pre class="message">gitbay auth token mint --name laptop   # API tokens
-gitbay auth export &gt; account.bundle    # your account, portable
 gitbay admin ...                       # instance administration</pre>
 <p class="meta">All of the above works from stock OpenSSH too:
 <code>ssh git@{{.Host}} auth whoami</code>.</p>

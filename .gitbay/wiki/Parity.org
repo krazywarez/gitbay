@@ -232,7 +232,7 @@ client has no use for one (krz/gitbay#57).
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | no  |
 | API token mint              | yes | no  | no  |
-| account export bundle       | yes | no  | no  |
+| account export bundle       | yes | yes | no  |
 | profile set                 | yes | no  | no  |
 | request a login link        | n/a | yes | no  |
 

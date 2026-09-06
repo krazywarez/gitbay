@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -95,6 +96,31 @@ func TestAccountSettingsWeb(t *testing.T) {
 	// Token minting is SSHOnly and has no web form to reach it.
 	if strings.Contains(body, `value="token-mint"`) {
 		t.Error("token minting exposed on the web")
+	}
+
+	// The account bundle downloads as an attachment, carrying what
+	// "account export" writes (#166).
+	resp, err := browser.Get(inst.base() + "/settings/export")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	bundle, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Fatalf("export: %d", resp.StatusCode)
+	}
+	if !strings.Contains(resp.Header.Get("Content-Disposition"), `filename="alice.bundle"`) {
+		t.Errorf("export is not an attachment: %q", resp.Header.Get("Content-Disposition"))
+	}
+	var got struct {
+		Bundle   string `json:"bundle"`
+		Username string `json:"username"`
+	}
+	if err := json.Unmarshal(bundle, &got); err != nil {
+		t.Fatalf("bundle is not JSON: %v\n%s", err, bundle)
+	}
+	if got.Username != "alice" || !strings.HasPrefix(got.Bundle, "gitbay-account/") {
+		t.Errorf("wrong bundle: %s", bundle)
 	}
 }
 
