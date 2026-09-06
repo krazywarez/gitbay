@@ -4,6 +4,138 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.14.0 — 2026-09-06
+
+Logging into the web without an SSH key, wikis inside the repository,
+CI that skips what a change does not touch, and the browser catching up
+with the command line on nine capabilities.
+
+** Accounts and the web
+
+- A browser session can be requested by mail: the login page takes a
+  username or a verified address and sends a link that works once and
+  expires in fifteen minutes. An account with no SSH key had no way into
+  the web at all. The response never says whether the account exists, and
+  the form appears only when the instance has SMTP. #155
+- A login link resolves to any verified address on the account, not only
+  the primary. #158
+- Login mail is queued rather than sent from a goroutine, so a link in
+  flight survives a restart. #159
+- A suspended account cannot mail itself a session, and a link minted
+  before suspension opens nothing. #156
+- The session cookie is =SameSite=Lax=, and a test now walks every
+  mutating route to assert it carries the origin check. #157
+- =POST /register= is reachable on an open instance again.
+
+** Wikis
+
+- A wiki lives at =.gitbay/wiki/= on the default branch, so editing one
+  is editing a file in the repository — a push, or the web editor — and
+  it is cloned, diffed and reviewed like anything else. The companion
+  =<repo>.wiki= is gone. #170
+
+** CI
+
+- Path filters: =paths= and =paths-ignore= per job, so a docs commit
+  does not run the whole suite. #169
+- A branch's first push derives its diff base from the merge base
+  rather than treating every file as changed. #171
+- A job filtered out records a skipped status instead of nothing, so
+  =require_checks= cannot wait forever for a check that will never
+  arrive. #172
+- A force-push no longer leaves queued builds pointing at an object
+  that is gone; the orphan is cancelled when a runner claims it. #152
+- A build step's environment is constructed rather than inherited. It
+  was =os.Environ()= plus the build's variables, which handed repository
+  content everything set on the runner service. A step now gets =PATH=,
+  =HOME=, =LANG=, =CI=, its =GITBAY_*= variables and its secrets. =HOME=
+  is the workspace, so a build cannot read the runner's =.netrc=,
+  =.npmrc= or =.gitconfig=, where tools keep credentials. Ref #144
+- A runner host can be prepared for rootless podman:
+  =deploy/runner-podman-setup.sh=, the systemd changes it needs, and
+  weekly image pruning. Nothing reads them yet; the preparation ships
+  before the runner that requires it, on purpose. Ref #144
+
+** Collaboration
+
+- =mr review request --add <user>= asks a particular person for a
+  review, who then carries it in their queue and is notified;
+  =--remove= withdraws the ask. The queue was computed from involvement
+  alone, so a collaborator who had not touched a thread heard nothing.
+  #145
+- Bookmarks save someone else's repository to come back to, and the
+  count is the instance's only popularity signal. Separate from pins
+  rather than a flag on them: a pin is private quick access to your own
+  work and drives the rail, a bookmark is public and counted. =repo
+  bookmark=, =repo unbookmark=, =repo bookmarks=, a control on the
+  repository header, the count in the facts bar, and =/bookmarks=. Read
+  access is all a bookmark needs, and one made while a repository was
+  public drops out of the listing if it goes private. #146
+
+** The browser catches up
+
+Nine capabilities that were CLI-only and had no reason to be:
+
+- label management — list, create, colour, remove #163
+- dependency status under the toggle that turns checks on #164
+- release delete #165
+- the account export bundle, as a download #166
+- organization create and rename; delete stays CLI-only, wanting a
+  typed confirmation, and the page says so #167
+- opening a merge request from a fork, with a source picker offering
+  the branches of every fork you can push to #168
+- forking a repository #174
+- cancelling a queued or running build #162
+- the profile form #161, and a markup picker on issue and merge
+  request create #160
+- admin table headers align with their columns #151
+
+** CLI
+
+- =gitbay mr rebase <n>= replays a merge request's branch onto its
+  target and re-pushes it. A repository requiring signed commits accepts
+  only fast-forward merges, so a merge request whose target moved had to
+  be rebased by hand; the refusal already named the procedure and this
+  runs it. The git work is local, so the replayed commits carry your
+  signature — the server still holds no key. A branch in a fork is
+  refused, naming the repository to run it in. #175
+
+** Security
+
+- Mutating commands are bounded per account in the dispatcher, so SSH,
+  the JSON API and the web spend one budget and a caller cannot refresh
+  it by changing surface. Authentication failures were throttled;
+  commands were not. #148
+- A dead-lettered mail is logged by its queue row id, not the recipient
+  address, and the relay's error is redacted before logging because a
+  rejection quotes the address it rejected. The address stays on the
+  row, where =/admin= shows it. One rule for every mail type. #173
+- The 2026-09 sweep's coverage — and what it did not reach — is recorded
+  in the wiki's Threat-Model rather than in a closed issue. #149
+
+** Dependencies
+
+- goldmark 1.8.6, sqlite 1.58.0. #140
+
+** Upgrading
+
+Replace the binary and reinstall the CLI. One migration (0043,
+bookmarks), applied on start.
+
+=limits.write_rate= defaults to 60 mutating commands a minute per
+account. A script that writes faster will be refused with exit 4 and a
+retry time; raise it in =[limits]=, or slow the script. Read-only
+commands, the runner protocol and the host CLI are not counted.
+
+A companion =<repo>.wiki= repository is no longer read. Move its pages
+to =.gitbay/wiki/= on the default branch.
+
+Runner isolation is half done. Builds still run as the runner's user
+with no container: the step environment no longer leaks the service's,
+and a host can be prepared for podman, but nothing yet executes a build
+in one. Do not enable CI for repositories you do not trust. #144 stays
+open for the execution half.
+
 * v1.13.3 — 2026-09-05
 
 Only a writer's review decides a merge gate, and a scan of one branch
