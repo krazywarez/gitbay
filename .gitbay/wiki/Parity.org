@@ -213,7 +213,7 @@ now render the way the reference does. go-org is not yet on the corpus.
 | capability                       | cli | web | ios |
 |----------------------------------+-----+-----+-----|
 | search repositories              | yes | yes | yes |
-| search issues and merge requests | yes | yes | no  |
+| search issues and merge requests | yes | yes | yes |
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
 | profile about and links          | yes | yes | yes |
