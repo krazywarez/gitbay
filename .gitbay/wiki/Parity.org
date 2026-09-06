@@ -137,10 +137,10 @@ column and are always markdown.
 | download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
 | create                      | yes | yes | yes |
-| fork                        | yes | yes | no  |
+| fork                        | yes | yes | yes |
 | pin                         | yes | yes | yes |
-| bookmark, bookmark list     | yes | yes | no  |
-| watch, mute                 | yes | yes | no  |
+| bookmark, bookmark list     | yes | yes | yes |
+| watch, mute                 | yes | yes | yes |
 | settings, protection        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
