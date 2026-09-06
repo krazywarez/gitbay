@@ -131,7 +131,7 @@ column and are always markdown.
 | one commit with its patch   | yes | yes | yes |
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
-| compare two refs            | yes | yes | no  |
+| compare two refs            | yes | yes | yes |
 | branches and tags           | yes | yes | yes |
 | wiki (read)                 | yes | yes | yes |
 | download an archive         | yes | yes | n/a |
