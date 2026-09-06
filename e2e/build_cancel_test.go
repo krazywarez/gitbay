@@ -122,6 +122,7 @@ func TestBuildCancelRunning(t *testing.T) {
 	opts := fmt.Sprintf("-p %d -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=%s -o BatchMode=yes",
 		inst.port, runnerKey, filepath.Join(inst.sshDir, "known_hosts"))
 	runner := exec.Command(inst.runner, "-once", "-remote", "git@127.0.0.1", "-ssh-opts", opts,
+		"-isolation", "none",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", inst.port), "-workdir", t.TempDir())
 	runner.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	var runnerOut strings.Builder

@@ -35,6 +35,7 @@ type job struct {
 	SHA     string            `json:"sha"`
 	Ref     string            `json:"ref"`
 	Steps   []string          `json:"steps"`
+	Image   string            `json:"image"`
 	Secrets map[string]string `json:"secrets"`
 }
 
@@ -44,6 +45,10 @@ type runner struct {
 	cloneBase string // e.g. ssh://git@gitbay.org
 	workdir   string
 	timeout   time.Duration
+	// image is the container image for a job that names none, and
+	// isolation selects how steps run: "podman" or "none".
+	image     string
+	isolation string
 	// repos limits which repositories this runner claims builds for. Empty
 	// means any, which is what a runner on the server itself wants; a runner
 	// somewhere that should not execute every repository's steps names them.
@@ -61,6 +66,8 @@ func main() {
 		repos     = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
 		once      = flag.Bool("once", false, "process at most one build, then exit")
 		jobs      = flag.Int("jobs", 1, "builds to run at once")
+		image     = flag.String("image", "", "default container image for jobs that name none")
+		isolation = flag.String("isolation", "podman", "how steps run: podman, or none for no container")
 		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
 	flag.Parse()
@@ -76,6 +83,16 @@ func main() {
 		cloneBase: *cloneBase,
 		workdir:   *workdir,
 		timeout:   *timeout,
+		image:     *image,
+		isolation: *isolation,
+	}
+	if err := r.checkIsolation(); err != nil {
+		// Refusing to start is the point. A runner that quietly fell back
+		// to running repository code on the host would drop isolation
+		// with nothing to surface it, which is worse than a stopped
+		// runner: the operator sees a failed unit either way, but only
+		// one of them is honest about why (#144).
+		log.Fatalf("isolation: %v", err)
 	}
 	if *sshOpts != "" {
 		r.sshOpts = strings.Fields(*sshOpts)
@@ -323,18 +340,7 @@ func (r *runner) run(j job) bool {
 	}
 
 	env := stepEnv(j, buildHome)
-	for _, step := range j.Steps {
-		fmt.Fprintf(sink, "$ %s\n", step)
-		cmd := exec.Command(toolpath.Look("sh"), "-c", step)
-		cmd.Dir = dir
-		cmd.Env = env
-		cmd.Stdout, cmd.Stderr = sink, sink
-		if ok, why := runStep(cmd, deadline); !ok {
-			fmt.Fprintf(sink, "%s\n", why)
-			return false
-		}
-	}
-	return true
+	return r.runSteps(j, dir, env, sink, deadline, runStep)
 }
 
 // stepEnv builds the environment a build step runs with. It is

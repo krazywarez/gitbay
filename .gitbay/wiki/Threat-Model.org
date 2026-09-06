@@ -137,17 +137,25 @@ runner, polling over SSH, clones the commit and runs its steps.
   one build can poison a cache another reads, which is no more than
   anything a step can already do as this user, and is what isolation
   (krz/gitbay#144) is for.
-- *Where it runs.* Steps run as the runner's own user on the runner
-  host, with no container; the systemd drop-in adds =NoNewPrivileges=,
-  =ProtectSystem=full= and the kernel and cgroup protections. =-repos=
-  limits a runner to named repositories, which is the control that
-  matters on an open instance: without it a runner builds whatever
-  anyone pushes.
+- *Where it runs.* Steps run in a rootless podman container, one per
+  job, with the workspace bind mounted and nothing else. The clone
+  happens outside it with the runner's key, so the container never sees
+  =GIT_SSH_COMMAND=, the key, or the runner's environment. =-isolation
+  none= runs steps on the host as before, for an instance where every
+  repository is trusted; there is no automatic fallback to it — a runner
+  configured for podman that cannot find one refuses to start, because
+  dropping isolation silently is worse than a stopped runner. The
+  systemd drop-in still adds =NoNewPrivileges=, =ProtectSystem=full= and
+  the kernel and cgroup protections, and =-repos= still limits a runner
+  to named repositories.
 
-Anything a step can do as the runner's user, a pushed =ci.yml= can do.
-Treat the runner host as executing untrusted code: keep it off the
-daemon's host where the database lives, or scope it to repositories
-whose writers you trust.
+Under =-isolation none=, anything a step can do as the runner's user a
+pushed =ci.yml= can do. Under podman a step is confined to its
+container and the bind-mounted workspace, but the build home's caches
+are shared between builds, so one build can still leave something a
+later build reads. Treat the runner host as executing untrusted code:
+keep it off the daemon's host where the database lives, or scope it to
+repositories whose writers you trust.
 
 * What has not been audited
 
@@ -187,6 +195,7 @@ assume has been checked.
   harmless (see [[Admin]]).
 - A global signature-verification epoch over-invalidates the cache on any
   trust-input change. Correct, not a leak; a performance tradeoff.
-- Build steps run as the runner's user with no container. Isolation is
-  the key scope, the sandboxing drop-in and =-repos=; containers are
-  future work.
+- A build's secrets are environment variables inside its container, so
+  they are visible to =podman inspect= as the runner's user — the same
+  user that already holds them in memory. They reach podman through a
+  0600 env file rather than argv, since =/proc= is world-readable.

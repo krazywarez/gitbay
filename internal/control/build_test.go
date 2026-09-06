@@ -432,7 +432,7 @@ func TestQueueBranchBuildsAlreadyBuiltJobRecordsNoSkippedStatus(t *testing.T) {
 	// The same commit already has a build for "unit" from another branch,
 	// still pending. Its filter would exclude this push too, so the only
 	// way to tell the two paths apart is that this one must record nothing.
-	if _, err := st.CreateBuild(repo.ID, "unit", newSHA, "other", `["echo hi"]`, true); err != nil {
+	if _, err := st.CreateBuild(repo.ID, "unit", newSHA, "other", `["echo hi"]`, "", true); err != nil {
 		t.Fatal(err)
 	}
 

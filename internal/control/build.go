@@ -227,7 +227,7 @@ func runBuildTrigger(c *Ctx, args []string) int {
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps), true)
+		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps), j.Image, true)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
@@ -398,8 +398,9 @@ func runRunnerNext(c *Ctx, args []string) int {
 		SHA     string            `json:"sha"`
 		Ref     string            `json:"ref"`
 		Steps   []string          `json:"steps"`
+		Image   string            `json:"image,omitempty"`
 		Secrets map[string]string `json:"secrets,omitempty"`
-	}{b.ID, repo.Path(), b.Number, b.Job, b.SHA, b.Ref, steps, secrets}
+	}{b.ID, repo.Path(), b.Number, b.Job, b.SHA, b.Ref, steps, b.Image, secrets}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d: %s %s @ %.10s\n", d.ID, d.Repo, d.Job, d.SHA)
 	})
@@ -687,7 +688,7 @@ func queueJobs(
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := st.CreateBuild(repo.ID, j.Name, sha, ref, string(steps), trusted)
+		n, err := st.CreateBuild(repo.ID, j.Name, sha, ref, string(steps), j.Image, trusted)
 		if err != nil {
 			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
 			continue

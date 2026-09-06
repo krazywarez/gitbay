@@ -408,15 +408,20 @@ repos likewise need at least read for the clone.
 
 ** Container isolation
 
-Builds currently run as the runner's own user with no container; the
-service drop-in and =-repos= are the controls (krz/gitbay#144). The step
-environment is constructed rather than inherited, so a build sees =PATH=,
-=HOME= (its workspace), =LANG=, =CI=, its =GITBAY_*= variables and its
-secrets and nothing else — but a step can still read what that user can
-read, and concurrent builds share a =-workdir=.
+Builds run in a rootless podman container, one per job, with the
+workspace bind mounted and nothing else: the clone happens outside with
+the runner's key, so a step cannot read it. =-isolation none= keeps the
+old behaviour — steps on the host as the runner's user — for an instance
+where every repository is trusted. There is no automatic fallback: a
+runner started with =-isolation podman= that cannot find a working
+podman exits rather than running a build unsandboxed.
 
-Rootless podman is the chosen remedy; the host preparation ships ahead of
-the runner that uses it, so the order is fixed:
+=-image= sets the default image for jobs that name none
+(=docker.io/library/debian:stable-slim= if unset); a job overrides it
+with =image:= in =.gitbay/ci.yml=, validated as a reference so a config
+file cannot turn it into podman arguments.
+
+Prepare a host before pointing an isolating runner at it:
 
 #+begin_src sh
 ssh -p 2222 root@<host> 'sh -s' < deploy/runner-podman-setup.sh

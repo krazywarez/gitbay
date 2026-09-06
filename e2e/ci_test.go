@@ -27,9 +27,14 @@ func (i *instance) runnerOnce(t *testing.T, key string) string {
 	t.Helper()
 	opts := fmt.Sprintf("-p %d -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=%s -o BatchMode=yes",
 		i.port, key, filepath.Join(i.sshDir, "known_hosts"))
+	// -isolation none: these tests exercise claiming, logs, statuses and
+	// cancellation, not the sandbox, and the suite must run on a machine
+	// without podman. The isolation tests are in isolation_podman_test.go
+	// and skip visibly when it is absent (#144).
 	cmd := exec.Command(i.runner, "-once",
 		"-remote", "git@127.0.0.1",
 		"-ssh-opts", opts,
+		"-isolation", "none",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", i.port),
 		"-workdir", t.TempDir())
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
@@ -281,6 +286,7 @@ func (i *instance) runnerJobs(t *testing.T, key, repo string, jobs int) string {
 	cmd := exec.Command(i.runner,
 		"-jobs", fmt.Sprint(jobs),
 		"-poll", "200ms",
+		"-isolation", "none",
 		"-remote", "git@127.0.0.1",
 		"-ssh-opts", opts,
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", i.port),

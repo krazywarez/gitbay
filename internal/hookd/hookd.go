@@ -302,7 +302,7 @@ func (s *Server) queueTagBuilds(repo store.Repo, userID int64, tag, pushed strin
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, tag, string(steps), true)
+		n, err := s.st.CreateBuild(repo.ID, j.Name, sha, tag, string(steps), j.Image, true)
 		if err != nil {
 			slog.Error("queueing tag build", "repo", repo.Path(), "job", j.Name, "err", err)
 			continue
