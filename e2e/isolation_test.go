@@ -67,6 +67,7 @@ func TestPrivateRepoIsInvisible(t *testing.T) {
 		"/owner/secret/tree/main/", "/owner/secret/blob/main/notes.txt",
 		"/owner/secret/raw/main/notes.txt", "/owner/secret/log",
 		"/owner/secret/releases", "/owner/secret/builds", "/owner/secret/wiki",
+		"/owner/secret/labels",
 		"/owner/secret/compare/main...feat", "/owner/secret/milestones",
 		"/owner/secret/archive/main.tar.gz", "/owner/secret/badge/build.svg",
 		"/owner/secret/search?q=" + fileWord,

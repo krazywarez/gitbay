@@ -1,0 +1,36 @@
+{{define "title"}}labels · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+<h1>Labels</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Labels}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">label</th><th scope="col">colour</th><th scope="col">issues</th><th scope="col"></th></tr>
+{{range .Labels}}<tr>
+  <td><a class="chip label" style="{{index $.LabelColors .Name}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.Name}}">{{.Name}}</a></td>
+  <td>{{if $.CanWrite}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
+    <input type="hidden" name="name" value="{{.Name}}">
+    <input type="text" name="color" value="{{.Color}}" aria-label="Colour for {{.Name}}" placeholder="rrggbb" size="8">
+    <button type="submit" class="btn">Save</button>
+  </form>{{else}}<span class="mono">{{if .Color}}{{.Color}}{{else}}—{{end}}</span>{{end}}</td>
+  <td>{{.Issues}}</td>
+  <td class="act">{{if $.CanWrite}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
+    <input type="hidden" name="action" value="remove">
+    <input type="hidden" name="name" value="{{.Name}}">
+    <button type="submit" class="linklike">Remove</button>
+  </form>{{end}}</td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No labels yet.</p>{{end}}
+{{if .CanWrite}}
+<details class="editbox">
+  <summary>New label</summary>
+  <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/labels" class="setform stack">
+    <label for="labelname">Name</label>
+    <input type="text" id="labelname" name="name" maxlength="50" required>
+    <label for="labelcolor">Colour</label>
+    <input type="text" id="labelcolor" name="color" placeholder="rrggbb, or blank for one picked from the name">
+    <button type="submit">Create label</button>
+  </form>
+</details>
+<p class="meta">Removing a label takes it off every issue that carries it.</p>
+{{end}}
+{{end}}

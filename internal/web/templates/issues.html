@@ -13,7 +13,7 @@
     <input type="hidden" name="state" value="{{.State}}">
   </form>
   <span class="spacer"></span>
-  <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
+  <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a> · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/labels">labels</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
 </div>
 <ul class="issuelist">
 {{range .Issues}}<li>
