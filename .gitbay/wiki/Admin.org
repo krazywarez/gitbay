@@ -449,6 +449,11 @@ The script installs podman, delegates a subuid/subgid range to
 assuming, enables lingering, and verifies rootless podman actually runs
 as that user. It is idempotent.
 
+The drop-in sets =NoNewPrivileges=no=, without which rootless podman
+cannot call =newuidmap= and the runner refuses to start. That is a
+considered trade, explained in the file and in the Threat-Model; if you
+run with =-isolation none=, set it back to =yes=.
+
 *Do not deploy an isolating runner to a host that has not been
 prepared.* The runner is specified to refuse to start without a working
 podman rather than fall back to running builds unsandboxed — a fallback

@@ -145,9 +145,15 @@ runner, polling over SSH, clones the commit and runs its steps.
   repository is trusted; there is no automatic fallback to it — a runner
   configured for podman that cannot find one refuses to start, because
   dropping isolation silently is worse than a stopped runner. The
-  systemd drop-in still adds =NoNewPrivileges=, =ProtectSystem=full= and
-  the kernel and cgroup protections, and =-repos= still limits a runner
-  to named repositories.
+  systemd drop-in still adds =ProtectSystem=full= and the kernel and
+  cgroup protections, and =-repos= still limits a runner to named
+  repositories. =NoNewPrivileges= is *off*: rootless podman sets up its
+  namespace with the setuid =newuidmap=, which that flag blocks, so the
+  choice is between it and containers at all. Containers are the stronger
+  boundary — the flag constrained a process that was already running
+  arbitrary repository code, and under podman that code no longer runs in
+  the runner's process context. Under =-isolation none= there is no
+  container and the flag should be on.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its
