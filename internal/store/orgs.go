@@ -143,7 +143,9 @@ func (s *Store) SetOrgMember(orgID, userID int64, role string) error {
 	return tx.Commit()
 }
 
-// RemoveOrgMember drops a member, refusing to remove the last admin.
+// RemoveOrgMember drops a member, refusing to remove the last admin. The
+// account's team memberships in the org go with it: team add requires
+// membership, so a row left behind would grant access to a non-member.
 func (s *Store) RemoveOrgMember(orgID, userID int64) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -163,6 +165,11 @@ func (s *Store) RemoveOrgMember(orgID, userID int64) error {
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
+	}
+	if _, err := tx.Exec(
+		"DELETE FROM team_members WHERE user_id = ? AND team_id IN (SELECT id FROM teams WHERE org_id = ?)",
+		userID, orgID); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
