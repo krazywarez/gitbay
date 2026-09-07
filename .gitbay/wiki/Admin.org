@@ -391,6 +391,11 @@ gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
   -workdir /var/lib/gitbay-runner/work
 #+end_src
 
+gitbay.org's runner is scoped: it builds the forge's own repositories
+and the isolation canary, nothing else, because it shares the host with
+the forge. A =.gitbay/ci.yml= in another repository there queues builds
+no runner claims. Whether that changes is krz/gitbay#184.
+
 Naming no repositories is the old behaviour and stays the right choice for
 the runner on the server itself. The scoping is what the runner asks for,
 not an ACL the server holds over it: a runner account is admin by
@@ -444,8 +449,20 @@ overrides it with =image:= in =.gitbay/ci.yml=, validated as a reference
 so a config file cannot turn it into podman arguments.
 
 =-cpus= and =-memory= cap one build's container (podman's own units,
-e.g. =-cpus 2 -memory 4g=); unset means uncapped. bay1 runs =-cpus 3=
-and no memory cap, since the e2e suite needs most of the host's 7GB.
+e.g. =-cpus 2 -memory 4g=); unset means uncapped. They only take effect
+where podman can create a cgroup for the container. Under rootless
+podman with the cgroupfs manager, which is what a system service gets,
+it cannot: the container runs inside the service's own cgroup and both
+flags are accepted and ignored (krz/gitbay#188). Cap the unit instead.
+bay1's drop-in sets =MemoryMax=6G= and =CPUQuota=300%= on a 7.7GB
+four-core host with no swap: the memory cap is what keeps the forge
+alive when a build allocates without bound, and it sits above the e2e
+suite's 5GB peak rather than at a fair share. =OOMPolicy=continue= keeps
+systemd from stopping the runner when a build is OOM-killed.
+
+Each repository gets its own build home under the runner's workdir,
+mounted into its containers as =HOME=. Caches persist between builds of
+one repository and are never read by another's.
 
 *Images are provisioned, never pulled by a build.* The runner passes
 =--pull=never=. Two reasons, and the second is the better one: the

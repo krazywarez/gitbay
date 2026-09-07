@@ -267,13 +267,12 @@ func (r *runner) run(j job) bool {
 	// credential dotfiles are. A directory beside the workspaces is
 	// neither.
 	//
-	// It is shared by every build on this runner, so a step can poison a
-	// cache another repository's build will read. That is already true of
-	// anything a step can reach as this user — see the wiki's
-	// Threat-Model on the runner — and is what container isolation (#144)
-	// is for; -repos is the control until then.
-	buildHome := filepath.Join(r.workdir, "home")
-	if err := os.MkdirAll(buildHome, 0o700); err != nil {
+	// One per repository: shared across repositories, a step could poison
+	// the module cache or plant a .gitconfig that another repository's
+	// build would honour, and the container mounts the home read-write
+	// (#184).
+	buildHome, err := buildHomeFor(r.workdir, j.Repo)
+	if err != nil {
 		log.Printf("build %d: build home: %v", j.ID, err)
 		return false
 	}
@@ -388,14 +387,29 @@ func (r *runner) run(j job) bool {
 // the runner's entire environment, including anything an operator set on
 // the service (#144).
 //
-// HOME is a build home shared by this runner's builds, not the runner's
-// own: tools read credentials out of dotfiles — .netrc, .npmrc,
-// .gitconfig — and a build has no business finding the runner's. It is
-// not the workspace either, because the workspace is deleted after every
-// build and every tool cache lives under HOME.
+// HOME is the repository's build home, not the runner's own: tools read
+// credentials out of dotfiles — .netrc, .npmrc, .gitconfig — and a build
+// has no business finding the runner's. It is not the workspace either,
+// because the workspace is deleted after every build and every tool
+// cache lives under HOME.
 //
 // PATH is the one thing carried over: without it a step cannot find the
 // tools the host was provisioned with.
+// buildHomeFor is the build home for one repository: <workdir>/home/<owner>/<name>,
+// created on first use. The repository path comes from the server, but a
+// home must still never resolve outside the home root.
+func buildHomeFor(workdir, repo string) (string, error) {
+	root := filepath.Join(workdir, "home")
+	dir := filepath.Join(root, filepath.FromSlash(repo))
+	if rel, err := filepath.Rel(root, dir); err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("repository path %q escapes the build home root", repo)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
 func stepEnv(j job, home string) []string {
 	path := os.Getenv("PATH")
 	if path == "" {

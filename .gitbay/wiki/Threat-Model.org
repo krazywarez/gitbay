@@ -166,11 +166,13 @@ runner, polling over SSH, clones the commit and runs its steps.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its
-container and the bind-mounted workspace, but the build home's caches
-are shared between builds, so one build can still leave something a
-later build reads. Treat the runner host as executing untrusted code:
-keep it off the daemon's host where the database lives, or scope it to
-repositories whose writers you trust.
+container, the bind-mounted workspace and the repository's own build
+home, so what a build leaves in a cache is read only by later builds of
+the same repository. Treat the runner host as executing untrusted code
+all the same: keep it off the daemon's host where the database lives,
+or scope it to repositories whose writers you trust. gitbay.org does
+the latter — its runner builds only the repositories the operator
+names.
 
 * What has not been audited
 
