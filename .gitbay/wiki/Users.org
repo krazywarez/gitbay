@@ -191,6 +191,7 @@ Access and settings (owner or =admin= grant):
 #+begin_src sh
 gitbay repo access grant you/project alice write    # read | write | admin
 gitbay repo access revoke you/project alice
+gitbay repo access list you/project                 # everyone who can reach it, role, and via what
 gitbay repo settings protect you/project main       # no force-push, no delete
 gitbay repo settings require-mr you/project on      # protected branches: merge requests only
 gitbay repo settings protect-tag you/project 'v*'   # matching tags: created once, never moved or deleted
@@ -252,7 +253,10 @@ shows the text instead. Other files show the text with highlighting.
 
 Orgs share the owner namespace with users and own repositories at
 =org/repo=. By default members get write on all org repos; org admins
-get repo admin, create repos under the org, and manage membership.
+get repo admin, create repos under the org, and manage membership. An
+org's existence and member list are public; its teams are visible to
+members, and anyone else asking is refused rather than told the org
+does not exist.
 
 #+begin_src sh
 gitbay org create krz

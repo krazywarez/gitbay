@@ -50,7 +50,7 @@ func init() {
 		Summary: "revoke access",
 		Usage:   "repo access revoke <owner/name> <user>", Run: runAccessRevoke})
 	register(Command{Path: []string{"repo", "access", "list"},
-		Summary: "list access grants",
+		Summary: "list who can reach the repository, with the role and where it comes from",
 		Usage:   "repo access list <owner/name>", ReadOnly: true, Run: runAccessList})
 	register(Command{Path: []string{"repo", "settings", "show"},
 		Summary: "show settings",
@@ -585,21 +585,22 @@ func runAccessList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	entries, err := c.Store.ListAccess(repo.ID)
+	entries, err := c.Store.EffectiveAccess(repo.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	type out struct {
-		User string `json:"user"`
-		Role string `json:"role"`
+		User   string `json:"user"`
+		Role   string `json:"role"`
+		Source string `json:"source"`
 	}
 	var ds []out
 	for _, e := range entries {
-		ds = append(ds, out{e.Username, e.Role})
+		ds = append(ds, out{e.Username, e.Role, e.Source})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\n", d.User, d.Role)
+			fmt.Fprintf(w, "%s\t%s\tvia %s\n", d.User, d.Role, d.Source)
 		}
 	})
 }

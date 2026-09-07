@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -305,29 +306,92 @@ func (s *Store) RevokeAccess(repoID, userID int64) error {
 	return nil
 }
 
-type AccessEntry struct {
+// EffectiveEntry is one account's effective role on a repository and the
+// grant it comes from: owner, direct, org admin, org member, or team
+// <name>.
+type EffectiveEntry struct {
 	Username string
 	Role     string
+	Source   string
 }
 
-func (s *Store) ListAccess(repoID int64) ([]AccessEntry, error) {
-	rows, err := s.DB.Query(`
-		SELECT u.username, a.role FROM repo_access a
-		JOIN users u ON a.subject_kind = 'user' AND u.id = a.subject_id
-		WHERE a.repo_id = ? ORDER BY u.username`, repoID)
-	if err != nil {
+// EffectiveAccess lists every account that can reach a repository with
+// the highest role it holds and where that role comes from. Direct
+// grants, org roles and team grants are folded together the way
+// AccessRole folds them for one account.
+func (s *Store) EffectiveAccess(repoID int64) ([]EffectiveEntry, error) {
+	rank := map[string]int{"read": 1, "write": 2, "admin": 3}
+	best := map[string]EffectiveEntry{}
+	var order []string
+	add := func(user, role, source string) {
+		if rank[role] == 0 {
+			return
+		}
+		cur, ok := best[user]
+		if !ok {
+			order = append(order, user)
+		}
+		if !ok || rank[role] > rank[cur.Role] {
+			best[user] = EffectiveEntry{user, role, source}
+		}
+	}
+	collect := func(query string, source func(extra string) string, args ...any) error {
+		rows, err := s.DB.Query(query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var user, role, extra string
+			if err := rows.Scan(&user, &role, &extra); err != nil {
+				return err
+			}
+			add(user, role, source(extra))
+		}
+		return rows.Err()
+	}
+	fixed := func(name string) func(string) string { return func(string) string { return name } }
+
+	// The owner: a user outright, or the org's admins and members.
+	if err := collect(`
+		SELECT u.username, 'admin', '' FROM repos r JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		WHERE r.id = ?`, fixed("owner"), repoID); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []AccessEntry
-	for rows.Next() {
-		var e AccessEntry
-		if err := rows.Scan(&e.Username, &e.Role); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
+	if err := collect(`
+		SELECT u.username, 'admin', '' FROM repos r
+		JOIN org_members m ON r.owner_kind = 'org' AND m.org_id = r.owner_id AND m.role = 'admin'
+		JOIN users u ON u.id = m.user_id WHERE r.id = ?`, fixed("org admin"), repoID); err != nil {
+		return nil, err
 	}
-	return out, rows.Err()
+	if err := collect(`
+		SELECT u.username, a.role, '' FROM repo_access a
+		JOIN users u ON a.subject_kind = 'user' AND u.id = a.subject_id WHERE a.repo_id = ?`,
+		fixed("direct"), repoID); err != nil {
+		return nil, err
+	}
+	if err := collect(`
+		SELECT u.username, tr.role, t.name FROM team_repos tr
+		JOIN teams t ON t.id = tr.team_id
+		JOIN team_members tm ON tm.team_id = tr.team_id
+		JOIN users u ON u.id = tm.user_id WHERE tr.repo_id = ?
+		ORDER BY CASE tr.role WHEN 'admin' THEN 3 WHEN 'write' THEN 2 ELSE 1 END DESC, t.name`,
+		func(team string) string { return "team " + team }, repoID); err != nil {
+		return nil, err
+	}
+	if err := collect(`
+		SELECT u.username, o.members_role, '' FROM repos r
+		JOIN orgs o ON r.owner_kind = 'org' AND o.id = r.owner_id
+		JOIN org_members m ON m.org_id = o.id AND m.role = 'member'
+		JOIN users u ON u.id = m.user_id WHERE r.id = ?`, fixed("org member"), repoID); err != nil {
+		return nil, err
+	}
+	sort.Strings(order)
+	out := make([]EffectiveEntry, 0, len(order))
+	for _, u := range order {
+		out = append(out, best[u])
+	}
+	return out, nil
 }
 
 func (s *Store) RepoByID(id int64) (Repo, error) {

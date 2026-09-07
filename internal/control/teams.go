@@ -58,7 +58,9 @@ func orgAdminRef(c *Ctx, name string) (store.Org, int) {
 	return org, -1
 }
 
-// orgMemberRef resolves an org, requiring at least membership.
+// orgMemberRef resolves an org, requiring at least membership. An org's
+// existence and member list are public (org show answers anyone), so a
+// non-member is refused rather than told the org does not exist.
 func orgMemberRef(c *Ctx, name string) (store.Org, int) {
 	org, err := c.Store.OrgByName(name)
 	if err != nil {
@@ -69,7 +71,7 @@ func orgMemberRef(c *Ctx, name string) (store.Org, int) {
 		return org, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if role == "" {
-		return org, c.fail(protocol.ExitNotFound, "no organization %q", name)
+		return org, c.fail(protocol.ExitDenied, "teams of %s are visible to its members", name)
 	}
 	return org, -1
 }
