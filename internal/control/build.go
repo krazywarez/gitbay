@@ -461,6 +461,12 @@ func runRunnerLog(c *Ctx, args []string) int {
 				if dropped > 0 {
 					slog.Warn("build log incomplete", "build", id, "dropped_chunks", dropped)
 				}
+				// The stream ending is the last thing the server hears
+				// from a runner that is about to die; note the time so
+				// the scheduler can fail the build if no outcome follows.
+				if err := c.Store.MarkBuildLogClosed(id); err != nil {
+					slog.Warn("marking build log closed", "build", id, "err", err)
+				}
 				return c.emit(map[string]string{"log": "ok"}, func(w io.Writer) {})
 			}
 		case <-watch.C:

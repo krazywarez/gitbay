@@ -248,3 +248,52 @@ func TestSuccessBuildForTree(t *testing.T) {
 		t.Error("an empty tree matched")
 	}
 }
+
+// A running build whose log stream ended is reaped after StaleLogGrace,
+// well before the deadline; one whose stream is still open is not (#179).
+func TestReapStaleBuildsAfterLogClosed(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := s.CreateUser("cmc", true)
+	repoID, _ := s.CreateRepo("user", uid, "app", "public")
+	for _, job := range []string{"gone", "alive"} {
+		if _, err := s.CreateBuild(repoID, job, "abc", "main", `["true"]`, "", "", true); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok, err := s.ClaimBuild([]int64{repoID}); err != nil || !ok {
+			t.Fatalf("claim %s: %v", job, err)
+		}
+	}
+	builds, _ := s.BuildsForCommit(repoID, "abc")
+	gone := builds["gone"].ID
+	if err := s.MarkBuildLogClosed(gone); err != nil {
+		t.Fatal(err)
+	}
+	// Just closed: within the grace period, nothing is reaped.
+	if stale, _ := s.ReapStaleBuilds(); len(stale) != 0 {
+		t.Fatalf("reaped inside the grace period: %+v", stale)
+	}
+	// Backdate the close past the grace period.
+	if _, err := s.DB.Exec("UPDATE builds SET log_closed_at = '2020-01-01T00:00:00Z' WHERE id = ?", gone); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := s.ReapStaleBuilds()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stale) != 1 || stale[0].ID != gone {
+		t.Fatalf("reaped %+v, want only the build whose log closed", stale)
+	}
+	if b, _ := s.BuildByID(gone); b.Status != "failure" {
+		t.Errorf("reaped build is %s, want failure", b.Status)
+	}
+	if b, _ := s.BuildByID(builds["alive"].ID); b.Status != "running" {
+		t.Errorf("build with an open stream is %s, want running", b.Status)
+	}
+	// Marking is a no-op on a build that is no longer running.
+	if err := s.MarkBuildLogClosed(gone); err != nil {
+		t.Fatal(err)
+	}
+}

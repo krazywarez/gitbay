@@ -24,6 +24,9 @@ type Build struct {
 	CreatedAt  string
 	StartedAt  string
 	FinishedAt string
+	// LogClosedAt is when the runner's log stream ended; "" while it is
+	// open or was never opened. Set on a running build only.
+	LogClosedAt string
 	// Trusted is false for a merge request head fetched from another
 	// repository: its steps run without the target's secrets.
 	Trusted bool
@@ -62,14 +65,14 @@ func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image, tree 
 }
 
 const buildSelect = `
-	SELECT id, repo_id, number, job, sha, ref, steps, image, tree, status, created_at, started_at, finished_at, trusted
+	SELECT id, repo_id, number, job, sha, ref, steps, image, tree, status, created_at, started_at, finished_at, log_closed_at, trusted
 	FROM builds`
 
 func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 	var b Build
 	var trusted int
 	err := row.Scan(&b.ID, &b.RepoID, &b.Number, &b.Job, &b.SHA, &b.Ref, &b.Steps, &b.Image, &b.Tree,
-		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &trusted)
+		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &b.LogClosedAt, &trusted)
 	b.Trusted = trusted != 0
 	return b, err
 }
@@ -131,14 +134,38 @@ func staleBuildDeadline() time.Duration {
 	return StaleBuildDeadline
 }
 
-// ReapStaleBuilds fails every build that has been running past the deadline and
-// returns them, so the caller can resolve their commit statuses. A runner that
+// StaleLogGrace is how long a running build may go on after its log
+// stream ended before it is treated as abandoned. The runner reports the
+// outcome right after closing the stream, retrying for about thirty
+// seconds if the server is unreachable; two minutes outlasts that.
+const StaleLogGrace = 2 * time.Minute
+
+// MarkBuildLogClosed records that the runner's log stream for a build
+// ended, on a build still running. A build that finishes normally is
+// reported moments later and the mark is moot; one that is not has lost
+// its runner, and ReapStaleBuilds fails it after StaleLogGrace rather
+// than at the deadline (#179).
+func (s *Store) MarkBuildLogClosed(id int64) error {
+	_, err := s.DB.Exec(`
+		UPDATE builds SET log_closed_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+		WHERE id = ? AND status = 'running' AND log_closed_at = ''`, id)
+	return err
+}
+
+// ReapStaleBuilds fails every running build whose runner is gone and
+// returns them, so the caller can resolve their commit statuses: one whose
+// log stream ended more than StaleLogGrace ago with no outcome reported,
+// or one running past the deadline with no stream ever seen. A runner that
 // dies between claiming a build and reporting it otherwise leaves the row
 // claimed forever, and the commit pending forever with it.
 func (s *Store) ReapStaleBuilds() ([]Build, error) {
-	cutoff := time.Now().UTC().Add(-staleBuildDeadline()).Format("2006-01-02T15:04:05Z")
+	const layout = "2006-01-02T15:04:05Z"
+	now := time.Now().UTC()
+	cutoff := now.Add(-staleBuildDeadline()).Format(layout)
+	logCutoff := now.Add(-StaleLogGrace).Format(layout)
 	rows, err := s.DB.Query(buildSelect+
-		" WHERE status = 'running' AND started_at != '' AND started_at < ?", cutoff)
+		" WHERE status = 'running' AND ((started_at != '' AND started_at < ?)"+
+		" OR (log_closed_at != '' AND log_closed_at < ?))", cutoff, logCutoff)
 	if err != nil {
 		return nil, err
 	}

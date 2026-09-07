@@ -215,3 +215,29 @@ func TestRunnerNextClaimsBuildWhenReachabilityCannotBeChecked(t *testing.T) {
 		t.Fatalf("build status = %q, want running: an unchecked build must still be claimable", b.Status)
 	}
 }
+
+// runner log records when the stream ended, so a build whose runner then
+// vanishes is failed within minutes rather than at the deadline (#179).
+func TestRunnerLogMarksStreamClosed(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	root := t.TempDir()
+	if _, err := st.CreateBuild(repo.ID, "unit", strings.Repeat("a", 40), "main", "[]", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	b, ok, err := st.ClaimBuild([]int64{repo.ID})
+	if err != nil || !ok {
+		t.Fatalf("claim: %v", err)
+	}
+	c, _ := runnerCtx(st, uid, root)
+	c.Stdin = strings.NewReader("hello\n") // one chunk, then EOF: the stream ends
+	if code := runRunnerLog(c, []string{fmt.Sprint(b.ID)}); code != 0 {
+		t.Fatalf("runner log exited %d", code)
+	}
+	got, _ := st.BuildByID(b.ID)
+	if got.LogClosedAt == "" {
+		t.Fatal("log_closed_at not set when the stream ended")
+	}
+	if got.Status != "running" {
+		t.Errorf("status %s, want still running until the runner reports", got.Status)
+	}
+}

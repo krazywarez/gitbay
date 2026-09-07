@@ -398,7 +398,10 @@ necessity, so the boundary is you choosing how to start it.
 that has polled as a runner: when it last polled, the =-repos= scope it
 asked for, and the build it holds. A build a runner claimed and never
 reported is failed by the scheduler's minute tick, whether or not any
-runner is still alive.
+runner is still alive: within about two minutes of its log stream ending
+with no outcome reported — the runner reports right after closing the
+stream, retrying for half a minute if gitbayd is unreachable — or, if no
+stream was ever seen, at the deadline.
 
 Instance admin on the runner account only authorizes the claim/report
 protocol; it grants no repo access. A build that pushes back — a pages
