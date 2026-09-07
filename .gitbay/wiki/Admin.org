@@ -478,7 +478,10 @@ run with =-isolation none=, set it back to =yes=.
 
 *Restarting the runner is safe.* On SIGTERM it stops claiming, finishes
 the build in flight, reports it, and exits; the drop-in's
-=TimeoutStopSec=50min= covers the longest build. So =make deploy-runner=
+=TimeoutStopSec=50min= covers the longest build, and its =KillMode=mixed=
+is what makes the signal reach the runner alone — under systemd's default
+the build's container and the log session are signalled with it, and the
+runner drains a build that is already dead. So =make deploy-runner=
 waits for a running build rather than orphaning it, and a build's result
 is retried for half a minute if gitbayd is restarting at that moment. A
 second SIGTERM ends the runner at once, abandoning the build to the
