@@ -50,8 +50,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
 | stacked merge requests | yes | yes | yes |
-| revisions              | yes | yes | no  |
-| range-diff             | yes | no  | no  |
+| revisions              | yes | yes | yes |
+| range-diff             | yes | no  | yes |
 
 Reviews and checks carry the time they last said something, and a
 =ci/<job>= check carries how long its build ran, so a merge request
@@ -73,11 +73,11 @@ stack both ways.
 A draft merge request is open but not asking: it does not merge, and it
 does not appear in anyone's review queue. Draft is a flag rather than a
 fifth state, so every =state = 'open'= rule still means what it did.
-=mr revisions= lists the heads a merge request has had, and the web
-page lists them beside the reviews they staled; the iOS client shows
-threads left on an earlier revision but not the heads. =mr range-diff=
-compares two heads and has no web or iOS view. Batched review is not
-built.
+=mr revisions= lists the heads a merge request has had; the web page
+lists them beside the reviews they staled, and the iOS client has a
+Revisions section. =mr range-diff= compares two heads: the iOS client
+shows it from a revision to the one before, as text; the web has no
+view. Batched review is not built.
 
 =mr review request --add <user>= asks a *particular* person, who then
 carries the merge request in their queue and is notified; =--remove=
@@ -110,8 +110,8 @@ reviews, since an approval was of the diff against the old branch.
 | milestone list      | yes | yes | yes |
 | labels: list, colour | yes | yes | yes |
 | choose body markup  | yes | yes | yes |
-| issue templates     | yes | yes | no  |
-| milestone create, close, reopen | yes | no | no |
+| issue templates     | yes | yes | yes |
+| milestone create, close, reopen | yes | no | yes |
 
 Labels are created on the fly by =issue label --add= and managed by
 =label list=, =label set <label> --color rrggbb= and =label remove=,
@@ -150,14 +150,14 @@ always markdown.
 | fork                        | yes | yes | yes |
 | pin                         | yes | yes | yes |
 | bookmark                    | yes | yes | yes |
-| bookmark list               | yes | yes | no  |
+| bookmark list               | yes | yes | yes |
 | watch, unwatch              | yes | yes | yes |
 | mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
-| require codeowners          | yes | yes | no  |
-| access grants               | yes | no  | no  |
-| webhooks                    | yes | no  | no  |
-| import from a remote        | yes | no  | no  |
+| require codeowners          | yes | yes | yes |
+| access grants               | yes | no  | yes |
+| webhooks                    | yes | no  | yes |
+| import from a remote        | yes | no  | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
 | archive (read-only flag)    | yes | yes | yes |
@@ -175,7 +175,7 @@ always markdown.
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | yes | yes |
 | release asset add           | yes | no  | n/a |
-| release asset remove        | yes | no  | no  |
+| release asset remove        | yes | no  | yes |
 
 No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a
@@ -325,7 +325,7 @@ cleared.
 | team repo grants          | yes | yes | yes |
 | create, rename            | yes | yes | yes |
 | delete                    | yes | n/a | n/a |
-| profile                   | yes | no  | no  |
+| profile                   | yes | no  | yes |
 
 * Pagination
 
