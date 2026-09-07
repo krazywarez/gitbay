@@ -327,7 +327,11 @@ gitbay release list / show v1.0 / delete v1.0 --yes
 #+end_src
 
 The web shows them under the repository's =releases= tab with rendered
-notes, sha256 sums, and download links.
+notes, sha256 sums, and download links. Feed readers subscribe at
+=/you/project/releases.atom=; commits are at =/you/project/log.atom=
+(the default branch) or =/you/project/log.atom/<ref>=, and an owner's
+activity on their public repositories at =/you/activity.atom=. The
+pages carry the discovery link.
 
 Commit messages act on issues when the commits land on the default
 branch (direct push or MR merge): =closes/fixes/resolves #4= closes the

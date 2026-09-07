@@ -4,6 +4,7 @@ package policy
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // reservedNames are forbidden as usernames and org names because they are, or
@@ -59,6 +60,11 @@ func ValidateName(name string) error {
 	}
 	if len(name) > 4 && name[len(name)-4:] == ".git" {
 		return fmt.Errorf("invalid name %q: must not end in .git", name)
+	}
+	// /{owner}/activity.atom is the owner's feed; a repository by that
+	// name would be unreachable.
+	if strings.HasSuffix(name, ".atom") {
+		return fmt.Errorf("invalid name %q: must not end in .atom", name)
 	}
 	return nil
 }

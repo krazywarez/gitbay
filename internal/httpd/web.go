@@ -253,6 +253,7 @@ type repoPage struct {
 	Host     string
 	Mirrors  []mirrorLine // repo admins only
 	CanAdmin bool         // gates the settings tab
+	Feed     string       // Atom feed for this page, if it has one
 	// OpenIssues and OpenMRs are the counts on the header tabs.
 	OpenIssues int
 	OpenMRs    int
@@ -445,11 +446,12 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		CanAdmin      bool
 		Self          bool
 		Notice        string
+		Feed          string
 	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
 		d.Repos, d.Members, d.Orgs,
 		weeks, activityTotal, teams, canAdmin,
 		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
-		s.takeFlash(w, r)})
+		s.takeFlash(w, r), "/" + name + "/activity.atom"})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {
@@ -613,6 +615,7 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "releases"
+	p.Feed = "/" + p.Repo.Path() + "/releases.atom"
 	rels, err := s.st.ListReleases(p.Repo.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -1406,6 +1409,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "log"
+	p.Feed = "/" + p.Repo.Path() + "/log.atom/" + p.Ref
 	const pageSize = 50
 	// ?path= filters to commits touching one file or directory.
 	filePath := strings.Trim(path.Clean("/"+r.URL.Query().Get("path")), "/")

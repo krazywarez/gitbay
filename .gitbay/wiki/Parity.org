@@ -163,6 +163,7 @@ always markdown.
 | visibility                  | yes | yes | yes |
 | archive (read-only flag)    | yes | yes | yes |
 | release list, show          | yes | yes | yes |
+| atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
 | build list                  | yes | yes | yes |
 | build show (one build)      | yes | yes | yes |

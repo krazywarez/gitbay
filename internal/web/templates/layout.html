@@ -6,7 +6,8 @@
 <title>{{template "title" .}}</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-</head>
+{{with field . "Feed"}}<link rel="alternate" type="application/atom+xml" href="{{.}}">
+{{end}}</head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">

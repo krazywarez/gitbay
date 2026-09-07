@@ -39,4 +39,7 @@ func TestRepoNameAllowsReservedWords(t *testing.T) {
 	if err := ValidateName("repo.git"); err == nil {
 		t.Error("ValidateName(\"repo.git\") = nil, want error")
 	}
+	if err := ValidateName("activity.atom"); err == nil {
+		t.Error("ValidateName(\"activity.atom\") = nil, want error")
+	}
 }

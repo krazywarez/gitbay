@@ -294,6 +294,35 @@ type FeedEvent struct {
 	CreatedAt string
 }
 
+// OwnerPublicEvents returns activity on an owner's public repositories,
+// newest first, for readers carrying no session. Push events are
+// excluded as in RecentEvents.
+func (s *Store) OwnerPublicEvents(ownerKind string, ownerID int64, limit int) ([]FeedEvent, error) {
+	rows, err := s.DB.Query(`
+		SELECT e.id, COALESCE(u.username, o.name) || '/' || r.name,
+		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
+		FROM events e
+		JOIN repos r ON r.id = e.repo_id
+		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+		LEFT JOIN users ac ON ac.id = e.actor_id
+		WHERE e.kind <> 'push' AND r.visibility = 'public' AND r.owner_kind = ? AND r.owner_id = ?
+		ORDER BY e.id DESC LIMIT ?`, ownerKind, ownerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FeedEvent
+	for rows.Next() {
+		var e FeedEvent
+		if err := rows.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 // RecentEvents returns activity on repositories the user can reach. Push
 // events are excluded: they repeat what the commit lists already show.
 // before (an event id) starts the page strictly below it, matching the
