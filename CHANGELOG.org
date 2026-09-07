@@ -4,6 +4,76 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.15.0 — 2026-09-07
+
+Builds run in containers, a rebase is not rebuilt, and a runner restart
+no longer strands the build it was running.
+
+** CI
+
+- A build's steps run in a rootless podman container, one per job. The
+  runner clones outside the container with its key and bind-mounts the
+  workspace in, so a step cannot reach the key, the runner's environment,
+  or another build's workspace. =image:= is required per job and is
+  validated as a reference, never pulled: an operator provisions images
+  on the host. A runner configured for podman that has none refuses to
+  start rather than fall back to the host. =-isolation none= is the
+  explicit host-execution mode. =-cpus= and =-memory= cap a build's
+  container. #144
+- Builds have a home directory that outlives the build, so the Go module
+  cache and the sonar scanner survive between runs. It is mounted into
+  the container at the same path, and only that directory. Ref #144
+- The host preparation script, the unit drop-in and the weekly image
+  prune ship with =make deploy-runner=; each hardening flag the drop-in
+  relaxes carries the reason in place. Ref #144
+- A nightly canary on the runner host proves the boundary holds:
+  =cmc/ci-smoke= runs a job that tries to read the key and list sibling
+  workspaces, and fails if either succeeds. Ref #144
+- Dedupe keys on the commit's tree, not its sha. A rebase that changes
+  nothing is not rebuilt: the new commit gets the earlier success as its
+  status, naming the build. Scheduled and tag builds carry no tree and
+  are never reused. #177
+- =vuln= and =sonar= run nightly on =main= rather than on every push;
+  neither could inform a merge. Branches run =build= and =test=. #177
+- A rewritten branch is filtered against the merge base rather than the
+  old tip, so a rebased branch whose own commits change code no longer
+  reads as a docs-only push and skips its jobs. #176
+- A build whose runner's log stream ended with no outcome is failed two
+  minutes later, instead of sitting =running= until a fixed deadline.
+  Migration 0046. Ref #179
+- The runner retries reporting a finished build's outcome, four times
+  over about thirty seconds, when the server is unreachable. A gitbayd
+  restart at that moment used to lose the result. Ref #179
+- The runner drains on SIGTERM: it claims nothing more, finishes and
+  reports the build in flight, then exits. A second signal exits at once.
+  The unit allows fifty minutes. #179
+
+** Repositories
+
+- =repo show= reports the caller's watch and bookmark state, and the
+  parent of a fork when the caller can read it. #178
+- =repo unwatch= clears the row from either state; =repo mute= is the
+  explicit silence. Watch then unwatch used to leave an account below
+  the default with no way back. The web header toggle follows. #180
+
+** Upgrading
+
+Replace the binary and reinstall the CLI. One migration (0046, the
+build log's close time), applied on start.
+
+The runner now defaults to =-isolation podman= and refuses to start
+without a working podman and a named image. Prepare the host with
+=deploy/runner-podman-setup.sh= and build =localhost/gitbay-ci:1= from
+=deploy/Containerfile.ci= before deploying it, or pass =-isolation
+none= to keep running steps on the host. Validate on a scratch
+repository with =-repos= scoped to it first; the wiki's Admin page has
+the procedure.
+
+The runner's unit gains =TimeoutStopSec=50min= and =KillMode=mixed= so
+a stop reaches the runner alone and it can drain; under the default
+kill mode systemd ends the build's container with the runner.
+=make deploy-runner= therefore waits for a build in flight.
+
 * v1.14.0 — 2026-09-06
 
 Logging into the web without an SSH key, wikis inside the repository,
