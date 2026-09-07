@@ -152,12 +152,12 @@ column and are always markdown.
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
-| build cancel                | yes | yes | no  |
+| build cancel                | yes | yes | yes |
 | job image (ci.yml)          | yes | n/a | n/a |
 | dependency checks on/off    | yes | yes | no  |
 | dependency status           | yes | yes | no  |
 | delete, transfer            | yes | no  | no  |
-| release delete              | yes | yes | no  |
+| release delete              | yes | yes | yes |
 
 No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a
@@ -294,7 +294,7 @@ iOS client.
 | teams create, delete      | yes | yes | yes |
 | team members              | yes | yes | yes |
 | team repo grants          | yes | yes | yes |
-| create, rename            | yes | yes | no  |
+| create, rename            | yes | yes | yes |
 | delete                    | yes | n/a | n/a |
 
 * Pagination
