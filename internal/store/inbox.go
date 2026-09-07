@@ -111,6 +111,13 @@ func (s *Store) SetRepoWatch(repoID, userID int64, state string) error {
 	return err
 }
 
+// ClearRepoWatch returns the user to the default: notified about work
+// they are part of, nothing more.
+func (s *Store) ClearRepoWatch(repoID, userID int64) error {
+	_, err := s.DB.Exec("DELETE FROM repo_watchers WHERE repo_id = ? AND user_id = ?", repoID, userID)
+	return err
+}
+
 // RepoWatchState returns "watching", "muted", or "" for the default.
 func (s *Store) RepoWatchState(repoID, userID int64) string {
 	var state string

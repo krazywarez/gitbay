@@ -146,6 +146,19 @@ func TestNotifyRecipients(t *testing.T) {
 	if s.RepoWatchState(repoID, owner) != "muted" {
 		t.Fatal("watch state not recorded")
 	}
+	// Clearing returns the owner to the default and they are told again.
+	if err := s.ClearRepoWatch(repoID, owner); err != nil {
+		t.Fatal(err)
+	}
+	if s.RepoWatchState(repoID, owner) != "" {
+		t.Fatal("clear left a state")
+	}
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}); len(got) != 2 {
+		t.Fatalf("cleared owner not notified: %v", got)
+	}
+	if err := s.SetRepoWatch(repoID, owner, "muted"); err != nil {
+		t.Fatal(err)
+	}
 
 	// Watching after muting replaces the row rather than adding one.
 	if err := s.SetRepoWatch(repoID, owner, "watching"); err != nil {

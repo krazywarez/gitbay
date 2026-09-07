@@ -23,8 +23,11 @@ func init() {
 		Summary: "hear about all activity on a repository",
 		Usage:   "repo watch <owner/name>", Run: runRepoWatch})
 	register(Command{Path: []string{"repo", "unwatch"},
-		Summary: "mute a repository, including work you are part of",
+		Summary: "back to the default: only work you are part of",
 		Usage:   "repo unwatch <owner/name>", Run: runRepoUnwatch})
+	register(Command{Path: []string{"repo", "mute"},
+		Summary: "mute a repository, including work you are part of",
+		Usage:   "repo mute <owner/name>", Run: runRepoMute})
 }
 
 // notice is one thing that happened, in the shape both delivery routes
@@ -171,14 +174,14 @@ func runNotificationsRead(c *Ctx, args []string) int {
 	})
 }
 
-func runRepoWatch(c *Ctx, args []string) int   { return setWatch(c, args, "watching") }
-func runRepoUnwatch(c *Ctx, args []string) int { return setWatch(c, args, "muted") }
+func runRepoWatch(c *Ctx, args []string) int   { return setWatch(c, args, "watch", "watching") }
+func runRepoMute(c *Ctx, args []string) int    { return setWatch(c, args, "mute", "muted") }
+func runRepoUnwatch(c *Ctx, args []string) int { return setWatch(c, args, "unwatch", "default") }
 
-func setWatch(c *Ctx, args []string, state string) int {
-	verb := "watch"
-	if state == "muted" {
-		verb = "unwatch"
-	}
+// setWatch records the caller's state on a repository. "default" deletes
+// the row: watch then unwatch leaves no trace, and a mute is undone the
+// same way.
+func setWatch(c *Ctx, args []string, verb, state string) int {
 	if len(args) != 1 {
 		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
 	}
@@ -186,7 +189,13 @@ func setWatch(c *Ctx, args []string, state string) int {
 	if code >= 0 {
 		return code
 	}
-	if err := c.Store.SetRepoWatch(repo.ID, c.User.ID, state); err != nil {
+	var err error
+	if state == "default" {
+		err = c.Store.ClearRepoWatch(repo.ID, c.User.ID)
+	} else {
+		err = c.Store.SetRepoWatch(repo.ID, c.User.ID, state)
+	}
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]string{"repo": repo.Path(), "state": state}, func(w io.Writer) {

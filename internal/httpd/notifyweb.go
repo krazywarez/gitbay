@@ -63,10 +63,10 @@ func (s *Server) watchToggle(w http.ResponseWriter, r *http.Request, u store.Use
 	if !ok {
 		return
 	}
-	state := "watching"
 	if s.st.RepoWatchState(repo.ID, u.ID) == "watching" {
-		state = "muted"
+		s.st.ClearRepoWatch(repo.ID, u.ID)
+	} else {
+		s.st.SetRepoWatch(repo.ID, u.ID, "watching")
 	}
-	s.st.SetRepoWatch(repo.ID, u.ID, state)
 	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }

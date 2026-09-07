@@ -32,6 +32,21 @@ func TestRepoShowCarriesViewerState(t *testing.T) {
 	if !strings.Contains(out, `"watch":"watching"`) || !strings.Contains(out, `"bookmarked":true`) {
 		t.Fatalf("bob's state not reported:\n%s", out)
 	}
+	// unwatch is the way back to the default from either state, and
+	// mute is its own state, not what unwatch means (#180).
+	inst.ssh(t, bobKey, "", "repo", "unwatch", "alice/app")
+	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "alice/app", "--json"); strings.Contains(out, `"watch"`) {
+		t.Errorf("unwatch did not clear the state:\n%s", out)
+	}
+	inst.ssh(t, bobKey, "", "repo", "mute", "alice/app")
+	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "alice/app", "--json"); !strings.Contains(out, `"watch":"muted"`) {
+		t.Errorf("mute not reported:\n%s", out)
+	}
+	inst.ssh(t, bobKey, "", "repo", "unwatch", "alice/app")
+	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "alice/app", "--json"); strings.Contains(out, `"watch"`) {
+		t.Errorf("unwatch did not clear a mute:\n%s", out)
+	}
+	inst.ssh(t, bobKey, "", "repo", "watch", "alice/app")
 	// It is the caller's state: alice sees her own, not bob's.
 	if out, _, _ := inst.ssh(t, aliceKey, "", "repo", "show", "alice/app", "--json"); strings.Contains(out, `"bookmarked"`) {
 		t.Errorf("alice sees bob's bookmark:\n%s", out)

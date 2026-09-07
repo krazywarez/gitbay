@@ -142,7 +142,8 @@ always markdown.
 | fork                        | yes | yes | yes |
 | pin                         | yes | yes | yes |
 | bookmark, bookmark list     | yes | yes | yes |
-| watch, mute                 | yes | yes | yes |
+| watch, unwatch              | yes | yes | yes |
+| mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
@@ -263,8 +264,10 @@ instance sends mail, and mail is the second half when SMTP is
 configured. =notifications list= reads it, unread by default;
 =notifications read <id>... | --all= clears it; the dashboard and the
 web rail carry the unread count. =repo watch= adds you to a
-repository's notifications and =repo unwatch= mutes it, and a mute wins
-over owning the repository or having written the thread.
+repository's notifications, =repo mute= silences it, and =repo unwatch=
+returns you to the default from either — told about work you are part
+of, nothing more. A mute wins over owning the repository or having
+written the thread.
 
 A login link is requested from the login page by username or verified
 address, and arrives by mail: it works once and expires in fifteen

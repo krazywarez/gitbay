@@ -91,8 +91,8 @@ func TestNotificationInbox(t *testing.T) {
 
 	// Muting beats being a participant: bob wrote the issue and still
 	// hears nothing more, while the watcher does.
-	if _, errOut, code := inst.ssh(t, bobKey, "", "repo", "unwatch", "alice/app"); code != 0 {
-		t.Fatalf("repo unwatch: %s", errOut)
+	if _, errOut, code := inst.ssh(t, bobKey, "", "repo", "mute", "alice/app"); code != 0 {
+		t.Fatalf("repo mute: %s", errOut)
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "comment", "alice/app", "1", "--message", "'more'"); code != 0 {
 		t.Fatal("alice comment failed")
