@@ -184,8 +184,8 @@ func (r *runner) step() (bool, error) {
 	if r.run(j) {
 		status = "success"
 	}
-	if out, err := r.ssh(nil, "runner", "done", fmt.Sprint(j.ID), status); err != nil {
-		return true, fmt.Errorf("reporting build %d: %w (%s)", j.ID, err, out)
+	if err := r.reportDone(j.ID, status); err != nil {
+		return true, err
 	}
 	log.Printf("build %d: %s", j.ID, status)
 	return true, nil
