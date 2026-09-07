@@ -78,6 +78,8 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "require-resolved", repo, onOff(v("require-resolved"))}
 	case "require-codeowners":
 		argv = []string{"repo", "settings", "require-codeowners", repo, onOff(v("require-codeowners"))}
+	case "require-mr":
+		argv = []string{"repo", "settings", "require-mr", repo, onOff(v("require-mr"))}
 	case "require-signed":
 		argv = []string{"repo", "settings", "require-signed", repo, onOff(v("require-signed"))}
 	case "require-approvals":

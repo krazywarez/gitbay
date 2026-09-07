@@ -106,7 +106,15 @@ func CheckPush(repo store.Repo, updates []RefUpdate) string {
 			if u.IsForce {
 				return "branch " + branch + " is protected: force-push refused"
 			}
+			// Under require_mr the server's merge is the only writer of an
+			// existing protected branch. Creating one is still a push:
+			// there is nothing to route a merge request into yet.
+			if repo.Settings.RequireMR && !isZeroSHA(u.Old) {
+				return "branch " + branch + " accepts changes through merge requests only"
+			}
 		}
 	}
 	return ""
 }
+
+func isZeroSHA(sha string) bool { return sha != "" && strings.Trim(sha, "0") == "" }

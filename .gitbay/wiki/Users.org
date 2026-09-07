@@ -192,6 +192,7 @@ Access and settings (owner or =admin= grant):
 gitbay repo access grant you/project alice write    # read | write | admin
 gitbay repo access revoke you/project alice
 gitbay repo settings protect you/project main       # no force-push, no delete
+gitbay repo settings require-mr you/project on      # protected branches: merge requests only
 gitbay repo settings default-branch you/project trunk # HEAD, and what the web shows
 gitbay repo settings require-signed you/project on  # every commit must verify
 gitbay repo settings git-daemon you/project on      # expose over git://
@@ -396,6 +397,13 @@ the opt-in, so a repository can carry the file as documentation of who
 to ask without it gating merges; with it on and no file on the target
 branch, the merge is refused and says so. It does not wait on
 =require-approvals=.
+
+Those gates apply to =mr merge=. A direct push to a protected branch
+passes none of them until =require-mr on=: then an existing protected
+branch refuses every push, including =repo commit-file= and the web
+editor, and the server's merge is its only writer. Creating the branch
+is still a push, since there is nothing to open a merge request against
+yet.
 
 A merge request whose target is another open merge request's source
 branch is stacked on it: =mr create= says so, =mr show= carries

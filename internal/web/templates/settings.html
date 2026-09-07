@@ -105,6 +105,13 @@
   </select>
   <button type="submit">Protect</button>
 </form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-mr">
+  <label for="require-mr">Merge requests only</label>
+  <input type="checkbox" id="require-mr" name="require-mr" value="on"{{if .Repo.Settings.RequireMR}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<p class="meta">With merge requests only, a protected branch refuses every direct push once it exists; the merge gates above are then what a change has to pass.</p>
 
 <h2>Dependencies</h2>
 <form method="post" action="{{$base}}" class="setform">

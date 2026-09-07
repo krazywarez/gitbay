@@ -32,6 +32,9 @@ func init() {
 	register(Command{Path: []string{"repo", "settings", "require-checks"},
 		Summary: "gate merges on green statuses",
 		Usage:   "repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
+	register(Command{Path: []string{"repo", "settings", "require-mr"},
+		Summary: "protected branches take changes through merge requests only",
+		Usage:   "repo settings require-mr <owner/name> on|off", Run: runRequireMR})
 	register(Command{Path: []string{"repo", "settings", "require-signed"},
 		Summary: "require verified commit signatures",
 		Usage:   "repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
@@ -214,6 +217,23 @@ func runRequireChecks(c *Ctx, args []string) int {
 	}
 	return c.emit(s, func(w io.Writer) {
 		fmt.Fprintf(w, "require_checks %s on %s\n", args[1], repo.Path())
+	})
+}
+
+func runRequireMR(c *Ctx, args []string) int {
+	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: repo settings require-mr <owner/name> on|off")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireMR = args[1] == "on" })
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(s, func(w io.Writer) {
+		fmt.Fprintf(w, "require_mr %s on %s\n", args[1], repo.Path())
 	})
 }
 

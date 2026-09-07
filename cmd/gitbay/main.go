@@ -479,6 +479,7 @@ func repoCmd() *cobra.Command {
 			pass("require-checks", "gate merges on green statuses: ... on|off", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
 			pass("visibility", "set repository visibility: public|private", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
 			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
+			pass("require-mr", "protected branches take changes through merge requests only: on|off", passOpts{server: []string{"repo", "settings", "require-mr"}, needsRepo: true}),
 			pass("description", "set the repository description: <text>", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
 			pass("website", "set the repository website: <url> ('' clears)", passOpts{server: []string{"repo", "settings", "website"}, needsRepo: true}),
 			pass("git-daemon", "expose over git://: ... on|off", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),

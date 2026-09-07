@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"strings"
 	"testing"
 
 	"gitbay.org/gitbay/internal/store"
@@ -108,5 +109,33 @@ func TestCheckPush(t *testing.T) {
 				t.Errorf("CheckPush = %q, denied should be %v", msg, tc.denied)
 			}
 		})
+	}
+}
+
+// With require_mr, a protected branch takes no direct push once it
+// exists; creating it and pushing elsewhere are unaffected (#197).
+func TestCheckPushRequireMR(t *testing.T) {
+	repo := store.Repo{Settings: store.RepoSettings{ProtectedBranches: []string{"main"}, RequireMR: true}}
+	const zero = "0000000000000000000000000000000000000000"
+	cases := []struct {
+		name    string
+		updates []RefUpdate
+		denied  bool
+	}{
+		{"update protected", []RefUpdate{{Ref: "refs/heads/main", Old: "abc", New: "def"}}, true},
+		{"create protected", []RefUpdate{{Ref: "refs/heads/main", Old: zero, New: "def"}}, false},
+		{"delete protected", []RefUpdate{{Ref: "refs/heads/main", Old: "abc", New: zero, IsDelete: true}}, true},
+		{"update unprotected", []RefUpdate{{Ref: "refs/heads/dev", Old: "abc", New: "def"}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := CheckPush(repo, tc.updates)
+			if (msg != "") != tc.denied {
+				t.Errorf("CheckPush = %q, denied should be %v", msg, tc.denied)
+			}
+		})
+	}
+	if msg := CheckPush(repo, cases[0].updates); !strings.Contains(msg, "merge requests only") {
+		t.Errorf("message %q", msg)
 	}
 }

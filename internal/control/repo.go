@@ -606,8 +606,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 		return code
 	}
 	return c.emit(repo.Settings, func(w io.Writer) {
-		fmt.Fprintf(w, "protected_branches: %s\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
-			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
+		fmt.Fprintf(w, "protected_branches: %s\nrequire_mr: %v\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
+			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireMR, repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
 	})
 }
 

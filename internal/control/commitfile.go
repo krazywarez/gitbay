@@ -3,6 +3,7 @@ package control
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
@@ -54,6 +55,9 @@ func runCommitFile(c *Ctx, args []string) int {
 	filePath, ok := cleanRepoPath(rest[1])
 	if !ok || filePath == "" {
 		return c.fail(protocol.ExitUsage, "path must stay inside the repository")
+	}
+	if repo.Settings.RequireMR && slices.Contains(repo.Settings.ProtectedBranches, ref) {
+		return c.fail(protocol.ExitDenied, "branch %s accepts changes through merge requests only", ref)
 	}
 	// The server authors this commit, so it cannot sign it.
 	if repo.Settings.RequireSignedCommits {
