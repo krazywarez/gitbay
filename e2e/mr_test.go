@@ -108,9 +108,10 @@ func TestMergeRequests(t *testing.T) {
 	}
 	firstHead := show.HeadSHA
 
-	// Bob force-pushes the source branch: the MR head updates and the
-	// review goes stale.
-	mustGit(t, bobDir, bobEnv, "commit", "-q", "--amend", "-m", "add feature (amended)")
+	// Bob force-pushes a changed diff: the MR head updates and the review
+	// goes stale. (A force-push carrying the same diff keeps it, #198.)
+	os.WriteFile(filepath.Join(bobDir, "feature.txt"), []byte("bob's work, amended\n"), 0o644)
+	mustGit(t, bobDir, bobEnv, "commit", "-q", "-a", "--amend", "-m", "add feature (amended)")
 	mustGit(t, bobDir, bobEnv, "push", "-q", "--force", "origin", "feature")
 	show = inst.mrShow(t, aliceKey, "alice/lib", "1")
 	if show.HeadSHA == firstHead {

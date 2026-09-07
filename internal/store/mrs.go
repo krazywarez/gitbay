@@ -284,18 +284,29 @@ func (s *Store) SetMRState(mrID int64, state string) error {
 	return nil
 }
 
-// UpdateMRHead records a new head and marks every review at another head
-// stale, in one transaction.
 // UpdateMRHead moves a merge request onto a new head, stales the reviews
 // of the old one, and records the head in the history a range-diff reads.
 // baseSHA is the merge base at this moment; "" when the caller could not
 // work it out, which only costs the range-diff its precision.
-func (s *Store) UpdateMRHead(mrID int64, headSHA, baseSHA string) error {
+//
+// sameDiff says the new head proposes the change the old one did (a
+// rebase onto a moved target, or the same commits pushed again). Then the
+// fresh reviews of the old head are reviews of this diff and move to the
+// new head rather than going stale (#198). Reviews already stale stay so.
+func (s *Store) UpdateMRHead(mrID int64, headSHA, baseSHA string, sameDiff bool) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if sameDiff {
+		if _, err := tx.Exec(`
+			UPDATE mr_reviews SET head_sha = ? WHERE mr_id = ? AND stale = 0
+			AND head_sha = (SELECT head_sha FROM merge_requests WHERE id = ?)`,
+			headSHA, mrID, mrID); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.Exec(
 		"UPDATE merge_requests SET head_sha = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
 		headSHA, mrID); err != nil {

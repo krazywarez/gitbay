@@ -122,6 +122,35 @@ func cutAtLine(out []byte, limit int64) ([]byte, bool) {
 	return cut, true
 }
 
+// PatchID identifies the change between old and new independently of the
+// commits carrying it: git patch-id --stable over the whole-range diff.
+// Two revisions with the same PatchID propose the same change, whatever
+// was rebased underneath. "" when the range has no diff.
+func PatchID(dir, old, new string) (string, error) {
+	diff := exec.Command(toolpath.Look("git"), "-C", dir, "diff", "--end-of-options", old, new)
+	pid := exec.Command(toolpath.Look("git"), "-C", dir, "patch-id", "--stable")
+	pipe, err := diff.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	pid.Stdin = pipe
+	if err := diff.Start(); err != nil {
+		return "", fmt.Errorf("diff: %w", err)
+	}
+	out, err := pid.Output()
+	if werr := diff.Wait(); werr != nil {
+		return "", fmt.Errorf("diff: %w", werr)
+	}
+	if err != nil {
+		return "", fmt.Errorf("patch-id: %w", err)
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) == 0 {
+		return "", nil
+	}
+	return fields[0], nil
+}
+
 // MergeBase returns the best common ancestor, or an error if none exists.
 func MergeBase(dir, a, b string) (string, error) {
 	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-base", "--end-of-options", a, b)

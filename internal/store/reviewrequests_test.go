@@ -36,7 +36,7 @@ func TestReviewQueueRequestedReviewer(t *testing.T) {
 		t.Fatalf("queue after reviewing the current head: %+v, %v", q, err)
 	}
 
-	if err := s.UpdateMRHead(mr.ID, "def456", ""); err != nil {
+	if err := s.UpdateMRHead(mr.ID, "def456", "", false); err != nil {
 		t.Fatal(err)
 	}
 	if q, err := s.ReviewQueue(reviewerID); err != nil || len(q) != 1 {

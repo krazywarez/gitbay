@@ -53,8 +53,9 @@ below it.
 
 Changing a lower layer is a rebase you do yourself. Amend =feat-a=,
 then =git rebase feat-a= on =feat-b= and each layer above, and
-force-push them. A force-push stales the reviews on that layer, the
-same as on any merge request. The server never rewrites your commits:
+force-push them. A force-push stales the reviews on that layer when it
+changes the layer's diff, the same as on any merge request; a rebase
+that carries the same change keeps them. The server never rewrites your commits:
 it holds no signing key, and a rebase it performed would land commits
 nobody signed.
 

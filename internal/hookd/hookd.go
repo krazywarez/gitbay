@@ -283,7 +283,7 @@ func (s *Server) postReceive(req Request) {
 			if err != nil {
 				base = ""
 			}
-			if err := s.st.UpdateMRHead(mr.ID, u.New, base); err != nil {
+			if err := s.st.UpdateMRHead(mr.ID, u.New, base, sameChange(dstDir, mr, base, u.New)); err != nil {
 				slog.Error("post-receive: recording MR head", "mr", mr.Number, "err", err)
 			}
 			if srcRepo.ID != target.ID {
@@ -324,6 +324,27 @@ func (s *Server) adoptDefaultBranch(repo *store.Repo, updates []policy.RefUpdate
 		repo.DefaultBranch = branch
 		return
 	}
+}
+
+// sameChange reports whether the new head proposes the diff the old one
+// did: the patch-id of each revision against its own merge base. A
+// rebase onto a moved target changes every sha and nothing about the
+// change, and the reviews of it should not go stale for that (#198).
+// Any doubt answers false, which is the old behaviour.
+func sameChange(dir string, mr store.MR, newBase, newHead string) bool {
+	if mr.HeadSHA == "" || newBase == "" || mr.HeadSHA == newHead {
+		return false
+	}
+	oldBase, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, mr.HeadSHA)
+	if err != nil {
+		return false
+	}
+	oldID, err := gitutil.PatchID(dir, oldBase, mr.HeadSHA)
+	if err != nil || oldID == "" {
+		return false
+	}
+	newID, err := gitutil.PatchID(dir, newBase, newHead)
+	return err == nil && newID == oldID
 }
 
 // queueBuilds queues the push jobs for a branch update. The work is

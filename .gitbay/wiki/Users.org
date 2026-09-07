@@ -378,7 +378,10 @@ Semantics worth knowing:
   =refs/merge-requests/N/head= (fetchable by any reader), so an MR
   survives deletion of its source branch or fork.
 - force-pushing the source updates the MR and marks existing reviews
-  stale.
+  stale — unless the diff is the one they reviewed. A rebase onto a
+  target that moved on changes every sha and nothing about the change,
+  so fresh reviews follow it to the new head; a push that changes the
+  diff stales them.
 - default strategy: fast-forward when possible, else a merge commit.
   Squash makes one commit authored by the MR author, committed by the
   merger. Rebase replays a linear range preserving authors; it refuses

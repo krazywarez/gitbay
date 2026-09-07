@@ -118,7 +118,8 @@ func TestMergeRequirements(t *testing.T) {
 		t.Fatalf("fully gated merge: %s", errOut)
 	}
 
-	// Stale approvals never count: new MR, approve, force-push, refused.
+	// Stale approvals never count: new MR, approve, force-push a changed
+	// diff, refused. (A force-push carrying the same diff keeps them, #198.)
 	mustGit(t, dir, env, "fetch", "-q", "origin")
 	mustGit(t, dir, env, "checkout", "-q", "-b", "feat2", "origin/main")
 	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("n\n"), 0o644)
@@ -132,7 +133,8 @@ func TestMergeRequirements(t *testing.T) {
 	if _, _, code = inst.ssh(t, bobKey, "", "mr", "review", "alice/svc", "2", "--approve"); code != 0 {
 		t.Fatal("bob approve 2 failed")
 	}
-	mustGit(t, dir, env, "commit", "-q", "--amend", "-m", "notes v2")
+	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("n2\n"), 0o644)
+	mustGit(t, dir, env, "commit", "-q", "-a", "--amend", "-m", "notes v2")
 	mustGit(t, dir, env, "push", "-q", "--force", "origin", "feat2")
 	_, errOut, code = inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "2")
 	if code != 4 || !strings.Contains(errOut, "requires 1 fresh approval") {
