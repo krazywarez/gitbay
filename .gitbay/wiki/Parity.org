@@ -50,6 +50,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
 | stacked merge requests | yes | yes | yes |
+| revisions              | yes | yes | no  |
+| range-diff             | yes | no  | no  |
 
 Reviews and checks carry the time they last said something, and a
 =ci/<job>= check carries how long its build ran, so a merge request
@@ -65,13 +67,17 @@ branch is stacked on it: =mr show= and the page say so both ways, and
 when the lower one merges, everything stacked on it is retargeted onto
 what it merged into with its reviews kept. A squash or rebase merge is
 refused while anything is stacked on the merge request, since it would
-rewrite the commits the stack builds on. The iOS client renders the
-retarget but has no stack view yet.
+rewrite the commits the stack builds on. All three surfaces show the
+stack both ways.
 
 A draft merge request is open but not asking: it does not merge, and it
 does not appear in anyone's review queue. Draft is a flag rather than a
 fifth state, so every =state = 'open'= rule still means what it did.
-Batched review and range-diff (krz/gitbay#111) are not built.
+=mr revisions= lists the heads a merge request has had, and the web
+page lists them beside the reviews they staled; the iOS client shows
+threads left on an earlier revision but not the heads. =mr range-diff=
+compares two heads and has no web or iOS view. Batched review is not
+built.
 
 =mr review request --add <user>= asks a *particular* person, who then
 carries the merge request in their queue and is notified; =--remove=
@@ -104,6 +110,8 @@ reviews, since an approval was of the diff against the old branch.
 | milestone list      | yes | yes | yes |
 | labels: list, colour | yes | yes | yes |
 | choose body markup  | yes | yes | yes |
+| issue templates     | yes | yes | no  |
+| milestone create, close, reopen | yes | no | no |
 
 Labels are created on the fly by =issue label --add= and managed by
 =label list=, =label set <label> --color rrggbb= and =label remove=,
@@ -141,10 +149,15 @@ always markdown.
 | create                      | yes | yes | yes |
 | fork                        | yes | yes | yes |
 | pin                         | yes | yes | yes |
-| bookmark, bookmark list     | yes | yes | yes |
+| bookmark                    | yes | yes | yes |
+| bookmark list               | yes | yes | no  |
 | watch, unwatch              | yes | yes | yes |
 | mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
+| require codeowners          | yes | yes | no  |
+| access grants               | yes | no  | no  |
+| webhooks                    | yes | no  | no  |
+| import from a remote        | yes | no  | no  |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
 | archive (read-only flag)    | yes | yes | yes |
@@ -161,6 +174,8 @@ always markdown.
 | dependency status           | yes | yes | yes |
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | yes | yes |
+| release asset add           | yes | no  | n/a |
+| release asset remove        | yes | no  | no  |
 
 No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a
@@ -182,6 +197,10 @@ repository — and a repository bookmarked while public and since made
 private drops out of the listing rather than leaking that it exists
 (krz/gitbay#146).
 
+The web's watch and pin controls write the store directly instead of
+dispatching =repo watch= and =repo pin=. That is why the web cannot
+mute: its toggle knows watching and default only.
+
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps
 status= lists what is behind; the repository's settings page renders the
@@ -202,7 +221,9 @@ missing from it. Archive download is =n/a= on iOS: the read API carries
 a command's stdout as a JSON string, so a gzip stream cannot survive it,
 and the app has nowhere useful to put a tarball — the brief rules out
 local git, so there is no clone, checkout or build to feed. The web's
-route stays the way to get one.
+route stays the way to get one. =release asset add= is =n/a= on iOS for
+the same reason from the other direction: the file arrives on stdin,
+which the API carries as a JSON string.
 
 A README or wiki page's org renders per surface: the web through
 go-org, the iOS client through the shared OrgSwift package
@@ -258,6 +279,7 @@ client has no use for one (krz/gitbay#57).
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
 | request a login link        | n/a | yes | n/a |
+| account import bundle       | yes | no  | n/a |
 
 Notifications land in an inbox row per recipient whether or not the
 instance sends mail, and mail is the second half when SMTP is
@@ -303,6 +325,7 @@ cleared.
 | team repo grants          | yes | yes | yes |
 | create, rename            | yes | yes | yes |
 | delete                    | yes | n/a | n/a |
+| profile                   | yes | no  | no  |
 
 * Pagination
 
@@ -315,7 +338,8 @@ with the same cursors; iOS pages with them too.
 * SSH only, by design
 
 Build secrets, mirror configuration and tokens, custom domain claims,
-API token minting, deploy keys, account and instance administration. Deleting or transferring a repository is also
+API token minting, web session listing and revocation, deploy keys,
+account and instance administration. Deleting or transferring a repository is also
 CLI-only, as is deleting an organization: each wants a typed
 confirmation, not a button.
 
