@@ -239,7 +239,8 @@ func TestWebhooks(t *testing.T) {
 	recv.waitN(t, prev+1)
 
 	// SSRF: on a default instance (allow_local off), local targets are
-	// rejected at add time.
+	// rejected at add time. A refused value is exit 1 with the reason;
+	// exit 2 is for the shape of the command line (#187).
 	inst2 := startInstance(t)
 	k2 := inst2.newKey(t, "a2")
 	inst2.admin(t, "admin", "user", "create", "a2", "--key", k2+".pub")
@@ -247,10 +248,10 @@ func TestWebhooks(t *testing.T) {
 		t.Fatal("repo create failed")
 	}
 	_, errOut, code := inst2.ssh(t, k2, "", "webhook", "add", "a2/r", "http://127.0.0.1:9/x")
-	if code != 2 || !strings.Contains(errOut, "SSRF") {
+	if code != 1 || !strings.Contains(errOut, "SSRF") {
 		t.Fatalf("local webhook target accepted: exit %d, %s", code, errOut)
 	}
-	if _, _, code := inst2.ssh(t, k2, "", "webhook", "add", "a2/r", "ftp://example.com/x"); code != 2 {
+	if _, _, code := inst2.ssh(t, k2, "", "webhook", "add", "a2/r", "ftp://example.com/x"); code != 1 {
 		t.Fatal("non-http scheme accepted")
 	}
 }
