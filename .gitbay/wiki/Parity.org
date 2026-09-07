@@ -48,7 +48,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | retarget               | yes | yes | yes |
 | milestone              | yes | yes | yes |
 | request a review       | yes | yes | yes |
-| choose body markup     | yes | yes | no  |
+| choose body markup     | yes | yes | yes |
 | stacked merge requests | yes | yes | yes |
 
 Reviews and checks carry the time they last said something, and a
@@ -103,7 +103,7 @@ reviews, since an approval was of the diff against the old branch.
 | milestone           | yes | yes | yes |
 | milestone list      | yes | yes | yes |
 | labels: list, colour | yes | yes | yes |
-| choose body markup  | yes | yes | no  |
+| choose body markup  | yes | yes | yes |
 
 Labels are created on the fly by =issue label --add= and managed by
 =label list=, =label set <label> --color rrggbb= and =label remove=,
@@ -115,10 +115,12 @@ create, recolour and remove, dispatching the same commands.
 Issue, MR and release bodies, and their comments, carry the markup they
 were written in — =--format md|org= on create, comment and edit, stored
 alongside the text so changing a preference later cannot reinterpret
-prose that already exists. Every surface *renders* the stored format;
-the web's create forms offer the choice, and the =no= above is the iOS
-composer, which writes markdown. Diff-line comments have no format
-column and are always markdown.
+prose that already exists. Every surface *renders* the stored format, and
+every surface now offers the choice: the web's create forms, and the iOS
+composer on create, edit and comment. An edit starts on the format its
+body was stored in, since starting elsewhere would silently reinterpret
+it on the next save. Diff-line comments have no format column and are
+always markdown.
 
 * Repositories
 
