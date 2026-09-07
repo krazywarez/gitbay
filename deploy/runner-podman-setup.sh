@@ -73,6 +73,17 @@ printf '[storage]\ndriver = "overlay"\ngraphroot = "%s/.local/share/containers/s
 chown "$RUNNER_USER:$RUNNER_USER" "$conf"
 echo "   written"
 
+# podman sets net.ipv4.ping_group_range in every container by default,
+# for unprivileged ping. The service runs with ProtectKernelTunables, so
+# /proc/sys is read-only and crun fails to start the container with
+# "open /proc/sys/net/ipv4/ping_group_range: Read-only file system". A
+# build has no use for ping; drop the default rather than the hardening.
+cconf="$home/.config/containers/containers.conf"
+echo "==> container defaults in $cconf"
+printf '[containers]\ndefault_sysctls = []\n' >"$cconf"
+chown "$RUNNER_USER:$RUNNER_USER" "$cconf"
+echo "   written"
+
 # Lingering keeps the user's systemd session alive when nobody is logged
 # in, which podman's pause process relies on.
 echo "==> lingering for $RUNNER_USER"
