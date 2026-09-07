@@ -12,4 +12,6 @@ CLI-first git forge: SSH is the API, the web is a rendering.
 - [[Parity][Parity]] — what each surface can do, and what stays SSH-only
 - [[Performance][Performance]] — stress-test numbers from importing git.git
 
-This wiki is a git repository: =git clone ssh://git@gitbay.org/krz/gitbay.wiki.git=
+This wiki is =.gitbay/wiki/= on the repository's default branch:
+=git clone ssh://git@gitbay.org/krz/gitbay.git=, edit a page like any
+other file, and open a merge request.
