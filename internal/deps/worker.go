@@ -251,7 +251,7 @@ func (w *Worker) notify(repo store.Repo, number int64, action, body string) {
 		if w.Cfg.Mail.SMTPHost == "" {
 			continue
 		}
-		email, err := w.St.PrimaryVerifiedEmail(id)
+		email, err := w.St.ActivityMailAddress(id)
 		if err != nil || email == "" {
 			continue
 		}

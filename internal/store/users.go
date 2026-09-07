@@ -195,6 +195,26 @@ func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 	return err
 }
 
+// MailEnabled reports whether activity notifications reach the account
+// by mail as well as the inbox.
+func (s *Store) MailEnabled(userID int64) (bool, error) {
+	var on int
+	err := s.DB.QueryRow("SELECT notify_mail FROM users WHERE id = ?", userID).Scan(&on)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	return on != 0, err
+}
+
+func (s *Store) SetMailEnabled(userID int64, on bool) error {
+	v := 0
+	if on {
+		v = 1
+	}
+	_, err := s.DB.Exec("UPDATE users SET notify_mail = ? WHERE id = ?", v, userID)
+	return err
+}
+
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
 	var admin, pending, disabled int

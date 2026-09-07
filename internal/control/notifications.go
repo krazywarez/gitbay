@@ -20,6 +20,13 @@ func init() {
 	register(Command{Path: []string{"notifications", "read"},
 		Summary: "mark notifications read",
 		Usage:   "notifications read <id>... | --all", Run: runNotificationsRead})
+	register(Command{Path: []string{"notifications", "settings", "show"},
+		Summary:  "your notification preferences",
+		Usage:    "notifications settings show",
+		ReadOnly: true, Run: runNotificationsSettingsShow})
+	register(Command{Path: []string{"notifications", "settings", "mail"},
+		Summary: "activity by mail as well as the inbox (login links are unaffected)",
+		Usage:   "notifications settings mail on|off", Run: runNotificationsSettingsMail})
 	register(Command{Path: []string{"repo", "watch"},
 		Summary: "hear about all activity on a repository",
 		Usage:   "repo watch <owner/name>", Run: runRepoWatch})
@@ -66,7 +73,7 @@ func notify(c *Ctx, userIDs []int64, n notice) {
 		if !sendMail {
 			continue
 		}
-		email, err := c.Store.PrimaryVerifiedEmail(id)
+		email, err := c.Store.ActivityMailAddress(id)
 		if err != nil || email == "" {
 			continue
 		}
@@ -134,6 +141,39 @@ func issueSubject(repo store.Repo, number int64, title string) string {
 
 func mrSubject(repo store.Repo, number int64, title string) string {
 	return fmt.Sprintf("[%s] !%d: %s", repo.Path(), number, title)
+}
+
+func emitNotificationSettings(c *Ctx) int {
+	on, err := c.Store.MailEnabled(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]bool{"mail": on}, func(w io.Writer) {
+		state := "off"
+		if on {
+			state = "on"
+		}
+		fmt.Fprintf(w, "mail: %s\n", state)
+	})
+}
+
+func runNotificationsSettingsShow(c *Ctx, args []string) int {
+	if len(args) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: notifications settings show")
+	}
+	return emitNotificationSettings(c)
+}
+
+// runNotificationsSettingsMail is the "inbox but no mail" switch: the
+// inbox is filed either way, the mail half consults it (#194).
+func runNotificationsSettingsMail(c *Ctx, args []string) int {
+	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: notifications settings mail on|off")
+	}
+	if err := c.Store.SetMailEnabled(c.User.ID, args[0] == "on"); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return emitNotificationSettings(c)
 }
 
 // noticesDefaultLimit caps a bare list; pagination reaches further back.

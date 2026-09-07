@@ -277,6 +277,7 @@ client has no use for one (krz/gitbay#57).
 | email list, remove, primary | yes | yes | no  |
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
+| activity mail on, off       | yes | yes | no  |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |

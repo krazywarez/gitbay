@@ -494,6 +494,17 @@ func (s *Store) PrimaryVerifiedEmail(userID int64) (string, error) {
 	return addr, err
 }
 
+// ActivityMailAddress returns where activity mail for an account goes:
+// its verified primary address, or "" when there is none or the account
+// turned activity mail off (#194).
+func (s *Store) ActivityMailAddress(userID int64) (string, error) {
+	on, err := s.MailEnabled(userID)
+	if err != nil || !on {
+		return "", err
+	}
+	return s.PrimaryVerifiedEmail(userID)
+}
+
 // PreferredVerifiedEmail returns the primary address if it is verified,
 // otherwise the account's other verified address that sorts first by
 // address; "" if none is verified. Unlike PrimaryVerifiedEmail, a verified
