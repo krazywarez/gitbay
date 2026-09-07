@@ -50,9 +50,12 @@ type runner struct {
 	// isolation selects how steps run: "podman" or "none".
 	image     string
 	isolation string
-	// memory and cpus cap one build's container; empty means no cap.
+	// memory and cpus cap one build's cgroup; empty means no cap.
 	memory string
 	cpus   string
+	// cgroups is the runner's build cgroup subtree, nil where the unit
+	// is not delegated and builds run unconfined in the service cgroup.
+	cgroups *buildCgroups
 	// stepFn is step, replaceable by tests.
 	stepFn func() (bool, error)
 	// repos limits which repositories this runner claims builds for. Empty
@@ -74,8 +77,8 @@ func main() {
 		jobs      = flag.Int("jobs", 1, "builds to run at once")
 		image     = flag.String("image", "", "default container image for jobs that name none")
 		isolation = flag.String("isolation", "podman", "how steps run: podman, or none for no container")
-		memory    = flag.String("memory", "", "memory limit per build container, e.g. 4g (podman only; default unlimited)")
-		cpus      = flag.String("cpus", "", "CPU limit per build container, e.g. 2 (podman only; default unlimited)")
+		memory    = flag.String("memory", "", "memory limit per build, e.g. 4g (podman only, needs a delegated cgroup; default unlimited)")
+		cpus      = flag.String("cpus", "", "CPU limit per build, e.g. 2 (podman only, needs a delegated cgroup; default unlimited)")
 		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
 	flag.Parse()
@@ -95,6 +98,23 @@ func main() {
 		isolation: *isolation,
 		memory:    *memory,
 		cpus:      *cpus,
+	}
+	if r.isolation == isolationPodman {
+		// Before podman runs anything: its pause process lands in the
+		// cgroup of the first invocation, and that must be the runner's
+		// leaf, not a build's.
+		cg, err := prepareBuildCgroups()
+		switch {
+		case err == nil:
+			r.cgroups = cg
+		case r.memory != "" || r.cpus != "":
+			// Limits that cannot be applied are refused, not dropped:
+			// a runner that accepted -memory and ran uncapped is what
+			// #188 was.
+			log.Fatalf("-memory/-cpus: build cgroups unavailable: %v", err)
+		default:
+			log.Printf("build cgroups unavailable (%v); builds run unconfined in the service cgroup", err)
+		}
 	}
 	if err := r.checkIsolation(); err != nil {
 		// Refusing to start is the point. A runner that quietly fell back

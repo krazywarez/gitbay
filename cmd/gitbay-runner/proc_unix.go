@@ -13,7 +13,10 @@ import (
 // child: dash forks a single command rather than exec'ing it, so on a
 // Debian host "sh -c 'sleep 120'" survived its shell by two minutes.
 func ownProcessGroup(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setpgid = true
 }
 
 func killTree(cmd *exec.Cmd) {

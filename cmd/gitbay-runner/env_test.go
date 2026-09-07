@@ -118,19 +118,6 @@ func TestEnvHomeFindsHome(t *testing.T) {
 	}
 }
 
-// A limit is passed to podman only when set; unset means uncapped, not a
-// default that could kill the suite.
-func TestLimitArgs(t *testing.T) {
-	if got := (&runner{}).limitArgs(); len(got) != 0 {
-		t.Errorf("no limits set, got %v", got)
-	}
-	got := (&runner{memory: "4g", cpus: "2"}).limitArgs()
-	want := []string{"--memory", "4g", "--cpus", "2"}
-	if strings.Join(got, " ") != strings.Join(want, " ") {
-		t.Errorf("limitArgs = %v, want %v", got, want)
-	}
-}
-
 // Closing stop drains: the build in flight finishes and is reported, and
 // no further build is claimed (#179).
 func TestServeDrainsOnStop(t *testing.T) {

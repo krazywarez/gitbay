@@ -122,11 +122,26 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	}
 	defer os.Remove(envFile)
 
+	// The build's cgroup carries its limits; podman's own cgroup handling
+	// is off because it never worked here (#188). Every podman process
+	// for this build starts inside the cgroup, exec included: one started
+	// from the runner's cgroup would run the step outside the limit.
+	var cgroupFD *os.File
+	if r.cgroups != nil {
+		dir, f, err := r.cgroups.create(j.ID, r.memory, r.cpus)
+		if err != nil {
+			fmt.Fprintf(sink, "preparing the build cgroup: %v\n", err)
+			return false
+		}
+		cgroupFD = f
+		defer f.Close()
+		defer r.cgroups.remove(dir)
+	}
+
 	name := fmt.Sprintf("gitbay-build-%d", j.ID)
 	// --rm so a container cannot outlive its build; the explicit rm below
 	// covers the case where the daemon-less run itself fails.
-	args := append(r.podmanGlobal(), "run", "--detach", "--rm", "--pull=never")
-	args = append(args, r.limitArgs()...)
+	args := append(r.podmanGlobal(), "run", "--detach", "--rm", "--pull=never", "--cgroups=disabled")
 	args = append(args,
 		"--name", name,
 		"--env-file", envFile,
@@ -142,6 +157,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		image, "-c", "sleep infinity")
 	start := exec.Command(podman, args...)
 	start.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
+	intoCgroup(start, cgroupFD)
 	if out, err := start.CombinedOutput(); err != nil {
 		// A missing image lands here, and it is the common case worth
 		// explaining: this runner never pulls, so an image it does not
@@ -162,6 +178,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		fmt.Fprintf(sink, "$ %s\n", step)
 		cmd := exec.Command(podman, append(r.podmanGlobal(), "exec", "--workdir", "/workspace", name, "sh", "-c", step)...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
+		intoCgroup(cmd, cgroupFD)
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
 			fmt.Fprintf(sink, "%s\n", why)
@@ -187,23 +204,6 @@ func (r *runner) podmanGlobal() []string {
 	// XDG_RUNTIME_DIR the database was not initialised with. Changing
 	// either means `podman system reset` and rebuilding the images.
 	return []string{"--cgroup-manager=cgroupfs"}
-}
-
-// limitArgs caps one build's container. The service's CPUWeight and
-// IOWeight shape the service against other services, not one build
-// against the host, and the threat model lists resource exhaustion as
-// unaddressed. Memory is deliberately uncapped by default: the e2e suite
-// peaks past 5GB on a 7GB host, and a cap that kills the suite is an
-// outage, not a limit.
-func (r *runner) limitArgs() []string {
-	var args []string
-	if r.memory != "" {
-		args = append(args, "--memory", r.memory)
-	}
-	if r.cpus != "" {
-		args = append(args, "--cpus", r.cpus)
-	}
-	return args
 }
 
 // envHome returns the HOME the step environment carries.

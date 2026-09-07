@@ -448,17 +448,21 @@ because an image this host does not have would fail every build. A job
 overrides it with =image:= in =.gitbay/ci.yml=, validated as a reference
 so a config file cannot turn it into podman arguments.
 
-=-cpus= and =-memory= cap one build's container (podman's own units,
-e.g. =-cpus 2 -memory 4g=); unset means uncapped. They only take effect
-where podman can create a cgroup for the container. Under rootless
-podman with the cgroupfs manager, which is what a system service gets,
-it cannot: the container runs inside the service's own cgroup and both
-flags are accepted and ignored (krz/gitbay#188). Cap the unit instead.
-bay1's drop-in sets =MemoryMax=6G= and =CPUQuota=300%= on a 7.7GB
-four-core host with no swap: the memory cap is what keeps the forge
-alive when a build allocates without bound, and it sits above the e2e
-suite's 5GB peak rather than at a fair share. =OOMPolicy=continue= keeps
-systemd from stopping the runner when a build is OOM-killed.
+=-cpus= and =-memory= cap one build (podman's units, e.g. =-cpus 2
+-memory 4g=); unset means uncapped. The runner applies them itself: it
+creates a cgroup per build under its own delegated service cgroup,
+writes the limits there, and starts every podman process for the build
+inside it, with podman's cgroup handling off. Podman's own =--memory=
+and =--cpus= never applied under rootless cgroupfs, which is what a
+system service gets (krz/gitbay#188). The unit therefore needs
+=Delegate=yes=, which the drop-in sets; without it the runner refuses
+to start when a limit is set, and logs that builds run unconfined when
+none is. bay1 runs =-cpus 3 -memory 6g= per build inside =MemoryMax=6G=
+and =CPUQuota=300%= on the unit, on a 7.7GB four-core host with no
+swap: the memory cap is what keeps the forge alive when a build
+allocates without bound, and it sits above the e2e suite's 5GB peak
+rather than at a fair share. =OOMPolicy=continue= keeps systemd from
+stopping the runner when a build is OOM-killed.
 
 Each repository gets its own build home under the runner's workdir,
 mounted into its containers as =HOME=. Caches persist between builds of
