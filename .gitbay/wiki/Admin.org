@@ -432,10 +432,25 @@ The tag is deliberate rather than =:latest=: changing the file means
 bumping the tag in =.gitbay/ci.yml=, so a running branch's image does not
 change under it.
 
-=-image= sets the default image for jobs that name none
-(=docker.io/library/debian:stable-slim= if unset); a job overrides it
-with =image:= in =.gitbay/ci.yml=, validated as a reference so a config
-file cannot turn it into podman arguments.
+=-image= names the image a job runs in when it declares none, and is
+required under =-isolation podman=: there is no built-in default,
+because an image this host does not have would fail every build. A job
+overrides it with =image:= in =.gitbay/ci.yml=, validated as a reference
+so a config file cannot turn it into podman arguments.
+
+*Images are provisioned, never pulled by a build.* The runner passes
+=--pull=never=. Two reasons, and the second is the better one: the
+service runs with =RestrictSUIDSGID=yes= so podman cannot unpack a layer
+holding a setuid file, which is nearly every distribution image; and on
+an instance where anyone can push a =ci.yml=, =image:= would otherwise
+mean "fetch and run anything from the internet". An operator pulls or
+builds what is allowed and a build picks among those. A job naming an
+image the host does not have fails with a message saying so.
+
+#+begin_src sh
+su - ci-runner -s /bin/sh -c "podman pull docker.io/library/alpine:3.20"
+su - ci-runner -s /bin/sh -c "podman images"
+#+end_src
 
 Prepare a host before pointing an isolating runner at it:
 

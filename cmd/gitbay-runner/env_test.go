@@ -93,7 +93,8 @@ func TestStepEnvHomeIsNotTheWorkspace(t *testing.T) {
 // has no user slice to work in. Every invocation must say so, or crun
 // fails creating the container's scope (#144).
 func TestPodmanUsesCgroupfs(t *testing.T) {
-	got := podmanGlobal()
+	r := &runner{}
+	got := r.podmanGlobal()
 	found := false
 	for _, f := range got {
 		if f == "--cgroup-manager=cgroupfs" {

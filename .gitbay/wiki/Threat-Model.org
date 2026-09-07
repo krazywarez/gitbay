@@ -154,6 +154,11 @@ runner, polling over SSH, clones the commit and runs its steps.
   arbitrary repository code, and under podman that code no longer runs in
   the runner's process context. Under =-isolation none= there is no
   container and the flag should be on.
+- *Images are provisioned by the operator, not fetched by a build.* The
+  runner passes =--pull=never=, so =image:= chooses among what the host
+  already has rather than naming anything on the internet. On an
+  instance with open registration that is the difference between a
+  curated set and arbitrary code from a registry nobody vetted.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its

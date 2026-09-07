@@ -21,10 +21,21 @@ const (
 	isolationNone   = "none"
 )
 
-// defaultImage is used when neither the job nor -image names one. Chosen
-// for being small and having a shell; anything a build actually needs it
-// declares with `image:`.
-const defaultImage = "docker.io/library/debian:stable-slim"
+// Images are provisioned, never pulled at build time.
+//
+// The service runs with RestrictSUIDSGID=yes, so podman cannot unpack an
+// image layer containing a setuid or setgid file — which is almost every
+// distribution image (chage, passwd, su). A pull from inside the service
+// fails deep in the unpack with "operation not permitted" on some file
+// nobody has heard of.
+//
+// Keeping that flag and provisioning images deliberately is the better
+// half of the trade, and not only because it is one less hardening
+// concession: on an instance where anyone can push a ci.yml, `image:`
+// would otherwise be "fetch and run this arbitrary image from the
+// internet". An operator pulls or builds what they will allow, and a
+// build chooses among those. --pull=never makes that explicit rather
+// than leaving it to whether a pull happens to fail (#144).
 
 // checkIsolation fails the runner at start-up rather than at the first
 // build, and refuses anything it does not recognise. There is no silent
@@ -37,6 +48,19 @@ func (r *runner) checkIsolation() error {
 			"with no container. Only do this where every repository is trusted.", currentUser())
 		return nil
 	case isolationPodman:
+		// Configuration before environment: a missing -image is the
+		// operator's to fix whatever the host looks like, and saying so
+		// first means the message does not depend on which machine this
+		// is.
+		//
+		// No built-in default image: one that is not provisioned here
+		// would fail every build with --pull=never, and guessing which
+		// image an operator has is worse than asking.
+		if r.image == "" {
+			return fmt.Errorf("-isolation podman needs -image <ref>, the image a job runs in " +
+				"when it names none. It must already be present on this host: " +
+				"pull or build it as the runner's user, since the service cannot unpack images")
+		}
 		bin := toolpath.Look("podman")
 		out, err := exec.Command(bin, "info", "--format", "{{.Host.Security.Rootless}}").CombinedOutput()
 		if err != nil {
@@ -44,10 +68,7 @@ func (r *runner) checkIsolation() error {
 				"prepare the host with deploy/runner-podman-setup.sh, or pass -isolation none "+
 				"if every repository on this instance is trusted", err, strings.TrimSpace(string(out)))
 		}
-		if r.image == "" {
-			r.image = defaultImage
-		}
-		log.Printf("isolation: podman (rootless=%s), default image %s",
+		log.Printf("isolation: podman (rootless=%s), default image %s, images must be provisioned locally",
 			strings.TrimSpace(string(out)), r.image)
 		return nil
 	default:
@@ -104,7 +125,8 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	name := fmt.Sprintf("gitbay-build-%d", j.ID)
 	// --rm so a container cannot outlive its build; the explicit rm below
 	// covers the case where the daemon-less run itself fails.
-	start := exec.Command(podman, append(podmanGlobal(), "run", "--detach", "--rm",
+	start := exec.Command(podman, append(r.podmanGlobal(), "run", "--detach", "--rm",
+		"--pull=never",
 		"--name", name,
 		"--env-file", envFile,
 		"--volume", dir+":/workspace:rw",
@@ -113,16 +135,24 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		image, "-c", "sleep infinity")...)
 	start.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 	if out, err := start.CombinedOutput(); err != nil {
-		// A pull failure lands here. Fail the build with what podman
-		// said; do not retry and do not fall back to another image.
-		fmt.Fprintf(sink, "starting the build container from %s failed:\n%s\n", image, strings.TrimSpace(string(out)))
+		// A missing image lands here, and it is the common case worth
+		// explaining: this runner never pulls, so an image it does not
+		// have is an operator's job to provision, not a transient error
+		// to retry.
+		msg := strings.TrimSpace(string(out))
+		fmt.Fprintf(sink, "starting the build container from %s failed:\n%s\n", image, msg)
+		if strings.Contains(msg, "no such image") || strings.Contains(msg, "image not known") ||
+			strings.Contains(msg, "unable to find") {
+			fmt.Fprintf(sink, "\nThis runner does not pull images. Ask an operator to provision %s "+
+				"on the runner host (podman pull, or podman build) before a job names it.\n", image)
+		}
 		return false
 	}
-	defer exec.Command(podman, append(podmanGlobal(), "rm", "--force", name)...).Run()
+	defer exec.Command(podman, append(r.podmanGlobal(), "rm", "--force", name)...).Run()
 
 	for _, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
-		cmd := exec.Command(podman, append(podmanGlobal(), "exec", "--workdir", "/workspace", name, "sh", "-c", step)...)
+		cmd := exec.Command(podman, append(r.podmanGlobal(), "exec", "--workdir", "/workspace", name, "sh", "-c", step)...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
@@ -142,7 +172,12 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 // fails with "create directory .../libpod-<id>.scope/container: No such
 // file or directory". The service's own cgroup is delegated
 // (Delegate=yes in the drop-in), which is what cgroupfs needs (#144).
-func podmanGlobal() []string {
+func (r *runner) podmanGlobal() []string {
+	// Storage paths are left to podman. They are recorded in its
+	// database at first use, so passing --root or --runroot later fails
+	// with "database configuration mismatch" — as does introducing an
+	// XDG_RUNTIME_DIR the database was not initialised with. Changing
+	// either means `podman system reset` and rebuilding the images.
 	return []string{"--cgroup-manager=cgroupfs"}
 }
 

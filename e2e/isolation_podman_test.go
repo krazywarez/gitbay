@@ -12,6 +12,22 @@ import (
 // havePodman reports whether a working rootless podman is on this
 // machine. The skip is loud on purpose: an isolation test that quietly
 // does not run is how isolation regresses (#144).
+// provisionedImage returns an image present on this host, since the
+// runner never pulls one (#144). Tests must use what is provisioned, the
+// same rule builds follow.
+func provisionedImage(t *testing.T) string {
+	t.Helper()
+	for _, img := range []string{"localhost/gitbay-ci:1", "docker.io/library/debian:stable-slim", "docker.io/library/alpine:latest"} {
+		if err := exec.Command("podman", "image", "exists", img).Run(); err == nil {
+			return img
+		}
+	}
+	t.Log("SKIPPING ISOLATION TEST: podman has no image this test can use. " +
+		"Provision one (podman build -t localhost/gitbay-ci:1 -f deploy/Containerfile.ci). " +
+		"The container path is NOT covered by this run.")
+	return ""
+}
+
 func havePodman(t *testing.T) bool {
 	t.Helper()
 	if _, err := exec.LookPath("podman"); err != nil {
@@ -32,7 +48,7 @@ func havePodman(t *testing.T) bool {
 func TestRunnerRefusesToStartWithoutPodman(t *testing.T) {
 	bin := buildRunner(t)
 	cmd := exec.Command(bin, "-once", "-remote", "git@127.0.0.1",
-		"-isolation", "podman", "-workdir", t.TempDir())
+		"-isolation", "podman", "-image", "localhost/whatever:1", "-workdir", t.TempDir())
 	// An empty PATH is the reliable way to make podman missing whether or
 	// not this machine has one.
 	cmd.Env = []string{"PATH=" + t.TempDir(), "HOME=" + t.TempDir()}
@@ -76,6 +92,10 @@ func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
 	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
 	inst.ssh(t, aliceKey, "", "repo", "create", "alice/app")
 
+	image := provisionedImage(t)
+	if image == "" {
+		t.Skip("no provisioned image")
+	}
 	env := inst.gitEnv(aliceKey)
 	work := t.TempDir()
 	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
@@ -84,7 +104,7 @@ func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
 	// The step tries to read the key the runner authenticates with, and
 	// to list the runner's home. Both must fail inside the container.
 	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
-		"jobs:\n  peek:\n    image: docker.io/library/debian:stable-slim\n    steps:\n"+
+		"jobs:\n  peek:\n    image: "+image+"\n    steps:\n"+
 			"      - 'if cat "+runnerKey+" 2>/dev/null; then echo LEAKED-KEY; exit 1; fi; echo no-key'\n"+
 			"      - 'echo HOME=$HOME; ls /workspace'\n"), 0o644)
 	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
@@ -94,10 +114,12 @@ func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
 
 	runnerPodmanOnce(t, inst, runnerKey)
 	out, _, _ := inst.ssh(t, aliceKey, "", "build", "list", "alice/app")
-	if !strings.Contains(out, "success") {
-		t.Fatalf("the containerised build did not pass:\n%s", out)
-	}
 	log, _, _ := inst.ssh(t, aliceKey, "", "build", "log", "alice/app", "1")
+	if !strings.Contains(out, "success") {
+		// Without the log this says only "it failed", which cost two CI
+		// rounds to diagnose the first time.
+		t.Fatalf("the containerised build did not pass:\n%s\nbuild log:\n%s", out, log)
+	}
 	if strings.Contains(log, "LEAKED-KEY") {
 		t.Errorf("a step read the runner's ssh key:\n%s", log)
 	}
@@ -106,9 +128,9 @@ func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
 	}
 }
 
-// A pull failure fails the build and says why, rather than retrying or
-// silently choosing another image.
-func TestPodmanPullFailureFailsTheBuild(t *testing.T) {
+// An image this runner does not have fails the build and says an
+// operator must provision it, rather than pulling it.
+func TestPodmanMissingImageFailsTheBuild(t *testing.T) {
 	if !havePodman(t) {
 		t.Skip("no podman")
 	}
@@ -139,7 +161,10 @@ func TestPodmanPullFailureFailsTheBuild(t *testing.T) {
 	}
 	log, _, _ := inst.ssh(t, aliceKey, "", "build", "log", "alice/app", "1")
 	if !strings.Contains(log, "gitbay-no-such-image") {
-		t.Errorf("the log does not name the image that could not be pulled:\n%s", log)
+		t.Errorf("the log does not name the missing image:\n%s", log)
+	}
+	if !strings.Contains(log, "does not pull images") {
+		t.Errorf("the log does not say an operator must provision it:\n%s", log)
 	}
 	if strings.Contains(log, "unreachable") {
 		t.Error("a step ran despite the image failing to start")
@@ -154,10 +179,27 @@ func runnerPodmanOnce(t *testing.T, inst *instance, key string) {
 		"-remote", "git@127.0.0.1",
 		"-ssh-opts", opts,
 		"-isolation", "podman",
+		"-image", "localhost/gitbay-ci:1",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", inst.port),
 		"-workdir", t.TempDir())
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("runner: %v\n%s", err, out)
+	}
+}
+
+// Under podman the runner insists on a default image rather than
+// guessing one: with --pull=never an image the host does not have fails
+// every job that names none.
+func TestRunnerRefusesPodmanWithoutAnImage(t *testing.T) {
+	bin := buildRunner(t)
+	cmd := exec.Command(bin, "-once", "-remote", "git@127.0.0.1",
+		"-isolation", "podman", "-workdir", t.TempDir())
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("the runner started in podman mode with no -image:\n%s", out)
+	}
+	if !strings.Contains(string(out), "-image") {
+		t.Errorf("refusal does not name the missing flag:\n%s", out)
 	}
 }
