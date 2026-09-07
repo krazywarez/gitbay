@@ -145,6 +145,14 @@
     {{if gt (len .Revisions) 1}}<p class="row none">{{len .Revisions}} revisions pushed. What changed between the last two:
       <code>gitbay mr range-diff {{.Repo.OwnerName}}/{{.Repo.Name}} {{.MR.Number}}</code></p>{{end}}
   </div>
+  {{with .Gates}}<div class="grp">
+    <h2>Merge gates</h2>
+    {{if .Unmet}}{{range .Unmet}}<p class="row"><span class="dot bad"></span>{{.}}</p>{{end}}
+    {{else}}<p class="row"><span class="dot ok"></span>All gates met</p>{{end}}
+    {{if .ApprovalsRequired}}<p class="row none">approvals: {{len .Approvals}} of {{.ApprovalsRequired}}{{if .Approvals}} ({{range $i, $a := .Approvals}}{{if $i}}, {{end}}{{$a}}{{end}}){{end}}</p>{{end}}
+    {{range .OwnersOutstanding}}<p class="row none">waiting on {{range $i, $o := .Owners}}{{if $i}} or {{end}}<a href="/{{$o}}">{{$o}}</a>{{end}} for {{range $i, $f := .Files}}{{if $i}}, {{end}}<code>{{$f}}</code>{{end}}</p>{{end}}
+    <p class="row none">{{if .FastForward}}fast-forward possible{{else}}not a fast-forward: rebase, or merge with a merge commit{{end}}</p>
+  </div>{{end}}
   <div class="grp">
     <h2>Checks</h2>
     {{if .Checks}}<p class="row"><span class="badge check-{{.Combined}}">{{.Combined}}</span></p>

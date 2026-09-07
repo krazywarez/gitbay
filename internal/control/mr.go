@@ -567,6 +567,13 @@ func runMRShow(c *Ctx, args []string) int {
 	d := MRShow{mrOut: mrToOut(repo, mr, true), Checks: checks, Combined: combined,
 		UnresolvedThreads: unresolved, Commits: commits, Comments: cs, Reviews: rs}
 	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
+	if mr.State == "open" || mr.State == "source_gone" {
+		if targetSHA, err := gitutil.ResolveRef(dir, "refs/heads/"+mr.TargetRef); err == nil {
+			if g, err := MergeGates(c.Store, repo, mr, dir, targetSHA, mr.HeadSHA); err == nil {
+				d.Gates = &g
+			}
+		}
+	}
 	return c.emit(d, func(w io.Writer) {
 		state := d.State
 		if d.Draft {
@@ -603,6 +610,20 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 		if d.UnresolvedThreads > 0 {
 			fmt.Fprintf(w, "unresolved threads: %d\n", d.UnresolvedThreads)
+		}
+		if g := d.Gates; g != nil {
+			ff := "fast-forward possible"
+			if !g.FastForward {
+				ff = "fast-forward not possible"
+			}
+			if len(g.Unmet) == 0 {
+				fmt.Fprintf(w, "gates: met; %s\n", ff)
+			} else {
+				fmt.Fprintf(w, "gates: %d unmet; %s\n", len(g.Unmet), ff)
+				for _, u := range g.Unmet {
+					fmt.Fprintf(w, "gate: %s\n", u)
+				}
+			}
 		}
 		for _, r := range rs {
 			stale := ""
@@ -800,10 +821,16 @@ func runMRReview(c *Ctx, args []string) int {
 			action:  reviewAction(mr.Number, verdict, published),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
-	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict, "published": published}, func(w io.Writer) {
+	// Whether the merge gates will count this verdict, said now rather
+	// than at the refusal (#199).
+	counts := ReviewersWhoCount(c.Store, repo, []store.MRReview{{Reviewer: c.User.Username}})[c.User.Username]
+	return c.emit(map[string]any{"number": mr.Number, "verdict": verdict, "published": published, "counts": counts}, func(w io.Writer) {
 		fmt.Fprintf(w, "reviewed %s!%d: %s", repo.Path(), mr.Number, verdict)
 		if published > 0 {
 			fmt.Fprintf(w, " (%d comment(s))", published)
+		}
+		if !counts {
+			fmt.Fprintf(w, " (advisory: no write access on %s, so the merge gates do not count it)", repo.Path())
 		}
 		fmt.Fprintln(w)
 	})
@@ -928,31 +955,8 @@ func runMRMerge(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "MR head ref: %v", err)
 	}
 
-	// Check gate: with require_checks, the MR head must carry statuses
-	// and every one of them must be green.
-	if repo.Settings.RequireChecks {
-		statuses, err := c.Store.ListCommitStatuses(repo.ID, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		switch store.CombinedStatus(statuses) {
-		case "success":
-		case "":
-			return c.fail(protocol.ExitDenied,
-				"%s requires green checks and none were reported on %.10s", repo.Path(), headSHA)
-		default:
-			var bad []string
-			for _, st := range statuses {
-				if st.State != "success" {
-					bad = append(bad, st.Context+"="+st.State)
-				}
-			}
-			return c.fail(protocol.ExitDenied,
-				"%s requires green checks; %.10s has %s", repo.Path(), headSHA, strings.Join(bad, ", "))
-		}
-	}
-
-	// Review gates: approvals, CODEOWNERS, resolved threads.
+	// Merge gates: draft, checks, approvals, CODEOWNERS, resolved threads,
+	// all reported at once.
 	if code := c.reviewGates(repo, mr, dir, targetSHA, headSHA); code >= 0 {
 		return code
 	}
@@ -1225,20 +1229,62 @@ func runMRMerge(c *Ctx, args []string) int {
 	})
 }
 
-// reviewGates enforces require_approvals (fresh, non-author, latest review
-// per reviewer; a fresh request-changes blocks), require_codeowners, and
-// require_resolved. Returns -1 to proceed.
+// reviewGates refuses a merge whose gates are not all met, naming every
+// unmet one. Returns -1 to proceed.
 func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA string) int {
+	g, err := MergeGates(c.Store, repo, mr, dir, targetSHA, headSHA)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if len(g.Unmet) > 0 {
+		return c.fail(protocol.ExitDenied, "%s", strings.Join(g.Unmet, "; "))
+	}
+	return -1
+}
+
+// MergeGates computes where a merge request stands against its
+// repository's gates: draft, require_checks, require_approvals (fresh,
+// non-author, latest review per reviewer from someone who can write; a
+// fresh request-changes blocks), require_codeowners and require_resolved.
+// Unmet carries one sentence per gate not passed. Fast-forward is
+// reported, not gated: whether it matters depends on the strategy.
+func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, headSHA string) (GatesOut, error) {
+	set := repo.Settings
+	g := GatesOut{Draft: mr.Draft, ApprovalsRequired: set.RequireApprovals,
+		CodeownersRequired: set.RequireCodeowners, ResolvedRequired: set.RequireResolved,
+		ChecksRequired: set.RequireChecks}
 	// A draft is open but not asking. This gate is unconditional — no
 	// setting turns it off — because the author said so themselves.
 	if mr.Draft {
-		return c.fail(protocol.ExitDenied,
-			"!%d is a draft; `gitbay mr ready %s %d` first", mr.Number, repo.Path(), mr.Number)
+		g.Unmet = append(g.Unmet, fmt.Sprintf("!%d is a draft; `gitbay mr ready %s %d` first", mr.Number, repo.Path(), mr.Number))
 	}
-	set := repo.Settings
-	reviews, err := c.Store.ListMRReviews(mr.ID)
+
+	// Checks: with require_checks, the head must carry statuses and every
+	// one of them must be green.
+	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return g, err
+	}
+	g.Checks = store.CombinedStatus(statuses)
+	if set.RequireChecks {
+		switch g.Checks {
+		case "success":
+		case "":
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", repo.Path(), headSHA))
+		default:
+			var bad []string
+			for _, st := range statuses {
+				if st.State != "success" {
+					bad = append(bad, st.Context+"="+st.State)
+				}
+			}
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks; %.10s has %s", repo.Path(), headSHA, strings.Join(bad, ", ")))
+		}
+	}
+
+	reviews, err := st.ListMRReviews(mr.ID)
+	if err != nil {
+		return g, err
 	}
 	// Latest fresh review per reviewer decides their stance — but only
 	// from someone the repository trusts to write to it. Reviewing is
@@ -1246,7 +1292,7 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 	// public change possible; deciding a merge gate is not the same
 	// thing, and counting every verdict let anyone with an account
 	// satisfy require_approvals or block a merge indefinitely (#147).
-	counts := ReviewersWhoCount(c.Store, repo, reviews)
+	counts := ReviewersWhoCount(st, repo, reviews)
 	latest := map[string]string{}
 	for _, r := range reviews {
 		if r.Stale || r.Reviewer == mr.Author || !counts[r.Reviewer] {
@@ -1254,26 +1300,22 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 		}
 		latest[r.Reviewer] = r.Verdict
 	}
-	var approvers []string
-	var blockers []string
 	for who, verdict := range latest {
 		switch verdict {
 		case "approve":
-			approvers = append(approvers, who)
+			g.Approvals = append(g.Approvals, who)
 		case "request_changes":
-			blockers = append(blockers, who)
+			g.ChangesRequested = append(g.ChangesRequested, who)
 		}
 	}
-
+	slices.Sort(g.Approvals)
+	slices.Sort(g.ChangesRequested)
 	if set.RequireApprovals > 0 {
-		if len(blockers) > 0 {
-			slices.Sort(blockers)
-			return c.fail(protocol.ExitDenied,
-				"%s requested changes on !%d; resolve their review before merging", strings.Join(blockers, ", "), mr.Number)
+		if len(g.ChangesRequested) > 0 {
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requested changes on !%d; resolve their review before merging", strings.Join(g.ChangesRequested, ", "), mr.Number))
 		}
-		if len(approvers) < set.RequireApprovals {
-			return c.fail(protocol.ExitDenied,
-				"%s requires %d fresh approval(s); !%d has %d", repo.Path(), set.RequireApprovals, mr.Number, len(approvers))
+		if len(g.Approvals) < set.RequireApprovals {
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires %d fresh approval(s); !%d has %d", repo.Path(), set.RequireApprovals, mr.Number, len(g.Approvals)))
 		}
 	}
 
@@ -1287,65 +1329,72 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 			content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
 		}
 		if err != nil || len(content) == 0 {
-			return c.fail(protocol.ExitDenied,
-				"%s requires CODEOWNERS approval but %s carries no CODEOWNERS file",
-				repo.Path(), mr.TargetRef)
-		}
-		rules := policy.ParseCodeowners(string(content))
-		base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		files, err := gitutil.DiffFiles(dir, base, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		approved := map[string]bool{}
-		for _, a := range approvers {
-			approved[a] = true
-		}
-		missing := map[string][]string{} // owner-set key -> example paths
-		for _, f := range files {
-			owners := policy.OwnersFor(rules, f)
-			if owners == nil {
-				continue
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires CODEOWNERS approval but %s carries no CODEOWNERS file", repo.Path(), mr.TargetRef))
+		} else {
+			rules := policy.ParseCodeowners(string(content))
+			base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
+			if err != nil {
+				return g, err
 			}
-			ok := false
-			for _, o := range owners {
-				if approved[o] {
-					ok = true
-					break
+			files, err := gitutil.DiffFiles(dir, base, headSHA)
+			if err != nil {
+				return g, err
+			}
+			approved := map[string]bool{}
+			for _, a := range g.Approvals {
+				approved[a] = true
+			}
+			missing := map[string][]string{} // owner-set key -> paths
+			var keys []string
+			for _, f := range files {
+				owners := policy.OwnersFor(rules, f)
+				if owners == nil {
+					continue
 				}
-			}
-			if !ok {
-				key := strings.Join(owners, ",")
-				if len(missing[key]) < 3 {
+				ok := false
+				for _, o := range owners {
+					if approved[o] {
+						ok = true
+						break
+					}
+				}
+				if !ok {
+					key := strings.Join(owners, ",")
+					if _, seen := missing[key]; !seen {
+						keys = append(keys, key)
+					}
 					missing[key] = append(missing[key], f)
 				}
 			}
-		}
-		if len(missing) > 0 {
-			var parts []string
-			for owners, paths := range missing {
-				parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), owners))
+			if len(missing) > 0 {
+				slices.Sort(keys)
+				var parts []string
+				for _, key := range keys {
+					paths := missing[key]
+					g.OwnersOutstanding = append(g.OwnersOutstanding, OwnersOut{Files: paths, Owners: strings.Split(key, ",")})
+					if len(paths) > 3 {
+						paths = paths[:3]
+					}
+					parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), key))
+				}
+				g.Unmet = append(g.Unmet, "CODEOWNERS approval missing for: "+strings.Join(parts, "; "))
 			}
-			slices.Sort(parts)
-			return c.fail(protocol.ExitDenied,
-				"CODEOWNERS approval missing for: %s", strings.Join(parts, "; "))
 		}
 	}
 
-	if set.RequireResolved {
-		n, err := c.Store.UnresolvedThreadCount(mr.ID)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if n > 0 {
-			return c.fail(protocol.ExitDenied,
-				"%s requires review threads resolved; !%d has %d open (mr threads %s %d)", repo.Path(), mr.Number, n, repo.Path(), mr.Number)
-		}
+	n, err := st.UnresolvedThreadCount(mr.ID)
+	if err != nil {
+		return g, err
 	}
-	return -1
+	g.OpenThreads = n
+	if set.RequireResolved && n > 0 {
+		g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires review threads resolved; !%d has %d open (mr threads %s %d)", repo.Path(), mr.Number, n, repo.Path(), mr.Number))
+	}
+
+	if ff, err := gitutil.IsAncestor(dir, targetSHA, headSHA); err == nil {
+		g.FastForward = ff
+	}
+	return g, nil
 }
 
 func runMRDraft(c *Ctx, args []string) int { return setMRDraft(c, args, true) }

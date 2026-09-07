@@ -1828,6 +1828,16 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	if view != "commits" && view != "diff" {
 		view = "conversation"
 	}
+	// Where the merge request stands against the gates, the same
+	// computation mr merge refuses on (#199).
+	var gates *control.GatesOut
+	if m.State == "open" || m.State == "source_gone" {
+		if targetSHA, err := gitutil.ResolveRef(p.Dir, "refs/heads/"+m.TargetRef); err == nil {
+			if g, err := control.MergeGates(s.st, p.Repo, m, p.Dir, targetSHA, m.HeadSHA); err == nil {
+				gates = &g
+			}
+		}
+	}
 	// The stack around an open merge request, for the header.
 	var stackedOn *store.MR
 	var stacked []store.MR
@@ -1862,9 +1872,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		DetachedThreads []diffThread
 		StackedOn       *store.MR
 		Stacked         []store.MR
+		Gates           *control.GatesOut
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked})
+		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates})
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {

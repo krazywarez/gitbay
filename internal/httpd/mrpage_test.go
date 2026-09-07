@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/web"
@@ -31,6 +32,7 @@ type mrPageData struct {
 	Revisions       []store.MRHead
 	Notice          string
 	DetachedThreads []diffThread
+	Gates           *control.GatesOut
 }
 
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
@@ -129,5 +131,35 @@ func TestMRChecksRenderSkippedWithoutBuildLink(t *testing.T) {
 	}
 	if strings.Contains(row, "<a href") {
 		t.Errorf("skipped check with no build linked anyway: %s", row)
+	}
+}
+
+// The gates block says what the merge is waiting on before a merge is
+// refused (#199): every unmet gate, the approval count, the outstanding
+// owners, and whether a fast-forward is possible.
+func TestMRGatesRender(t *testing.T) {
+	render := func(g *control.GatesOut) string {
+		t.Helper()
+		var sb strings.Builder
+		if err := web.Render(&sb, "mr.html", mrPageData{
+			repoPage: testRepoPage(), MR: testMR("open"), View: "conversation", Gates: g,
+		}); err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return sb.String()
+	}
+	out := render(&control.GatesOut{ApprovalsRequired: 2, Approvals: []string{"bob"},
+		OwnersOutstanding: []control.OwnersOut{{Files: []string{"svc.go"}, Owners: []string{"carol"}}},
+		Unmet:             []string{"krz/hutch requires 2 fresh approval(s); !42 has 1", "CODEOWNERS approval missing for: svc.go (owned by carol)"}})
+	for _, want := range []string{"Merge gates", "requires 2 fresh approval(s)", "approvals: 1 of 2 (bob)", `waiting on <a href="/carol">carol</a>`, "not a fast-forward"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("gates block missing %q:\n%s", want, out)
+		}
+	}
+	if out := render(&control.GatesOut{FastForward: true}); !strings.Contains(out, "All gates met") || !strings.Contains(out, "fast-forward possible") {
+		t.Errorf("met gates not rendered:\n%s", out)
+	}
+	if out := render(nil); strings.Contains(out, "Merge gates") {
+		t.Errorf("gates block on a merge request without gates:\n%s", out)
 	}
 }

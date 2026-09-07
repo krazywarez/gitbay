@@ -408,6 +408,14 @@ to ask without it gating merges; with it on and no file on the target
 branch, the merge is refused and says so. It does not wait on
 =require-approvals=.
 
+=mr show= carries a =gates= block with where the merge request stands
+against all of them — approvals counted and required, owners still
+outstanding per file, open threads, checks, and whether a fast-forward
+is possible — and the merge request page shows the same block. =mr
+merge= names every unmet gate at once rather than the first. =mr
+review= says when a verdict is advisory, which it is from anyone
+without write access: the gates do not count it.
+
 Those gates apply to =mr merge=. A direct push to a protected branch
 passes none of them until =require-mr on=: then an existing protected
 branch refuses every push, including =repo commit-file= and the web

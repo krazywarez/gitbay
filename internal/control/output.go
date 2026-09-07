@@ -33,6 +33,33 @@ type MRShow struct {
 	Commits           []CommitOut  `json:"commits,omitempty"`
 	Comments          []commentOut `json:"comments,omitempty"`
 	Reviews           []ReviewOut  `json:"reviews,omitempty"`
+	// Gates is set while the merge request is open.
+	Gates *GatesOut `json:"gates,omitempty"`
+}
+
+// OwnersOut is a set of changed files still waiting on an approval from
+// one of their CODEOWNERS.
+type OwnersOut struct {
+	Files  []string `json:"files"`
+	Owners []string `json:"owners"`
+}
+
+// GatesOut is what a merge request has to pass to merge, and where it
+// stands: the same computation mr merge refuses on, so nothing is
+// learned at the refusal that mr show did not say (#199).
+type GatesOut struct {
+	Draft              bool        `json:"draft,omitempty"`
+	ApprovalsRequired  int         `json:"approvals_required"`
+	Approvals          []string    `json:"approvals,omitempty"` // fresh, from reviewers who count
+	ChangesRequested   []string    `json:"changes_requested,omitempty"`
+	CodeownersRequired bool        `json:"codeowners_required"`
+	OwnersOutstanding  []OwnersOut `json:"owners_outstanding,omitempty"`
+	ResolvedRequired   bool        `json:"resolved_required"`
+	OpenThreads        int         `json:"open_threads"`
+	ChecksRequired     bool        `json:"checks_required"`
+	Checks             string      `json:"checks,omitempty"` // combined status; "" when none reported
+	FastForward        bool        `json:"fast_forward"`
+	Unmet              []string    `json:"unmet,omitempty"`
 }
 
 // ReviewOut is one review on a merge request.
