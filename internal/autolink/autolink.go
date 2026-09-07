@@ -84,6 +84,22 @@ type span struct {
 
 // rewriteText returns replacement nodes for a text node, or nil when no
 // reference resolved.
+// Mentions returns the distinct @names in text, in order of appearance,
+// as written. A name may carry trailing punctuation the writer meant as
+// prose ("@alice."); the caller resolves and, failing that, trims ._-
+// the way Rewrite does.
+func Mentions(text string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range mentionPat.FindAllStringSubmatch(text, -1) {
+		if who := m[2]; !seen[who] {
+			seen[who] = true
+			out = append(out, who)
+		}
+	}
+	return out
+}
+
 func rewriteText(text, owner, name string, r Resolver) []*html.Node {
 	var spans []span
 

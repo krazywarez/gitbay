@@ -131,7 +131,7 @@ func (s *Store) RepoWatchState(repoID, userID int64) string {
 // the repository's watchers, minus the actor and minus anyone who muted
 // it. Muting wins over every other reason to be told, including owning
 // the repository or having written the thread.
-func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64) ([]int64, error) {
+func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64, widen bool) ([]int64, error) {
 	rows, err := s.DB.Query("SELECT user_id, state FROM repo_watchers WHERE repo_id = ?", repoID)
 	if err != nil {
 		return nil, err
@@ -156,6 +156,9 @@ func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64) ([]int6
 	}
 	var out []int64
 	seen := map[int64]bool{}
+	if !widen {
+		watching = nil
+	}
 	for _, id := range append(append([]int64{}, targets...), watching...) {
 		if skip[id] || seen[id] {
 			continue

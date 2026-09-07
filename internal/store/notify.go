@@ -58,21 +58,36 @@ func (s *Store) MarkMailFailed(id int64, errMsg string, nextAt *time.Time) error
 }
 
 // IssueParticipants returns distinct user ids involved in an issue: the
-// author and every commenter.
+// author, every commenter, and everyone mentioned.
 func (s *Store) IssueParticipants(issueID int64) ([]int64, error) {
 	return s.idQuery(`
 		SELECT author_id FROM issues WHERE id = ?
-		UNION SELECT author_id FROM issue_comments WHERE issue_id = ?`, issueID, issueID)
+		UNION SELECT author_id FROM issue_comments WHERE issue_id = ?
+		UNION SELECT user_id FROM mentions WHERE kind = 'issue' AND item_id = ?`, issueID, issueID, issueID)
 }
 
 // MRParticipants returns distinct user ids involved in an MR: author,
-// commenters, reviewers.
+// commenters, reviewers, and everyone mentioned.
 func (s *Store) MRParticipants(mrID int64) ([]int64, error) {
 	return s.idQuery(`
 		SELECT author_id FROM merge_requests WHERE id = ?
 		UNION SELECT author_id FROM mr_comments WHERE mr_id = ?
 		UNION SELECT reviewer_id FROM mr_reviews WHERE mr_id = ?
-		UNION SELECT author_id FROM mr_diff_comments WHERE mr_id = ?`, mrID, mrID, mrID, mrID)
+		UNION SELECT author_id FROM mr_diff_comments WHERE mr_id = ?
+		UNION SELECT user_id FROM mentions WHERE kind = 'mr' AND item_id = ?`, mrID, mrID, mrID, mrID, mrID)
+}
+
+// AddMentions records accounts mentioned in an issue or merge request
+// (kind "issue" or "mr"); a repeat mention is not an error.
+func (s *Store) AddMentions(repoID int64, kind string, itemID int64, userIDs []int64) error {
+	for _, id := range userIDs {
+		if _, err := s.DB.Exec(
+			"INSERT INTO mentions (repo_id, kind, item_id, user_id) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+			repoID, kind, itemID, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RepoNotifyTargets returns who should hear about new activity on a repo:

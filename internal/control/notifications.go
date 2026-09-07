@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gitbay.org/gitbay/internal/autolink"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -44,14 +45,17 @@ type notice struct {
 	// mail is not prose — a failed build's log tail is not an excerpt of
 	// something someone wrote, and is not cut to an excerpt's length.
 	body string
+	// direct keeps the notice to the given accounts: watchers of the
+	// repository are not added. A mention is addressed to someone.
+	direct bool
 }
 
 // notify delivers a notice to the given user ids widened by the
-// repository's watchers, minus anyone who muted it and minus the acting
-// user. A best-effort side channel: failures are ignored, the action
-// itself already succeeded.
+// repository's watchers (unless direct), minus anyone who muted it and
+// minus the acting user. A best-effort side channel: failures are
+// ignored, the action itself already succeeded.
 func notify(c *Ctx, userIDs []int64, n notice) {
-	recipients, err := c.Store.NotifyRecipients(n.repo.ID, c.User.ID, userIDs)
+	recipients, err := c.Store.NotifyRecipients(n.repo.ID, c.User.ID, userIDs, !n.direct)
 	if err != nil {
 		return
 	}
@@ -68,6 +72,42 @@ func notify(c *Ctx, userIDs []int64, n notice) {
 		}
 		c.Store.EnqueueMail(email, n.subject, body)
 	}
+}
+
+// notifyMentions files an inbox row for every account text mentions by
+// @name that can read the repository, and records them as participants
+// of the thread so they hear what follows (#202). Mute is honoured by
+// notify; the actor mentioning themselves is dropped there too.
+func notifyMentions(c *Ctx, repo store.Repo, t thread, itemID, number int64, title, text string) {
+	var ids []int64
+	for _, name := range autolink.Mentions(text) {
+		u, err := c.Store.UserByUsername(name)
+		if err != nil {
+			trimmed := strings.TrimRight(name, "._-")
+			if trimmed == "" || trimmed == name {
+				continue
+			}
+			if u, err = c.Store.UserByUsername(trimmed); err != nil {
+				continue
+			}
+		}
+		if u.ID == c.User.ID {
+			continue
+		}
+		grant, err := c.Store.AccessRole(repo.ID, u.ID)
+		if err != nil || !policy.CanRead(u, repo, grant) {
+			continue
+		}
+		ids = append(ids, u.ID)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	c.Store.AddMentions(repo.ID, t.kind, itemID, ids)
+	notify(c, ids, notice{repo: repo, kind: t.kind, direct: true,
+		subject: fmt.Sprintf("[%s] %s%d: %s", repo.Path(), t.symbol, number, title),
+		action:  fmt.Sprintf("mentioned you in %s%d", t.symbol, number),
+		excerpt: text, path: fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)})
 }
 
 // noticeBody builds the standard mail body: who did what, an excerpt, and

@@ -238,7 +238,7 @@ func (w *Worker) notify(repo store.Repo, number int64, action, body string) {
 	if err != nil {
 		return
 	}
-	recipients, err := w.St.NotifyRecipients(repo.ID, author.ID, targets)
+	recipients, err := w.St.NotifyRecipients(repo.ID, author.ID, targets, true)
 	if err != nil {
 		return
 	}

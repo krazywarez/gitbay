@@ -517,7 +517,12 @@ handled.
 
 When the instance has SMTP configured, activity mails you: someone
 opens an issue or MR on your repository, comments where you are a
-participant (author, commenter, reviewer), reviews, closes, or merges.
+participant (author, commenter, reviewer, or mentioned), reviews,
+closes, or merges. Writing =@name= in an issue, merge request or
+comment files "mentioned you" in that account's inbox and makes them a
+participant of the thread, provided they can read the repository and
+have not muted it; watchers are not told about a mention addressed to
+someone else.
 You are never mailed about your own actions, and only verified primary
 addresses receive anything. Delivery retries on relay failure.
 

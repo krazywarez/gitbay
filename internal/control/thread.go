@@ -112,6 +112,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 			action:  fmt.Sprintf("commented on %s%d", t.symbol, number),
 			excerpt: body, path: fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)})
 	}
+	notifyMentions(c, repo, t, id, number, title, body)
 	return c.emit(Created{Number: number}, func(w io.Writer) {
 		fmt.Fprintf(w, "commented on %s%s%d\n", repo.Path(), t.symbol, number)
 	})

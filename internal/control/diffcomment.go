@@ -113,6 +113,7 @@ func runDiffComment(c *Ctx, args []string) int {
 				action:  fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number),
 				excerpt: body, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 		}
+		notifyMentions(c, repo, mrThread, mr.ID, mr.Number, mr.Title, body)
 	}
 	return c.emit(map[string]any{"id": id, "thread": firstNonZero(replyTo, id), "pending": pending}, func(w io.Writer) {
 		what := "thread %d opened on %s:%d in %s!%d\n"

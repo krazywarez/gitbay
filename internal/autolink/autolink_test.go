@@ -100,3 +100,16 @@ func TestRewriteEscaping(t *testing.T) {
 		t.Fatalf("ref not linked:\n%s", got)
 	}
 }
+
+func TestMentions(t *testing.T) {
+	got := Mentions("cc @alice and (@bob) — @alice again; mail@example.org is not one, @carol.")
+	want := []string{"alice", "bob", "carol."}
+	if len(got) != len(want) {
+		t.Fatalf("Mentions = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("Mentions = %v, want %v", got, want)
+		}
+	}
+}

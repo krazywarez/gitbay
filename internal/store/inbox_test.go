@@ -115,7 +115,7 @@ func TestNotifyRecipients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := s.NotifyRecipients(repoID, other, []int64{owner, other})
+	got, err := s.NotifyRecipients(repoID, other, []int64{owner, other}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,20 +126,24 @@ func TestNotifyRecipients(t *testing.T) {
 	if err := s.SetRepoWatch(repoID, third, "watching"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}); len(got) != 2 {
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, true); len(got) != 2 {
 		t.Fatalf("watcher not added: %v", got)
 	}
 
 	// A watcher who is also a target is listed once.
-	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner, third}); len(got) != 2 {
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner, third}, true); len(got) != 2 {
 		t.Fatalf("watcher duplicated: %v", got)
+	}
+	// A direct notice stays with its targets; watchers are not added.
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, false); len(got) != 1 || got[0] != owner {
+		t.Fatalf("direct notice widened: %v", got)
 	}
 
 	// Muting beats owning the repository.
 	if err := s.SetRepoWatch(repoID, owner, "muted"); err != nil {
 		t.Fatal(err)
 	}
-	got, _ = s.NotifyRecipients(repoID, other, []int64{owner})
+	got, _ = s.NotifyRecipients(repoID, other, []int64{owner}, true)
 	if len(got) != 1 || got[0] != third {
 		t.Fatalf("muted owner still notified: %v", got)
 	}
@@ -153,7 +157,7 @@ func TestNotifyRecipients(t *testing.T) {
 	if s.RepoWatchState(repoID, owner) != "" {
 		t.Fatal("clear left a state")
 	}
-	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}); len(got) != 2 {
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, true); len(got) != 2 {
 		t.Fatalf("cleared owner not notified: %v", got)
 	}
 	if err := s.SetRepoWatch(repoID, owner, "muted"); err != nil {

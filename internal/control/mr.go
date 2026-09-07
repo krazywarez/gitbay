@@ -344,6 +344,9 @@ func runMRCreate(c *Ctx, args []string) int {
 			action:  fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target),
 			excerpt: b, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), n)})
 	}
+	if created, err := c.Store.MRByNumber(repo.ID, n); err == nil {
+		notifyMentions(c, repo, mrThread, created.ID, n, title, b)
+	}
 	out := MRCreated{Number: n, HeadSHA: headSHA}
 	if p, ok, err := c.Store.OpenMRBySource(repo.ID, target); err == nil && ok {
 		out.StackedOn = &stackRef{p.Number, p.Title}

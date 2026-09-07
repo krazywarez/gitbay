@@ -155,6 +155,9 @@ func runIssueCreate(c *Ctx, args []string) int {
 			action:  fmt.Sprintf("opened issue #%d", n),
 			excerpt: b, path: fmt.Sprintf("%s/issues/%d", repo.Path(), n)})
 	}
+	if issue, err := c.Store.IssueByNumber(repo.ID, n); err == nil {
+		notifyMentions(c, repo, issueThread, issue.ID, n, title, b)
+	}
 	return c.emit(Created{Number: n}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s#%d\n", repo.Path(), n)
 	})
