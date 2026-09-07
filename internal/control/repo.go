@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -60,6 +61,12 @@ func init() {
 	register(Command{Path: []string{"repo", "settings", "unprotect"},
 		Summary: "unprotect a branch",
 		Usage:   "repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
+	register(Command{Path: []string{"repo", "settings", "protect-tag"},
+		Summary: "protect tags matching a glob (created once, never moved or deleted)",
+		Usage:   "repo settings protect-tag <owner/name> <glob>", Run: runProtectTag})
+	register(Command{Path: []string{"repo", "settings", "unprotect-tag"},
+		Summary: "drop a protected-tag glob",
+		Usage:   "repo settings unprotect-tag <owner/name> <glob>", Run: runUnprotectTag})
 	register(Command{Path: []string{"repo", "settings", "description"},
 		Summary: "set the repository description",
 		Usage:   "repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
@@ -606,8 +613,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 		return code
 	}
 	return c.emit(repo.Settings, func(w io.Writer) {
-		fmt.Fprintf(w, "protected_branches: %s\nrequire_mr: %v\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
-			strings.Join(repo.Settings.ProtectedBranches, ", "), repo.Settings.RequireMR, repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
+		fmt.Fprintf(w, "protected_branches: %s\nprotected_tags: %s\nrequire_mr: %v\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
+			strings.Join(repo.Settings.ProtectedBranches, ", "), strings.Join(repo.Settings.ProtectedTags, ", "), repo.Settings.RequireMR, repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
 	})
 }
 
@@ -1059,6 +1066,43 @@ func runRepoBookmarks(c *Ctx, args []string) int {
 		for _, b := range out {
 			fmt.Fprintf(w, "%s\t%d\t%s\n", b.Path, b.Bookmarks, b.Description)
 		}
+	})
+}
+
+func runProtectTag(c *Ctx, args []string) int   { return setProtectTag(c, args, true) }
+func runUnprotectTag(c *Ctx, args []string) int { return setProtectTag(c, args, false) }
+
+func setProtectTag(c *Ctx, args []string, protect bool) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo settings protect-tag|unprotect-tag <owner/name> <glob>")
+	}
+	glob := args[1]
+	if _, err := path.Match(glob, "x"); err != nil || glob == "" {
+		return c.fail(protocol.ExitUsage, "bad glob %q", glob)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) {
+		has := slices.Contains(s.ProtectedTags, glob)
+		if protect && !has {
+			s.ProtectedTags = append(s.ProtectedTags, glob)
+			slices.Sort(s.ProtectedTags)
+		}
+		if !protect && has {
+			s.ProtectedTags = slices.DeleteFunc(s.ProtectedTags, func(g string) bool { return g == glob })
+		}
+	})
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	verb := "protected"
+	if !protect {
+		verb = "unprotected"
+	}
+	return c.emit(s, func(w io.Writer) {
+		fmt.Fprintf(w, "tags %s %s on %s\n", glob, verb, repo.Path())
 	})
 }
 

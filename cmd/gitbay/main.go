@@ -472,6 +472,8 @@ func repoCmd() *cobra.Command {
 			pass("show", "show settings", passOpts{server: []string{"repo", "settings", "show"}, needsRepo: true}),
 			pass("protect", "protect a branch", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
 			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
+			pass("protect-tag", "protect tags matching a glob: <glob>", passOpts{server: []string{"repo", "settings", "protect-tag"}, needsRepo: true}),
+			pass("unprotect-tag", "drop a protected-tag glob: <glob>", passOpts{server: []string{"repo", "settings", "unprotect-tag"}, needsRepo: true}),
 			pass("default-branch", "set the default branch: <branch>", passOpts{server: []string{"repo", "settings", "default-branch"}, needsRepo: true}),
 			pass("require-approvals", "require N fresh approvals to merge: <n>", passOpts{server: []string{"repo", "settings", "require-approvals"}, needsRepo: true}),
 			pass("require-resolved", "require threads resolved to merge: on|off", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),

@@ -132,6 +132,10 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		enc.Encode(Response{Allow: false, Message: msg})
 		return
 	}
+	if msg := s.releaseAnchors(repo, req.Updates); msg != "" {
+		enc.Encode(Response{Allow: false, Message: msg})
+		return
+	}
 	if !repo.Settings.RequireSignedCommits {
 		enc.Encode(Response{Allow: true})
 		return
@@ -179,6 +183,27 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		return
 	}
 	enc.Encode(Response{Allow: true})
+}
+
+// releaseAnchors refuses deleting or moving a tag that a release is
+// anchored to. A release outliving its tag served assets for a commit
+// nobody could reach (#201); the release goes first, then the tag.
+func (s *Server) releaseAnchors(repo store.Repo, updates []policy.RefUpdate) string {
+	for _, u := range updates {
+		tag, ok := strings.CutPrefix(u.Ref, "refs/tags/")
+		if !ok || gitutil.ZeroSHA(u.Old) {
+			continue
+		}
+		if _, err := s.st.ReleaseByTag(repo.ID, tag); err != nil {
+			continue
+		}
+		verb := "moved"
+		if u.IsDelete {
+			verb = "deleted"
+		}
+		return fmt.Sprintf("tag %s anchors a release and cannot be %s: delete the release first", tag, verb)
+	}
+	return ""
 }
 
 // postReceive applies the cross-repo MR effect: a push to a source branch

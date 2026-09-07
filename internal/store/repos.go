@@ -23,6 +23,7 @@ type Repo struct {
 
 type RepoSettings struct {
 	ProtectedBranches    []string `json:"protected_branches,omitempty"`
+	ProtectedTags        []string `json:"protected_tags,omitempty"` // path.Match globs
 	RequireSignedCommits bool     `json:"require_signed_commits,omitempty"`
 	RequireChecks        bool     `json:"require_checks,omitempty"`
 	RequireApprovals     int      `json:"require_approvals,omitempty"`

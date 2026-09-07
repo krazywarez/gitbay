@@ -88,6 +88,10 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "protect", repo, v("branch")}
 	case "unprotect":
 		argv = []string{"repo", "settings", "unprotect", repo, v("branch")}
+	case "protect-tag":
+		argv = []string{"repo", "settings", "protect-tag", repo, v("glob")}
+	case "unprotect-tag":
+		argv = []string{"repo", "settings", "unprotect-tag", repo, v("glob")}
 	case "deps":
 		verb := "disable"
 		if v("deps") == "on" {

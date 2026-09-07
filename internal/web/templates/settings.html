@@ -113,6 +113,25 @@
 </form>
 <p class="meta">With merge requests only, a protected branch refuses every direct push once it exists; the merge gates above are then what a change has to pass.</p>
 
+<h2>Protected tags</h2>
+{{if .Repo.Settings.ProtectedTags}}
+<ul class="protlist">
+{{range .Repo.Settings.ProtectedTags}}<li><code>{{.}}</code>
+  <form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="unprotect-tag">
+    <input type="hidden" name="glob" value="{{.}}">
+    <button type="submit" class="linklike">Unprotect</button>
+  </form></li>
+{{end}}
+</ul>
+{{else}}<p class="meta">No protected tags. A tag matching a protected glob is created once and refuses moves and deletion. A tag a release is anchored to refuses both regardless.</p>{{end}}
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="protect-tag">
+  <label for="glob">Protect tags matching</label>
+  <input type="text" id="glob" name="glob" placeholder="v*">
+  <button type="submit">Protect</button>
+</form>
+
 <h2>Dependencies</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="deps">

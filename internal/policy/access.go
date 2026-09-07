@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"path"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,15 @@ func CheckPush(repo store.Repo, updates []RefUpdate) string {
 		if strings.HasPrefix(u.Ref, "refs/merge-requests/") {
 			return "refs/merge-requests/* is server-owned and cannot be pushed"
 		}
+		// A protected tag is created once. Its globs match the tag name.
+		if tag, ok := strings.CutPrefix(u.Ref, "refs/tags/"); ok && TagProtected(repo, tag) {
+			if u.IsDelete {
+				return "tag " + tag + " is protected: deletion refused"
+			}
+			if !isZeroSHA(u.Old) {
+				return "tag " + tag + " is protected: update refused"
+			}
+		}
 		if protected[u.Ref] {
 			branch := strings.TrimPrefix(u.Ref, "refs/heads/")
 			if u.IsDelete {
@@ -115,6 +125,17 @@ func CheckPush(repo store.Repo, updates []RefUpdate) string {
 		}
 	}
 	return ""
+}
+
+// TagProtected reports whether a tag name matches one of the repository's
+// protected-tag globs.
+func TagProtected(repo store.Repo, tag string) bool {
+	for _, g := range repo.Settings.ProtectedTags {
+		if ok, _ := path.Match(g, tag); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func isZeroSHA(sha string) bool { return sha != "" && strings.Trim(sha, "0") == "" }

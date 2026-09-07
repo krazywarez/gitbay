@@ -112,6 +112,31 @@ func TestCheckPush(t *testing.T) {
 	}
 }
 
+// A protected tag (glob) can be created once and neither moved nor
+// deleted (#201).
+func TestCheckPushProtectedTags(t *testing.T) {
+	repo := store.Repo{Settings: store.RepoSettings{ProtectedTags: []string{"v*"}}}
+	const zero = "0000000000000000000000000000000000000000"
+	cases := []struct {
+		name    string
+		updates []RefUpdate
+		denied  bool
+	}{
+		{"create protected", []RefUpdate{{Ref: "refs/tags/v1.0", Old: zero, New: "abc"}}, false},
+		{"delete protected", []RefUpdate{{Ref: "refs/tags/v1.0", Old: "abc", New: zero, IsDelete: true}}, true},
+		{"move protected", []RefUpdate{{Ref: "refs/tags/v1.0", Old: "abc", New: "def", IsForce: true}}, true},
+		{"delete unmatched", []RefUpdate{{Ref: "refs/tags/nightly", Old: "abc", New: zero, IsDelete: true}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := CheckPush(repo, tc.updates)
+			if (msg != "") != tc.denied {
+				t.Errorf("CheckPush = %q, denied should be %v", msg, tc.denied)
+			}
+		})
+	}
+}
+
 // With require_mr, a protected branch takes no direct push once it
 // exists; creating it and pushing elsewhere are unaffected (#197).
 func TestCheckPushRequireMR(t *testing.T) {

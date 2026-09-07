@@ -193,6 +193,7 @@ gitbay repo access grant you/project alice write    # read | write | admin
 gitbay repo access revoke you/project alice
 gitbay repo settings protect you/project main       # no force-push, no delete
 gitbay repo settings require-mr you/project on      # protected branches: merge requests only
+gitbay repo settings protect-tag you/project 'v*'   # matching tags: created once, never moved or deleted
 gitbay repo settings default-branch you/project trunk # HEAD, and what the web shows
 gitbay repo settings require-signed you/project on  # every commit must verify
 gitbay repo settings git-daemon you/project on      # expose over git://
@@ -310,7 +311,9 @@ git add .gitbay/wiki && git commit -m "wiki" && git push
 #+end_src
 
 Releases anchor notes and binary assets to a pushed tag (write access;
-assets stream over SSH, capped by the instance's =max_asset_bytes=):
+assets stream over SSH, capped by the instance's =max_asset_bytes=).
+While a release exists its tag can be neither deleted nor moved, whether
+or not the tag is protected: delete the release first.
 
 #+begin_src sh
 gitbay release create v1.0 --title "First light" [--notes|--file -|$EDITOR]
