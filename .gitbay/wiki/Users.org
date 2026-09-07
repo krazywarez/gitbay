@@ -191,6 +191,7 @@ Access and settings (owner or =admin= grant):
 gitbay repo access grant you/project alice write    # read | write | admin
 gitbay repo access revoke you/project alice
 gitbay repo settings protect you/project main       # no force-push, no delete
+gitbay repo settings default-branch you/project trunk # HEAD, and what the web shows
 gitbay repo settings require-signed you/project on  # every commit must verify
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web

@@ -17,7 +17,15 @@
   <input type="text" id="website" name="website" value="{{.Repo.Settings.Website}}" placeholder="https://example.org">
   <button type="submit">Save</button>
 </form>
-<form method="post" action="{{$base}}" class="setform">
+{{if .Branches}}<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="default-branch">
+  <label for="default-branch">Default branch</label>
+  <select id="default-branch" name="default-branch">
+    {{$cur := .Repo.DefaultBranch}}{{range .Branches}}<option value="{{.Name}}"{{if eq .Name $cur}} selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+  <button type="submit">Save</button>
+</form>
+{{end}}<form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="topics">
   <label for="topics-add">Topics to add</label>
   <input type="text" id="topics-add" name="add" placeholder="add, space-separated">

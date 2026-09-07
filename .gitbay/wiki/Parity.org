@@ -154,6 +154,7 @@ always markdown.
 | watch, unwatch              | yes | yes | yes |
 | mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
+| default branch              | yes | yes | no  |
 | require codeowners          | yes | yes | yes |
 | access grants               | yes | no  | yes |
 | webhooks                    | yes | no  | yes |

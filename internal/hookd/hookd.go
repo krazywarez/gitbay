@@ -187,6 +187,9 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 // place a hook writes outside its own repository.
 func (s *Server) postReceive(req Request) {
 	pushedRepo, pushedRepoErr := s.st.RepoByID(req.RepoID)
+	if pushedRepoErr == nil {
+		s.adoptDefaultBranch(&pushedRepo, req.Updates)
+	}
 	for _, u := range req.Updates {
 		// Every ref update is an event webhooks can subscribe to.
 		s.st.RecordEvent(req.RepoID, req.UserID, "push", fmt.Sprintf(
@@ -266,6 +269,35 @@ func (s *Server) postReceive(req Request) {
 				s.st.SetMRState(mr.ID, "open") // branch came back
 			}
 		}
+	}
+}
+
+// adoptDefaultBranch moves an unborn HEAD to the first branch a push
+// creates. A repository is initialised with HEAD at the stored default,
+// and a first push of master or trunk left HEAD naming a branch that did
+// not exist: clones checked out nothing and every surface asked git for
+// a branch that was not there (#189). A push that includes the default
+// branch itself needs nothing.
+func (s *Server) adoptDefaultBranch(repo *store.Repo, updates []policy.RefUpdate) {
+	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	if _, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch); err == nil {
+		return
+	}
+	for _, u := range updates {
+		branch, ok := cutHeads(u.Ref)
+		if !ok || u.IsDelete || !gitutil.ZeroSHA(u.Old) {
+			continue
+		}
+		if err := gitutil.SetHead(dir, branch); err != nil {
+			slog.Error("post-receive: moving HEAD", "repo", repo.Path(), "err", err)
+			return
+		}
+		if err := s.st.UpdateDefaultBranch(repo.ID, branch); err != nil {
+			slog.Error("post-receive: recording default branch", "repo", repo.Path(), "err", err)
+			return
+		}
+		repo.DefaultBranch = branch
+		return
 	}
 }
 

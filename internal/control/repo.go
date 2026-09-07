@@ -66,6 +66,9 @@ func init() {
 	register(Command{Path: []string{"repo", "settings", "website"},
 		Summary: "set the repository website",
 		Usage:   "repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
+	register(Command{Path: []string{"repo", "settings", "default-branch"},
+		Summary: "set the default branch",
+		Usage:   "repo settings default-branch <owner/name> <branch>", Run: runSetDefaultBranch})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
 		Summary: "expose over git://",
 		Usage:   "repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
@@ -582,6 +585,30 @@ func runSetDescription(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]string{"description": gitutil.ReadDescription(dir)}, func(w io.Writer) {
 		fmt.Fprintf(w, "description set on %s\n", repo.Path())
+	})
+}
+
+func runSetDefaultBranch(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo settings default-branch <owner/name> <branch>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	branch := args[1]
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if _, err := gitutil.ResolveRef(dir, "refs/heads/"+branch); err != nil {
+		return c.fail(protocol.ExitFailure, "no branch named %q on %s", branch, repo.Path())
+	}
+	if err := gitutil.SetHead(dir, branch); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if err := c.Store.UpdateDefaultBranch(repo.ID, branch); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"default_branch": branch}, func(w io.Writer) {
+		fmt.Fprintf(w, "default branch of %s is now %s\n", repo.Path(), branch)
 	})
 }
 

@@ -68,6 +68,8 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "website", repo, v("website")}
 	case "visibility":
 		argv = []string{"repo", "settings", "visibility", repo, v("visibility")}
+	case "default-branch":
+		argv = []string{"repo", "settings", "default-branch", repo, v("default-branch")}
 	case "git-daemon":
 		argv = []string{"repo", "settings", "git-daemon", repo, onOff(v("git-daemon"))}
 	case "require-checks":
