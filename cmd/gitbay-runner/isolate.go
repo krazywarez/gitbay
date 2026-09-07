@@ -125,8 +125,9 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	name := fmt.Sprintf("gitbay-build-%d", j.ID)
 	// --rm so a container cannot outlive its build; the explicit rm below
 	// covers the case where the daemon-less run itself fails.
-	start := exec.Command(podman, append(r.podmanGlobal(), "run", "--detach", "--rm",
-		"--pull=never",
+	args := append(r.podmanGlobal(), "run", "--detach", "--rm", "--pull=never")
+	args = append(args, r.limitArgs()...)
+	args = append(args,
 		"--name", name,
 		"--env-file", envFile,
 		"--volume", dir+":/workspace:rw",
@@ -138,7 +139,8 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		"--volume", envHome(env)+":"+envHome(env)+":rw",
 		"--workdir", "/workspace",
 		"--entrypoint", "sh",
-		image, "-c", "sleep infinity")...)
+		image, "-c", "sleep infinity")
+	start := exec.Command(podman, args...)
 	start.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 	if out, err := start.CombinedOutput(); err != nil {
 		// A missing image lands here, and it is the common case worth
@@ -187,7 +189,24 @@ func (r *runner) podmanGlobal() []string {
 	return []string{"--cgroup-manager=cgroupfs"}
 }
 
-// env_home returns the HOME the step environment carries.
+// limitArgs caps one build's container. The service's CPUWeight and
+// IOWeight shape the service against other services, not one build
+// against the host, and the threat model lists resource exhaustion as
+// unaddressed. Memory is deliberately uncapped by default: the e2e suite
+// peaks past 5GB on a 7GB host, and a cap that kills the suite is an
+// outage, not a limit.
+func (r *runner) limitArgs() []string {
+	var args []string
+	if r.memory != "" {
+		args = append(args, "--memory", r.memory)
+	}
+	if r.cpus != "" {
+		args = append(args, "--cpus", r.cpus)
+	}
+	return args
+}
+
+// envHome returns the HOME the step environment carries.
 func envHome(env []string) string {
 	for _, e := range env {
 		if strings.HasPrefix(e, "HOME=") {

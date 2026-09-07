@@ -49,6 +49,9 @@ type runner struct {
 	// isolation selects how steps run: "podman" or "none".
 	image     string
 	isolation string
+	// memory and cpus cap one build's container; empty means no cap.
+	memory string
+	cpus   string
 	// repos limits which repositories this runner claims builds for. Empty
 	// means any, which is what a runner on the server itself wants; a runner
 	// somewhere that should not execute every repository's steps names them.
@@ -68,6 +71,8 @@ func main() {
 		jobs      = flag.Int("jobs", 1, "builds to run at once")
 		image     = flag.String("image", "", "default container image for jobs that name none")
 		isolation = flag.String("isolation", "podman", "how steps run: podman, or none for no container")
+		memory    = flag.String("memory", "", "memory limit per build container, e.g. 4g (podman only; default unlimited)")
+		cpus      = flag.String("cpus", "", "CPU limit per build container, e.g. 2 (podman only; default unlimited)")
 		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
 	flag.Parse()
@@ -85,6 +90,8 @@ func main() {
 		timeout:   *timeout,
 		image:     *image,
 		isolation: *isolation,
+		memory:    *memory,
+		cpus:      *cpus,
 	}
 	if err := r.checkIsolation(); err != nil {
 		// Refusing to start is the point. A runner that quietly fell back

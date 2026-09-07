@@ -438,6 +438,10 @@ because an image this host does not have would fail every build. A job
 overrides it with =image:= in =.gitbay/ci.yml=, validated as a reference
 so a config file cannot turn it into podman arguments.
 
+=-cpus= and =-memory= cap one build's container (podman's own units,
+e.g. =-cpus 2 -memory 4g=); unset means uncapped. bay1 runs =-cpus 3=
+and no memory cap, since the e2e suite needs most of the host's 7GB.
+
 *Images are provisioned, never pulled by a build.* The runner passes
 =--pull=never=. Two reasons, and the second is the better one: the
 service runs with =RestrictSUIDSGID=yes= so podman cannot unpack a layer
