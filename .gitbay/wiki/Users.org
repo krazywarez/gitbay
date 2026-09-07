@@ -154,6 +154,11 @@ gitbay repo fork other/project [--name mine]
 gitbay repo delete you/project --yes
 #+end_src
 
+=repo show= also reports your own state on the repository — =watch=
+(=watching= or =muted=) and =bookmarked= — and =fork_of= when it is a
+fork whose parent you can read, so a client draws a toggle rather than
+two blind buttons. Absent means none.
+
 Pushing is SSH-only. Public repositories are anonymously readable over
 HTTPS (and =git://= where enabled); private repositories exist only over
 SSH and answer "not found" to everyone without access.

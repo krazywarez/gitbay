@@ -289,6 +289,13 @@ func runRepoShow(c *Ctx, args []string) int {
 		Topics            []string    `json:"topics,omitempty"`
 		Domains           []string    `json:"domains,omitempty"`
 		Mirrors           []mirrorOut `json:"mirrors,omitempty"`
+		// ForkOf names the parent only when the caller can read it: a
+		// private parent is not confirmed to exist, here as anywhere.
+		ForkOf string `json:"fork_of,omitempty"`
+		// Watch and Bookmarked are the caller's own state, so a client
+		// can draw a toggle rather than two stateless buttons (#178).
+		Watch      string `json:"watch,omitempty"` // watching, muted, or absent
+		Bookmarked bool   `json:"bookmarked,omitempty"`
 	}
 	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
 	topics, err := c.Store.ListTopics(repo.ID)
@@ -303,8 +310,20 @@ func runRepoShow(c *Ctx, args []string) int {
 			}
 		}
 	}
-	d := out{repo.Path(), desc, repo.Settings.Website, repo.Visibility, repo.DefaultBranch,
-		repo.Settings.ProtectedBranches, repo.Settings.Archived, topics, domains, nil}
+	d := out{Path: repo.Path(), Description: desc, Website: repo.Settings.Website, Visibility: repo.Visibility,
+		DefaultBranch: repo.DefaultBranch, ProtectedBranches: repo.Settings.ProtectedBranches,
+		Archived: repo.Settings.Archived, Topics: topics, Domains: domains}
+	if repo.ForkOf != 0 {
+		if parent, err := c.Store.RepoByID(repo.ForkOf); err == nil {
+			if grant, err := c.Store.AccessRole(parent.ID, c.User.ID); err == nil && policy.CanRead(c.User, parent, grant) {
+				d.ForkOf = parent.Path()
+			}
+		}
+	}
+	if c.User.ID != 0 {
+		d.Watch = c.Store.RepoWatchState(repo.ID, c.User.ID)
+		d.Bookmarked = c.Store.IsBookmarked(c.User.ID, repo.ID)
+	}
 	// Mirror status is admin-only, like repo mirror list. The token never
 	// leaves the server.
 	if grant, err := c.Store.AccessRole(repo.ID, c.User.ID); err == nil && policy.CanAdmin(c.User, repo, grant) {
@@ -336,6 +355,15 @@ func runRepoShow(c *Ctx, args []string) int {
 		}
 		if len(d.Domains) > 0 {
 			fmt.Fprintf(w, "pages domains: %s\n", strings.Join(d.Domains, ", "))
+		}
+		if d.ForkOf != "" {
+			fmt.Fprintf(w, "fork of: %s\n", d.ForkOf)
+		}
+		if d.Watch != "" {
+			fmt.Fprintf(w, "watch: %s\n", d.Watch)
+		}
+		if d.Bookmarked {
+			fmt.Fprintln(w, "bookmarked")
 		}
 		for _, m := range d.Mirrors {
 			status := "ok"
