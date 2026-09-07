@@ -30,9 +30,9 @@
 {{with .Queues.Builds}}
 <h2>Builds <span class="count">{{.Pending}}</span></h2>
 <p class="meta">{{.Pending}} pending · {{.Running}} running{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
-{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Repository</th><th>Build</th><th>Job</th><th>Running since</th></tr></thead><tbody>
-{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td><a href="/{{.Repo}}/builds/{{.Number}}">#{{.Number}}</a></td><td>{{.Job}}</td><td>{{when .StartedAt}}</td></tr>
-{{end}}</tbody></table></div>{{else}}<p class="none">No build running</p>{{end}}
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Repository</th><th>Build</th><th>Job</th><th>Status</th><th>Since</th></tr></thead><tbody>
+{{range .Items}}<tr><td><a href="/{{.Repo}}">{{.Repo}}</a></td><td><a href="/{{.Repo}}/builds/{{.Number}}">#{{.Number}}</a></td><td>{{.Job}}</td><td>{{.Status}}</td><td>{{if .StartedAt}}{{when .StartedAt}}{{else}}{{when .CreatedAt}}{{end}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">No build running or pending</p>{{end}}
 {{end}}
 
 {{with .Queues.Deps}}

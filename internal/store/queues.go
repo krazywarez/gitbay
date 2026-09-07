@@ -69,14 +69,16 @@ type QueueBuilds struct {
 	Pending       int64           `json:"pending"`
 	Running       int64           `json:"running"`
 	OldestPending string          `json:"oldest_pending,omitempty"`
-	Items         []QueueBuildRow `json:"items"` // running builds, oldest first
+	Items         []QueueBuildRow `json:"items"` // running then pending, oldest first
 }
 
 type QueueBuildRow struct {
 	Repo      string `json:"repo"`
 	Number    int64  `json:"number"`
 	Job       string `json:"job"`
-	StartedAt string `json:"started_at"`
+	Status    string `json:"status"` // running | pending
+	CreatedAt string `json:"created_at"`
+	StartedAt string `json:"started_at"` // "" while pending
 }
 
 type QueueDeps struct {
@@ -176,10 +178,11 @@ func (s *Store) QueueStatus() (Queues, error) {
 		COALESCE(MIN(created_at) FILTER (WHERE status = 'pending'), '') FROM builds`).Scan(&q.Builds.Pending, &q.Builds.Running, &q.Builds.OldestPending); err != nil {
 		return q, err
 	}
-	if err := s.queryEach(`SELECT `+repoPathExpr+`, b.number, b.job, b.started_at
-		FROM builds b`+repoJoin("b.repo_id")+` WHERE b.status = 'running' ORDER BY b.started_at LIMIT ?`, func(sc scanner) error {
+	if err := s.queryEach(`SELECT `+repoPathExpr+`, b.number, b.job, b.status, b.created_at, b.started_at
+		FROM builds b`+repoJoin("b.repo_id")+` WHERE b.status IN ('running', 'pending')
+		ORDER BY b.status = 'running' DESC, b.started_at, b.created_at, b.id LIMIT ?`, func(sc scanner) error {
 		var b QueueBuildRow
-		if err := sc.Scan(&b.Repo, &b.Number, &b.Job, &b.StartedAt); err != nil {
+		if err := sc.Scan(&b.Repo, &b.Number, &b.Job, &b.Status, &b.CreatedAt, &b.StartedAt); err != nil {
 			return err
 		}
 		q.Builds.Items = append(q.Builds.Items, b)

@@ -209,7 +209,11 @@ func runDashboard(c *Ctx, args []string) int {
 			}
 			fmt.Fprintf(w, "  builds\tpending %d\trunning %d\n", q.Builds.Pending, q.Builds.Running)
 			for _, it := range q.Builds.Items {
-				fmt.Fprintf(w, "    %s\t%d\t%s\tsince %s\n", it.Repo, it.Number, it.Job, it.StartedAt)
+				since := it.StartedAt
+				if it.Status == "pending" {
+					since = it.CreatedAt
+				}
+				fmt.Fprintf(w, "    %s\t%d\t%s\t%s since %s\n", it.Repo, it.Number, it.Job, it.Status, since)
 			}
 			fmt.Fprintf(w, "  deps\terrors %d\n", q.Deps.Errors)
 			for _, it := range q.Deps.Items {

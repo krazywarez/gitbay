@@ -493,6 +493,12 @@ func TestAdminQueuesDashboard(t *testing.T) {
 		Builds struct {
 			Pending       int64  `json:"pending"`
 			OldestPending string `json:"oldest_pending"`
+			Items         []struct {
+				Repo      string `json:"repo"`
+				Job       string `json:"job"`
+				Status    string `json:"status"`
+				CreatedAt string `json:"created_at"`
+			} `json:"items"`
 		} `json:"builds"`
 		Mail struct {
 			Pending int64 `json:"pending"`
@@ -535,6 +541,11 @@ func TestAdminQueuesDashboard(t *testing.T) {
 	if len(q.Webhooks.Items) == 0 || q.Webhooks.Items[0].Repo != "alice/app" || q.Webhooks.Items[0].Attempts == 0 || q.Webhooks.Items[0].LastError == "" {
 		t.Fatalf("retrying item: %+v", q.Webhooks.Items)
 	}
+	// A build no runner has claimed is listed, not just counted.
+	if len(q.Builds.Items) == 0 || q.Builds.Items[0].Repo != "alice/app" || q.Builds.Items[0].Job != "ok" ||
+		q.Builds.Items[0].Status != "pending" || q.Builds.Items[0].CreatedAt == "" {
+		t.Fatalf("pending build item: %+v", q.Builds.Items)
+	}
 
 	// The web page dispatches the same read; non-admins get a 404 and no
 	// rail link.
@@ -548,7 +559,7 @@ func TestAdminQueuesDashboard(t *testing.T) {
 	root := inst.login(t, rootKey)
 	status, body := browserGet(t, root, inst.base()+"/admin")
 	if status != 200 || !strings.Contains(body, "Webhook deliveries") || !strings.Contains(body, "alice/app") ||
-		!strings.Contains(body, "retrying") || !strings.Contains(body, "1 pending") {
+		!strings.Contains(body, "retrying") || !strings.Contains(body, "1 pending") || !strings.Contains(body, "<td>pending</td>") {
 		t.Fatalf("/admin: %d\n%s", status, body)
 	}
 	if _, body := browserGet(t, root, inst.base()+"/"); !strings.Contains(body, `href="/admin"`) {
