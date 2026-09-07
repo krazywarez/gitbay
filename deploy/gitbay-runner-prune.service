@@ -7,6 +7,9 @@ Description=Prune unused podman images on the CI runner
 [Service]
 Type=oneshot
 User=ci-runner
+# Rootless podman reads storage.conf under HOME; a User= unit does not
+# set it.
+Environment=HOME=/var/lib/gitbay-runner
 # Images not used by a container and older than a week. A build that
 # names an image again re-pulls it; the cost is one pull, not a failure.
 ExecStart=/usr/bin/podman image prune --all --force --filter until=168h

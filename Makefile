@@ -74,9 +74,13 @@ deploy-runner: preflight
 	./deploy/copy.sh $(HOST) $(PORT) $(RUNNER_BIN) /usr/local/bin/gitbay-runner.new
 	ssh -p $(PORT) root@$(HOST) 'mkdir -p /etc/systemd/system/gitbay-runner.service.d'
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner.override.conf /etc/systemd/system/gitbay-runner.service.d/override.conf
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.service /etc/systemd/system/gitbay-runner-prune.service
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.timer /etc/systemd/system/gitbay-runner-prune.timer
 	ssh -p $(PORT) root@$(HOST) 'set -eu; \
 	  chmod 755 /usr/local/bin/gitbay-runner.new; \
 	  mv /usr/local/bin/gitbay-runner.new /usr/local/bin/gitbay-runner; \
 	  systemctl daemon-reload; \
+	  systemctl enable --now gitbay-runner-prune.timer; \
 	  systemctl restart gitbay-runner; \
-	  systemctl --no-pager --lines=3 status gitbay-runner'
+	  systemctl --no-pager --lines=3 status gitbay-runner; \
+	  systemctl --no-pager list-timers gitbay-runner-prune.timer'
