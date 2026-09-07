@@ -53,7 +53,9 @@ func runWebhookAdd(c *Ctx, args []string) int {
 		return code
 	}
 	if err := webhook.ValidateURL(url, c.Cfg.Webhooks.AllowLocal); err != nil {
-		return c.failErr(err)
+		// The command line parsed; the value is what the server refuses.
+		// Exit 1 carries the reason to every client verbatim (#187).
+		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	id, err := c.Store.AddWebhook(repo.ID, url, secret, events)
 	if err != nil {
