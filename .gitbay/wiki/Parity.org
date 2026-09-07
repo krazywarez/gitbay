@@ -154,8 +154,8 @@ column and are always markdown.
 | build trigger               | yes | yes | yes |
 | build cancel                | yes | yes | yes |
 | job image (ci.yml)          | yes | n/a | n/a |
-| dependency checks on/off    | yes | yes | no  |
-| dependency status           | yes | yes | no  |
+| dependency checks on/off    | yes | yes | yes |
+| dependency status           | yes | yes | yes |
 | delete, transfer            | yes | no  | no  |
 | release delete              | yes | yes | yes |
 
