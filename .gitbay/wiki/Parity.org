@@ -253,7 +253,7 @@ client has no use for one (krz/gitbay#57).
 | notification inbox          | yes | yes | yes |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
-| profile set                 | yes | yes | no  |
+| profile set                 | yes | yes | yes |
 | request a login link        | n/a | yes | n/a |
 
 Notifications land in an inbox row per recipient whether or not the
@@ -282,8 +282,10 @@ and the web route stays the way to get one.
 
 =profile set= carries description, website, about and links. It is not
 =SSHOnly= — nothing about a bio is a credential, and the JSON API runs
-it — and the account settings page has the form; the =no= above is the
-iOS client.
+it. The account settings page has the form, and so does the iOS client:
+=--link= replaces the whole set rather than appending, so a client sends
+every link it keeps on every save, and =--link ''= is how they are
+cleared.
 
 * Organizations
 
