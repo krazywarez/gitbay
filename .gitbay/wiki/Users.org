@@ -79,7 +79,14 @@ set. No separate registration step.
 
 Add and verify additional addresses with =email add <address>= /
 =email verify <code>= (requires the instance to have SMTP; otherwise an
-admin can assert an address for you).
+admin can assert an address for you). =email list= shows them. =email
+remove <address>= drops one, with two refusals: the primary stays until
+=email primary <address>= names another verified address, and the last
+verified address stays, since activation, login links and commit
+identity all resolve through verified addresses. Removing a verified
+address re-evaluates signature states, so a commit authored from it
+shows as =signed_email_mismatch= afterwards. A removed address is free
+for any account to claim.
 
 The states you will see, in decreasing order of trust: =verified=,
 =signed_unknown_key= (valid signature, key not registered here — register

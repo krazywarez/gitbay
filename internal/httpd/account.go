@@ -179,6 +179,18 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "address verified")
+	case "email-remove":
+		if _, msg, ok := s.runControl(u, []string{"email", "remove", r.FormValue("address")}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "address removed")
+	case "email-primary":
+		if _, msg, ok := s.runControl(u, []string{"email", "primary", r.FormValue("address")}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "primary address changed")
 	case "profile":
 		format := r.FormValue("format")
 		if format != "org" {

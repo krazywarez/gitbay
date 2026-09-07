@@ -90,6 +90,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"explore":              {},
 		"audit":                {},
 		"keys list":            {},
+		"email list":           {},
 		"pgp list":             {},
 		"token list":           {},
 		"web sessions list":    {},

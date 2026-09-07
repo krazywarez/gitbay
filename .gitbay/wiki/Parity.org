@@ -273,6 +273,7 @@ client has no use for one (krz/gitbay#57).
 | SSH keys: list, add, remove | yes | yes | yes |
 | PGP keys: list, add, remove | yes | yes | yes |
 | email add and verify        | yes | yes | yes |
+| email list, remove, primary | yes | yes | no  |
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
 | API token mint              | yes | no  | no  |

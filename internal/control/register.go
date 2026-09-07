@@ -31,6 +31,84 @@ func init() {
 	register(Command{Path: []string{"email", "verify"},
 		Summary: "confirm a verification code",
 		Usage:   "email verify <code>", Run: runEmailVerify})
+	register(Command{Path: []string{"email", "list"},
+		Summary:  "list the addresses on your account",
+		Usage:    "email list",
+		ReadOnly: true, Run: runEmailList})
+	register(Command{Path: []string{"email", "remove"},
+		Summary: "remove an address; not the primary, nor the last verified one",
+		Usage:   "email remove <address>", Run: runEmailRemove})
+	register(Command{Path: []string{"email", "primary"},
+		Summary: "make a verified address the primary",
+		Usage:   "email primary <address>", Run: runEmailPrimary})
+}
+
+func runEmailList(c *Ctx, args []string) int {
+	if len(args) != 0 {
+		return c.fail(protocol.ExitUsage, "usage: email list [--json]")
+	}
+	emails, err := c.Store.ListEmails(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "listing addresses: %v", err)
+	}
+	type out struct {
+		Address    string `json:"address"`
+		Verified   bool   `json:"verified"`
+		VerifiedBy string `json:"verified_by,omitempty"`
+		Primary    bool   `json:"primary"`
+	}
+	ds := make([]out, 0, len(emails))
+	for _, e := range emails {
+		ds = append(ds, out{e.Address, e.Verified, e.VerifiedBy, e.Primary})
+	}
+	return c.emit(ds, func(w io.Writer) {
+		for _, d := range ds {
+			state := "unverified"
+			if d.Verified {
+				state = "verified"
+			}
+			if d.Primary {
+				state += "\tprimary"
+			}
+			fmt.Fprintf(w, "%s\t%s\n", d.Address, state)
+		}
+	})
+}
+
+// emailErr maps the store's refusals onto exit codes: a missing address is
+// not found, a rule is denied, anything else is a failure.
+func emailErr(c *Ctx, verb string, err error) int {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return c.fail(protocol.ExitNotFound, "no such address on your account")
+	case errors.Is(err, store.ErrPrimaryEmail), errors.Is(err, store.ErrLastVerifiedEmail), errors.Is(err, store.ErrUnverifiedEmail):
+		return c.fail(protocol.ExitDenied, "%v", err)
+	}
+	return c.fail(protocol.ExitFailure, "%s: %v", verb, err)
+}
+
+func runEmailRemove(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: email remove <address>")
+	}
+	if err := c.Store.RemoveEmail(c.User.ID, args[0]); err != nil {
+		return emailErr(c, "removing address", err)
+	}
+	return c.emit(map[string]string{"address": args[0], "status": "removed"}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s removed\n", args[0])
+	})
+}
+
+func runEmailPrimary(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: email primary <address>")
+	}
+	if err := c.Store.SetPrimaryEmail(c.User.ID, args[0]); err != nil {
+		return emailErr(c, "setting primary", err)
+	}
+	return c.emit(map[string]string{"address": args[0], "status": "primary"}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s is now the primary address\n", args[0])
+	})
 }
 
 func siteHost(cfg config.Config) string {

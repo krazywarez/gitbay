@@ -56,7 +56,9 @@ account, and where notifications go.</p>
 {{range .Emails}}<li>{{.Address}}
   {{if .Primary}}<span class="chip">primary</span>{{end}}
   {{if .Verified}}<span class="badge badge-verified">verified{{with .VerifiedBy}} · {{.}}{{end}}</span>
-  {{else}}<span class="badge badge-unsigned">unverified</span>{{end}}</li>
+  {{else}}<span class="badge badge-unsigned">unverified</span>{{end}}
+  {{if not .Primary}}{{if .Verified}}<form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-primary"><input type="hidden" name="address" value="{{.Address}}"><button type="submit" class="linklike">Make primary</button></form>{{end}}
+  <form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-remove"><input type="hidden" name="address" value="{{.Address}}"><button type="submit" class="linklike">Remove</button></form>{{end}}</li>
 {{end}}</ul>{{end}}
 <details class="editbox">
   <summary>Add an address</summary>

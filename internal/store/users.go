@@ -320,6 +320,88 @@ func (s *Store) AddEmail(userID int64, address, verifiedBy string, primary bool)
 	return tx.Commit()
 }
 
+var (
+	ErrPrimaryEmail      = errors.New("that is the primary address; make another address primary first")
+	ErrLastVerifiedEmail = errors.New("that is the only verified address on the account; verify another first")
+	ErrUnverifiedEmail   = errors.New("that address is not verified")
+)
+
+// RemoveEmail drops an address from the account, and any verification
+// code pending for it. The primary and the last verified address stay:
+// activation, login links and commit identity all resolve through
+// verified addresses. Removing a verified address bumps the key epoch,
+// since the signature cache keys on verified addresses too.
+func (s *Store) RemoveEmail(userID int64, address string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var primary, verified bool
+	err = tx.QueryRow("SELECT is_primary, verified_at IS NOT NULL FROM emails WHERE user_id = ? AND address = ?",
+		userID, address).Scan(&primary, &verified)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if primary {
+		return ErrPrimaryEmail
+	}
+	if verified {
+		var others int
+		if err := tx.QueryRow("SELECT count(*) FROM emails WHERE user_id = ? AND verified_at IS NOT NULL AND address != ?",
+			userID, address).Scan(&others); err != nil {
+			return err
+		}
+		if others == 0 {
+			return ErrLastVerifiedEmail
+		}
+	}
+	if _, err := tx.Exec("DELETE FROM email_tokens WHERE user_id = ? AND address = ?", userID, address); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM emails WHERE user_id = ? AND address = ?", userID, address); err != nil {
+		return err
+	}
+	if verified {
+		if err := bumpKeyEpoch(tx); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SetPrimaryEmail makes a verified address the account's primary. The
+// verified set is unchanged, so the key epoch is not.
+func (s *Store) SetPrimaryEmail(userID int64, address string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var verified bool
+	err = tx.QueryRow("SELECT verified_at IS NOT NULL FROM emails WHERE user_id = ? AND address = ?",
+		userID, address).Scan(&verified)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return ErrUnverifiedEmail
+	}
+	if _, err := tx.Exec("UPDATE emails SET is_primary = 0 WHERE user_id = ?", userID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("UPDATE emails SET is_primary = 1 WHERE user_id = ? AND address = ?", userID, address); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) KeyEpoch() (int64, error) {
 	var v int64
 	err := s.DB.QueryRow("SELECT value FROM settings WHERE key = 'key_epoch'").Scan(&v)
