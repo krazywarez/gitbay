@@ -469,6 +469,23 @@ cannot call =newuidmap= and the runner refuses to start. That is a
 considered trade, explained in the file and in the Threat-Model; if you
 run with =-isolation none=, set it back to =yes=.
 
+*Validate podman mode on a scratch repository before pointing the runner
+at real ones.* Every deploy that switched the whole instance to
+containers and failed took CI down with it. Instead: create a throwaway
+repository the runner account can read (public, or granted read — a
+private one is "not found" to the runner and the build stays pending),
+give it one job that names the CI image, and deploy the runner with
+=-repos= naming only that repository. The production unit, with its real
+hardening, then claims nothing else; other repositories' builds queue
+until =-repos= is switched back, which is a pause, not an outage.
+
+#+begin_src sh
+gitbay repo create cmc/ci-smoke          # then push a .gitbay/ci.yml naming the image
+sed -i 's#-repos krz/gitbay #-repos cmc/ci-smoke #' /etc/systemd/system/gitbay-runner.service.d/override.conf
+systemctl daemon-reload && systemctl restart gitbay-runner
+gitbay build log cmc/ci-smoke 1         # green: switch -repos back, redeploy
+#+end_src
+
 *Do not deploy an isolating runner to a host that has not been
 prepared.* The runner is specified to refuse to start without a working
 podman rather than fall back to running builds unsandboxed — a fallback
