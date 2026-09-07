@@ -12,3 +12,8 @@
 - Moving from GitHub? :: =gitbay repo import= (git data) then
   =gitbay repo import-issues= (history); =repo mirror= covers the
   transition window.
+- What is not planned? :: A container or package registry (scope creep
+  away from "forge"; external registries integrate through CI), an
+  email patch flow (revisit only if sourcehut-style demand appears),
+  federation and Postgres (no need at this scale). Recorded so the
+  absence reads as a decision, not an oversight.

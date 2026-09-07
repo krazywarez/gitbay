@@ -8,7 +8,6 @@ CLI-first git forge: SSH is the API, the web is a rendering.
 - [[Stacked-MRs][Stacked merge requests]] — dependent merge requests, merged one layer at a time
 - [[Admin][Admin guide]] — install, configuration reference, backup, security
 - [[API][API and webhooks]] — the JSON API contract, tokens, payloads
-- [[Roadmap][Roadmap]] — status, phases, decisions, what is not planned
 - [[Threat-Model][Threat model]] — what the forge trusts and never does
 - [[Parity][Parity]] — what each surface can do, and what stays SSH-only
 - [[Performance][Performance]] — stress-test numbers from importing git.git

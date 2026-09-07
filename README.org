@@ -110,7 +110,6 @@ wiki feature:
 - [[https://gitbay.org/krz/gitbay/wiki/Users][user guide]] — accounts, keys, verified commits, repos, issues, MRs, scripting
 - [[https://gitbay.org/krz/gitbay/wiki/Admin][admin guide]] — install, full configuration reference, backup/restore, security
 - [[https://gitbay.org/krz/gitbay/wiki/API][API and webhooks]] — the JSON API contract, tokens, webhook payloads and HMAC
-- [[https://gitbay.org/krz/gitbay/wiki/Roadmap][roadmap]] — status, phased plan, and what is deliberately not planned
 - [[https://gitbay.org/krz/gitbay/wiki/Threat-Model][threat model]] — what the forge trusts and never does
 
 * Contributing
