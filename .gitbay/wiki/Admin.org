@@ -503,6 +503,8 @@ management and =ReadWritePaths= for podman's store under
 make read-only. Those paths are prefixed =-= so they are ignored when
 absent: the drop-in installs on unprepared hosts too, and a unit that
 refused to start would stop every build.
+The nightly canary on =cmc/ci-smoke= only runs if the runner's =-repos=
+names that repository too; a scoped runner claims nothing else.
 =gitbay-runner-prune.timer= prunes unused images weekly, as the runner's
 user: rootless storage belongs to that user, and root's prune would not
 see it. An unpruned image store on a 40GB host is a slow outage.
