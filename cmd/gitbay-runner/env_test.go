@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A step's environment is constructed, not inherited: repository content
@@ -127,5 +128,50 @@ func TestLimitArgs(t *testing.T) {
 	want := []string{"--memory", "4g", "--cpus", "2"}
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("limitArgs = %v, want %v", got, want)
+	}
+}
+
+// Closing stop drains: the build in flight finishes and is reported, and
+// no further build is claimed (#179).
+func TestServeDrainsOnStop(t *testing.T) {
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	calls := 0
+	r := &runner{stepFn: func() (bool, error) {
+		calls++
+		if calls == 1 {
+			close(started)
+			<-release // the build is in flight while stop closes
+		}
+		return true, nil
+	}}
+	done := make(chan struct{})
+	go func() { r.serve(1, false, time.Millisecond, stop); close(done) }()
+	<-started
+	close(stop)
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("serve did not return after the in-flight build finished")
+	}
+	if calls != 1 {
+		t.Errorf("claimed %d builds after stop, want the one already in flight", calls-1)
+	}
+}
+
+// An idle worker leaves promptly on stop rather than sleeping out a poll.
+func TestServeStopsWhileIdle(t *testing.T) {
+	stop := make(chan struct{})
+	r := &runner{stepFn: func() (bool, error) { return false, nil }}
+	done := make(chan struct{})
+	go func() { r.serve(1, false, time.Hour, stop); close(done) }()
+	time.Sleep(20 * time.Millisecond)
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("idle worker did not stop")
 	}
 }

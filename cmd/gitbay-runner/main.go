@@ -17,6 +17,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -52,6 +53,8 @@ type runner struct {
 	// memory and cpus cap one build's container; empty means no cap.
 	memory string
 	cpus   string
+	// stepFn is step, replaceable by tests.
+	stepFn func() (bool, error)
 	// repos limits which repositories this runner claims builds for. Empty
 	// means any, which is what a runner on the server itself wants; a runner
 	// somewhere that should not execute every repository's steps names them.
@@ -133,28 +136,58 @@ func main() {
 	// claiming at once is already safe; the runner just never used that.
 	// Each build works in its own build-<id> directory, so they do not
 	// meet on disk either.
+	// A stop signal drains: no build is claimed after it, and each build
+	// already in flight runs to completion and is reported. The old
+	// behaviour was to die mid-build, which left the build "running" on
+	// the server with nothing executing (#179). The unit's
+	// TimeoutStopSec bounds the drain; a second signal ends it now.
+	stop := make(chan struct{})
+	go func() {
+		sigs := make(chan os.Signal, 2)
+		signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+		<-sigs
+		log.Printf("draining: finishing builds in flight, claiming no more")
+		close(stop)
+		<-sigs
+		log.Printf("second signal: exiting without draining")
+		os.Exit(1)
+	}()
+	r.serve(n, *once, *poll, stop)
+}
+
+// serve runs n workers until stop closes. A worker checks stop only
+// between builds, so closing it never interrupts one.
+func (r *runner) serve(n int, once bool, poll time.Duration, stop <-chan struct{}) {
+	if r.stepFn == nil {
+		r.stepFn = r.step
+	}
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			// Spread the idle polls across the interval rather than
-			// having every worker wake together: n workers asking the
-			// same question in the same instant is n times the load for
-			// one answer.
 			if n > 1 {
-				time.Sleep(time.Duration(i) * *poll / time.Duration(n))
+				time.Sleep(time.Duration(i) * poll / time.Duration(n))
 			}
 			for {
-				ran, err := r.step()
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				ran, err := r.stepFn()
 				if err != nil {
 					log.Printf("runner: %v", err)
 				}
-				if *once {
+				if once {
 					return
 				}
 				if !ran {
-					time.Sleep(*poll)
+					select {
+					case <-stop:
+						return
+					case <-time.After(poll):
+					}
 				}
 			}
 		}(i)
