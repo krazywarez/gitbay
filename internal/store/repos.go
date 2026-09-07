@@ -398,6 +398,16 @@ func (s *Store) ListReposForOwner(ownerKind string, ownerID int64) ([]Repo, erro
 	return out, rows.Err()
 }
 
+// RenameRepo changes a repository's name under the same owner. The unique
+// index on (owner_kind, owner_id, name) refuses collisions.
+func (s *Store) RenameRepo(repoID int64, newName string) error {
+	_, err := s.DB.Exec("UPDATE repos SET name = ? WHERE id = ?", newName, repoID)
+	if isUniqueErr(err) {
+		return fmt.Errorf("the owner already has a repository by that name")
+	}
+	return err
+}
+
 // TransferRepo moves a repository to a new owner. The unique index on
 // (owner_kind, owner_id, name) refuses collisions in the target namespace.
 func (s *Store) TransferRepo(repoID int64, newKind string, newOwnerID int64) error {

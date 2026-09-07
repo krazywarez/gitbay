@@ -173,6 +173,7 @@ gitbay repo list
 gitbay repo show you/project
 gitbay repo log you/project --limit 20      # commits with signature states
 gitbay repo fork other/project [--name mine]
+gitbay repo rename you/project tool          # clone URLs change
 gitbay repo delete you/project --yes
 #+end_src
 

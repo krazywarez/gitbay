@@ -36,6 +36,9 @@ func init() {
 	register(Command{Path: []string{"repo", "transfer"},
 		Summary: "move a repository to another owner",
 		Usage:   "repo transfer <owner/name> <new-owner> (clone URLs change)", Run: runRepoTransfer})
+	register(Command{Path: []string{"repo", "rename"},
+		Summary: "rename a repository",
+		Usage:   "repo rename <owner/name> <new-name> (clone URLs change)", Run: runRepoRename})
 	register(Command{Path: []string{"repo", "delete"},
 		Summary: "delete a repository",
 		Usage:   "repo delete <owner/name> --yes", Run: runRepoDelete})
@@ -435,6 +438,43 @@ func runRepoTransfer(c *Ctx, args []string) int {
 	newPath := newOwner + "/" + repo.Name
 	return c.emit(map[string]string{"repo": newPath, "was": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "transferred %s to %s — clone URLs now use %s\n", repo.Path(), newPath, newPath)
+	})
+}
+
+func runRepoRename(c *Ctx, args []string) int {
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: repo rename <owner/name> <new-name>")
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	newName := args[1]
+	if newName == repo.Name {
+		return c.fail(protocol.ExitUsage, "%s is already named %s", repo.Path(), newName)
+	}
+	if err := policyValidateRepoName(newName); err != nil {
+		return c.failErr(err)
+	}
+	oldDir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	newDir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, newName)
+	if _, err := os.Stat(newDir); err == nil {
+		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", repo.OwnerName, newName)
+	}
+	if err := c.Store.RenameRepo(repo.ID, newName); err != nil {
+		return c.failErr(err)
+	}
+	if err := os.Rename(oldDir, newDir); err != nil {
+		// Same rule as transfer: keep name and disk consistent, and say so
+		// if even the revert fails.
+		if rerr := c.Store.RenameRepo(repo.ID, repo.Name); rerr != nil {
+			return c.fail(protocol.ExitFailure, "moving repository: %v; and reverting the record failed: %v (the record now names %s/%s but the directory is still %s)", err, rerr, repo.OwnerName, newName, repo.Path())
+		}
+		return c.fail(protocol.ExitFailure, "moving repository: %v", err)
+	}
+	newPath := repo.OwnerName + "/" + newName
+	return c.emit(map[string]string{"repo": newPath, "was": repo.Path()}, func(w io.Writer) {
+		fmt.Fprintf(w, "renamed %s to %s — clone URLs now use %s\n", repo.Path(), newPath, newPath)
 	})
 }
 
