@@ -145,9 +145,13 @@ runner, polling over SSH, clones the commit and runs its steps.
   repository is trusted; there is no automatic fallback to it — a runner
   configured for podman that cannot find one refuses to start, because
   dropping isolation silently is worse than a stopped runner. The
-  systemd drop-in still adds =ProtectSystem=full= and the kernel and
-  cgroup protections, and =-repos= still limits a runner to named
-  repositories. =NoNewPrivileges= is *off*: rootless podman sets up its
+  systemd drop-in still adds =ProtectSystem=full= and the cgroup
+  protections, and =-repos= still limits a runner to named
+  repositories. =ProtectKernelTunables= is *off*: it overmounts =/proc=
+  in the unit's namespace and the kernel then refuses a proc mount in
+  any child user namespace, which every rootless container needs; the
+  container masks the same paths for the build itself.
+  =NoNewPrivileges= is *off*: rootless podman sets up its
   namespace with the setuid =newuidmap=, which that flag blocks, so the
   choice is between it and containers at all. Containers are the stronger
   boundary — the flag constrained a process that was already running
