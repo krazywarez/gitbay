@@ -96,6 +96,13 @@ repository header, the count in the facts bar, and the list at
 =/bookmarks=. Bookmarks are public and counted; pins are private and
 drive the rail. Read access is all a bookmark needs.
 
+A job's result is a property of the commit's *tree*, not its sha: a
+rebase onto a base that touched nothing the branch did gives every
+commit a new sha and the same tree, and a job that already passed for
+that tree is not run again — the new commit gets the earlier result as
+its =ci/<job>= status, naming the build it came from. Scheduled and tag
+jobs are never reused this way; their trigger is the clock or the tag.
+
 * Profiles
 
 A profile is what =/{owner}= shows: a one-line description, a website, a

@@ -432,7 +432,7 @@ func TestQueueBranchBuildsAlreadyBuiltJobRecordsNoSkippedStatus(t *testing.T) {
 	// The same commit already has a build for "unit" from another branch,
 	// still pending. Its filter would exclude this push too, so the only
 	// way to tell the two paths apart is that this one must record nothing.
-	if _, err := st.CreateBuild(repo.ID, "unit", newSHA, "other", `["echo hi"]`, "", true); err != nil {
+	if _, err := st.CreateBuild(repo.ID, "unit", newSHA, "other", `["echo hi"]`, "", "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -547,5 +547,61 @@ func TestQueueBranchBuildsRebaseFiltersAgainstMergeBase(t *testing.T) {
 	}
 	if len(builds) == 0 {
 		t.Fatal("a rebased branch whose commits change code queued no build")
+	}
+}
+
+// A rebase gives a commit a new sha and the same tree. A job that
+// succeeded for that tree has nothing left to prove, so the new commit
+// gets the earlier result as its status instead of a new build (#177).
+func TestQueueBranchBuildsSameTreeReusesSuccess(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  unit:\n    steps:\n      - echo hi\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+	first := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+	// Same tree, new sha: what a rebase onto an unrelated base produces.
+	git(src, "commit", "-q", "--allow-empty", "-m", "rewritten")
+	second := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+	if git(src, "rev-parse", first+"^{tree}") != git(src, "rev-parse", second+"^{tree}") {
+		t.Fatal("fixture: trees differ")
+	}
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", "", first, time.Now())
+	builds, _ := st.ListBuilds(repo.ID, 10)
+	if len(builds) != 1 {
+		t.Fatalf("first commit queued %d builds, want 1", len(builds))
+	}
+	if _, ok, err := st.ClaimBuild([]int64{repo.ID}); err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	if err := st.FinishBuild(builds[0].ID, "success"); err != nil {
+		t.Fatal(err)
+	}
+
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", first, second, time.Now())
+	builds, _ = st.ListBuilds(repo.ID, 10)
+	if len(builds) != 1 {
+		t.Fatalf("same tree queued a second build: %+v", builds)
+	}
+	statuses, _ := st.ListCommitStatuses(repo.ID, second)
+	found := false
+	for _, s := range statuses {
+		if s.Context == "ci/unit" && s.State == "success" && strings.Contains(s.Description, "same tree") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("second commit has no success status from the first: %+v", statuses)
 	}
 }

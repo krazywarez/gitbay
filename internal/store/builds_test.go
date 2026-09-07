@@ -21,11 +21,11 @@ func TestReapStaleBuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stuck, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", true)
+	stuck, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := s.CreateBuild(1, "pages", "abc123", "main", `["true"]`, "", true)
+	fresh, err := s.CreateBuild(1, "pages", "abc123", "main", `["true"]`, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,11 +87,11 @@ func TestBuildsForCommitTiming(t *testing.T) {
 	}
 	// Two runs of the same job on one commit: the retry is what counts.
 	for range 2 {
-		if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`, "", true); err != nil {
+		if _, err := s.CreateBuild(repoID, "test", "abc123", "main", `["true"]`, "", "", true); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.CreateBuild(repoID, "lint", "def456", "main", `["true"]`, "", true); err != nil {
+	if _, err := s.CreateBuild(repoID, "lint", "def456", "main", `["true"]`, "", "", true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(`UPDATE builds SET started_at = '2026-08-28T04:42:54Z',
@@ -140,10 +140,10 @@ func TestClaimBuildScopedToRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Queued first, so an unscoped claim would take it.
-	if _, err := s.CreateBuild(theirs, "evil", "abc123", "main", `["true"]`, "", true); err != nil {
+	if _, err := s.CreateBuild(theirs, "evil", "abc123", "main", `["true"]`, "", "", true); err != nil {
 		t.Fatal(err)
 	}
-	wanted, err := s.CreateBuild(mine, "deploy", "def456", "main", `["true"]`, "", true)
+	wanted, err := s.CreateBuild(mine, "deploy", "def456", "main", `["true"]`, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestBuildLogSaysWhenItTruncates(t *testing.T) {
 	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
 		t.Fatal(err)
 	}
-	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", true)
+	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,5 +210,41 @@ func TestBuildLogSaysWhenItTruncates(t *testing.T) {
 	}
 	if len(log) > MaxBuildLog+len(truncNotice)+len(chunk) {
 		t.Errorf("log grew to %d, past the cap plus one chunk", len(log))
+	}
+}
+
+// A success is found by tree across commits; an empty tree never matches,
+// so builds queued without one (scheduled, tag) are never reused (#177).
+func TestSuccessBuildForTree(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repoID, err := s.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateBuild(repoID, "unit", "aaa", "main", `["true"]`, "", "tree1", true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := s.BuildsForCommit(repoID, "aaa")
+	if _, ok, err := s.ClaimBuild([]int64{repoID}); err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	if err := s.FinishBuild(b["unit"].ID, "success"); err != nil {
+		t.Fatal(err)
+	}
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit"); !ok || prev.SHA != "aaa" {
+		t.Fatalf("success not found by tree: ok=%v prev=%+v", ok, prev)
+	}
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "other"); ok {
+		t.Error("matched a different job")
+	}
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "", "unit"); ok {
+		t.Error("an empty tree matched")
 	}
 }

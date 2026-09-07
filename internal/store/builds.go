@@ -19,6 +19,7 @@ type Build struct {
 	Ref        string
 	Steps      string // JSON array of shell commands
 	Image      string // container image for the steps; "" means the runner default
+	Tree       string // the commit's tree; "" when not deduplicated by tree
 	Status     string // pending|running|success|failure
 	CreatedAt  string
 	StartedAt  string
@@ -39,7 +40,7 @@ var truncNotice = []byte("\n[log truncated: reached the " +
 
 // CreateBuild allocates the per-repo build number in the same transaction
 // as the insert, like issue and MR numbers.
-func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image string, trusted bool) (int64, error) {
+func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image, tree string, trusted bool) (int64, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -53,21 +54,21 @@ func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image string
 		return 0, err
 	}
 	if _, err := tx.Exec(
-		"INSERT INTO builds (repo_id, number, job, sha, ref, steps, image, trusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		repoID, n, job, sha, ref, stepsJSON, image, trusted); err != nil {
+		"INSERT INTO builds (repo_id, number, job, sha, ref, steps, image, tree, trusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		repoID, n, job, sha, ref, stepsJSON, image, tree, trusted); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()
 }
 
 const buildSelect = `
-	SELECT id, repo_id, number, job, sha, ref, steps, image, status, created_at, started_at, finished_at, trusted
+	SELECT id, repo_id, number, job, sha, ref, steps, image, tree, status, created_at, started_at, finished_at, trusted
 	FROM builds`
 
 func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 	var b Build
 	var trusted int
-	err := row.Scan(&b.ID, &b.RepoID, &b.Number, &b.Job, &b.SHA, &b.Ref, &b.Steps, &b.Image,
+	err := row.Scan(&b.ID, &b.RepoID, &b.Number, &b.Job, &b.SHA, &b.Ref, &b.Steps, &b.Image, &b.Tree,
 		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &trusted)
 	b.Trusted = trusted != 0
 	return b, err
@@ -315,6 +316,21 @@ func (s *Store) CancelBuild(id int64) error {
 
 // SuccessBuildFor finds a passed build of the commit for the job, on any
 // ref: what a cancelled duplicate can point back at.
+// SuccessBuildForTree is SuccessBuildFor keyed by tree rather than
+// commit: a rebase that changes nothing in the tree has already been
+// built (#177). An empty tree never matches.
+func (s *Store) SuccessBuildForTree(repoID int64, tree, job string) (Build, bool, error) {
+	if tree == "" {
+		return Build{}, false, nil
+	}
+	b, err := scanBuild(s.DB.QueryRow(buildSelect+
+		" WHERE repo_id = ? AND tree = ? AND job = ? AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, tree, job))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Build{}, false, nil
+	}
+	return b, err == nil, err
+}
+
 func (s *Store) SuccessBuildFor(repoID int64, sha, job string) (Build, bool, error) {
 	b, err := scanBuild(s.DB.QueryRow(buildSelect+
 		" WHERE repo_id = ? AND sha = ? AND job = ? AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, sha, job))

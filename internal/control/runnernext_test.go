@@ -60,14 +60,14 @@ func setupOrphanRepo(t *testing.T) (*store.Store, store.Repo, int64, string, str
 func TestRunnerNextSkipsOrphanedBuildAndClaimsNext(t *testing.T) {
 	st, repo, uid, root, baseSHA, orphanSHA := setupOrphanRepo(t)
 
-	orphanedID, err := st.CreateBuild(repo.ID, "unit", orphanSHA, "main", "[]", "", true)
+	orphanedID, err := st.CreateBuild(repo.ID, "unit", orphanSHA, "main", "[]", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetCommitStatus(repo.ID, orphanSHA, "ci/unit", "pending", "queued", "https://x.test", uid); err != nil {
 		t.Fatal(err)
 	}
-	realID, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", true)
+	realID, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestRunnerNextSkipsOrphanedBuildAndClaimsNext(t *testing.T) {
 // the reachability check must never reject a healthy build.
 func TestRunnerNextClaimsReachableBuildNormally(t *testing.T) {
 	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
-	id, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", true)
+	id, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestRunnerNextOrphanedQueuePastCapReportsNoPendingBuilds(t *testing.T) {
 	st, repo, uid, root, _, orphanSHA := setupOrphanRepo(t)
 	total := maxOrphanSkip + 1
 	for i := 0; i < total; i++ {
-		if _, err := st.CreateBuild(repo.ID, fmt.Sprintf("job%d", i), orphanSHA, "main", "[]", "", true); err != nil {
+		if _, err := st.CreateBuild(repo.ID, fmt.Sprintf("job%d", i), orphanSHA, "main", "[]", "", "", true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -194,7 +194,7 @@ func TestRunnerNextClaimsBuildWhenReachabilityCannotBeChecked(t *testing.T) {
 	// No RepoDir created on disk at all: Reachable will fail to even stat
 	// the repository, which must not be read as "orphaned".
 	root := t.TempDir()
-	id, err := st.CreateBuild(repo.ID, "unit", strings.Repeat("a", 40), "main", "[]", "", true)
+	id, err := st.CreateBuild(repo.ID, "unit", strings.Repeat("a", 40), "main", "[]", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

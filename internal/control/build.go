@@ -227,7 +227,8 @@ func runBuildTrigger(c *Ctx, args []string) int {
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps), j.Image, true)
+		tree, _ := gitutil.ResolveTree(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name), sha)
+		n, err := c.Store.CreateBuild(repo.ID, j.Name, sha, repo.DefaultBranch, string(steps), j.Image, tree, true)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
@@ -613,6 +614,12 @@ func queueJobs(
 	if err != nil {
 		built = nil
 	}
+	// A job's result is a property of the tree, not the commit: a rebase
+	// onto a base that touched nothing the branch did gives every commit
+	// a new sha and the same tree, and re-running the suite over it
+	// proves nothing it did not already prove (#177). A success recorded
+	// against the tree stands for the new commit.
+	tree, _ := gitutil.ResolveTree(dir, sha)
 	// The changed-file list a job's path filters run against, computed
 	// once and only if some job actually declares one. When the diff
 	// base does not exist or the diff itself fails, filtered stays
@@ -669,6 +676,12 @@ func queueJobs(
 		if b, ok := built[j.Name]; ok && (b.Status == "success" || b.Status == "pending" || b.Status == "running") {
 			continue
 		}
+		if prev, ok, _ := st.SuccessBuildForTree(repo.ID, tree, j.Name); ok && prev.SHA != sha {
+			url := fmt.Sprintf("%s/%s/builds/%d", siteURL, repo.Path(), prev.Number)
+			st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "success",
+				fmt.Sprintf("passed in build %d as %.10s, same tree", prev.Number, prev.SHA), url, userID)
+			continue
+		}
 		// Scheduled jobs run on their cron, not on push; a default-branch
 		// push (re)registers them.
 		if j.Schedule != "" {
@@ -688,7 +701,7 @@ func queueJobs(
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)
-		n, err := st.CreateBuild(repo.ID, j.Name, sha, ref, string(steps), j.Image, trusted)
+		n, err := st.CreateBuild(repo.ID, j.Name, sha, ref, string(steps), j.Image, tree, trusted)
 		if err != nil {
 			slog.Error("queueing build", "repo", repo.Path(), "job", j.Name, "err", err)
 			continue
