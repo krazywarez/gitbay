@@ -130,6 +130,12 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		"--name", name,
 		"--env-file", envFile,
 		"--volume", dir+":/workspace:rw",
+		// The build home holds the tool caches (Go modules, the sonar
+		// scanner) that must outlive a build; HOME in env points at it.
+		// Mounted at the same path so HOME resolves identically with and
+		// without a container. Only this directory — never the workdir
+		// above it, which holds other builds' workspaces.
+		"--volume", envHome(env)+":"+envHome(env)+":rw",
 		"--workdir", "/workspace",
 		"--entrypoint", "sh",
 		image, "-c", "sleep infinity")...)
@@ -179,6 +185,16 @@ func (r *runner) podmanGlobal() []string {
 	// XDG_RUNTIME_DIR the database was not initialised with. Changing
 	// either means `podman system reset` and rebuilding the images.
 	return []string{"--cgroup-manager=cgroupfs"}
+}
+
+// env_home returns the HOME the step environment carries.
+func envHome(env []string) string {
+	for _, e := range env {
+		if strings.HasPrefix(e, "HOME=") {
+			return strings.TrimPrefix(e, "HOME=")
+		}
+	}
+	return ""
 }
 
 // podmanHome is where podman keeps its own storage: the runner's home,

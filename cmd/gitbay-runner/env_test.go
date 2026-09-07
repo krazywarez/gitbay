@@ -105,3 +105,14 @@ func TestPodmanUsesCgroupfs(t *testing.T) {
 		t.Errorf("podmanGlobal() = %v, missing the cgroupfs manager", got)
 	}
 }
+
+// The build home is where caches live, so the container must see it at
+// the path HOME names; otherwise every containerised build starts cold.
+func TestEnvHomeFindsHome(t *testing.T) {
+	if got := envHome([]string{"PATH=/bin", "HOME=/var/lib/gitbay-runner/work/home", "CI=true"}); got != "/var/lib/gitbay-runner/work/home" {
+		t.Errorf("envHome = %q", got)
+	}
+	if got := envHome([]string{"PATH=/bin"}); got != "" {
+		t.Errorf("envHome with no HOME = %q, want empty", got)
+	}
+}
