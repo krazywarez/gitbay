@@ -213,8 +213,8 @@ func (s *Store) QueueStats() (QueueStats, error) {
 	err := s.DB.QueryRow(`SELECT
 		(SELECT COUNT(*) FROM builds WHERE status = 'pending'),
 		COUNT(*),
-		COALESCE(AVG(strftime('%s', started_at) - strftime('%s', created_at)), 0),
-		COALESCE(MAX(strftime('%s', started_at) - strftime('%s', created_at)), 0),
+		CAST(COALESCE(AVG(strftime('%s', started_at) - strftime('%s', created_at)), 0) AS INTEGER),
+		CAST(COALESCE(MAX(strftime('%s', started_at) - strftime('%s', created_at)), 0) AS INTEGER),
 		(SELECT COUNT(*) FROM builds WHERE reaped_at >= ?)
 		FROM builds WHERE started_at >= ?`, since, since).
 		Scan(&q.Pending, &q.Claimed24h, &q.ClaimWaitAvgS, &q.ClaimWaitMaxS, &q.Reaped24h)

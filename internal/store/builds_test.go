@@ -297,3 +297,37 @@ func TestReapStaleBuildsAfterLogClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// AVG is a float in SQLite; the stats scan it as whole seconds.
+func TestQueueStatsFractionalAverage(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok, err := s.ClaimBuild(nil); err != nil || !ok {
+			t.Fatalf("claim: %v ok=%v", err, ok)
+		}
+	}
+	// Waits of 1 s and 2 s: an average of 1.5.
+	if _, err := s.DB.Exec(`UPDATE builds SET created_at = strftime('%Y-%m-%dT%H:%M:%SZ', started_at, '-' || number || ' seconds')`); err != nil {
+		t.Fatal(err)
+	}
+	q, err := s.QueueStats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Claimed24h != 2 || q.ClaimWaitAvgS != 1 || q.ClaimWaitMaxS != 2 || q.Pending != 0 || q.Reaped24h != 0 {
+		t.Fatalf("stats: %+v", q)
+	}
+}
