@@ -511,7 +511,13 @@ runner drains a build that is already dead. So =make deploy-runner=
 waits for a running build rather than orphaning it, and a build's result
 is retried for half a minute if gitbayd is restarting at that moment. A
 second SIGTERM ends the runner at once, abandoning the build to the
-reaper.
+reaper. The suite checks all three: =TestRunnerDrainsOnSIGTERM= signals
+the process, =TestRunnerDropInLetsTheDrainHappen= reads the drop-in's
+=KillMode= and =TimeoutStopSec=, and =TestRunnerDrainUnderSystemd= runs
+the runner as a transient user unit under =systemd-run= and stops it
+under both kill modes. That last one needs a systemd user manager, so it
+skips in the container CI runs in; run it on a Linux host with
+=go test ./e2e -run TestRunnerDrainUnderSystemd -v=.
 
 *Validate podman mode on a scratch repository before pointing the runner
 at real ones.* Every deploy that switched the whole instance to
