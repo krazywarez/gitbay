@@ -4,6 +4,92 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.16.0 — 2026-09-08
+
+What stops a stranger from moving here: the repository plumbing and
+the team gates the #185 walk found missing, twelve merge requests
+merged as one stack.
+
+** Repositories
+
+- =repo settings default-branch <owner/name> <branch>= moves HEAD and
+  the record; a branch that does not exist is refused. A first push of
+  =master= or =trunk= into a fresh repository moves the unborn HEAD to
+  the branch that arrived, so the clone checks something out. Settings
+  page select. #189
+- =repo rename <owner/name> <new-name>=: the row and the directory move
+  together, with transfer's revert on a failed move. Clone URLs change.
+  #190
+- =repo settings require-mr on=: an existing protected branch refuses
+  every direct push in pre-receive, =repo commit-file= and the web
+  editor included; =mr merge= is its only writer. Creating the branch
+  is still a push. #197
+- =repo settings protect-tag <glob>= (and =unprotect-tag=): matching
+  tags are created once and refuse moves and deletion. Separately, a
+  tag a release is anchored to refuses both while the release exists,
+  protected or not; delete the release first. #201
+- =repo access list= reports effective access: one row per account
+  with the highest role and where it comes from (owner, direct, org
+  admin, org member, team). It used to list direct grants only, so a
+  repository reached through teams answered with nothing. #200
+- Removing an org member drops their team memberships in the same
+  transaction. They kept every grant their teams carried, and re-adding
+  them to the org restored nothing because nothing had gone. #196
+- An outsider gets one answer about an org: its existence and members
+  are public, its teams are for members, and =org team list= and =show=
+  refuse a non-member rather than say the org does not exist. Ref #200
+- A repository name may not end in =.atom=, as it may not end in
+  =.git=. Ref #192
+
+** Merge requests
+
+- A push that leaves the merge request's diff unchanged keeps its fresh
+  reviews: the patch-id of each revision against its own merge base is
+  compared, and a rebase onto a target that moved on no longer stales
+  every approval. A push that changes the diff stales them as before.
+  #198
+- The merge gates are one computation shared by =mr show= (a =gates=
+  block: approvals counted and required, owners outstanding per file,
+  open threads, checks, whether a fast-forward is possible), the merge
+  request page, and =mr merge=, which names every unmet gate in one
+  refusal rather than the first. =mr review= reports =counts= and says
+  when a verdict is advisory because the reviewer cannot write. #199
+
+** Notifications
+
+- =@name= in an issue, merge request, comment or diff comment files
+  "mentioned you" in that account's inbox and makes them a participant
+  of the thread, provided they can read the repository and have not
+  muted it. Watchers are not told about a mention addressed to someone
+  else. Migration 0047. #202
+- =notifications settings mail on|off= (and =show=): inbox rows are
+  filed either way, this is the mail half. Login links are not activity
+  and still arrive. The account page carries the same switch.
+  Migration 0048. Ref #194
+
+** Web
+
+- Atom feeds: =/{owner}/{repo}/releases.atom=,
+  =/{owner}/{repo}/log.atom[/{ref}]= and =/{owner}/activity.atom=,
+  rendered over the rows the pages already serve. The owner feed covers
+  public repositories only, since a reader carries no session; a
+  private repository answers 404. The releases, log and owner pages
+  carry the discovery link. #192
+
+** Documentation
+
+- The Users page says what differs over stock ssh: a multi-word value
+  needs a second layer of quotes, and =help <noun>= replaces =--help=.
+  The companion-wiki paragraph #170 made stale now points at
+  =.gitbay/wiki/=. #204
+
+** Upgrading
+
+Replace the binary and reinstall the CLI. Two migrations (0047, the
+mentions table; 0048, the per-account mail switch), applied on start.
+Nothing changes behaviour until a setting is turned on: =require-mr=,
+=protect-tag= and =mail off= are all opt-in.
+
 * v1.15.0 — 2026-09-07
 
 Builds run in containers, a rebase is not rebuilt, and a runner restart
