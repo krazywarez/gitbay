@@ -207,16 +207,21 @@ gitbay repo archive you/project                     # read-only: pushes and issu
 gitbay repo unarchive you/project                   #   writes refused, browsing intact
 #+end_src
 
-Import from another forge — git data first, then optionally the GitHub
-issue and PR history (issues keep state/labels/comments; PRs land as
-closed or merged MRs with their discussion; originals are attributed
-inline since foreign authors have no local account; re-running resumes
-where it stopped):
+Import from another forge — git data first, then optionally the issue
+and PR history from GitHub or any Forgejo instance such as Codeberg
+(issues keep state/labels/comments; PRs land as closed or merged MRs
+with their discussion; originals are attributed inline since foreign
+authors have no local account; re-running resumes where it stopped):
 #+begin_src sh
 gitbay repo import you/mirror --from https://github.com/you/repo.git \
     [--private] [--token-stdin]        # token on stdin, never in the URL
 gitbay repo import-issues you/mirror --from you/repo --token-stdin
+gitbay repo import-issues you/mirror --from you/repo \
+    --api-base https://codeberg.org/api/v1    # Forgejo: the site's /api/v1
 #+end_src
+
+Sourcehut has no API of that shape; =repo import= takes its git data
+and the todo.sr.ht tracker is not read.
 
 Moving between gitbay instances (no lock-in): run on the TARGET, with
 your key registered on both sides. Profile, repos with settings,

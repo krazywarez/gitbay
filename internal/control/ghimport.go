@@ -23,8 +23,8 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "import-issues"},
-		Summary:    "import GitHub issue and PR history",
-		Usage:      "repo import-issues <owner/name> --from <ghowner/ghrepo> [--token-stdin] [--api-base <url>]",
+		Summary:    "import issue and PR history from GitHub or Forgejo",
+		Usage:      "repo import-issues <owner/name> --from <owner/repo> [--token-stdin] [--api-base <url>]",
 		ReadsStdin: true, Run: runImportIssues})
 }
 
@@ -66,6 +66,45 @@ type ghClient struct {
 	base  string
 	token string
 	http  *http.Client
+	// forgejo is set when the API base answers /version, which GitHub
+	// does not. Forgejo (and Gitea, and so Codeberg) mirror GitHub's
+	// issue, pull and comment shapes but not its query parameters:
+	// pages are sized by `limit`, order is `sort=oldest`, and the
+	// comments endpoint has no pages at all — it ignores `page` and
+	// returns everything every time, which paged the old loop forever.
+	forgejo bool
+}
+
+func (g *ghClient) detect() {
+	var v struct{ Version string }
+	g.forgejo = g.get("/version", &v) == nil && v.Version != ""
+}
+
+// issuesQuery lists every issue and pull request oldest first, so local
+// numbers come out in the source's order.
+func (g *ghClient) issuesQuery(from string, page int) string {
+	if g.forgejo {
+		return fmt.Sprintf("/repos/%s/issues?state=all&sort=oldest&limit=50&page=%d", from, page)
+	}
+	return fmt.Sprintf("/repos/%s/issues?state=all&sort=created&direction=asc&per_page=100&page=%d", from, page)
+}
+
+// siteFromAPI turns an API base into the site that serves git and the
+// name attribution carries: api.github.com is github.com, a GitHub
+// Enterprise or Forgejo base drops its /api/vN suffix.
+func siteFromAPI(apiBase string) string {
+	u, err := url.Parse(apiBase)
+	if err != nil {
+		return apiBase
+	}
+	if u.Host == "api.github.com" {
+		u.Host = "github.com"
+		u.Path = ""
+	}
+	u.Path = strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/api/v1")
+	u.Path = strings.TrimSuffix(u.Path, "/api/v3")
+	u.RawQuery, u.Fragment = "", ""
+	return u.String()
 }
 
 func (g *ghClient) get(path string, out any) error {
@@ -110,12 +149,7 @@ func runImportIssues(c *Ctx, args []string) int {
 	}
 	path, from, apiBase, tokenStdin := f.pos(0), f.Value("--from"), f.Value("--api-base"), f.Has("--token-stdin")
 	if path == "" || from == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo import-issues <owner/name> --from <ghowner/ghrepo> [--token-stdin]")
-	}
-	// Accept a bare owner/repo or a full github.com URL.
-	from = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(from, "https://"), "github.com/"), ".git")
-	if parts := strings.Split(from, "/"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return c.fail(protocol.ExitUsage, "--from must be <ghowner>/<ghrepo> (or the github.com URL)")
+		return c.fail(protocol.ExitUsage, "usage: repo import-issues <owner/name> --from <owner/repo> [--token-stdin] [--api-base <url>]")
 	}
 	if apiBase == "" {
 		apiBase = "https://api.github.com"
@@ -123,6 +157,15 @@ func runImportIssues(c *Ctx, args []string) int {
 		// A writer-supplied API base is the same SSRF surface as a
 		// webhook target; same rules apply.
 		return c.fail(protocol.ExitUsage, "--api-base: %v", err)
+	}
+	site := siteFromAPI(apiBase)
+	host := strings.TrimPrefix(strings.TrimPrefix(site, "https://"), "http://")
+	// Accept a bare owner/repo or the repository's URL on that site.
+	from = strings.TrimPrefix(from, site+"/")
+	from = strings.TrimPrefix(from, host+"/")
+	from = strings.TrimSuffix(from, ".git")
+	if parts := strings.Split(from, "/"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return c.fail(protocol.ExitUsage, "--from must be <owner>/<repo> (or the repository URL on %s)", site)
 	}
 	repo, code := resolveRepo(c, path, policy.CanWrite)
 	if code >= 0 {
@@ -142,6 +185,7 @@ func runImportIssues(c *Ctx, args []string) int {
 		token = strings.TrimSpace(line)
 	}
 	g := &ghClient{base: apiBase, token: token, http: &http.Client{Timeout: 30 * time.Second}}
+	g.detect()
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 
 	// Pull heads first, so every merge request below has objects to point
@@ -151,14 +195,13 @@ func runImportIssues(c *Ctx, args []string) int {
 	// import of issues from a repository whose git data is not here yet
 	// is a legitimate thing to do, and the merge requests still arrive
 	// with their head SHA recorded.
-	fetchedPullHeads := fetchPullHeads(c, dir, from, token)
-	src := "github.com/" + from
+	fetchedPullHeads := fetchPullHeads(c, dir, site+"/"+from+".git", token)
+	src := host + "/" + from
 
 	var issues, mrs, comments, skipped, headed int
 	for page := 1; ; page++ {
 		var items []ghIssue
-		q := fmt.Sprintf("/repos/%s/issues?state=all&sort=created&direction=asc&per_page=100&page=%d", from, page)
-		if err := g.get(q, &items); err != nil {
+		if err := g.get(g.issuesQuery(from, page), &items); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		if len(items) == 0 {
@@ -262,6 +305,10 @@ func importComments(c *Ctx, g *ghClient, repo store.Repo, from, src string, ghN,
 	}
 	imported := 0
 	for page := 1; ; page++ {
+		// Forgejo returns every comment in one unpaged reply.
+		if g.forgejo && page > 1 {
+			return imported, nil
+		}
 		var cs []ghComment
 		q := fmt.Sprintf("/repos/%s/issues/%d/comments?per_page=100&page=%d", url.PathEscape(from), ghN, page)
 		q = strings.ReplaceAll(q, "%2F", "/")
@@ -304,11 +351,11 @@ case "$1" in
 esac
 `
 
-// fetchPullHeads brings refs/pull/*/head into refs/gh-pull/*. Reports
-// whether it worked; a failure is not fatal, since importing issues from
-// a repository whose git data is not here yet is a reasonable thing to
-// do.
-func fetchPullHeads(c *Ctx, dir, from, token string) bool {
+// fetchPullHeads brings refs/pull/*/head into refs/gh-pull/*; GitHub and
+// Forgejo both publish pull heads under that name. Reports whether it
+// worked; a failure is not fatal, since importing issues from a
+// repository whose git data is not here yet is a reasonable thing to do.
+func fetchPullHeads(c *Ctx, dir, remote, token string) bool {
 	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + c.Cfg.Server.Root}
 	if token != "" {
 		askpass := filepath.Join(c.Cfg.Server.Root, "gh-import-askpass.sh")
@@ -319,8 +366,7 @@ func fetchPullHeads(c *Ctx, dir, from, token string) bool {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	url := "https://github.com/" + from + ".git"
-	if err := gitutil.FetchPullHeads(ctx, dir, url, io.Discard, env); err != nil {
+	if err := gitutil.FetchPullHeads(ctx, dir, remote, io.Discard, env); err != nil {
 		return false
 	}
 	return true

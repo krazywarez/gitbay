@@ -9,9 +9,9 @@
   when the one below merges, and refuses squash or rebase under a stack.
   No stack command; the workflow is branches. See
   [[Stacked-MRs][Stacked merge requests]].
-- Moving from GitHub? :: =gitbay repo import= (git data) then
-  =gitbay repo import-issues= (history); =repo mirror= covers the
-  transition window.
+- Moving from GitHub or Codeberg? :: =gitbay repo import= (git data)
+  then =gitbay repo import-issues= (history, from GitHub or any Forgejo
+  =--api-base=); =repo mirror= covers the transition window.
 - What is not planned? :: A container or package registry (scope creep
   away from "forge"; external registries integrate through CI), an
   email patch flow (revisit only if sourcehut-style demand appears),
