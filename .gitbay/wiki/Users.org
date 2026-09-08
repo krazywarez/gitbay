@@ -486,6 +486,9 @@ immediately, and =build cancel <owner/name> <n>= withdraws one, queued
 or running: a running build stops at the runner within seconds and the
 log says who cancelled it. Both need write access.
 
+What each push shape queues, with dedupe, path filters, schedules and
+the reaper together, is one table on [[CI][CI]].
+
 * Large files (LFS)
 
 Standard Git LFS works over both transports with no setup beyond the

@@ -1,0 +1,105 @@
+#+title: CI: what a push queues
+
+Three mechanisms decide what a push does to CI, and they interact:
+
+- *Dedupe.* A job's result is a property of the commit's tree. A commit
+  that already has a passed, queued or running build for a job is not
+  queued again; a commit whose tree already passed a job gets that
+  result as its status, naming the build it came from (#177). A failed,
+  cancelled or abandoned build does not count: that commit runs again.
+- *Path filters.* =paths= and =paths-ignore= on a job are evaluated
+  against the files the push changed. The diff base is the old tip when
+  it is an ancestor of the new one, and the merge base with the default
+  branch otherwise: a new branch, or a force push after a rebase (#176).
+  A filter that cannot be evaluated, because there is no diff base or
+  the diff fails, runs the job rather than skipping it. A filter that
+  excludes the push records a =skipped= status, which =require-checks=
+  accepts (#172).
+- *The reaper.* A build a runner claimed and never reported is failed by
+  the scheduler's tick: two minutes after its log stream ended, or at
+  the build deadline if no stream was ever seen (#179). Its status reads
+  =build abandoned=.
+
+Scheduled jobs run on their cron against the default branch, never on
+push; a default-branch push registers or updates them. Tag jobs run on
+a matching tag push and nothing else.
+
+* The table
+
+One =ci.yml= with five jobs, each isolating one rule:
+
+#+begin_src yaml
+jobs:
+  plain:
+    steps: [echo plain]
+  onapp:
+    paths: [app/**]
+    steps: [echo onapp]
+  notapp:
+    paths-ignore: [app/**]
+    steps: [echo notapp]
+  nightly:
+    schedule: "0 3 * * *"
+    steps: [echo nightly]
+  release:
+    tags: "v*"
+    steps: [echo release]
+#+end_src
+
+Every push below changes =app/x= and nothing else, so a push whose
+filters are evaluated queues =onapp= and skips =notapp=, and a push
+whose filters cannot be evaluated queues both. Each cell is what the
+push produced for that job; the commit's =ci/<job>= status follows:
+
+- =queued=: a build, and a =pending= status until the runner reports.
+  =queued, untrusted= is a build without the repository's secrets.
+- =skipped=: no build, and a =skipped= status naming the filter.
+- =reused=: no build, and a =success= status naming the earlier build
+  with the same tree.
+- =registered=: no build; the job's schedule is (re)registered.
+- =abandoned=: the build failed and the status reads =build abandoned=.
+- =—=: nothing new. A status the commit already had stands.
+
+| push | plain | onapp | notapp | nightly | release | ci/config |
+|---+---+---+---+---+---+---|
+| first push of the default branch | queued | queued | queued | registered | — | — |
+| push to the default branch | queued | queued | skipped | registered | — | — |
+| push to another branch | queued | queued | skipped | — | — | — |
+| a new branch, no old sha | queued | queued | skipped | — | — | — |
+| rebase onto a moved default branch, old not an ancestor | queued | queued | skipped | — | — | — |
+| rewritten commit, same tree as a passed build | reused | reused | skipped | — | — | — |
+| fast-forward of a commit built on another branch | — | — | — | registered | — | — |
+| a commit whose earlier build failed, on a new branch | queued | queued | — | — | — | — |
+| merge request head from a fork | queued, untrusted | queued, untrusted | queued, untrusted | — | — | — |
+| tag push | — | — | — | — | queued | — |
+| schedule tick on the default branch | — | — | — | queued | — | — |
+| claimed builds whose runner vanished | abandoned | abandoned | — | — | — | — |
+| push to the default branch with an old sha that cannot be diffed | queued | queued | queued | registered | — | — |
+| push with a broken ci.yml | — | — | — | — | — | failure |
+| push with no ci.yml | — | — | — | — | — | — |
+
+Rows worth a second look:
+
+- The first push of the default branch has no diff base at all: the
+  merge base of the tip with itself is the tip. Every filtered job
+  runs. The same holds when the old sha cannot be diffed on the default
+  branch; on any other branch the merge base takes over and the filters
+  apply.
+- A rewritten commit with the same tree reuses =plain= and =onapp=
+  because the tree check comes before the filter. =notapp= never had a
+  passed build to reuse, and the push changed nothing, so the filter
+  skips it again.
+- A fast-forward of a commit built elsewhere queues nothing: the
+  builds belong to the commit, not the branch. The default-branch push
+  still registers the schedule.
+- A failed build does not stand for its commit. The same commit pushed
+  to another branch runs again; =notapp= keeps its skipped status.
+- A merge request head from a fork has no diff base and, unlike a
+  branch push, no merge-base fallback: every job runs, without secrets.
+  Filtering a head down to no jobs would make it unmergeable under
+  =require-checks= (#172).
+
+=TestPushShapes= in =internal/hookd= runs every row against real git
+and the store, and =TestPushShapesTableOnWiki= checks that this page
+carries each row as the code has it. A row that changes fails there
+first.
