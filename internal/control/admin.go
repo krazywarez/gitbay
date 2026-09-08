@@ -30,7 +30,7 @@ func init() {
 		Usage:   "admin user demote <username>",
 		SSHOnly: true, Run: runAdminUserDemote})
 	register(Command{Path: []string{"admin", "runners"},
-		Summary:  "runner accounts: last poll, scope, the build each holds (instance admins)",
+		Summary:  "the build queue and runner accounts: last poll, scope, the build each holds (instance admins)",
 		Usage:    "admin runners",
 		ReadOnly: true, SSHOnly: true, Run: runAdminRunners})
 	register(Command{Path: []string{"admin", "repo", "list"},
@@ -452,7 +452,17 @@ func runAdminRunners(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(runners, func(w io.Writer) {
+	queue, err := c.Store.QueueStats()
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if runners == nil {
+		runners = []store.Runner{}
+	}
+	d := map[string]any{"queue": queue, "runners": runners}
+	return c.emit(d, func(w io.Writer) {
+		fmt.Fprintf(w, "queue: %d pending; last 24h: %d claimed, wait avg %ds max %ds, %d reaped\n",
+			queue.Pending, queue.Claimed24h, queue.ClaimWaitAvgS, queue.ClaimWaitMaxS, queue.Reaped24h)
 		for _, r := range runners {
 			scope := r.Scope
 			if scope == "" {

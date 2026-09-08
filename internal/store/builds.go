@@ -189,8 +189,36 @@ func (s *Store) ReapStaleBuilds() ([]Build, error) {
 		if err := s.FinishBuild(b.ID, "failure"); err != nil {
 			return nil, err
 		}
+		if _, err := s.DB.Exec(`UPDATE builds SET reaped_at = finished_at WHERE id = ?`, b.ID); err != nil {
+			return nil, err
+		}
 	}
 	return stale, nil
+}
+
+// QueueStats is the state of the build queue: what waits now, and over
+// the last day how long a build waited to be claimed and how many were
+// ended by the reaper rather than by a runner's report (#184).
+type QueueStats struct {
+	Pending       int64 `json:"pending"`
+	Claimed24h    int64 `json:"claimed_24h"`
+	ClaimWaitAvgS int64 `json:"claim_wait_avg_s"`
+	ClaimWaitMaxS int64 `json:"claim_wait_max_s"`
+	Reaped24h     int64 `json:"reaped_24h"`
+}
+
+func (s *Store) QueueStats() (QueueStats, error) {
+	var q QueueStats
+	since := time.Now().UTC().Add(-24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	err := s.DB.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM builds WHERE status = 'pending'),
+		COUNT(*),
+		COALESCE(AVG(strftime('%s', started_at) - strftime('%s', created_at)), 0),
+		COALESCE(MAX(strftime('%s', started_at) - strftime('%s', created_at)), 0),
+		(SELECT COUNT(*) FROM builds WHERE reaped_at >= ?)
+		FROM builds WHERE started_at >= ?`, since, since).
+		Scan(&q.Pending, &q.Claimed24h, &q.ClaimWaitAvgS, &q.ClaimWaitMaxS, &q.Reaped24h)
+	return q, err
 }
 
 // AppendBuildLog adds a chunk to the build's log, dropping bytes past the cap.

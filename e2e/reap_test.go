@@ -80,6 +80,11 @@ func TestStaleBuildReapedWithoutRunner(t *testing.T) {
 	if out, _, _ := inst.ssh(t, aliceKey, "", "build", "log", "alice/app", "1"); !strings.Contains(out, "build abandoned") {
 		t.Fatalf("log lacks the abandonment note:\n%s", out)
 	}
+	// The reaper's work is counted, apart from builds runners reported.
+	if out, _, _ := inst.ssh(t, runnerKey, "", "admin", "runners", "--json"); !strings.Contains(out, `"reaped_24h":1`) ||
+		!strings.Contains(out, `"claimed_24h":1`) {
+		t.Fatalf("queue after reap:\n%s", out)
+	}
 }
 
 func TestAdminRunners(t *testing.T) {
@@ -93,7 +98,8 @@ func TestAdminRunners(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "runners"); code != 4 {
 		t.Fatal("non-admin listed runners")
 	}
-	if out, _, code := inst.ssh(t, rootKey, "", "admin", "runners", "--json"); code != 0 || strings.TrimSpace(out) != `{"protocol_version":1,"data":[]}` {
+	if out, _, code := inst.ssh(t, rootKey, "", "admin", "runners", "--json"); code != 0 ||
+		strings.TrimSpace(out) != `{"protocol_version":1,"data":{"queue":{"pending":0,"claimed_24h":0,"claim_wait_avg_s":0,"claim_wait_max_s":0,"reaped_24h":0},"runners":[]}}` {
 		t.Fatalf("no runners yet: exit %d %s", code, out)
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
@@ -104,7 +110,8 @@ func TestAdminRunners(t *testing.T) {
 		t.Fatal("runner next failed")
 	}
 	out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners")
-	if !strings.HasPrefix(out, "ci\t") || !strings.Contains(out, "\talice/app\tidle") {
+	if !strings.HasPrefix(out, "queue: 0 pending; last 24h: 0 claimed") || !strings.Contains(out, "\nci\t") ||
+		!strings.Contains(out, "\talice/app\tidle") {
 		t.Fatalf("idle runner row:\n%s", out)
 	}
 	work := t.TempDir()
@@ -133,7 +140,8 @@ func TestAdminRunners(t *testing.T) {
 	if _, _, code := inst.ssh(t, runnerKey, "", "runner", "done", fmt.Sprint(claim.Data.ID), "success"); code != 0 {
 		t.Fatal("runner done failed")
 	}
-	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners"); !strings.Contains(out, "\tany\tidle") {
+	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners"); !strings.Contains(out, "\tany\tidle") ||
+		!strings.HasPrefix(out, "queue: 0 pending; last 24h: 1 claimed, wait avg ") {
 		t.Fatalf("runner still holds a build after done:\n%s", out)
 	}
 	// Host-local, the same read.

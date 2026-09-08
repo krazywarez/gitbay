@@ -403,7 +403,10 @@ necessity, so the boundary is you choosing how to start it.
 
 =gitbay dashboard= and =ssh git@<host> admin runners= list every account
 that has polled as a runner: when it last polled, the =-repos= scope it
-asked for, and the build it holds. A build a runner claimed and never
+asked for, and the build it holds. =admin runners= also heads the list
+with the queue: builds pending now, and over the last day how many were
+claimed, how long they waited to be claimed (average and worst), and
+how many the reaper ended instead of a runner reporting them. A build a runner claimed and never
 reported is failed by the scheduler's minute tick, whether or not any
 runner is still alive: within about two minutes of its log stream ending
 with no outcome reported — the runner reports right after closing the
