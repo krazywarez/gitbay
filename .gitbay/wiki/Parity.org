@@ -52,6 +52,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | stacked merge requests | yes | yes | yes |
 | revisions              | yes | yes | yes |
 | range-diff             | yes | no  | yes |
+| merge gates            | yes | yes | yes |
 
 Reviews and checks carry the time they last said something, and a
 =ci/<job>= check carries how long its build ran, so a merge request
@@ -154,9 +155,12 @@ always markdown.
 | watch, unwatch              | yes | yes | yes |
 | mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
-| default branch              | yes | yes | no  |
+| default branch              | yes | yes | yes |
+| merge requests only         | yes | yes | yes |
+| protected tags              | yes | yes | yes |
 | require codeowners          | yes | yes | yes |
 | access grants               | yes | no  | yes |
+| effective access            | yes | no  | yes |
 | webhooks                    | yes | no  | yes |
 | import from a remote        | yes | no  | yes |
 | topics, website             | yes | yes | yes |
@@ -174,7 +178,8 @@ always markdown.
 | job image (ci.yml)          | yes | n/a | n/a |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
-| delete, transfer, rename    | yes | no  | no  |
+| delete, transfer            | yes | no  | no  |
+| rename                      | yes | no  | yes |
 | release delete              | yes | yes | yes |
 | release asset add           | yes | no  | n/a |
 | release asset remove        | yes | no  | yes |
@@ -275,10 +280,10 @@ client has no use for one (krz/gitbay#57).
 | SSH keys: list, add, remove | yes | yes | yes |
 | PGP keys: list, add, remove | yes | yes | yes |
 | email add and verify        | yes | yes | yes |
-| email list, remove, primary | yes | yes | no  |
+| email list, remove, primary | yes | yes | yes |
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
-| activity mail on, off       | yes | yes | no  |
+| activity mail on, off       | yes | yes | yes |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
