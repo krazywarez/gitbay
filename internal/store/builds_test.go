@@ -32,7 +32,7 @@ func TestReapStaleBuilds(t *testing.T) {
 
 	// Claim both, then age only the first past the deadline.
 	for range 2 {
-		if _, ok, err := s.ClaimBuild(nil); err != nil || !ok {
+		if _, ok, err := s.ClaimBuild(nil, false); err != nil || !ok {
 			t.Fatalf("claim: %v ok=%v", err, ok)
 		}
 	}
@@ -148,7 +148,7 @@ func TestClaimBuildScopedToRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, ok, err := s.ClaimBuild([]int64{mine})
+	b, ok, err := s.ClaimBuild([]int64{mine}, false)
 	if err != nil || !ok {
 		t.Fatalf("claim: %v ok=%v", err, ok)
 	}
@@ -158,11 +158,11 @@ func TestClaimBuildScopedToRepos(t *testing.T) {
 	}
 
 	// Nothing left for that scope, even though another repo's build is pending.
-	if _, ok, err := s.ClaimBuild([]int64{mine}); err != nil || ok {
+	if _, ok, err := s.ClaimBuild([]int64{mine}, false); err != nil || ok {
 		t.Fatalf("second scoped claim: err=%v ok=%v, want no build", err, ok)
 	}
 	// An unscoped runner still takes it.
-	if b, ok, err := s.ClaimBuild(nil); err != nil || !ok || b.RepoID != theirs {
+	if b, ok, err := s.ClaimBuild(nil, false); err != nil || !ok || b.RepoID != theirs {
 		t.Fatalf("unscoped claim: err=%v ok=%v repo=%d", err, ok, b.RepoID)
 	}
 }
@@ -232,7 +232,7 @@ func TestSuccessBuildForTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := s.BuildsForCommit(repoID, "aaa")
-	if _, ok, err := s.ClaimBuild([]int64{repoID}); err != nil || !ok {
+	if _, ok, err := s.ClaimBuild([]int64{repoID}, false); err != nil || !ok {
 		t.Fatalf("claim: ok=%v err=%v", ok, err)
 	}
 	if err := s.FinishBuild(b["unit"].ID, "success"); err != nil {
@@ -262,7 +262,7 @@ func TestReapStaleBuildsAfterLogClosed(t *testing.T) {
 		if _, err := s.CreateBuild(repoID, job, "abc", "main", `["true"]`, "", "", true); err != nil {
 			t.Fatal(err)
 		}
-		if _, ok, err := s.ClaimBuild([]int64{repoID}); err != nil || !ok {
+		if _, ok, err := s.ClaimBuild([]int64{repoID}, false); err != nil || !ok {
 			t.Fatalf("claim %s: %v", job, err)
 		}
 	}
@@ -315,7 +315,7 @@ func TestQueueStatsFractionalAverage(t *testing.T) {
 		if _, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true); err != nil {
 			t.Fatal(err)
 		}
-		if _, ok, err := s.ClaimBuild(nil); err != nil || !ok {
+		if _, ok, err := s.ClaimBuild(nil, false); err != nil || !ok {
 			t.Fatalf("claim: %v ok=%v", err, ok)
 		}
 	}
@@ -329,5 +329,43 @@ func TestQueueStatsFractionalAverage(t *testing.T) {
 	}
 	if q.Claimed24h != 2 || q.ClaimWaitAvgS != 1 || q.ClaimWaitMaxS != 2 || q.Pending != 0 || q.Reaped24h != 0 {
 		t.Fatalf("stats: %+v", q)
+	}
+}
+
+// A merge request head from a fork is untrusted. A claim skips it unless
+// the runner asked for untrusted builds, so a runner on someone's laptop
+// never executes a stranger's branch by default.
+func TestClaimBuildSkipsUntrustedUnlessAsked(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := s.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Queued first, so an unfiltered claim would take it.
+	forkBuild, err := s.CreateBuild(repo, "unit", "abc123", "refs/merge-requests/1/head", `["true"]`, "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := s.CreateBuild(repo, "unit", "def456", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, ok, err := s.ClaimBuild(nil, false)
+	if err != nil || !ok || b.Number != own {
+		t.Fatalf("trusted-only claim: err=%v ok=%v number=%d, want %d", err, ok, b.Number, own)
+	}
+	if _, ok, _ := s.ClaimBuild(nil, false); ok {
+		t.Fatal("trusted-only claim took the fork build")
+	}
+	b, ok, err = s.ClaimBuild(nil, true)
+	if err != nil || !ok || b.Number != forkBuild {
+		t.Fatalf("untrusted claim: err=%v ok=%v number=%d, want %d", err, ok, b.Number, forkBuild)
 	}
 }

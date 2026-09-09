@@ -24,7 +24,7 @@ func TestQueuesListsPendingBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := s.ClaimBuild(nil); err != nil || !ok {
+	if _, ok, err := s.ClaimBuild(nil, false); err != nil || !ok {
 		t.Fatalf("claim: %v ok=%v", err, ok)
 	}
 
