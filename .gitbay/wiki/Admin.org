@@ -363,13 +363,14 @@ below are per service, not per build, so raising =-jobs= divides them
 rather than multiplying the host's load.
 
 =admin runners= shows which account each runner polls as, and what each
-is scoped to. A runner with no scope claims builds for *any*
-repository, which on an instance with open registration means running a
-stranger's steps; scope one with =-repos owner/name=. An admin key
-still works for the protocol during a rotation. A merge request head
-from a fork is built in the target repository as untrusted: the claim
-carries no secrets. Same-repository heads were built by their branch
-push and are not built again.
+may claim. A runner key claims builds only for the repositories it is
+attached to: with none attached it claims nothing, and =-repos= may only
+narrow within them. An admin's full-scope key claims any repository —
+that is what =-repos= was for — and still works for the protocol during
+a rotation. A merge request head from a fork is built in the target
+repository as untrusted: the claim carries no secrets, and only a runner
+started with =-untrusted= takes it. Same-repository heads were built by
+their branch push and are not built again.
 
 =make deploy-runner= also installs
 =deploy/gitbay-runner.override.conf= as a systemd drop-in: =Nice=10=,
@@ -386,12 +387,11 @@ v1 runs steps directly on the host — no containers — so treat the
 runner machine as executing whatever your users push. Install the
 toolchains your builds need on it.
 
-A runner claims the oldest pending build in the queue, whichever
-repository it belongs to. =-repos= narrows that to named repositories,
-which is what makes a runner outside the server practical — one on a
-machine that should build a single project, or that holds credentials for
-one deployment, no longer picks up a build belonging to someone else. With
-open registration that someone need not be anyone you know.
+A runner claims the oldest pending build among the repositories its key
+is attached to — for an admin key, the oldest in the instance. =-repos=
+narrows within that set, which is what makes a runner outside the server
+practical: one on a machine that should build a single project, or that
+holds credentials for one deployment, stays on it.
 
 #+begin_src sh
 gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
@@ -410,11 +410,13 @@ repositories among them. =-untrusted= makes a runner claim merge
 request heads from forks; the bay1 unit sets it because it isolates in
 podman. A runner without it builds trusted commits only.
 
-=gitbay dashboard= and =ssh git@<host> admin runners= list every account
-that has polled as a runner: when it last polled, the =-repos= scope it
-asked for, and the build it holds. =admin runners= also heads the list
-with the queue: builds pending now, and over the last day how many were
-claimed, how long they waited to be claimed (average and worst), and
+=gitbay dashboard= and =ssh git@<host> admin runners= list every key
+that has polled as a runner: the account, the key's fingerprint, when it
+last polled, the repositories it may claim — its attachments for a runner
+key, the =-repos= it asked for or =any= for an admin key — and the build
+it holds. =admin runners= also heads the list with the queue: builds
+pending now, and over the last day how many were claimed, how long they
+waited to be claimed (average and worst), and
 how many the reaper ended instead of a runner reporting them. A build a runner claimed and never
 reported is failed by the scheduler's minute tick, whether or not any
 runner is still alive: within about two minutes of its log stream ending
