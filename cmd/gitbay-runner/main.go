@@ -62,25 +62,42 @@ type runner struct {
 	// means any, which is what a runner on the server itself wants; a runner
 	// somewhere that should not execute every repository's steps names them.
 	repos []string
+	// untrusted also claims merge request heads from forks.
+	untrusted bool
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "init" {
+		os.Exit(runInit(os.Args[2:]))
+	}
 	var (
-		remote    = flag.String("remote", "git@gitbay.org", "ssh destination of the gitbay server")
-		sshOpts   = flag.String("ssh-opts", "", "extra ssh options, space-separated (also used for git clone)")
-		cloneBase = flag.String("clone-base", "", "clone URL prefix (default ssh://<remote>)")
-		workdir   = flag.String("workdir", defaultWorkdir(), "build workspace root")
-		poll      = flag.Duration("poll", 5*time.Second, "idle poll interval")
-		timeout   = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
-		repos     = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
-		once      = flag.Bool("once", false, "process at most one build, then exit")
-		jobs      = flag.Int("jobs", 1, "builds to run at once")
-		image     = flag.String("image", "", "default container image for jobs that name none")
-		isolation = flag.String("isolation", "podman", "how steps run: podman, or none for no container")
-		memory    = flag.String("memory", "", "memory limit per build, e.g. 4g (podman only, needs a delegated cgroup; default unlimited)")
-		cpus      = flag.String("cpus", "", "CPU limit per build, e.g. 2 (podman only, needs a delegated cgroup; default unlimited)")
-		version   = flag.Bool("version", false, "print the commit this binary was built from, then exit")
+		configPath = flag.String("config", defaultConfigPath(), "config file; keys are these flag names, flags override it")
+		identity   = flag.String("identity", "", "ssh private key to poll and clone with (default: the key gitbay-runner init generated, if present)")
+		untrusted  = flag.Bool("untrusted", false, "also claim untrusted builds: merge request heads from forks (needs -isolation podman to be safe)")
+		remote     = flag.String("remote", "git@gitbay.org", "ssh destination of the gitbay server")
+		sshOpts    = flag.String("ssh-opts", "", "extra ssh options, space-separated (also used for git clone)")
+		cloneBase  = flag.String("clone-base", "", "clone URL prefix (default ssh://<remote>)")
+		workdir    = flag.String("workdir", defaultWorkdir(), "build workspace root")
+		poll       = flag.Duration("poll", 5*time.Second, "idle poll interval")
+		timeout    = flag.Duration("timeout", 30*time.Minute, "per-build time limit")
+		repos      = flag.String("repos", "", "only claim builds for these repositories, comma-separated owner/name (default: any)")
+		once       = flag.Bool("once", false, "process at most one build, then exit")
+		jobs       = flag.Int("jobs", 1, "builds to run at once")
+		image      = flag.String("image", "", "default container image for jobs that name none")
+		isolation  = flag.String("isolation", "podman", "how steps run: podman, or none for no container")
+		memory     = flag.String("memory", "", "memory limit per build, e.g. 4g (podman only, needs a delegated cgroup; default unlimited)")
+		cpus       = flag.String("cpus", "", "CPU limit per build, e.g. 2 (podman only, needs a delegated cgroup; default unlimited)")
+		version    = flag.Bool("version", false, "print the commit this binary was built from, then exit")
 	)
+	path := configPathFromArgs(os.Args[1:], *configPath)
+	if values, found, err := loadConfig(path); err != nil {
+		log.Fatal(err)
+	} else if found {
+		if err := applyConfig(flag.CommandLine, values); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("config: %s", path)
+	}
 	flag.Parse()
 	if *version {
 		fmt.Println(buildinfo.String())
@@ -127,6 +144,13 @@ func main() {
 	if *sshOpts != "" {
 		r.sshOpts = strings.Fields(*sshOpts)
 	}
+	if *identity == "" {
+		if p := filepath.Join(configDir(), "id_ed25519"); fileExists(p) {
+			*identity = p
+		}
+	}
+	r.sshOpts = append(identityOpts(*identity), r.sshOpts...)
+	r.untrusted = *untrusted
 	for _, name := range strings.Split(*repos, ",") {
 		if name = strings.TrimSpace(name); name != "" {
 			r.repos = append(r.repos, name)
@@ -218,7 +242,12 @@ func (r *runner) serve(n int, once bool, poll time.Duration, stop <-chan struct{
 // step claims and executes at most one build. ran reports whether there was
 // one, so the caller knows when to idle.
 func (r *runner) step() (bool, error) {
-	out, err := r.ssh(nil, append([]string{"runner", "next"}, append(r.repos, "--json")...)...)
+	args := []string{"runner", "next"}
+	if r.untrusted {
+		args = append(args, "--untrusted")
+	}
+	args = append(append(args, r.repos...), "--json")
+	out, err := r.ssh(nil, args...)
 	if err != nil {
 		return false, fmt.Errorf("claiming build: %w (%s)", err, out)
 	}
@@ -467,6 +496,8 @@ func (r *runner) ssh(stdin io.Reader, args ...string) (string, error) {
 	}
 	return out.String(), nil
 }
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // defaultWorkdir picks a build workspace that another local user cannot
 // have created first.

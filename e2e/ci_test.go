@@ -23,7 +23,7 @@ func buildRunner(t *testing.T) string {
 }
 
 // runnerOnce processes at most one pending build with the given key.
-func (i *instance) runnerOnce(t *testing.T, key string) string {
+func (i *instance) runnerOnce(t *testing.T, key string, extra ...string) string {
 	t.Helper()
 	opts := fmt.Sprintf("-p %d -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=%s -o BatchMode=yes",
 		i.port, key, filepath.Join(i.sshDir, "known_hosts"))
@@ -31,12 +31,14 @@ func (i *instance) runnerOnce(t *testing.T, key string) string {
 	// cancellation, not the sandbox, and the suite must run on a machine
 	// without podman. The isolation tests are in isolation_podman_test.go
 	// and skip visibly when it is absent (#144).
-	cmd := exec.Command(i.runner, "-once",
+	args := []string{"-once",
 		"-remote", "git@127.0.0.1",
 		"-ssh-opts", opts,
 		"-isolation", "none",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", i.port),
-		"-workdir", t.TempDir())
+		"-workdir", t.TempDir()}
+	args = append(args, extra...)
+	cmd := exec.Command(i.runner, args...)
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

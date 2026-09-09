@@ -112,7 +112,7 @@ func TestForkMRHeadIsBuilt(t *testing.T) {
 	}
 
 	// The real runner fetches the merge request ref and runs the second job.
-	log := inst.runnerOnce(t, runnerKey)
+	log := inst.runnerOnce(t, runnerKey, "-untrusted")
 	if !strings.Contains(log, "two") {
 		t.Fatalf("runner did not run the second job:\n%s", log)
 	}
