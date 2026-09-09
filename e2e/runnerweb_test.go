@@ -35,8 +35,11 @@ func TestRunnerSettingsWeb(t *testing.T) {
 	}
 	fp := out[strings.Index(out, "SHA256:"):]
 	fp = fp[:strings.Index(fp, `"`)]
+	// html/template writes + as &#43; in text and attributes, and a
+	// fingerprint is base64, so the page shows the escaped form.
+	shown := strings.ReplaceAll(fp, "+", "&#43;")
 	_, body = browserGet(t, alice, settings)
-	if !strings.Contains(body, fp) || !strings.Contains(body, `value="runner-remove"`) {
+	if !strings.Contains(body, shown) || !strings.Contains(body, `value="runner-remove"`) {
 		t.Fatalf("attached runner not listed:\n%s", body)
 	}
 	if status, _ := browserPost(t, alice, settings, url.Values{"field": {"runner-remove"}, "fingerprint": {fp}}); status != 200 {
