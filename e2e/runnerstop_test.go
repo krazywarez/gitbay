@@ -81,7 +81,7 @@ func (i *instance) buildStatus(t *testing.T, key string) string {
 func TestRunnerDrainsOnSIGTERM(t *testing.T) {
 	inst, key := stopFixture(t)
 	cmd := exec.Command(inst.runner, inst.runnerArgs(t, key)...)
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	if err := cmd.Start(); err != nil {

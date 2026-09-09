@@ -39,7 +39,7 @@ func (i *instance) runnerOnce(t *testing.T, key string, extra ...string) string 
 		"-workdir", t.TempDir()}
 	args = append(args, extra...)
 	cmd := exec.Command(i.runner, args...)
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("runner: %v\n%s", err, out)
@@ -293,7 +293,7 @@ func (i *instance) runnerJobs(t *testing.T, key, repo string, jobs int) string {
 		"-ssh-opts", opts,
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", i.port),
 		"-workdir", t.TempDir())
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	if err := cmd.Start(); err != nil {

@@ -124,7 +124,7 @@ func TestBuildCancelRunning(t *testing.T) {
 	runner := exec.Command(inst.runner, "-once", "-remote", "git@127.0.0.1", "-ssh-opts", opts,
 		"-isolation", "none",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", inst.port), "-workdir", t.TempDir())
-	runner.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	runner.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	var runnerOut strings.Builder
 	runner.Stdout, runner.Stderr = &runnerOut, &runnerOut
 	if err := runner.Start(); err != nil {

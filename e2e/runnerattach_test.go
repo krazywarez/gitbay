@@ -74,6 +74,10 @@ func TestAttachedRunnerBuildsOwnRepo(t *testing.T) {
 	if out, _, _ := inst.ssh(t, aliceKey, "", "build", "list", "alice/app"); !strings.Contains(out, "unit\tpending") {
 		t.Fatalf("build not pending before attach: %s", out)
 	}
+	run()
+	if out, _, _ := inst.ssh(t, aliceKey, "", "build", "list", "alice/app"); !strings.Contains(out, "unit\tpending") {
+		t.Fatalf("unattached runner claimed the build: %s", out)
+	}
 
 	// Attach with the printed key.
 	if _, errOut, code := inst.ssh(t, aliceKey, string(pub), "repo", "runner", "add", "alice/app"); code != 0 {

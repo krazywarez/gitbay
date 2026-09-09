@@ -182,7 +182,7 @@ func runnerPodmanOnce(t *testing.T, inst *instance, key string) {
 		"-image", "localhost/gitbay-ci:1",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", inst.port),
 		"-workdir", t.TempDir())
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("runner: %v\n%s", err, out)
 	}
