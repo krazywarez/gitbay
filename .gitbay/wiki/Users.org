@@ -489,6 +489,40 @@ log says who cancelled it. Both need write access.
 What each push shape queues, with dedupe, path filters, schedules and
 the reaper together, is one table on [[CI][CI]].
 
+** Your own runner
+
+Builds run on runners attached to the repository. An instance need not
+offer any: install =gitbay-runner= on a machine of yours and attach it.
+
+#+begin_src sh
+brew install krz/tap/gitbay-runner        # or a binary from the release
+gitbay-runner init -remote git@gitbay.org
+#+end_src
+
+=init= generates a key under =~/.config/gitbay-runner/=, writes
+=config.toml= beside it, and prints the public key with the command to
+attach it:
+
+#+begin_src sh
+gitbay repo runner add owner/name < ~/.config/gitbay-runner/id_ed25519.pub
+#+end_src
+
+or paste the key under Runners on the repository's settings page. Then
+=brew services start krz/tap/gitbay-runner=, or run =gitbay-runner= with
+no arguments; it reads the config file, and any flag overrides it.
+
+What it builds: every build for the repositories it is attached to,
+with the repository's secrets, and nothing else. Merge requests from
+forks are untrusted and wait unless the runner runs with =-untrusted=,
+which is only sensible with =-isolation podman -image <ref>= (see
+[[Admin][Admin]]). Attach one runner to several repositories by repeating
+=repo runner add=; run several runners on one account by running =init=
+on each machine. =repo runner list= shows each attached key, when it
+last polled and the build it holds; =repo runner remove <fingerprint>=
+detaches one (the key stays on your account; =keys remove= drops it).
+A runner key reaches only the runner protocol and read-only git, so a
+build step that reads it off disk cannot administer your account.
+
 * Large files (LFS)
 
 Standard Git LFS works over both transports with no setup beyond the

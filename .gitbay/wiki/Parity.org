@@ -162,6 +162,7 @@ always markdown.
 | access grants               | yes | no  | yes |
 | effective access            | yes | no  | yes |
 | webhooks                    | yes | no  | yes |
+| runners attach, list, detach| yes | yes | no  |
 | import from a remote        | yes | no  | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |

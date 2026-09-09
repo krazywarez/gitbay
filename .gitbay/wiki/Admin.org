@@ -329,13 +329,16 @@ startup to point at the current binary path.
 * CI runner
 
 =gitbay-runner= executes builds queued by pushes and merge requests. It
-polls over SSH with a key added by =keys add --scope runner=, which
-reaches only the runner protocol and read-only git (a runner executes
-arbitrary repository code, so the key it holds must not do more), then
-clones, runs the steps, streams the log back and resolves the commit
-status. Run it as a dedicated unprivileged user on a non-admin account.
-=admin user create --key= registers a full-scope key, so the runner key
-is added afterwards through a bootstrap key that is then removed:
+polls over SSH with a key of scope =runner=, which reaches only the
+runner protocol and read-only git (a runner executes arbitrary
+repository code, so the key it holds must not do more). A runner key
+claims builds only for the repositories it is attached to, by =repo
+runner add= from a repository admin or an instance admin; an admin key
+claims any. Users attach their own runners: see the Users page. For an
+instance runner, run it as a dedicated unprivileged user on a non-admin
+account. =admin user create --key= registers a full-scope key, so the
+runner key is added afterwards through a bootstrap key that is then
+removed, and attached to each repository it should build:
 
 #+begin_src sh
 useradd --system --create-home --home-dir /var/lib/gitbay-runner ci-runner
@@ -346,6 +349,10 @@ ssh -i /tmp/ci-bootstrap git@127.0.0.1 keys add --scope runner < /var/lib/gitbay
 ssh -i /tmp/ci-bootstrap git@127.0.0.1 keys remove "$(ssh-keygen -lf /tmp/ci-bootstrap.pub | awk '{print $2}')"
 rm /tmp/ci-bootstrap /tmp/ci-bootstrap.pub
 gitbay-runner -remote git@127.0.0.1 -workdir /var/lib/gitbay-runner/work
+#+end_src
+
+#+begin_src sh
+gitbay repo runner add krz/site < /var/lib/gitbay-runner/.ssh/id_ed25519.pub
 #+end_src
 
 =-jobs N= runs N builds at once. Claiming is one transaction that
@@ -391,15 +398,17 @@ gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
   -workdir /var/lib/gitbay-runner/work
 #+end_src
 
+Add =-untrusted= only with =-isolation podman=.
+
 gitbay.org's runner is scoped: it builds the forge's own repositories
 and the isolation canary, nothing else, because it shares the host with
-the forge. A =.gitbay/ci.yml= in another repository there queues builds
-no runner claims. Whether that changes is krz/gitbay#184.
+the forge; any other repository builds on a runner its owner attaches.
 
-Naming no repositories is the old behaviour and stays the right choice for
-the runner on the server itself. The scoping is what the runner asks for,
-not an ACL the server holds over it: a runner account is admin by
-necessity, so the boundary is you choosing how to start it.
+=-repos= narrows an admin runner; for a runner key the attachments are
+the boundary, held by the server, and =-repos= may only name
+repositories among them. =-untrusted= makes a runner claim merge
+request heads from forks; the bay1 unit sets it because it isolates in
+podman. A runner without it builds trusted commits only.
 
 =gitbay dashboard= and =ssh git@<host> admin runners= list every account
 that has polled as a runner: when it last polled, the =-repos= scope it

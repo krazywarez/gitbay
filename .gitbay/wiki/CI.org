@@ -20,6 +20,12 @@ Three mechanisms decide what a push does to CI, and they interact:
   the build deadline if no stream was ever seen (#179). Its status reads
   =build abandoned=.
 
+Which runner takes a build is the fourth: a build is claimed only by a
+runner attached to its repository (or an instance admin's runner), and
+an untrusted build only by one started with =-untrusted=. A repository
+with no runner attached queues builds nothing claims. See the Users
+page.
+
 Scheduled jobs run on their cron against the default branch, never on
 push; a default-branch push registers or updates them. Tag jobs run on
 a matching tag push and nothing else.

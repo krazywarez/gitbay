@@ -117,13 +117,17 @@ JavaScript, so =script-src 'none'= costs nothing.
 gitbayd never does: it reads =.gitbay/ci.yml= and queues a build, and a
 runner, polling over SSH, clones the commit and runs its steps.
 
-- *What the runner holds.* A key added with =keys add --scope runner=,
-  which the dispatcher confines to =runner next=, =runner log= and
-  =runner done= and to read-only git. A step that reads the key off the
-  disk gets exactly that: it cannot administer the instance, push, or
-  read a repository the runner's account cannot. An admin key still
-  works for the runner protocol so an operator can rotate at their own
-  pace; a runner host should not hold one.
+- *What the runner holds.* A key of scope =runner=, which the dispatcher
+  confines to =runner next=, =runner log= and =runner done= and to
+  read-only git, and which claims, logs and finishes builds only for
+  the repositories it is attached to (=repo runner add=). A step that
+  reads the key off the disk gets exactly that: it cannot administer
+  the instance, push, read a repository the runner's account cannot, or
+  touch another repository's builds. An admin key still works for the
+  runner protocol so an operator can rotate at their own pace; a runner
+  host should not hold one. Untrusted builds are skipped unless the
+  runner asks with =-untrusted=, so a runner on a user's machine never
+  executes a stranger's branch by default.
 - *What a build sees.* The commit, the =GITBAY_*= variables and the
   repository's secrets — unless the head came from another repository.
   A merge request from a fork is built in the target as untrusted, with

@@ -17,9 +17,11 @@
   email patch flow (revisit only if sourcehut-style demand appears),
   federation and Postgres (no need at this scale). Recorded so the
   absence reads as a decision, not an oversight.
-- Does CI run for my repository on gitbay.org? :: Not yet. The runner
-  there is scoped to the forge's own repositories and its isolation
-  canary, since it shares the host with the forge. A =.gitbay/ci.yml=
-  in your repository queues builds nothing claims. krz/gitbay#184 is
-  where that gets decided. A self-hosted instance runs the same runner
-  for whichever repositories its operator names.
+- Does CI run for my repository on gitbay.org? :: On a runner you
+  attach. The instance's own runner builds the forge's repositories and
+  its isolation canary, since it shares the host with the forge.
+  Install =gitbay-runner= on a machine of yours, run =gitbay-runner
+  init=, and attach the key it prints with =repo runner add= or on the
+  repository's settings page; see the Users page. A self-hosted
+  instance can do the same, or run one runner for whichever
+  repositories its operator attaches it to.
