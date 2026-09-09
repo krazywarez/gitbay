@@ -208,8 +208,8 @@ already lists keys with their scope; a runner key shows as `runner`.
   necessity" and "the scoping is what the runner asks for, not an ACL the
   server holds" with the attachment rule. The bay1 example gains
   `-untrusted`.
-- `Parity`: three rows, `repo runner add|list|remove`, yes on SSH, CLI, web,
-  API.
+- `Parity`: one row in the repository table, runners attach/list/detach,
+  yes on CLI and web, no on iOS.
 - `CI` and `FAQ`: one line each pointing at the Users section. The FAQ's
   "CI builds only the repositories the operator names" becomes "and any
   repository with a runner attached".
