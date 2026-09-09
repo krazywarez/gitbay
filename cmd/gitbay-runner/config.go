@@ -92,6 +92,3 @@ func identityOpts(path string) []string {
 	}
 	return []string{"-i", path, "-o", "IdentitiesOnly=yes"}
 }
-
-// runInit is a stub; Task 7 replaces it.
-func runInit(args []string) int { fmt.Fprintln(os.Stderr, "init: not implemented"); return 2 }
