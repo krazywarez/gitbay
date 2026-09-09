@@ -14,12 +14,16 @@ import (
 )
 
 // runnerCtx builds a Ctx good enough to run runRunnerNext directly: an
-// admin user (requireRunner accepts admin as well as scope "runner"), a
+// admin user (runnerSession accepts admin as well as scope "runner"), a
 // server root that matches where the test's bare repo lives.
 func runnerCtx(st *store.Store, uid int64, root string) (*Ctx, *bytes.Buffer) {
 	var out bytes.Buffer
+	fp := fmt.Sprintf("SHA256:runner-%d", uid)
+	st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), "full") // ErrDuplicateKey on reuse is fine
 	c := &Ctx{
 		User:   store.User{ID: uid, Username: "ci", IsAdmin: true},
+		Scope:  "full",
+		Source: fp,
 		Store:  st,
 		Cfg:    config.Config{Server: config.Server{Root: root, SiteURL: "https://x.test"}},
 		Stdin:  strings.NewReader(""),
@@ -224,7 +228,7 @@ func TestRunnerLogMarksStreamClosed(t *testing.T) {
 	if _, err := st.CreateBuild(repo.ID, "unit", strings.Repeat("a", 40), "main", "[]", "", "", true); err != nil {
 		t.Fatal(err)
 	}
-	b, ok, err := st.ClaimBuild([]int64{repo.ID})
+	b, ok, err := st.ClaimBuild([]int64{repo.ID}, false)
 	if err != nil || !ok {
 		t.Fatalf("claim: %v", err)
 	}

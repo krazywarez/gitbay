@@ -582,7 +582,7 @@ func TestQueueBranchBuildsSameTreeReusesSuccess(t *testing.T) {
 	if len(builds) != 1 {
 		t.Fatalf("first commit queued %d builds, want 1", len(builds))
 	}
-	if _, ok, err := st.ClaimBuild([]int64{repo.ID}); err != nil || !ok {
+	if _, ok, err := st.ClaimBuild([]int64{repo.ID}, false); err != nil || !ok {
 		t.Fatalf("claim: ok=%v err=%v", ok, err)
 	}
 	if err := st.FinishBuild(builds[0].ID, "success"); err != nil {

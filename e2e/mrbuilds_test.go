@@ -92,7 +92,7 @@ func TestForkMRHeadIsBuilt(t *testing.T) {
 	}
 
 	// The claim carries no secrets for a head from another repository.
-	out, errOut, code := inst.ssh(t, runnerKey, "", "runner", "next", "alice/app", "--json")
+	out, errOut, code := inst.ssh(t, runnerKey, "", "runner", "next", "--untrusted", "alice/app", "--json")
 	if code != 0 {
 		t.Fatalf("runner next: %s", errOut)
 	}

@@ -59,8 +59,8 @@ func init() {
 	// dispatcher confines to these three commands and read-only git, or
 	// an admin key, which a runner host should not hold (#92).
 	register(Command{Path: []string{"runner", "next"},
-		Summary: "claim the oldest pending build (runner protocol)",
-		Usage:   "runner next [<owner/name>...]", SSHOnly: true, Run: runRunnerNext})
+		Summary: "claim the oldest pending build this key may run (runner protocol)",
+		Usage:   "runner next [--untrusted] [<owner/name>...]", SSHOnly: true, Run: runRunnerNext})
 	register(Command{Path: []string{"runner", "log"},
 		Summary: "append a build's log from stdin",
 		Usage:   "runner log <build-id>", SSHOnly: true, ReadsStdin: true, Run: runRunnerLog})
@@ -309,11 +309,29 @@ func runSecretList(c *Ctx, args []string) int {
 	})
 }
 
-func requireRunner(c *Ctx) int {
+// runnerSession resolves the key behind a runner-protocol session. The
+// runner commands are SSHOnly, so Source is the key's fingerprint. An
+// admin key is accepted so an operator can rotate at their own pace; a
+// runner host should hold a key added with --scope runner.
+func runnerSession(c *Ctx) (store.SSHKey, int) {
 	if c.Scope != "runner" && !c.User.IsAdmin {
-		return c.fail(protocol.ExitDenied, "runner commands need a key added with --scope runner")
+		return store.SSHKey{}, c.fail(protocol.ExitDenied, "runner commands need a key added with --scope runner")
 	}
-	return -1
+	key, err := c.Store.SSHKeyByFingerprint(c.Source)
+	if err != nil {
+		return store.SSHKey{}, c.fail(protocol.ExitDenied, "runner commands need an SSH key session")
+	}
+	return key, -1
+}
+
+// runnerMayBuild reports whether a runner session may act on a
+// repository's builds: an admin user may on any, a runner key on the
+// repositories it is attached to (#184).
+func runnerMayBuild(c *Ctx, key store.SSHKey, repoID int64) (bool, error) {
+	if c.User.IsAdmin {
+		return true, nil
+	}
+	return c.Store.RunnerAttached(key.ID, repoID)
 }
 
 // maxOrphanSkip bounds how many claimed builds runRunnerNext will find
@@ -327,26 +345,52 @@ func requireRunner(c *Ctx) int {
 const maxOrphanSkip = 50
 
 func runRunnerNext(c *Ctx, args []string) int {
-	if code := requireRunner(c); code >= 0 {
+	key, code := runnerSession(c)
+	if code >= 0 {
 		return code
 	}
-	// A runner may limit itself to named repositories. The operator chooses
-	// what a given runner executes by how they start it; this is scoping the
-	// runner asks for, not an ACL the server holds over it.
+	f, err := parseFlags(args, flagSpec{Bools: []string{"--untrusted"}, MaxPos: -1,
+		Usage: "runner next [--untrusted] [<owner/name>...]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	// The candidate set. An admin key claims from any repository, narrowed
+	// by the names given. A runner key claims from the repositories it is
+	// attached to; a name outside them is refused, not ignored, so a
+	// misconfigured runner says so instead of idling.
 	var repoIDs []int64
-	for _, arg := range args {
+	for _, arg := range f.Pos {
 		repo, code := resolveRepo(c, arg, policy.CanRead)
 		if code >= 0 {
 			return code
 		}
+		ok, err := runnerMayBuild(c, key, repo.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !ok {
+			return c.fail(protocol.ExitDenied, "this key is not attached to %s", repo.Path())
+		}
 		repoIDs = append(repoIDs, repo.ID)
 	}
+	if !c.User.IsAdmin && len(repoIDs) == 0 {
+		repoIDs, err = c.Store.RunnerRepoIDs(key.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if len(repoIDs) == 0 {
+			// Nothing attached: nothing to claim. Still a heartbeat, so
+			// admin runners shows the key polling.
+			c.Store.TouchRunner(key.ID, c.User.ID, "", 0)
+			return c.emit(map[string]any{}, func(w io.Writer) { fmt.Fprintln(w, "no pending builds") })
+		}
+	}
+	untrusted := f.Has("--untrusted")
 	var b store.Build
 	var repo store.Repo
 	var ok bool
-	var err error
 	for attempt := 0; attempt < maxOrphanSkip; attempt++ {
-		b, ok, err = c.Store.ClaimBuild(repoIDs)
+		b, ok, err = c.Store.ClaimBuild(repoIDs, untrusted)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
@@ -376,7 +420,7 @@ func runRunnerNext(c *Ctx, args []string) int {
 		b, ok = store.Build{}, false
 	}
 	// The poll itself is the runner's heartbeat: admin runners reads it.
-	c.Store.TouchRunner(c.User.ID, strings.Join(args, ","), b.ID)
+	c.Store.TouchRunner(key.ID, c.User.ID, strings.Join(f.Pos, ","), b.ID)
 	if !ok {
 		return c.emit(map[string]any{}, func(w io.Writer) { fmt.Fprintln(w, "no pending builds") })
 	}
@@ -408,7 +452,8 @@ func runRunnerNext(c *Ctx, args []string) int {
 }
 
 func runRunnerLog(c *Ctx, args []string) int {
-	if code := requireRunner(c); code >= 0 {
+	key, code := runnerSession(c)
+	if code >= 0 {
 		return code
 	}
 	if len(args) != 1 {
@@ -417,6 +462,13 @@ func runRunnerLog(c *Ctx, args []string) int {
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "bad build id %q", args[0])
+	}
+	if b, err := c.Store.BuildByID(id); err != nil {
+		return c.fail(protocol.ExitNotFound, "no build %d", id)
+	} else if ok, err := runnerMayBuild(c, key, b.RepoID); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	} else if !ok {
+		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository")
 	}
 	// Stream stdin into the log in chunks so long builds appear live. An
 	// append that fails drops its chunk and the loop keeps draining: ending
@@ -478,7 +530,8 @@ func runRunnerLog(c *Ctx, args []string) int {
 }
 
 func runRunnerDone(c *Ctx, args []string) int {
-	if code := requireRunner(c); code >= 0 {
+	key, code := runnerSession(c)
+	if code >= 0 {
 		return code
 	}
 	if len(args) != 2 || (args[1] != "success" && args[1] != "failure") {
@@ -492,10 +545,15 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitNotFound, "no build %d", id)
 	}
+	if ok, err := runnerMayBuild(c, key, b.RepoID); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	} else if !ok {
+		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository")
+	}
 	// Cancelled underneath the runner: its report is late, not wrong.
 	// The row, the status and the log were settled by the cancel.
 	if b.Status == "cancelled" {
-		c.Store.RunnerDone(c.User.ID)
+		c.Store.RunnerDone(key.ID)
 		return c.emit(map[string]any{"build": b.Number, "status": "cancelled"}, func(w io.Writer) {
 			fmt.Fprintf(w, "build %d was cancelled\n", b.Number)
 		})
@@ -503,7 +561,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if err := c.Store.FinishBuild(id, args[1]); err != nil {
 		return c.fail(protocol.ExitFailure, "finishing build %d: %v", id, err)
 	}
-	c.Store.RunnerDone(c.User.ID)
+	c.Store.RunnerDone(key.ID)
 	repo, err := c.Store.RepoByID(b.RepoID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

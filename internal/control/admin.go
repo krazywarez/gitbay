@@ -459,6 +459,20 @@ func runAdminRunners(c *Ctx, args []string) int {
 	if runners == nil {
 		runners = []store.Runner{}
 	}
+	for i := range runners {
+		if runners[i].Scope != "" {
+			continue
+		}
+		key, err := c.Store.SSHKeyByID(runners[i].KeyID)
+		if err != nil || key.Scope != "runner" {
+			continue // an admin key with no -repos: any
+		}
+		paths, err := c.Store.RunnerRepoPaths(runners[i].KeyID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		runners[i].Scope = strings.Join(paths, ",")
+	}
 	d := map[string]any{"queue": queue, "runners": runners}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "queue: %d pending; last 24h: %d claimed, wait avg %ds max %ds, %d reaped\n",
@@ -472,7 +486,7 @@ func runAdminRunners(c *Ctx, args []string) int {
 			if r.BuildNumber != 0 {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Username, r.LastSeen, scope, held)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Username, r.Fingerprint, r.LastSeen, scope, held)
 		}
 	})
 }
