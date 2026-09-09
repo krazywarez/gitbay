@@ -19,18 +19,16 @@ func TestBuildCancelWeb(t *testing.T) {
 	inst.admin(t, "admin", "user", "create", "alice",
 		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
 
-	// ci is an ordinary account; its runner key is self-added with
-	// --scope runner, which confines it to the runner protocol and
-	// read-only git rather than reaching for admin.
-	ciKey := inst.newKey(t, "ci")
-	inst.admin(t, "admin", "user", "create", "ci", "--key", ciKey+".pub")
 	runnerKey := inst.newKey(t, "ci-runner")
 	pub, _ := os.ReadFile(runnerKey + ".pub")
-	if _, errOut, code := inst.ssh(t, ciKey, string(pub), "keys", "add", "--scope", "runner"); code != 0 {
-		t.Fatalf("keys add --scope runner: %s", errOut)
-	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
 		t.Fatalf("repo create: %s", errOut)
+	}
+	// The runner key is attached by alice through repo runner add, which
+	// registers it on her account with scope runner, confining it to the
+	// runner protocol and read-only git rather than reaching for admin.
+	if _, errOut, code := inst.ssh(t, aliceKey, string(pub), "repo", "runner", "add", "alice/app"); code != 0 {
+		t.Fatalf("repo runner add: %s", errOut)
 	}
 	work := t.TempDir()
 	env := inst.gitEnv(aliceKey)
