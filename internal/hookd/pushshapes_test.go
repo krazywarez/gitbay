@@ -174,7 +174,7 @@ func (f *shapeFixture) push(branch, old, sha string) {
 // commit included.
 func (f *shapeFixture) finish(status string) {
 	for {
-		b, ok, err := f.st.ClaimBuild([]int64{f.repo.ID})
+		b, ok, err := f.st.ClaimBuild([]int64{f.repo.ID}, true)
 		if err != nil {
 			f.t.Fatal(err)
 		}
@@ -368,7 +368,7 @@ var pushShapes = []pushShape{
 		c1 := f.appCommit("more")
 		f.push("feat", zeroSHA40, c1)
 		for i := 0; i < 2; i++ {
-			if _, ok, err := f.st.ClaimBuild(nil); err != nil || !ok {
+			if _, ok, err := f.st.ClaimBuild(nil, true); err != nil || !ok {
 				f.t.Fatalf("claim: %v ok=%v", err, ok)
 			}
 		}
