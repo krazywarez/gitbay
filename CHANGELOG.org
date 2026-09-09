@@ -4,6 +4,69 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.17.0 — 2026-09-09
+
+CI without the operator's compute: a runner anyone installs and
+attaches to their own repositories, and the server rule that makes
+that safe. The rest of the #184 list besides.
+
+** CI
+
+- A runner key claims builds only for the repositories it is attached
+  to. =repo runner add <owner/name> < key.pub= attaches one; a key the
+  server has not seen lands on the caller's account with scope
+  =runner=. =repo runner list= shows each attached key with its last
+  poll and the build it holds; =repo runner remove <fingerprint>=
+  detaches it. All three on the settings page. A runner-scoped key
+  with nothing attached claims nothing, whoever owns it; a full-scope
+  admin key still claims any repository. =runner log= and =runner
+  done= refuse a build outside the key's attachments. #184
+- Closed: any account could add a runner-scoped key, and =runner next=
+  with no arguments handed it the oldest pending build on the
+  instance, secrets included.
+- =runner next --untrusted=: without it a merge request head from a
+  fork is never claimed. The runner passes it when started with
+  =-untrusted=; the bay1 unit does, because it isolates in podman.
+- =gitbay-runner init= generates a key under =~/.config/gitbay-runner/=,
+  writes =config.toml= beside it, and prints the public key with the
+  command that attaches it. The runner reads that file when present
+  and flags override it. =-identity=, defaulting to the generated key,
+  makes ssh and git use the runner's own key and no other. Homebrew:
+  =brew install krz/tap/gitbay-runner=, then =brew services start
+  krz/tap/gitbay-runner=. Releases ship =gitbay-runner= binaries.
+- =admin runners= heads its output with the queue: builds pending now,
+  and over the last day the builds claimed, the wait to claim (average
+  and worst) and the builds the reaper ended instead of a runner
+  reporting them. Rows are per key, with the fingerprint and the
+  repositories the key may claim. Migration 0049. #184
+- Stop tests for the runner's drain: a signal mid-step, the drop-in's
+  =KillMode= and =TimeoutStopSec=, and a transient systemd user unit
+  where one exists. #179
+- The CI wiki page carries every push shape against every job kind and
+  what dedupe, path filters, schedules and the reaper make of it, with
+  a test per row. #176, #177
+
+** Importing
+
+- =import-issues --api-base= reads Forgejo instances: paging by =limit=,
+  oldest first, comments read once, attribution and pull heads taken
+  from the API base rather than github.com. #191
+
+** Documentation
+
+- Users: "Your own runner". Admin, Threat-Model, CI, FAQ and Parity
+  follow the attachment rule.
+
+** Upgrading
+
+Replace the binaries and reinstall the CLI. Migration 0050 (runner
+attachments; the runner heartbeat table is rekeyed by key and
+emptied), applied on start. One behaviour change: a runner polling
+with a key of scope =runner= claims nothing until a repository admin
+attaches it with =repo runner add=. Do that right after the restart.
+A full-scope admin key is unaffected. Merge request heads from forks
+are built only by a runner started with =-untrusted=.
+
 * v1.16.0 — 2026-09-08
 
 What stops a stranger from moving here: the repository plumbing and
