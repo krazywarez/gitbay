@@ -324,11 +324,18 @@ func runnerSession(c *Ctx) (store.SSHKey, int) {
 	return key, -1
 }
 
+// runnerAdmin reports whether a session claims builds instance-wide. The
+// bypass is the key, not the account: a scope-runner key is confined to
+// its attachments whoever owns it, including an instance admin.
+func runnerAdmin(c *Ctx) bool {
+	return c.User.IsAdmin && c.Scope != "runner"
+}
+
 // runnerMayBuild reports whether a runner session may act on a
-// repository's builds: an admin user may on any, a runner key on the
+// repository's builds: an admin key may on any, a runner key on the
 // repositories it is attached to (#184).
 func runnerMayBuild(c *Ctx, key store.SSHKey, repoID int64) (bool, error) {
-	if c.User.IsAdmin {
+	if runnerAdmin(c) {
 		return true, nil
 	}
 	return c.Store.RunnerAttached(key.ID, repoID)
@@ -373,7 +380,7 @@ func runRunnerNext(c *Ctx, args []string) int {
 		}
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	if !c.User.IsAdmin && len(repoIDs) == 0 {
+	if !runnerAdmin(c) && len(repoIDs) == 0 {
 		repoIDs, err = c.Store.RunnerRepoIDs(key.ID)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)

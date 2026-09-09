@@ -104,4 +104,21 @@ func TestRepoRunnerAddRefusesWrongKeys(t *testing.T) {
 	if code := runRepoRunnerAdd(c, []string{repo.Path()}); code != protocol.ExitOK {
 		t.Fatalf("admin could not attach another account's runner key: exit %d %s", code, out.String())
 	}
+	// The runner clones what it builds: bob cannot read alice's private
+	// repository, so not even an admin may attach his key to it.
+	secretID, err := st.CreateRepo("user", uid, "secret", "private")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := st.RepoByID(secretID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, out = repoRunnerCtx(t, st, uid, true, testRunnerPub)
+	if code := runRepoRunnerAdd(c, []string{secret.Path()}); code != protocol.ExitDenied {
+		t.Fatalf("key attached to a repo its account cannot read: exit %d %s", code, out.String())
+	}
+	if runners, _ := st.ListRepoRunners(secret.ID); len(runners) != 0 {
+		t.Fatalf("attached anyway: %+v", runners)
+	}
 }

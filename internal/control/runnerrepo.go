@@ -66,6 +66,22 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 	case key.UserID != c.User.ID && !c.User.IsAdmin:
 		return c.fail(protocol.ExitDenied, "%s belongs to another account", fp)
 	}
+	// The runner clones what it builds, so the key's account must be able
+	// to read the repository. The caller's own key needs no check: they
+	// hold admin on the repository to get here.
+	if key.UserID != c.User.ID {
+		owner, err := c.Store.UserByID(key.UserID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		grant, err := c.Store.AccessRole(repo.ID, owner.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if !policy.CanRead(owner, repo, grant) {
+			return c.fail(protocol.ExitDenied, "%s belongs to %s, who cannot read %s", fp, owner.Username, repo.Path())
+		}
+	}
 	if err := c.Store.AttachRunner(key.ID, repo.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

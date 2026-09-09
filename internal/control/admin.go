@@ -459,19 +459,23 @@ func runAdminRunners(c *Ctx, args []string) int {
 	if runners == nil {
 		runners = []store.Runner{}
 	}
+	// The scope column is what the key may claim, not what it asked for. A
+	// runner key is confined to its attachments, so they replace whatever
+	// -repos it polled with, and none of them means none. Any other key
+	// keeps the repositories it asked for, or the whole instance.
 	for i := range runners {
-		if runners[i].Scope != "" {
-			continue
-		}
 		key, err := c.Store.SSHKeyByID(runners[i].KeyID)
 		if err != nil || key.Scope != "runner" {
-			continue // an admin key with no -repos: any
+			continue
 		}
 		paths, err := c.Store.RunnerRepoPaths(runners[i].KeyID)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-		runners[i].Scope = strings.Join(paths, ",")
+		runners[i].Scope = "none"
+		if len(paths) > 0 {
+			runners[i].Scope = strings.Join(paths, ",")
+		}
 	}
 	d := map[string]any{"queue": queue, "runners": runners}
 	return c.emit(d, func(w io.Writer) {

@@ -118,21 +118,59 @@ func TestRunnerNextAttachedClaimsOwnRepoOnly(t *testing.T) {
 }
 
 // The heartbeat is recorded against the key, and admin runners shows it
-// with its fingerprint and attachments.
+// with its fingerprint and attachments. The column is the attachments even
+// when the key polled with a narrower -repos, and none when it has no
+// attachment at all.
 func TestAdminRunnersShowsKeyAndAttachments(t *testing.T) {
 	f := newAttachFixture(t)
-	if err := f.st.AttachRunner(f.aliceKey.ID, f.app.ID); err != nil {
-		t.Fatal(err)
+	for _, id := range []int64{f.app.ID, f.evil.ID} {
+		if err := f.st.AttachRunner(f.aliceKey.ID, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 	c, _ := f.ctx(f.alice, f.aliceKey, false)
+	runRunnerNext(c, []string{"alice/app"})
+	c, _ = f.ctx(f.mallory, f.malloryKey, false)
 	runRunnerNext(c, nil)
 	admin, out := f.ctx(f.alice, f.aliceKey, true)
 	admin.Scope = "full"
 	if code := runAdminRunners(admin, nil); code != protocol.ExitOK {
 		t.Fatalf("admin runners: exit %d: %s", code, out.String())
 	}
-	if !strings.Contains(out.String(), "alice\tSHA256:alice\t") || !strings.Contains(out.String(), "\talice/app\t") {
+	if !strings.Contains(out.String(), "alice\tSHA256:alice\t") ||
+		!strings.Contains(out.String(), "\talice/app,mallory/evil\t") {
 		t.Fatalf("row lacks fingerprint or attachments:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "\tnone\t") {
+		t.Fatalf("mallory's unattached runner key is not none:\n%s", out.String())
+	}
+}
+
+// The instance-admin bypass is the key, not the account: a runner-scoped
+// key on an admin account claims only what it is attached to.
+func TestRunnerNextAdminAccountRunnerKeyIsConfined(t *testing.T) {
+	f := newAttachFixture(t)
+	c, out := f.ctx(f.alice, f.aliceKey, true)
+	if code := runRunnerNext(c, nil); code != protocol.ExitOK || !strings.Contains(out.String(), "no pending builds") {
+		t.Fatalf("exit %d: %s", code, out.String())
+	}
+	for _, b := range []struct {
+		repo   store.Repo
+		number int64
+	}{{f.app, f.appBuild}, {f.evil, f.evilBuild}} {
+		if got, _ := f.st.BuildByNumber(b.repo.ID, b.number); got.Status != "pending" {
+			t.Fatalf("%s claimed by an unattached runner key: %s", b.repo.Path(), got.Status)
+		}
+	}
+	if err := f.st.AttachRunner(f.aliceKey.ID, f.app.ID); err != nil {
+		t.Fatal(err)
+	}
+	c, out = f.ctx(f.alice, f.aliceKey, true)
+	if code := runRunnerNext(c, nil); code != protocol.ExitOK || !strings.Contains(out.String(), "alice/app") {
+		t.Fatalf("attached claim: exit %d: %s", code, out.String())
+	}
+	if got, _ := f.st.BuildByNumber(f.evil.ID, f.evilBuild); got.Status != "pending" {
+		t.Fatalf("mallory's build was claimed: %s", got.Status)
 	}
 }
 
