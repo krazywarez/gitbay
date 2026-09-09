@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -149,7 +150,9 @@ func main() {
 			*identity = p
 		}
 	}
-	r.sshOpts = append(identityOpts(*identity), r.sshOpts...)
+	// Clipped: the later appends run from concurrent workers, and spare
+	// capacity here would have them writing the same backing array.
+	r.sshOpts = slices.Clip(append(identityOpts(*identity), r.sshOpts...))
 	r.untrusted = *untrusted
 	for _, name := range strings.Split(*repos, ",") {
 		if name = strings.TrimSpace(name); name != "" {
