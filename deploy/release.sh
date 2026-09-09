@@ -1,6 +1,6 @@
 #!/bin/sh
-# Build release binaries for a tag: reproducible cross-compiled gitbay and
-# gitbayd with a checksum manifest.
+# Build release binaries for a tag: reproducible cross-compiled gitbay,
+# gitbayd and gitbay-runner with a checksum manifest.
 #
 #   git checkout v0.2.0 && ./deploy/release.sh v0.2.0
 #
@@ -19,7 +19,7 @@ mkdir -p "$out"
 for target in linux/amd64 linux/arm64 darwin/arm64; do
     goos="${target%/*}"
     goarch="${target#*/}"
-    for bin in gitbay gitbayd; do
+    for bin in gitbay gitbayd gitbay-runner; do
         name="${bin}-${V}-${goos}-${goarch}"
         echo "building $name"
         CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
