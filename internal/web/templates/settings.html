@@ -157,6 +157,26 @@ depends on.</p>
 {{else}}<p class="none">Nothing behind{{if not .Deps.LastCheck}} — the first check has not run yet{{end}}.</p>{{end}}
 {{end}}
 
+<h2>Runners</h2>
+{{if .Runners}}
+<ul class="protlist">
+{{range .Runners}}<li><code>{{.Fingerprint}}</code> <span class="meta">{{.Username}}{{if .LastSeen}}, last poll {{.LastSeen}}{{else}}, never polled{{end}}{{if .BuildNumber}}, running {{.BuildRepo}} #{{.BuildNumber}} {{.BuildJob}}{{end}}</span>
+  <form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="runner-remove">
+    <input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
+    <button type="submit" class="linklike">Detach</button>
+  </form></li>
+{{end}}
+</ul>
+{{else}}<p class="meta">No runners attached. Builds for this repository run on the runners attached here; a repository with none queues builds nothing claims.</p>{{end}}
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="runner-add">
+  <label for="runner-key">Attach a runner</label>
+  <textarea id="runner-key" name="key" rows="3" placeholder="ssh-ed25519 AAAA… (from gitbay-runner init)"></textarea>
+  <button type="submit">Attach</button>
+</form>
+<p class="meta">Install <code>gitbay-runner</code>, run <code>gitbay-runner init</code>, and paste the key it prints. The runner builds your commits with the repository's secrets; merge requests from forks wait unless it runs with <code>-untrusted</code>.</p>
+
 <h2>Lifecycle</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="archive">

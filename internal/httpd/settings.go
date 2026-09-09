@@ -21,6 +21,7 @@ type settingsPage struct {
 	Branches    []gitutil.Ref
 	DepsEnabled bool
 	Deps        control.DepsOut
+	Runners     []store.RepoRunner
 	Notice      string
 }
 
@@ -41,10 +42,13 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.Us
 	// prints (#164).
 	var deps control.DepsOut
 	s.runControlInto(u, []string{"repo", "deps", "status", repo.Path()}, &deps)
+	var runners []store.RepoRunner
+	s.runControlInto(u, []string{"repo", "runner", "list", repo.Path()}, &runners)
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: deps.Enabled, Deps: deps,
-		Notice: s.takeFlash(w, r),
+		Runners: runners,
+		Notice:  s.takeFlash(w, r),
 	})
 }
 
@@ -113,6 +117,20 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			s.settingsRedirect(w, r, "name at least one topic")
 			return
 		}
+	case "runner-add":
+		body := v("key")
+		if body == "" {
+			s.settingsRedirect(w, r, "paste the runner's public key")
+			return
+		}
+		msg, ok := s.runControlStdin(u, []string{"repo", "runner", "add", repo}, body+"\n")
+		if ok {
+			msg = ""
+		}
+		s.settingsRedirect(w, r, msg)
+		return
+	case "runner-remove":
+		argv = []string{"repo", "runner", "remove", repo, v("fingerprint")}
 	default:
 		s.settingsRedirect(w, r, "unknown setting")
 		return
