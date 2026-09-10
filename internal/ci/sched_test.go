@@ -101,4 +101,38 @@ func TestSchedulerRunDue(t *testing.T) {
 	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
 		t.Fatalf("second pass queued extra builds: %+v", builds)
 	}
+
+	// Due again while the first build is still pending: nothing is
+	// queued, so a repository no runner serves holds one row per
+	// scheduled job, not one per tick (#206). Once that build finishes,
+	// the next tick queues again — a schedule re-runs an unchanged
+	// commit on purpose.
+	if err := st.SetScheduleNext(repoID, "nightly", past); err != nil {
+		t.Fatal(err)
+	}
+	s.RunDue(now)
+	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
+		t.Fatalf("tick with the last build pending queued another: %+v", builds)
+	}
+	b, ok, err := st.ClaimBuild(nil, false)
+	if err != nil || !ok {
+		t.Fatalf("claim: %v ok=%v", err, ok)
+	}
+	if err := st.SetScheduleNext(repoID, "nightly", past); err != nil {
+		t.Fatal(err)
+	}
+	s.RunDue(now)
+	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
+		t.Fatalf("tick with the last build running queued another: %+v", builds)
+	}
+	if err := st.FinishBuild(b.ID, "success"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetScheduleNext(repoID, "nightly", past); err != nil {
+		t.Fatal(err)
+	}
+	s.RunDue(now)
+	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 2 {
+		t.Fatalf("tick after the last build finished did not queue: %+v", builds)
+	}
 }

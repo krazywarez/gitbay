@@ -28,8 +28,11 @@ nothing claims. See the Users page. Among what a runner may claim it
 takes the oldest pending build, across every repository it serves;
 a repository that must never wait on another gets a runner of its own
 (decided in krz/gitbay#207). There is no cap on how many
-builds an account queues or how often a schedule fires; that is
-krz/gitbay#206.
+builds an account queues or how often a schedule fires, and none is
+planned (krz/gitbay#206): a tick queues nothing while the job's last
+build is pending or running, so a repository with no runner holds one
+row per scheduled job, and a schedule with a runner attached spends
+its owner's compute, not the instance's.
 
 Scheduled jobs run on their cron against the default branch, never on
 push; a default-branch push registers or updates them. Tag jobs run on
@@ -84,6 +87,7 @@ push produced for that job; the commit's =ci/<job>= status follows:
 | merge request head from a fork | queued, untrusted | queued, untrusted | queued, untrusted | — | — | — |
 | tag push | — | — | — | — | queued | — |
 | schedule tick on the default branch | — | — | — | queued | — | — |
+| schedule tick while the last scheduled build is still pending | — | — | — | — | — | — |
 | claimed builds whose runner vanished | abandoned | abandoned | — | — | — | — |
 | push to the default branch with an old sha that cannot be diffed | queued | queued | queued | registered | — | — |
 | push with a broken ci.yml | — | — | — | — | — | failure |

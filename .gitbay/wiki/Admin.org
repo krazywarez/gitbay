@@ -402,11 +402,13 @@ stacks from one repository. A runner attached to one repository cannot
 be starved. That is the rule, decided in krz/gitbay#207: a runner
 serving several repositories takes them oldest-first, and an operator
 who wants one repository never to wait on another runs a second
-runner attached to it alone. Nothing caps what an account queues: builds pending at
-once and schedule intervals down to a minute are unbounded, and a
-build nothing claims stays pending. Since a build runs only on a
-runner its owner attaches, the cost is rows and the queue numbers on
-=admin runners=, not compute; a per-account cap is krz/gitbay#206.
+runner attached to it alone. Nothing caps what an account queues,
+and nothing needs to (krz/gitbay#206): a schedule tick queues nothing
+while the job's last build is pending or running, so a repository
+with no runner holds one row per scheduled job rather than one per
+tick, and a build runs only on a runner its owner attaches, so a busy
+schedule spends the owner's compute. Pushes are bounded by what an
+account can push.
 
 #+begin_src sh
 gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \

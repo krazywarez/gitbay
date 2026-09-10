@@ -363,6 +363,13 @@ var pushShapes = []pushShape{
 		f.sched.RunDue(time.Now().AddDate(1, 0, 0))
 	}, []string{"—", "—", "—", "queued", "—", "—"}},
 
+	{"schedule tick while the last scheduled build is still pending", func(f *shapeFixture) {
+		f.push("main", zeroSHA40, f.base)
+		f.sched.RunDue(time.Now().AddDate(1, 0, 0))
+		f.mark(f.base)
+		f.sched.RunDue(time.Now().AddDate(2, 0, 0))
+	}, []string{"—", "—", "—", "—", "—", "—"}},
+
 	{"claimed builds whose runner vanished", func(f *shapeFixture) {
 		f.git(f.src, "checkout", "-q", "-b", "feat")
 		c1 := f.appCommit("more")

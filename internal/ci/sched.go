@@ -100,6 +100,16 @@ func (s *Scheduler) RunDue(now time.Time) {
 			s.St.RemoveSchedule(e.RepoID, e.Job)
 			continue
 		}
+		// The push path skips a job whose build for the commit is still
+		// pending or running; so does a tick. Without this a repository
+		// no runner serves gained one row per tick forever (#206). A
+		// finished build does not suppress the tick: a schedule re-runs
+		// an unchanged commit on purpose.
+		if built, err := s.St.BuildsForCommit(repo.ID, sha); err == nil {
+			if b, ok := built[job.Name]; ok && (b.Status == "pending" || b.Status == "running") {
+				continue
+			}
+		}
 		steps, _ := json.Marshal(job.Steps)
 		n, err := s.St.CreateBuild(repo.ID, job.Name, sha, repo.DefaultBranch, string(steps), job.Image, "", true)
 		if err != nil {
