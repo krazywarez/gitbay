@@ -474,7 +474,11 @@ from a runner elsewhere; inside a container on the server's own runner
 the host is at a private address the runner fills in). A job that
 talks back to the instance — a release asset, a comment, a push to a
 pages branch — uses =$GITBAY_SSH= with a key it holds as a secret;
-the build's container has no key of its own.
+the build's container has no key of its own. Two things about that
+container: a secret with newlines (a private key) arrives intact, and
+=ssh= expands =~= from the passwd entry, =/root=, not from =$HOME=,
+which is the build home — write an ssh config to
+=$(getent passwd "$(id -u)" | cut -d: -f6)/.ssh/config=, or pass =-F=.
 
 Secrets: =repo secret set <owner/name> <NAME>= reads the value from
 stdin (never argv) and injects it into the repo's builds as =$NAME=;
