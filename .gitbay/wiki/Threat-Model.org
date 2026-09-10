@@ -219,4 +219,8 @@ assume has been checked.
 - A build's secrets are environment variables inside its container, so
   they are visible to =podman inspect= as the runner's user — the same
   user that already holds them in memory. They reach podman through a
-  0600 env file rather than argv, since =/proc= is world-readable.
+  0600 env file rather than argv, since =/proc= is world-readable. A
+  value with a newline in it — a private key — cannot go in that file;
+  it is named on podman's command line with =--env NAME= and valued in
+  the runner-owned podman process's environment, so it never touches
+  argv either.

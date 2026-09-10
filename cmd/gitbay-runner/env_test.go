@@ -162,3 +162,27 @@ func TestServeStopsWhileIdle(t *testing.T) {
 		t.Fatal("idle worker did not stop")
 	}
 }
+
+// A private key is a secret with newlines. An env file cannot carry one,
+// so such values reach the container through podman's own environment,
+// named on the command line and never valued there.
+func TestSplitEnvKeepsMultilineOutOfTheFile(t *testing.T) {
+	env := []string{"PATH=/bin", "KEY=-----BEGIN\nabc\n-----END", "TOKEN=s3cret", "CR=a\rb"}
+	file, inherit := splitEnv(env)
+	if len(file) != 2 || file[0] != "PATH=/bin" || file[1] != "TOKEN=s3cret" {
+		t.Fatalf("file env = %q", file)
+	}
+	if len(inherit) != 2 || inherit[0] != "KEY=-----BEGIN\nabc\n-----END" || inherit[1] != "CR=a\rb" {
+		t.Fatalf("inherited env = %q", inherit)
+	}
+	args := inheritArgs(inherit)
+	want := []string{"--env", "KEY", "--env", "CR"}
+	if strings.Join(args, " ") != strings.Join(want, " ") {
+		t.Fatalf("podman args = %q, want %q", args, want)
+	}
+	for _, a := range args {
+		if strings.Contains(a, "BEGIN") || strings.Contains(a, "a\rb") {
+			t.Fatalf("a secret's value reached argv: %q", a)
+		}
+	}
+}

@@ -115,8 +115,14 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	// file outside the workspace holds them instead — outside because the
 	// workspace is bind mounted, and a file of secrets sitting in the
 	// checkout is one `cat` from a build's own log.
+	//
+	// A value with a newline in it — a private key — cannot go in the
+	// file, which has no escape for one. Those are named on the command
+	// line with --env NAME and valued in the podman process's own
+	// environment, which podman copies into the container.
+	fileEnv, inherit := splitEnv(env)
 	envFile := filepath.Join(r.workdir, fmt.Sprintf("env-%d", j.ID))
-	if err := writeEnvFile(envFile, env); err != nil {
+	if err := writeEnvFile(envFile, fileEnv); err != nil {
 		fmt.Fprintf(sink, "preparing the build environment: %v\n", err)
 		return false
 	}
@@ -144,7 +150,9 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	args := append(r.podmanGlobal(), "run", "--detach", "--rm", "--pull=never", "--cgroups=disabled")
 	args = append(args,
 		"--name", name,
-		"--env-file", envFile,
+		"--env-file", envFile)
+	args = append(args, inheritArgs(inherit)...)
+	args = append(args,
 		"--volume", dir+":/workspace:rw",
 		// The build home holds the tool caches (Go modules, the sonar
 		// scanner) that must outlive a build; HOME in env points at it.
@@ -156,7 +164,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		"--entrypoint", "sh",
 		image, "-c", "sleep infinity")
 	start := exec.Command(podman, args...)
-	start.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
+	start.Env = append([]string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}, inherit...)
 	intoCgroup(start, cgroupFD)
 	if out, err := start.CombinedOutput(); err != nil {
 		// A missing image lands here, and it is the common case worth
@@ -224,6 +232,31 @@ func (r *runner) podmanHome() string {
 		return h
 	}
 	return "/var/lib/gitbay-runner"
+}
+
+// splitEnv separates the entries an env file can carry from those whose
+// value holds a newline, which podman must inherit from its environment.
+func splitEnv(env []string) (file, inherit []string) {
+	for _, e := range env {
+		if strings.ContainsAny(e, "\n\r") {
+			inherit = append(inherit, e)
+		} else {
+			file = append(file, e)
+		}
+	}
+	return file, inherit
+}
+
+// inheritArgs names each inherited variable for podman run: --env NAME
+// with no value makes podman take it from its own environment, so the
+// value never appears on a command line.
+func inheritArgs(inherit []string) []string {
+	var args []string
+	for _, e := range inherit {
+		name, _, _ := strings.Cut(e, "=")
+		args = append(args, "--env", name)
+	}
+	return args
 }
 
 // writeEnvFile writes KEY=VALUE lines for podman --env-file, readable
