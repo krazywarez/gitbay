@@ -383,9 +383,11 @@ daemon instances; without the drop-in a deploy's copy over the admin
 sshd stalled. Both deploy targets copy with =rsync --partial=, which
 resumes a stalled transfer.
 
-v1 runs steps directly on the host — no containers — so treat the
-runner machine as executing whatever your users push. Install the
-toolchains your builds need on it.
+Under =-isolation podman=, the default and what bay1 runs, each build
+is confined to a container (see Container isolation below). Under
+=-isolation none= steps run directly on the host as the runner's user,
+so treat that machine as executing whatever your users push, and
+install the toolchains your builds need on it.
 
 A runner claims the oldest pending build among the repositories its key
 is attached to — for an admin key, the oldest in the instance. =-repos=
@@ -411,9 +413,10 @@ gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
 
 Add =-untrusted= only with =-isolation podman=.
 
-gitbay.org's runner is scoped: it builds the forge's own repositories
-and the isolation canary, nothing else, because it shares the host with
-the forge; any other repository builds on a runner its owner attaches.
+gitbay.org's runner is attached to the forge's own repositories and
+the isolation canary, nothing else, because it shares the host with
+the forge; its unit names no =-repos=, the attachments are the
+boundary. Any other repository builds on a runner its owner attaches.
 
 =-repos= narrows an admin runner; for a runner key the attachments are
 the boundary, held by the server, and =-repos= may only name
