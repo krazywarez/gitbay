@@ -25,8 +25,9 @@ runner attached to its repository (or one polling with a full-scope
 admin key), and an untrusted build only by one started with
 =-untrusted=. A repository with no runner attached queues builds
 nothing claims. See the Users page. Among what a runner may claim it
-takes the oldest pending build; per-repository rotation when one
-runner serves several is krz/gitbay#207. There is no cap on how many
+takes the oldest pending build, across every repository it serves;
+a repository that must never wait on another gets a runner of its own
+(decided in krz/gitbay#207). There is no cap on how many
 builds an account queues or how often a schedule fires; that is
 krz/gitbay#206.
 

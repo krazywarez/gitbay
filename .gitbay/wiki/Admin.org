@@ -399,8 +399,10 @@ Oldest-first is across everything the key may claim, so a repository
 with a deep queue holds every other repository the same runner serves;
 bay1 measured a 15-minute average wait on a day of merge request
 stacks from one repository. A runner attached to one repository cannot
-be starved. Whether a runner serving several rotates across them is
-krz/gitbay#207. Nothing caps what an account queues: builds pending at
+be starved. That is the rule, decided in krz/gitbay#207: a runner
+serving several repositories takes them oldest-first, and an operator
+who wants one repository never to wait on another runs a second
+runner attached to it alone. Nothing caps what an account queues: builds pending at
 once and schedule intervals down to a minute are unbounded, and a
 build nothing claims stays pending. Since a build runs only on a
 runner its owner attaches, the cost is rows and the queue numbers on
