@@ -5,7 +5,7 @@
 # Build it on the runner host, where podman keeps it:
 #
 #   ssh -p 2222 root@bay1 'su - ci-runner -s /bin/sh -c \
-#     "podman build -t localhost/gitbay-ci:1 -f - ." ' < deploy/Containerfile.ci
+#     "podman build -t localhost/gitbay-ci:2 -f - ." ' < deploy/Containerfile.ci
 #
 # Tagged, not :latest, so a change to this file is a deliberate bump in
 # .gitbay/ci.yml rather than a silent change under a running branch.
@@ -14,6 +14,9 @@ FROM docker.io/library/golang:1.27-trixie
 # The suite drives real git, ssh, sshd and gpg rather than mocking them,
 # and asserts they are present before running. git-lfs has its own tests;
 # sshd must be the binary at /usr/sbin/sshd that the tests exec.
+# python3-venv: this is also the default image for every repository the
+# bay1 runner is attached to, and a lint job that makes a venv for ruff
+# fails without ensurepip (gitbay-ci:2).
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         git-lfs \
         gnupg \
@@ -22,6 +25,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
         ca-certificates \
         curl \
         unzip \
+        python3 \
+        python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # A build runs as this image's root inside its own user namespace, mapped

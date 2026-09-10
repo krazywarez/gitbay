@@ -17,13 +17,13 @@ import (
 // same rule builds follow.
 func provisionedImage(t *testing.T) string {
 	t.Helper()
-	for _, img := range []string{"localhost/gitbay-ci:1", "docker.io/library/debian:stable-slim", "docker.io/library/alpine:latest"} {
+	for _, img := range []string{"localhost/gitbay-ci:2", "docker.io/library/debian:stable-slim", "docker.io/library/alpine:latest"} {
 		if err := exec.Command("podman", "image", "exists", img).Run(); err == nil {
 			return img
 		}
 	}
 	t.Log("SKIPPING ISOLATION TEST: podman has no image this test can use. " +
-		"Provision one (podman build -t localhost/gitbay-ci:1 -f deploy/Containerfile.ci). " +
+		"Provision one (podman build -t localhost/gitbay-ci:2 -f deploy/Containerfile.ci). " +
 		"The container path is NOT covered by this run.")
 	return ""
 }
@@ -179,7 +179,7 @@ func runnerPodmanOnce(t *testing.T, inst *instance, key string) {
 		"-remote", "git@127.0.0.1",
 		"-ssh-opts", opts,
 		"-isolation", "podman",
-		"-image", "localhost/gitbay-ci:1",
+		"-image", "localhost/gitbay-ci:2",
 		"-clone-base", fmt.Sprintf("ssh://git@127.0.0.1:%d", inst.port),
 		"-workdir", t.TempDir())
 	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
