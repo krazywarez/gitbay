@@ -16,7 +16,8 @@ FROM docker.io/library/golang:1.27-trixie
 # sshd must be the binary at /usr/sbin/sshd that the tests exec.
 # python3-venv: this is also the default image for every repository the
 # bay1 runner is attached to, and a lint job that makes a venv for ruff
-# fails without ensurepip (gitbay-ci:2).
+# fails without ensurepip (gitbay-ci:2). sqlite3: the same reason, for
+# a job that maintains an archive database.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         git-lfs \
         gnupg \
@@ -27,6 +28,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
         unzip \
         python3 \
         python3-venv \
+        sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # A build runs as this image's root inside its own user namespace, mapped
