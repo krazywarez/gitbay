@@ -4,6 +4,67 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.18.0 — 2026-09-10
+
+What the first real job on a user's runner needed. A twice-daily
+archive pull that had run on the server's host moved into a container
+and then onto a laptop, and each hop found a gap.
+
+** CI runner
+
+- A secret with newlines — a private key — reaches the build. An env
+  file has no escape for one, so such values are named on podman's
+  command line with =--env NAME= and valued in the podman process's own
+  environment; the value touches neither argv nor the file.
+- =GITBAY_SSH= in every build's environment: the instance's ssh
+  destination as the build reaches it. Under podman the host's own
+  addresses belong to the container (pasta), so a loopback remote is
+  rewritten to the address pasta exposes the host at. A job that
+  publishes back to the instance uses the variable rather than
+  guessing. Inside a container =ssh= expands =~= from the passwd entry,
+  not =$HOME=; keep a build's ssh config in the workspace and pass =-F=.
+- =-identity= drops the user's =~/.ssh/config= (=-F /dev/null=):
+  =IdentitiesOnly= kept identities the config named, so a laptop runner
+  authenticated as the user's own full-scope key and, on an admin's
+  machine, could claim every repository's builds. A first-seen host key
+  is accepted, since a service cannot answer a prompt.
+- A schedule tick queues nothing while the job's last build is pending
+  or running, matching the push path. A repository no runner served
+  gained one row per tick forever. A finished build does not suppress
+  the tick; a schedule re-runs an unchanged commit on purpose. #206
+- =admin runners forget <fingerprint>= drops a key's heartbeat row; the
+  key stays. =admin runners= rows are the repositories a key may claim.
+- The bay1 unit names no =-repos=: the runner key's attachments are the
+  boundary. =gitbay-ci:2= carries =python3-venv= and =sqlite3=, since
+  it is also the default image for every repository the runner is
+  attached to.
+
+** Decisions
+
+- Claim order stays oldest-first across everything a key may claim; a
+  repository that must never wait on another gets a runner of its own.
+  #207
+- No per-account cap on queued builds and no schedule floor: with the
+  tick dedupe a repository with no runner holds one row per scheduled
+  job, and a busy schedule spends its owner's compute. #206
+- Attaching a runner is =n/a= on iOS: the key lives on the machine that
+  runs builds.
+
+** Documentation
+
+- Users: =GITBAY_SSH=, ssh's home inside a container, the =ci.yml= caps
+  (ten jobs, fifty steps, 4096 bytes a step, 64 KiB a file) and where a
+  broken config shows up. Admin, CI and Threat-Model follow the changes
+  above.
+
+** Upgrading
+
+Replace the binaries and reinstall the CLI. No migration. A runner
+started with =-identity= (every runner =gitbay-runner init= set up) now
+ignores =~/.ssh/config=; a runner that relied on it for a =ProxyJump=
+or an alias passes the equivalent in =-ssh-opts=. Homebrew:
+=brew upgrade krz/tap/gitbay-runner=.
+
 * v1.17.0 — 2026-09-09
 
 CI without the operator's compute: a runner anyone installs and
