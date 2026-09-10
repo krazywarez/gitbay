@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -77,8 +78,9 @@ func TestIdentityOpts(t *testing.T) {
 	if got := identityOpts(""); got != nil {
 		t.Fatalf("empty identity produced %v", got)
 	}
-	got := identityOpts("/k")
-	if len(got) != 4 || got[0] != "-i" || got[1] != "/k" || got[3] != "IdentitiesOnly=yes" {
-		t.Fatalf("got %v", got)
+	got := strings.Join(identityOpts("/k"), " ")
+	want := "-F /dev/null -i /k -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }

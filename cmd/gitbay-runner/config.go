@@ -84,11 +84,15 @@ func applyConfig(fs *flag.FlagSet, values map[string]string) error {
 }
 
 // identityOpts is what makes ssh and git use the runner's own key and no
-// other: on a laptop the ambient key is the user's full-scope one, which
-// the runner protocol refuses.
+// other. On a laptop the user's ~/.ssh/config names their full-scope key
+// for the instance, and IdentitiesOnly keeps identities from the config,
+// so the runner would authenticate as that key and, on an admin's
+// machine, claim every repository's builds. -F /dev/null drops the
+// config; known_hosts is unaffected, and a host seen for the first time
+// is accepted, since a service cannot answer a prompt.
 func identityOpts(path string) []string {
 	if path == "" {
 		return nil
 	}
-	return []string{"-i", path, "-o", "IdentitiesOnly=yes"}
+	return []string{"-F", "/dev/null", "-i", path, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=accept-new"}
 }
