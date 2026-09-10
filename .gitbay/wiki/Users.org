@@ -468,7 +468,13 @@ the web) and a =ci/<job>= commit status, which =repo settings
 require-checks= can gate merges on. Steps run with =sh -c= on the
 instance's runner, stopping at the first failure; a broken config
 surfaces as a failed =ci/config= status. Environment: =GITBAY_REPO=,
-=GITBAY_SHA=, =GITBAY_REF=, =GITBAY_JOB=, =CI=true=.
+=GITBAY_SHA=, =GITBAY_REF=, =GITBAY_JOB=, =CI=true=, and =GITBAY_SSH=,
+the instance's ssh destination as the build reaches it (=git@gitbay.org=
+from a runner elsewhere; inside a container on the server's own runner
+the host is at a private address the runner fills in). A job that
+talks back to the instance — a release asset, a comment, a push to a
+pages branch — uses =$GITBAY_SSH= with a key it holds as a secret;
+the build's container has no key of its own.
 
 Secrets: =repo secret set <owner/name> <NAME>= reads the value from
 stdin (never argv) and injects it into the repo's builds as =$NAME=;

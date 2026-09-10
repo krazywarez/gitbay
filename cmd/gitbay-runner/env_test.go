@@ -13,7 +13,7 @@ func TestStepEnvDoesNotInherit(t *testing.T) {
 	t.Setenv("GITBAY_RUNNER_TOKEN", "a-secret-the-service-was-given")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "also-not-for-builds")
 
-	env := stepEnv(job{Repo: "alice/app", SHA: "abc", Ref: "main", Job: "test"}, "/tmp/buildhome")
+	env := stepEnv(job{Repo: "alice/app", SHA: "abc", Ref: "main", Job: "test"}, "/tmp/buildhome", "git@x.test")
 
 	for _, e := range env {
 		if strings.HasPrefix(e, "GITBAY_RUNNER_TOKEN=") || strings.HasPrefix(e, "AWS_SECRET_ACCESS_KEY=") {
@@ -47,11 +47,11 @@ func TestStepEnvDoesNotInherit(t *testing.T) {
 // Secrets are passed through when the server sent them, which it does
 // only for a trusted build.
 func TestStepEnvCarriesSecrets(t *testing.T) {
-	env := stepEnv(job{Secrets: map[string]string{"TOKEN": "s3cret"}}, "/tmp/buildhome")
+	env := stepEnv(job{Secrets: map[string]string{"TOKEN": "s3cret"}}, "/tmp/buildhome", "git@x.test")
 	if !containsEnv(env, "TOKEN=s3cret") {
 		t.Error("a trusted build's secret did not reach the step")
 	}
-	env = stepEnv(job{}, "/tmp/buildhome")
+	env = stepEnv(job{}, "/tmp/buildhome", "git@x.test")
 	for _, e := range env {
 		if strings.HasPrefix(e, "TOKEN=") {
 			t.Errorf("a secret appeared with none sent: %q", e)
@@ -64,7 +64,7 @@ func TestStepEnvPathFallback(t *testing.T) {
 	old := os.Getenv("PATH")
 	os.Unsetenv("PATH")
 	defer os.Setenv("PATH", old)
-	if env := stepEnv(job{}, "/tmp/buildhome"); !containsEnv(env, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin") {
+	if env := stepEnv(job{}, "/tmp/buildhome", "git@x.test"); !containsEnv(env, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin") {
 		t.Errorf("no PATH fallback: %v", env)
 	}
 }
@@ -82,7 +82,7 @@ func containsEnv(env []string, want string) bool {
 // which run() removes when the build ends, so every build re-downloaded
 // the Go module cache and the ~50MB sonar scanner.
 func TestStepEnvHomeIsNotTheWorkspace(t *testing.T) {
-	env := stepEnv(job{ID: 7}, "/var/lib/gitbay-runner/work/home")
+	env := stepEnv(job{ID: 7}, "/var/lib/gitbay-runner/work/home", "git@x.test")
 	for _, e := range env {
 		if strings.HasPrefix(e, "HOME=") && strings.Contains(e, "build-7") {
 			t.Errorf("HOME is the per-build workspace, which is deleted after the build: %q", e)
@@ -183,6 +183,30 @@ func TestSplitEnvKeepsMultilineOutOfTheFile(t *testing.T) {
 	for _, a := range args {
 		if strings.Contains(a, "BEGIN") || strings.Contains(a, "a\rb") {
 			t.Fatalf("a secret's value reached argv: %q", a)
+		}
+	}
+}
+
+// A build that talks back to the instance — releases, comments — needs an
+// address that works from where it runs. GITBAY_SSH carries the runner's
+// remote; under podman a loopback remote is rewritten to the address at
+// which pasta exposes the host, since the host's own addresses belong to
+// the container inside it.
+func TestStepEnvCarriesInstanceAddress(t *testing.T) {
+	env := stepEnv(job{}, "/tmp/buildhome", "git@gitbay.org")
+	if !containsEnv(env, "GITBAY_SSH=git@gitbay.org") {
+		t.Errorf("GITBAY_SSH missing: %q", env)
+	}
+	for _, tc := range []struct{ remote, isolation, want string }{
+		{"git@127.0.0.1", isolationNone, "git@127.0.0.1"},
+		{"git@127.0.0.1", isolationPodman, "git@169.254.1.2"},
+		{"git@localhost", isolationPodman, "git@169.254.1.2"},
+		{"git@gitbay.org", isolationPodman, "git@gitbay.org"},
+		{"gitbay.org", isolationPodman, "gitbay.org"},
+	} {
+		r := &runner{remote: tc.remote, isolation: tc.isolation}
+		if got := r.buildSSH(); got != tc.want {
+			t.Errorf("remote %s under %s: got %s want %s", tc.remote, tc.isolation, got, tc.want)
 		}
 	}
 }

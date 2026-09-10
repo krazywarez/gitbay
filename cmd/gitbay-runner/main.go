@@ -430,7 +430,7 @@ func (r *runner) run(j job) bool {
 		}
 	}
 
-	env := stepEnv(j, buildHome)
+	env := stepEnv(j, buildHome, r.buildSSH())
 	return r.runSteps(j, dir, env, sink, deadline, runStep)
 }
 
@@ -462,7 +462,30 @@ func buildHomeFor(workdir, repo string) (string, error) {
 	return dir, nil
 }
 
-func stepEnv(j job, home string) []string {
+// buildSSH is the instance's ssh destination as a build reaches it. Under
+// podman, pasta gives the container the host's own addresses, so a
+// loopback remote — the runner on the server itself — is unreachable by
+// that name; pasta exposes the host at 169.254.1.2, its
+// --map-host-loopback default. Any other remote is a real host elsewhere
+// and works as it is.
+func (r *runner) buildSSH() string {
+	if r.isolation != isolationPodman {
+		return r.remote
+	}
+	user, host, hasUser := strings.Cut(r.remote, "@")
+	if !hasUser {
+		user, host = "", user
+	}
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+		return r.remote
+	}
+	if hasUser {
+		return user + "@169.254.1.2"
+	}
+	return "169.254.1.2"
+}
+
+func stepEnv(j job, home, sshDest string) []string {
 	path := os.Getenv("PATH")
 	if path == "" {
 		path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -476,6 +499,7 @@ func stepEnv(j job, home string) []string {
 		"GITBAY_SHA=" + j.SHA,
 		"GITBAY_REF=" + j.Ref,
 		"GITBAY_JOB=" + j.Job,
+		"GITBAY_SSH=" + sshDest,
 	}
 	// The server sends secrets only for a trusted build — a merge request
 	// head from a fork arrives with none — so this loop is empty exactly
