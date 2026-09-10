@@ -146,3 +146,27 @@ func TestRunnerSeenPerKeyAndRepoList(t *testing.T) {
 		t.Fatalf("RunnerRepoPaths: %v err=%v", paths, err)
 	}
 }
+
+// A heartbeat row outlives its usefulness when a key polled once by
+// mistake; forgetting it by fingerprint removes the row and nothing else.
+func TestForgetRunner(t *testing.T) {
+	s, uid, keyID, _, _ := runnerFixture(t)
+	if err := s.TouchRunner(keyID, uid, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForgetRunner("SHA256:nobody"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown fingerprint: %v, want ErrNotFound", err)
+	}
+	if err := s.ForgetRunner("SHA256:runnerkey"); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := s.ListRunners(); len(rows) != 0 {
+		t.Fatalf("row survived forget: %+v", rows)
+	}
+	if _, err := s.SSHKeyByFingerprint("SHA256:runnerkey"); err != nil {
+		t.Fatalf("forget removed the key itself: %v", err)
+	}
+	if err := s.ForgetRunner("SHA256:runnerkey"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second forget: %v, want ErrNotFound", err)
+	}
+}

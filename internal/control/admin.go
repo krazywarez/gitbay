@@ -33,6 +33,10 @@ func init() {
 		Summary:  "the build queue and runner accounts: last poll, scope, the build each holds (instance admins)",
 		Usage:    "admin runners",
 		ReadOnly: true, SSHOnly: true, Run: runAdminRunners})
+	register(Command{Path: []string{"admin", "runners", "forget"},
+		Summary: "drop a key's runner heartbeat row, e.g. one that polled once by mistake (instance admins)",
+		Usage:   "admin runners forget <fingerprint>",
+		SSHOnly: true, Run: runAdminRunnersForget})
 	register(Command{Path: []string{"admin", "repo", "list"},
 		Summary:  "list every repository with size and last push (instance admins)",
 		Usage:    "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
@@ -439,6 +443,25 @@ func runAdminRepoDelete(c *Ctx, args []string) int {
 	}
 	c.Store.Audit(c.User.ID, "admin repo.delete", map[string]any{"repo": repo.Path()})
 	return protocol.ExitOK
+}
+
+func runAdminRunnersForget(c *Ctx, args []string) int {
+	if code := requireInstanceAdmin(c); code >= 0 {
+		return code
+	}
+	if len(args) != 1 {
+		return c.fail(protocol.ExitUsage, "usage: admin runners forget <fingerprint>")
+	}
+	if err := c.Store.ForgetRunner(args[0]); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "no runner has polled with %s", args[0])
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.Audit(c.User.ID, "admin runners.forget", map[string]any{"fingerprint": args[0]})
+	return c.emit(map[string]string{"forgot": args[0]}, func(w io.Writer) {
+		fmt.Fprintf(w, "forgot runner %s\n", args[0])
+	})
 }
 
 func runAdminRunners(c *Ctx, args []string) int {

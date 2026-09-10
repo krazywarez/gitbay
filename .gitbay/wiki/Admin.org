@@ -432,7 +432,9 @@ podman. A runner without it builds trusted commits only.
 that has polled as a runner: the account, the key's fingerprint, when it
 last polled, the repositories it may claim — its attachments for a runner
 key, the =-repos= it asked for or =any= for an admin key — and the build
-it holds. =admin runners= also heads the list with the queue: builds
+it holds; =admin runners forget <fingerprint>= drops the row for a key
+that polled by mistake, the key itself untouched. =admin runners= also
+heads the list with the queue: builds
 pending now, and over the last day how many were claimed, how long they
 waited to be claimed (average and worst), and
 how many the reaper ended instead of a runner reporting them. A build a runner claimed and never

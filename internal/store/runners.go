@@ -145,6 +145,19 @@ func (s *Store) TouchRunner(keyID, userID int64, scope string, buildID int64) er
 	return err
 }
 
+// ForgetRunner drops a key's heartbeat row. The key itself stays.
+func (s *Store) ForgetRunner(fingerprint string) error {
+	res, err := s.DB.Exec(`DELETE FROM runner_seen
+		WHERE key_id = (SELECT id FROM ssh_keys WHERE fingerprint = ?)`, fingerprint)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // RunnerDone records that the key reported and holds nothing now.
 func (s *Store) RunnerDone(keyID int64) error {
 	_, err := s.DB.Exec(`UPDATE runner_seen SET last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now'),

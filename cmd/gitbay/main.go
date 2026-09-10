@@ -111,7 +111,8 @@ func newRoot() *cobra.Command {
 			),
 			pass("invite", "issue a registration invite and mail its code: --email <address>", passOpts{server: []string{"admin", "invite"}}),
 			pass("stats", "instance statistics: counts and per-repository disk usage", passOpts{server: []string{"admin", "stats"}}),
-			pass("runners", "the build queue and runner accounts: last poll, scope, the build each holds", passOpts{server: []string{"admin", "runners"}}),
+			withSub(pass("runners", "the build queue and runner keys: last poll, scope, the build each holds", passOpts{server: []string{"admin", "runners"}}),
+				pass("forget", "drop a key's heartbeat row: <fingerprint>", passOpts{server: []string{"admin", "runners", "forget"}})),
 			group("repo", "any repository, for moderation (audited)",
 				pass("list", "every repository with size and last push: [--owner o] [--visibility v] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "repo", "list"}}),
 				pass("archive", "archive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "archive"}}),
@@ -277,6 +278,13 @@ func usesStdin(args []string) bool {
 		}
 	}
 	return false
+}
+
+// withSub hangs subcommands off a passthrough command, so `admin runners`
+// still runs while `admin runners forget` reaches its own command.
+func withSub(cmd *cobra.Command, subs ...*cobra.Command) *cobra.Command {
+	cmd.AddCommand(subs...)
+	return cmd
 }
 
 func group(use, short string, subs ...*cobra.Command) *cobra.Command {

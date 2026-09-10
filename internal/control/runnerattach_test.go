@@ -223,3 +223,31 @@ func TestRunnerDoneRefusedForUnattachedBuild(t *testing.T) {
 		t.Fatalf("build was finished by a foreign key: %s", b.Status)
 	}
 }
+
+// admin runners forget drops one heartbeat row by fingerprint.
+func TestAdminRunnersForget(t *testing.T) {
+	f := newAttachFixture(t)
+	c, _ := f.ctx(f.alice, f.aliceKey, false)
+	runRunnerNext(c, nil)
+	admin, out := f.ctx(f.alice, f.aliceKey, true)
+	admin.Scope = "full"
+	if code := runAdminRunnersForget(admin, []string{"SHA256:nobody"}); code != protocol.ExitNotFound {
+		t.Fatalf("unknown fingerprint: exit %d, want %d: %s", code, protocol.ExitNotFound, out.String())
+	}
+	admin, out = f.ctx(f.alice, f.aliceKey, true)
+	admin.Scope = "full"
+	if code := runAdminRunnersForget(admin, []string{f.aliceKey.Fingerprint}); code != protocol.ExitOK {
+		t.Fatalf("forget: exit %d: %s", code, out.String())
+	}
+	admin, out = f.ctx(f.alice, f.aliceKey, true)
+	admin.Scope = "full"
+	runAdminRunners(admin, nil)
+	if strings.Contains(out.String(), f.aliceKey.Fingerprint) {
+		t.Fatalf("row still listed after forget:\n%s", out.String())
+	}
+	user, out := f.ctx(f.alice, f.aliceKey, false)
+	user.Scope = "full"
+	if code := runAdminRunnersForget(user, []string{f.aliceKey.Fingerprint}); code != protocol.ExitDenied {
+		t.Fatalf("non-admin forgot a runner: exit %d: %s", code, out.String())
+	}
+}
