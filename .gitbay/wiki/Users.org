@@ -477,8 +477,10 @@ pages branch — uses =$GITBAY_SSH= with a key it holds as a secret;
 the build's container has no key of its own. Two things about that
 container: a secret with newlines (a private key) arrives intact, and
 =ssh= expands =~= from the passwd entry, =/root=, not from =$HOME=,
-which is the build home — write an ssh config to
-=$(getent passwd "$(id -u)" | cut -d: -f6)/.ssh/config=, or pass =-F=.
+which is the build home — so keep an ssh config in the workspace and
+pass it with =ssh -F= (and =GIT_SSH_COMMAND="ssh -F ..."= for git),
+which also works on a runner with no container, where writing to
+=~/.ssh= would edit that machine's own configuration.
 
 Secrets: =repo secret set <owner/name> <NAME>= reads the value from
 stdin (never argv) and injects it into the repo's builds as =$NAME=;
