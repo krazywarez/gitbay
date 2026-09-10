@@ -393,6 +393,17 @@ narrows within that set, which is what makes a runner outside the server
 practical: one on a machine that should build a single project, or that
 holds credentials for one deployment, stays on it.
 
+Oldest-first is across everything the key may claim, so a repository
+with a deep queue holds every other repository the same runner serves;
+bay1 measured a 15-minute average wait on a day of merge request
+stacks from one repository. A runner attached to one repository cannot
+be starved. Whether a runner serving several rotates across them is
+krz/gitbay#207. Nothing caps what an account queues: builds pending at
+once and schedule intervals down to a minute are unbounded, and a
+build nothing claims stays pending. Since a build runs only on a
+runner its owner attaches, the cost is rows and the queue numbers on
+=admin runners=, not compute; a per-account cap is krz/gitbay#206.
+
 #+begin_src sh
 gitbay-runner -remote git@gitbay.org -repos krz/site,krz/docs \
   -workdir /var/lib/gitbay-runner/work
