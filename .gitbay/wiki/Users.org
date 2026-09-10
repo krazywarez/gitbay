@@ -463,6 +463,12 @@ jobs:
       - go test ./...
 #+end_src
 
+A config holds at most ten jobs of fifty steps each, each step under
+4096 bytes, in a file under 64 KiB; a longer step runs a script from the
+repository (=- sh ci/publish.sh=). A config past a cap, or otherwise
+unparseable, records a failed =ci/config= status on the commit and
+queues nothing, so look there when a push builds nothing.
+
 Each job becomes a build (=build list=, =build log=, the builds tab on
 the web) and a =ci/<job>= commit status, which =repo settings
 require-checks= can gate merges on. Steps run with =sh -c= on the
