@@ -53,7 +53,7 @@ func TestMilestonesAndTemplates(t *testing.T) {
 		"--description", "'first release'", "--due", "2027-01-01"); code != 0 {
 		t.Fatalf("milestone create: %s", errOut)
 	}
-	if _, _, code := inst.ssh(t, aliceKey, "", "milestone", "create", "alice/app", "v1.0"); code != 2 {
+	if _, _, code := inst.ssh(t, aliceKey, "", "milestone", "create", "alice/app", "v1.0"); code != 1 {
 		t.Fatal("duplicate milestone accepted")
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "milestone", "create", "alice/app", "v2.0", "--due", "soon"); code != 2 || !strings.Contains(errOut, "YYYY-MM-DD") {
