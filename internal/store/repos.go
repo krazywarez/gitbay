@@ -476,11 +476,76 @@ func (s *Store) RenameRepo(repoID int64, newName string) error {
 
 // TransferRepo moves a repository to a new owner. The unique index on
 // (owner_kind, owner_id, name) refuses collisions in the target namespace.
+// Moving into an org folds the repository's labels and milestones whose
+// names the org already holds into the org's rows, in the same
+// transaction, so the repository does not come out seeing two of each.
+// Moving out of an org needs no counterpart: the repository keeps what it
+// owns and stops seeing the org's rows.
 func (s *Store) TransferRepo(repoID int64, newKind string, newOwnerID int64) error {
-	_, err := s.DB.Exec("UPDATE repos SET owner_kind = ?, owner_id = ? WHERE id = ?",
-		newKind, newOwnerID, repoID)
-	if isUniqueErr(err) {
-		return fmt.Errorf("the target owner already has a repository by that name")
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
 	}
-	return err
+	defer tx.Rollback()
+	if _, err := tx.Exec("UPDATE repos SET owner_kind = ?, owner_id = ? WHERE id = ?",
+		newKind, newOwnerID, repoID); err != nil {
+		if isUniqueErr(err) {
+			return fmt.Errorf("the target owner already has a repository by that name")
+		}
+		return err
+	}
+	if newKind == "org" {
+		if err := foldIntoOrg(tx, repoID, newOwnerID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// foldIntoOrg folds a repository's labels and milestones into the org's
+// rows of the same name, the way org label set and org milestone create
+// fold the repositories already under the org.
+func foldIntoOrg(tx *sql.Tx, repoID, orgID int64) error {
+	labels, err := sharedNameRows(tx, "labels", "name", repoID, orgID)
+	if err != nil {
+		return err
+	}
+	for _, p := range labels {
+		if err := foldLabelRow(tx, p.org, p.repo); err != nil {
+			return err
+		}
+	}
+	milestones, err := sharedNameRows(tx, "milestones", "title", repoID, orgID)
+	if err != nil {
+		return err
+	}
+	for _, p := range milestones {
+		if err := foldMilestoneRow(tx, p.org, p.repo); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// rowPair is one repository row and the org row it folds into.
+type rowPair struct{ repo, org int64 }
+
+// sharedNameRows pairs a repository's label or milestone rows with the
+// org's rows carrying the same name.
+func sharedNameRows(tx *sql.Tx, table, nameCol string, repoID, orgID int64) ([]rowPair, error) {
+	rows, err := tx.Query("SELECT t.id, o.id FROM "+table+" t JOIN "+table+" o"+
+		" ON o.org_id = ? AND o."+nameCol+" = t."+nameCol+" WHERE t.repo_id = ?", orgID, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []rowPair
+	for rows.Next() {
+		var p rowPair
+		if err := rows.Scan(&p.repo, &p.org); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }

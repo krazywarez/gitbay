@@ -89,27 +89,29 @@ func (s *Store) CreateOrgMilestone(orgID int64, title, description, due string) 
 	if err != nil {
 		return 0, 0, err
 	}
-	var repoRows []int64
-	for rows.Next() {
-		var rid int64
-		if err := rows.Scan(&rid); err != nil {
-			rows.Close()
-			return 0, 0, err
-		}
-		repoRows = append(repoRows, rid)
+	repoMilestones, err := scanIDs(rows)
+	if err != nil {
+		return 0, 0, err
 	}
-	rows.Close()
-	for _, rid := range repoRows {
-		for _, table := range []string{"issues", "merge_requests"} {
-			if _, err := tx.Exec("UPDATE "+table+" SET milestone_id = ? WHERE milestone_id = ?", id, rid); err != nil {
-				return 0, 0, err
-			}
-		}
-		if _, err := tx.Exec("DELETE FROM milestones WHERE id = ?", rid); err != nil {
+	for _, mid := range repoMilestones {
+		if err := foldMilestoneRow(tx, id, mid); err != nil {
 			return 0, 0, err
 		}
 	}
-	return id, len(repoRows), tx.Commit()
+	return id, len(repoMilestones), tx.Commit()
+}
+
+// foldMilestoneRow moves a repository's milestone onto the org's row:
+// every issue and merge request attached to it gets the org row, then the
+// repository row goes.
+func foldMilestoneRow(tx *sql.Tx, orgRow, repoRow int64) error {
+	for _, table := range []string{"issues", "merge_requests"} {
+		if _, err := tx.Exec("UPDATE "+table+" SET milestone_id = ? WHERE milestone_id = ?", orgRow, repoRow); err != nil {
+			return err
+		}
+	}
+	_, err := tx.Exec("DELETE FROM milestones WHERE id = ?", repoRow)
+	return err
 }
 
 // milestoneQuery selects milestones with their progress, counting only

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 )
@@ -30,4 +31,18 @@ func inClause(ids []int64) (string, []any) {
 		args[i] = id
 	}
 	return "(" + strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",") + ")", args
+}
+
+// scanIDs collects a single-column id result and closes the rows.
+func scanIDs(rows *sql.Rows) ([]int64, error) {
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }

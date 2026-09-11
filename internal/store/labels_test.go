@@ -229,3 +229,69 @@ func TestSetOrgLabelPromotesRepoLabels(t *testing.T) {
 		t.Fatalf("memberships after org delete: %d", n)
 	}
 }
+
+// A repository moving into an org brings its own labels and milestones;
+// the names the org already holds fold into the org's rows rather than
+// leaving the repository seeing two of each.
+func TestTransferIntoOrgFoldsDuplicateNames(t *testing.T) {
+	f := newAcme(t)
+	n, err := f.s.CreateIssue(f.app.ID, f.alice, "a1", "", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue, err := f.s.IssueByNumber(f.app.ID, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetLabel(f.app, "bug", "#123456"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetIssueLabel(f.app, issue.ID, "bug", true); err != nil {
+		t.Fatal(err)
+	}
+	repoMS, err := f.s.CreateMilestone(f.app, "v1", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetIssueMilestone(issue.ID, repoMS); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.SetOrgLabel(f.org, "bug", "#ff0000"); err != nil {
+		t.Fatal(err)
+	}
+	orgMS, _, err := f.s.CreateOrgMilestone(f.org, "v1", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.TransferRepo(f.app.ID, "org", f.org); err != nil {
+		t.Fatal(err)
+	}
+	app, err := f.s.RepoByID(f.app.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels, err := f.s.ListLabels(app, []int64{app.ID})
+	if err != nil || len(labels) != 1 || !labels[0].Org || labels[0].Color != "#ff0000" || labels[0].Issues != 1 {
+		t.Fatalf("labels after transfer = %+v, %v", labels, err)
+	}
+	ms, err := f.s.ListMilestones(app, "all", []int64{app.ID})
+	if err != nil || len(ms) != 1 || ms[0].ID != orgMS || ms[0].OrgID != f.org || ms[0].OpenItems != 1 {
+		t.Fatalf("milestones after transfer = %+v, %v", ms, err)
+	}
+	// The issue keeps both, pointing at the org's rows; the repository's
+	// rows are gone.
+	var count int
+	f.s.DB.QueryRow(`SELECT COUNT(*) FROM issue_labels il JOIN labels l ON l.id = il.label_id
+		WHERE il.issue_id = ? AND l.org_id = ?`, issue.ID, f.org).Scan(&count)
+	if count != 1 {
+		t.Fatalf("label membership after transfer: %d", count)
+	}
+	f.s.DB.QueryRow("SELECT COUNT(*) FROM labels WHERE repo_id = ?", app.ID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("repo label rows left: %d", count)
+	}
+	f.s.DB.QueryRow("SELECT COUNT(*) FROM milestones WHERE id = ?", repoMS).Scan(&count)
+	if count != 0 {
+		t.Fatalf("repo milestone row left: %d", count)
+	}
+}

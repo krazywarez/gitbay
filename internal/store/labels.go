@@ -149,27 +149,28 @@ func (s *Store) SetOrgLabel(orgID int64, name, color string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	var repoRows []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		repoRows = append(repoRows, id)
+	repoRows, err := scanIDs(rows)
+	if err != nil {
+		return 0, err
 	}
-	rows.Close()
 	for _, id := range repoRows {
-		// OR IGNORE: an issue cannot carry both today, but the primary key
-		// makes the move safe if it ever did.
-		if _, err := tx.Exec("UPDATE OR IGNORE issue_labels SET label_id = ? WHERE label_id = ?", orgRow, id); err != nil {
-			return 0, err
-		}
-		if _, err := tx.Exec("DELETE FROM labels WHERE id = ?", id); err != nil {
+		if err := foldLabelRow(tx, orgRow, id); err != nil {
 			return 0, err
 		}
 	}
 	return len(repoRows), tx.Commit()
+}
+
+// foldLabelRow moves a repository's label onto the org's row: every issue
+// carrying it gets the org row, then the repository row goes.
+func foldLabelRow(tx *sql.Tx, orgRow, repoRow int64) error {
+	// OR IGNORE: an issue cannot carry both today, but the primary key
+	// makes the move safe if it ever did.
+	if _, err := tx.Exec("UPDATE OR IGNORE issue_labels SET label_id = ? WHERE label_id = ?", orgRow, repoRow); err != nil {
+		return err
+	}
+	_, err := tx.Exec("DELETE FROM labels WHERE id = ?", repoRow)
+	return err
 }
 
 // DeleteOrgLabel removes an org's label from the org and from every issue
