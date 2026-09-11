@@ -96,3 +96,14 @@ func identityOpts(path string) []string {
 	}
 	return []string{"-F", "/dev/null", "-i", path, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=accept-new"}
 }
+
+// sshOptions is every ssh invocation's option list: the identity, the
+// operator's -ssh-opts, then a bound on dead connections. Without one a
+// claim whose TCP session died under it (a laptop's network dropping)
+// blocks the poll loop indefinitely; ssh took thirteen hours on one
+// before a restart. ssh honours the first value of an option, so the
+// operator's come first and override these.
+func sshOptions(identity string, extra []string) []string {
+	opts := append(identityOpts(identity), extra...)
+	return append(opts, "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3")
+}

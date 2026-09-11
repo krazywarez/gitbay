@@ -84,3 +84,20 @@ func TestIdentityOpts(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestSSHOptionsBoundDeadConnections(t *testing.T) {
+	got := strings.Join(sshOptions("/k", []string{"-o", "ServerAliveInterval=60"}), " ")
+	want := "-F /dev/null -i /k -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" +
+		" -o ServerAliveInterval=60" +
+		" -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	// No identity: the keepalive still applies, so a runner on its
+	// default key cannot hang on a dead connection either.
+	got = strings.Join(sshOptions("", nil), " ")
+	want = "-o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
