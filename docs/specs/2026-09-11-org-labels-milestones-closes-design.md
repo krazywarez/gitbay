@@ -61,10 +61,13 @@ Migration 0052 rebuilds `labels` and `milestones` the way 0041 rebuilt
 renamed parent, which would leave the children pointing at `labels_old`.
 The script therefore brackets the renames with `PRAGMA legacy_alter_table
 = ON` and `= OFF`, which a transaction allows; the children keep naming
-`labels` and `milestones` and bind to the new tables. `foreign_keys` stays
-on, so the copy is checked and the drop of the old tables cascades
-nothing, since nothing references them. The migration test runs `PRAGMA
-foreign_key_check` afterwards and expects no rows.
+`labels` and `milestones` and bind to the new tables. The migration
+file's first line, `-- foreign_keys: off`, has the migration runner
+switch foreign keys off on a pinned connection for that step, because
+rebuilding a parent table with children otherwise loses the children's
+rows. The runner checks `foreign_key_check` is empty once the step
+commits and foreign keys are back on; the migration test asserts it
+too.
 
 ```sql
 CREATE TABLE labels (

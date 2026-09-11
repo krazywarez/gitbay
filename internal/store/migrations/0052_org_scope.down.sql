@@ -1,6 +1,6 @@
+-- foreign_keys: off
 -- Back to per-repository rows. An org-scoped row has no repository to go
 -- to; the NOT NULL on repo_id refuses the copy, which fails the migration.
-PRAGMA foreign_keys = OFF;
 PRAGMA legacy_alter_table = ON;
 
 ALTER TABLE labels RENAME TO labels_old;
@@ -31,4 +31,3 @@ INSERT INTO milestones (id, repo_id, title, description, due_date, state, create
 DROP TABLE milestones_old;
 
 PRAGMA legacy_alter_table = OFF;
-PRAGMA foreign_keys = ON;

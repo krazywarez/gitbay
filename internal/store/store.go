@@ -70,7 +70,15 @@ type migration struct {
 	name    string
 	up      string
 	down    string
+	// upFKOff and downFKOff are true when the up/down script's first line
+	// is the directive "-- foreign_keys: off".
+	upFKOff   bool
+	downFKOff bool
 }
+
+// fkOffDirective, as the first line of a migration script, opts that
+// direction out of foreign-key enforcement for its step.
+const fkOffDirective = "-- foreign_keys: off"
 
 func loadMigrations() ([]migration, error) {
 	entries, err := fs.ReadDir(migrationFS, "migrations")
@@ -110,10 +118,15 @@ func loadMigrations() ([]migration, error) {
 		if err != nil {
 			return nil, err
 		}
+		text := string(sqlBytes)
+		firstLine, _, _ := strings.Cut(text, "\n")
+		fkOff := strings.TrimSpace(firstLine) == fkOffDirective
 		if dir == "up" {
-			m.up = string(sqlBytes)
+			m.up = text
+			m.upFKOff = fkOff
 		} else {
-			m.down = string(sqlBytes)
+			m.down = text
+			m.downFKOff = fkOff
 		}
 	}
 	var ms []migration
@@ -160,15 +173,40 @@ func (s *Store) migrateTo(target int) error {
 	if err != nil {
 		return err
 	}
-	step := func(sqlText string, newVersion int) error {
-		needsFKOff := strings.Contains(sqlText, "PRAGMA foreign_keys = OFF")
-		if needsFKOff {
-			if _, err := s.DB.Exec("PRAGMA foreign_keys = OFF"); err != nil {
+	step := func(sqlText string, newVersion int, fkOff bool) error {
+		if !fkOff {
+			tx, err := s.DB.Begin()
+			if err != nil {
 				return err
 			}
-			defer s.DB.Exec("PRAGMA foreign_keys = ON")
+			defer tx.Rollback()
+			if _, err := tx.Exec(sqlText); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", newVersion)); err != nil {
+				return err
+			}
+			return tx.Commit()
 		}
-		tx, err := s.DB.Begin()
+
+		// A script whose first line is "-- foreign_keys: off" rebuilds a
+		// table that other tables reference (labels, milestones): with
+		// foreign keys on, the rebuild-by-rename loses the children's
+		// rows. PRAGMA foreign_keys is a no-op inside a transaction, and
+		// the pool gives no guarantee that a pragma set on one connection
+		// is seen by the connection Begin() draws next, so the whole step
+		// — pragma off, transaction, pragma on, foreign_key_check — runs
+		// on a single pinned connection.
+		ctx := context.Background()
+		conn, err := s.DB.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+			return err
+		}
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -179,18 +217,39 @@ func (s *Store) migrateTo(target int) error {
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", newVersion)); err != nil {
 			return err
 		}
-		return tx.Commit()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+			return err
+		}
+		rows, err := conn.QueryContext(ctx, "PRAGMA foreign_key_check")
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			var table string
+			var rowid sql.NullInt64
+			var referredTable string
+			var fkid int
+			if err := rows.Scan(&table, &rowid, &referredTable, &fkid); err != nil {
+				return err
+			}
+			return fmt.Errorf("foreign_key_check failed after migration: %s", table)
+		}
+		return rows.Err()
 	}
 	for cur < target {
 		m := ms[cur]
-		if err := step(m.up, m.version); err != nil {
+		if err := step(m.up, m.version, m.upFKOff); err != nil {
 			return fmt.Errorf("migration %d up: %w", m.version, err)
 		}
 		cur = m.version
 	}
 	for cur > target {
 		m := ms[cur-1]
-		if err := step(m.down, m.version-1); err != nil {
+		if err := step(m.down, m.version-1, m.downFKOff); err != nil {
 			return fmt.Errorf("migration %d down: %w", m.version, err)
 		}
 		cur = m.version - 1

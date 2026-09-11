@@ -145,13 +145,14 @@ func TestSSHKeyLabel(t *testing.T) {
 	}
 }
 
-// Migration 0052 rebuilds labels and milestones with an org scope. The
-// rebuild renames the old tables; since SQLite 3.26 a rename rewrites the
-// children's foreign keys to follow it, which would bind them to the *_old
-// tables. legacy_alter_table keeps the children naming labels and milestones,
-// which the new tables then are. foreign_keys stays on: nothing references the
-// *_old tables, so dropping them cascades nothing.
-// This checks the ids, the memberships and the foreign keys all survive.
+// Migration 0052 rebuilds labels and milestones with an org scope. Foreign
+// keys are off for the migration: rebuilding a parent table with children
+// (issue_labels, issues.milestone_id) otherwise loses the children's rows.
+// legacy_alter_table keeps the children naming labels and milestones
+// through the rename, so they bind to the new tables rather than to
+// labels_old/milestones_old. foreign_key_check afterwards proves the ids
+// line up. This checks the ids, the memberships and the foreign keys all
+// survive.
 func TestMigration0052KeepsMembershipsAndForeignKeys(t *testing.T) {
 	s := open(t)
 	if err := s.MigrateTo(51); err != nil {
@@ -226,5 +227,24 @@ func TestMigration0052KeepsMembershipsAndForeignKeys(t *testing.T) {
 	}
 	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM issue_labels il JOIN labels l ON l.id = il.label_id WHERE il.issue_id = ?`, iid).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("label membership after down: %d, %v", n, err)
+	}
+}
+
+// Migrating all the way up runs 0052's "-- foreign_keys: off" step on its
+// own pinned connection and every other migration's script, which has no
+// such directive, on the pool as usual. A fresh query afterwards still
+// sees foreign keys on: the pinned connection re-enabled them before
+// returning to the pool, and no other connection was ever touched.
+func TestMigrationForeignKeysDirective(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	var fk int
+	if err := s.DB.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil {
+		t.Fatal(err)
+	}
+	if fk != 1 {
+		t.Fatalf("foreign_keys after MigrateUp: %d, want 1", fk)
 	}
 }

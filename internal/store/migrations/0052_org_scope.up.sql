@@ -1,14 +1,15 @@
+-- foreign_keys: off
 -- Labels and milestones scoped to a repository or to an org (#203).
 -- Exactly one of repo_id and org_id is set. Uniqueness is per scope, as
 -- two partial indexes; the app refuses a repo name the org already holds.
 --
 -- Both tables have children (issue_labels, issues.milestone_id,
--- merge_requests.milestone_id). Since SQLite 3.26 renaming a parent
--- rewrites the children's foreign keys to follow it, which would bind them
--- to the *_old tables. legacy_alter_table keeps the children naming labels
--- and milestones, which the new tables then are. foreign_keys stays on:
--- nothing references the *_old tables, so dropping them cascades nothing.
-PRAGMA foreign_keys = OFF;
+-- merge_requests.milestone_id). Foreign keys are off for this migration:
+-- rebuilding a parent table that children reference loses the children's
+-- rows with foreign keys on. legacy_alter_table keeps the children naming
+-- labels and milestones through the rename, so they bind to the new
+-- tables rather than to labels_old/milestones_old. foreign_key_check
+-- afterwards proves the ids line up.
 PRAGMA legacy_alter_table = ON;
 
 ALTER TABLE labels RENAME TO labels_old;
@@ -45,4 +46,3 @@ CREATE UNIQUE INDEX milestones_repo_title ON milestones(repo_id, title) WHERE re
 CREATE UNIQUE INDEX milestones_org_title  ON milestones(org_id, title)  WHERE org_id  IS NOT NULL;
 
 PRAGMA legacy_alter_table = OFF;
-PRAGMA foreign_keys = ON;
