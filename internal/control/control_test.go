@@ -227,23 +227,30 @@ func TestRefusalsHonourJSON(t *testing.T) {
 	}
 }
 
-// TestFailErrExitCodes: not-found, an internal failure, and the caller's
-// mistake each get their own exit code (#107).
+// TestFailErrExitCodes: a store error is not-found or a failure, never
+// usage (#211); an input error is usage unless the I/O beneath it failed
+// (#107).
 func TestFailErrExitCodes(t *testing.T) {
-	code := func(err error) int {
-		c := &Ctx{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
-		return c.failErr(err)
-	}
-	if got := code(store.ErrNotFound); got != protocol.ExitNotFound {
-		t.Errorf("not found: %d", got)
-	}
-	if got := code(fmt.Errorf("looking up: %w", store.ErrNotFound)); got != protocol.ExitNotFound {
-		t.Errorf("wrapped not found: %d", got)
-	}
-	if got := code(errors.New("name must be lowercase")); got != protocol.ExitUsage {
-		t.Errorf("caller's mistake: %d", got)
-	}
-	if got := code(&fs.PathError{Op: "open", Path: "/x", Err: fs.ErrPermission}); got != protocol.ExitFailure {
-		t.Errorf("i/o failure: %d", got)
+	ctx := func() *Ctx { return &Ctx{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}} }
+	notFound := fmt.Errorf("looking up: %w", store.ErrNotFound)
+	refused := errors.New("the name is taken")
+	ioErr := &fs.PathError{Op: "open", Path: "/x", Err: fs.ErrPermission}
+	for _, tc := range []struct {
+		name string
+		fn   func(*Ctx, error) int
+		err  error
+		want int
+	}{
+		{"failErr not found", (*Ctx).failErr, store.ErrNotFound, protocol.ExitNotFound},
+		{"failErr wrapped not found", (*Ctx).failErr, notFound, protocol.ExitNotFound},
+		{"failErr refusal", (*Ctx).failErr, refused, protocol.ExitFailure},
+		{"failErr i/o", (*Ctx).failErr, ioErr, protocol.ExitFailure},
+		{"failInput not found", (*Ctx).failInput, notFound, protocol.ExitNotFound},
+		{"failInput caller's mistake", (*Ctx).failInput, errors.New("name must be lowercase"), protocol.ExitUsage},
+		{"failInput i/o", (*Ctx).failInput, ioErr, protocol.ExitFailure},
+	} {
+		if got := tc.fn(ctx(), tc.err); got != tc.want {
+			t.Errorf("%s: exit %d, want %d", tc.name, got, tc.want)
+		}
 	}
 }

@@ -223,13 +223,23 @@ func (c *Ctx) emit(data any, plain func(w io.Writer)) int {
 	return protocol.ExitOK
 }
 
-// failErr reports an error from a store or helper call with the exit code
-// its kind deserves: not-found is not-found, the database or I/O failing
-// is a failure, and anything else is the caller's mistake, which is what
-// most such errors are (a name that does not validate, a state that does
-// not allow the change). A SQLite I/O error used to be a usage error and
-// an HTTP 400 (#107).
+// failErr reports an error from a store call: not-found is not-found,
+// and anything else — the database failing, a duplicate, a state that
+// does not allow the change — is a failure. An error about the caller's
+// own arguments goes through failInput instead; this used to default to
+// usage, which turned every refusal into exit 2 (#211).
 func (c *Ctx) failErr(err error) int {
+	if errors.Is(err, store.ErrNotFound) {
+		return c.fail(protocol.ExitNotFound, "%v", err)
+	}
+	return c.fail(protocol.ExitFailure, "%v", err)
+}
+
+// failInput reports an error about the caller's input — a name that does
+// not validate, a flag value out of range, a body that could not be read
+// — as a usage error, unless the database or I/O failed underneath it.
+// A SQLite I/O error used to be a usage error and an HTTP 400 (#107).
+func (c *Ctx) failInput(err error) int {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return c.fail(protocol.ExitNotFound, "%v", err)

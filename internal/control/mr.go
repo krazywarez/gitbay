@@ -114,7 +114,7 @@ func runRepoFork(c *Ctx, args []string) int {
 		name = src.Name
 	}
 	if err := policy.ValidateName(name); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	repoCreateMu.Lock()
 	if code := checkRepoQuota(c); code >= 0 {
@@ -286,7 +286,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -323,7 +323,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	n, err := c.Store.CreateMR(repo.ID, c.User.ID, srcRepo.ID, srcBranch, target, title, b, headSHA, fmtName, f.Has("--draft"))
 	if err != nil {
@@ -455,7 +455,7 @@ func runMRList(c *Ctx, args []string) int {
 	f.Search = fl.Value("--search")
 	if fl.Has("--search") {
 		if err := validQuery(f.Search); err != nil {
-			return c.failErr(err)
+			return c.failInput(err)
 		}
 	}
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
@@ -845,7 +845,7 @@ func runMRReview(c *Ctx, args []string) int {
 func runMRReviewRequest(c *Ctx, args []string) int {
 	rest, adds, removes, err := addRemoveFlags(args)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if len(adds)+len(removes) == 0 {
 		return c.fail(protocol.ExitUsage, "usage: mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...")

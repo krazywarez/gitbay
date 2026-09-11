@@ -97,7 +97,7 @@ func TestOrganizations(t *testing.T) {
 		t.Fatalf("bob (now admin) removing alice: %s", errOut)
 	}
 	_, errOut, code := inst.ssh(t, bobKey, "", "org", "members", "remove", "krz", "bob")
-	if code != 2 || !strings.Contains(errOut, "at least one admin") {
+	if code != 1 || !strings.Contains(errOut, "at least one admin") {
 		t.Fatalf("last admin removal: %d %s", code, errOut)
 	}
 
@@ -150,7 +150,7 @@ func TestOrganizations(t *testing.T) {
 	}
 	rnWork := t.TempDir()
 	mustGit(t, rnWork, inst.gitEnv(aliceKey), "clone", inst.sshURL("oldname/thing"), "w1")
-	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "rename", "oldname", "bob"); code != 2 || !strings.Contains(errOut, "taken") {
+	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "rename", "oldname", "bob"); code != 1 || !strings.Contains(errOut, "taken") {
 		t.Fatalf("rename onto user name: %d %s", code, errOut)
 	}
 	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "rename", "oldname", "newname"); code != 0 {

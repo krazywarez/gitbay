@@ -86,7 +86,7 @@ func runSearch(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: %s", usage)
 	}
 	if err := validQuery(f.Pos[0]); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	kinds := f.List("--kind")
 	for _, k := range kinds {

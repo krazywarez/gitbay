@@ -96,7 +96,7 @@ func runTeamCreate(c *Ctx, args []string) int {
 		return code
 	}
 	if err := policy.ValidateName(args[1]); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if _, err := c.Store.CreateTeam(org.ID, args[1]); err != nil {
 		return c.failErr(err)

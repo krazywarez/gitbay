@@ -83,7 +83,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 	}
 	fmtName, err := markupFormat(f.Value("--format"))
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -97,7 +97,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 	}
 	body, err := bodyFrom(c, f.Value("--message"), f.Value("--file"))
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")

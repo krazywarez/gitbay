@@ -88,7 +88,7 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if fmtName == "" {
 		fmtName = "md"
@@ -106,7 +106,7 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, notes, file)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if title == "" {
 		title = tag
@@ -159,7 +159,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 	setTitle, setNotes := f.Has("--title"), f.Has("--notes") || f.Has("--file")
 	fmtName, err := markupFormat(format)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if path == "" || tag == "" || (!setTitle && !setNotes && fmtName == "") {
 		return c.fail(protocol.ExitUsage, usage)
@@ -184,7 +184,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 	body := rel.Notes
 	if setNotes {
 		if body, err = bodyFrom(c, notes, file); err != nil {
-			return c.failErr(err)
+			return c.failInput(err)
 		}
 	}
 	if fmtName == "" {

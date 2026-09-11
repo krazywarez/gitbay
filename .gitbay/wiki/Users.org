@@ -632,8 +632,9 @@ addresses receive anything. Delivery retries on relay failure.
 Every read command takes =--json= and emits one envelope:
 ={"protocol_version": 1, "data": ...}=. stdout is data, stderr is
 messages. Exit codes are stable: 0 ok, 1 failure, 2 usage, 3 not found,
-4 denied, 5 server/protocol error. Nothing ever prompts; destructive
-commands take =--yes=.
+4 denied, 5 server/protocol error. Usage means the arguments were wrong;
+a refusal — a name already taken, a state that does not allow the change
+— is a failure. Nothing ever prompts; destructive commands take =--yes=.
 
 For HTTP automation see [[API]].
 

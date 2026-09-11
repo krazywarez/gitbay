@@ -76,7 +76,7 @@ func TestDiffComments(t *testing.T) {
 	}
 	json.Unmarshal([]byte(out), &env3)
 	if _, errOut, code = inst.ssh(t, bobKey, "", "mr", "diff-comment", "alice/lib", "1",
-		"--reply", fmt.Sprint(env3.Data.ID), "--message", "'nested'"); code != 2 || !strings.Contains(errOut, "thread root") {
+		"--reply", fmt.Sprint(env3.Data.ID), "--message", "'nested'"); code != 1 || !strings.Contains(errOut, "thread root") {
 		t.Fatalf("nested reply: exit %d, %s", code, errOut)
 	}
 

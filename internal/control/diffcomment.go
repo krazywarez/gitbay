@@ -66,7 +66,7 @@ func runDiffComment(c *Ctx, args []string) int {
 	}
 	body, err := bodyFrom(c, message, file)
 	if err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")

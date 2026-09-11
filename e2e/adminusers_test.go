@@ -190,7 +190,7 @@ func TestAdminPromoteDemote(t *testing.T) {
 		t.Fatalf("disabled account promoted: exit %d %s", code, errOut)
 	}
 	// The only admin cannot step down.
-	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "demote", "root"); code != 2 || !strings.Contains(errOut, "only instance admin") {
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "demote", "root"); code != 1 || !strings.Contains(errOut, "only instance admin") {
 		t.Fatalf("last admin demoted: exit %d %s", code, errOut)
 	}
 	if _, _, code := inst.ssh(t, rootKey, "", "admin", "user", "promote", "alice"); code != 0 {
@@ -209,7 +209,7 @@ func TestAdminPromoteDemote(t *testing.T) {
 	if _, _, code := inst.ssh(t, rootKey, "", "audit"); code != 4 {
 		t.Fatal("demoted account still admin")
 	}
-	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "user", "demote", "alice"); code != 2 {
+	if _, _, code := inst.ssh(t, aliceKey, "", "admin", "user", "demote", "alice"); code != 1 {
 		t.Fatal("last admin demoted")
 	}
 	// Host-local recovery: the operator restores root without an admin key.
@@ -356,7 +356,7 @@ func TestAdminHostAndSSHAreOneSurface(t *testing.T) {
 	if _, _, code := inst.ssh(t, carolKey, "", "whoami"); code != 0 {
 		t.Fatal("created account cannot authenticate")
 	}
-	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "create", "alice"); code != 2 || !strings.Contains(errOut, "taken") {
+	if _, errOut, code := inst.ssh(t, rootKey, "", "admin", "user", "create", "alice"); code != 1 || !strings.Contains(errOut, "taken") {
 		t.Fatalf("duplicate create: exit %d %s", code, errOut)
 	}
 	for _, args := range [][]string{{"admin", "stats"}, {"admin", "user", "disable", "carol"}, {"admin", "invite", "--email", "x@example.test"}} {

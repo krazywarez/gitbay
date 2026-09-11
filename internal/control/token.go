@@ -54,7 +54,7 @@ func runTokenCreate(c *Ctx, args []string) int {
 	if ttl != "" {
 		d, err := parseTTL(ttl)
 		if err != nil {
-			return c.failErr(err)
+			return c.failInput(err)
 		}
 		t := time.Now().Add(d)
 		expires = &t

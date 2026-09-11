@@ -63,7 +63,7 @@ func runOrgCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: org create <name>")
 	}
 	if err := policy.ValidateOwnerName(args[0]); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	if _, err := c.Store.CreateOrg(args[0], c.User.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -138,7 +138,7 @@ func runOrgRename(c *Ctx, args []string) int {
 	}
 	newName := args[1]
 	if err := policy.ValidateOwnerName(newName); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	oldDir := filepath.Join(c.Cfg.Server.Root, "repos", org.Name)
 	newDir := filepath.Join(c.Cfg.Server.Root, "repos", newName)

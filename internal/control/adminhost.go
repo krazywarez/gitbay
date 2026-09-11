@@ -72,7 +72,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, usage)
 	}
 	if err := policy.ValidateOwnerName(username); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	// Parse the key before creating anything, so a bad key leaves no
 	// half-made account behind.

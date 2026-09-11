@@ -255,8 +255,8 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
 	alicePub, _ := os.ReadFile(aliceKey + ".pub")
 	_, errOut, code = inst.ssh(t, bobKey, string(alicePub), "keys", "add")
-	if code != 2 {
-		t.Fatalf("duplicate key add: exit %d, want 2", code)
+	if code != 1 {
+		t.Fatalf("duplicate key add: exit %d, want 1", code)
 	}
 	want := "that key is already registered to another account; remove it there first or use a different key"
 	if !strings.Contains(errOut, want) {

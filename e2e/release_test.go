@@ -36,7 +36,7 @@ func TestReleases(t *testing.T) {
 		"--title", "'First light'", "--notes", "'the **first** release'"); code != 0 {
 		t.Fatalf("release create: %s", errOut)
 	}
-	if _, _, code := inst.ssh(t, aliceKey, "", "release", "create", "alice/app", "v1.0"); code != 2 {
+	if _, _, code := inst.ssh(t, aliceKey, "", "release", "create", "alice/app", "v1.0"); code != 1 {
 		t.Fatal("duplicate release accepted")
 	}
 
@@ -67,7 +67,7 @@ func TestReleases(t *testing.T) {
 	if _, errOut, code := inst.ssh(t, aliceKey, payload, "release", "asset", "add", "alice/app", "v1.0", "tool-linux-amd64"); code != 0 {
 		t.Fatalf("asset add: %s", errOut)
 	}
-	if _, _, code := inst.ssh(t, aliceKey, payload, "release", "asset", "add", "alice/app", "v1.0", "tool-linux-amd64"); code != 2 {
+	if _, _, code := inst.ssh(t, aliceKey, payload, "release", "asset", "add", "alice/app", "v1.0", "tool-linux-amd64"); code != 1 {
 		t.Fatal("duplicate asset accepted")
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "release", "asset", "add", "alice/app", "v1.0", "empty-file"); code != 2 || !strings.Contains(errOut, "empty asset") {

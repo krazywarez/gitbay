@@ -44,7 +44,7 @@ func runMirrorAdd(c *Ctx, args []string) int {
 	// The worker's git process dials this URL from the server: same SSRF
 	// surface as a webhook target, same rules.
 	if err := webhook.ValidateURL(urlArg, c.Cfg.Webhooks.AllowLocal); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {

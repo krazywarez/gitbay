@@ -47,7 +47,7 @@ func runRepoImport(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url>")
 	}
 	if err := policy.ValidateName(name); err != nil {
-		return c.failErr(err)
+		return c.failInput(err)
 	}
 	// Same ownership rule as repo create: yourself, or an org you admin.
 	ownerKind, ownerID := "user", c.User.ID
