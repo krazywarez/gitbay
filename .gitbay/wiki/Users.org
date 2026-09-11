@@ -347,7 +347,9 @@ pages carry the discovery link.
 Commit messages act on issues when the commits land on the default
 branch (direct push or MR merge): =closes/fixes/resolves #4= closes the
 issue with a linking comment, and a bare =#4= leaves a reference
-comment. Each issue/commit pair acts once, ever. Same repository only.
+comment. Each issue/commit pair acts once, ever. =Closes owner/name#N= closes an issue in another repository when
+you hold write there; otherwise it stays a plain link. A bare
+=owner/name#N= links and does nothing.
 
 Milestones group issues and MRs toward a release (write access to
 manage, attach with =issue milestone= / =mr milestone=; progress shows
@@ -358,6 +360,24 @@ gitbay milestone create v1.0 --description "first release" --due 2027-01-01
 gitbay milestone list [--state open|closed|all]
 gitbay milestone close v1.0 / reopen v1.0
 #+end_src
+
+An org holds labels and milestones every repository under it sees
+beside its own. =issue label --add=, =issue milestone= and =mr
+milestone= resolve the org's row first; a repository cannot create a
+label or milestone with a name its org holds. Creating an org label or
+milestone whose name repositories under the org already use folds them
+in: their issues and merge requests move to the org's row. Org admins
+manage them; counts span the repositories you can read.
+
+#+begin_src sh
+gitbay org label set acme bug --color cf222e
+gitbay org label list acme / remove acme bug
+gitbay org milestone create acme v2 --due 2027-03-01
+gitbay org milestone list acme [--state open|closed|all]
+gitbay org milestone close acme v2 / reopen acme v2
+#+end_src
+
+On the web: =/acme/-/labels= and =/acme/-/milestones=, read-only.
 
 Issue templates: commit =.gitbay/issue-template.md= (and optional
 =issue-template-<name>.md= variants) to the default branch. =gitbay

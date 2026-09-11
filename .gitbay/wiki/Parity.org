@@ -113,6 +113,9 @@ reviews, since an approval was of the diff against the old branch.
 | choose body markup  | yes | yes | yes |
 | issue templates     | yes | yes | yes |
 | milestone create, close, reopen | yes | no | yes |
+| org labels: set, list, remove | yes | list | no |
+| org milestones: create, list, close, reopen | yes | list | no |
+| closes across repositories | yes | yes | yes |
 
 Labels are created on the fly by =issue label --add= and managed by
 =label list=, =label set <label> --color rrggbb= and =label remove=,
@@ -120,6 +123,11 @@ which takes the label off every issue. The web paints the stored colour
 on every chip and derives one from the name when none is set. The set
 itself is at =/<owner>/<repo>/labels=, linked from the issue list:
 create, recolour and remove, dispatching the same commands.
+
+Org labels and milestones are managed on the CLI and API only;
+=/<org>/-/labels= and =/<org>/-/milestones= show them. The repository
+label page's form exists for colour alone, and three org forms nobody
+asked for were not worth their handlers.
 
 Issue, MR and release bodies, and their comments, carry the markup they
 were written in — =--format md|org= on create, comment and edit, stored
