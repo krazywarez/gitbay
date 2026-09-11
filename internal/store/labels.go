@@ -82,29 +82,42 @@ func orgHoldsLabel(q interface {
 // SetLabel creates the repository's label or sets its colour. A name the
 // org holds is refused with ErrOrgScoped.
 func (s *Store) SetLabel(repo Repo, name, color string) error {
-	if held, err := orgHoldsLabel(s.DB, repo, name); err != nil || held {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if held, err := orgHoldsLabel(tx, repo, name); err != nil || held {
 		if err != nil {
 			return err
 		}
 		return ErrOrgScoped
 	}
-	_, err := s.DB.Exec(`INSERT INTO labels (repo_id, name, color) VALUES (?, ?, ?)
+	_, err = tx.Exec(`INSERT INTO labels (repo_id, name, color) VALUES (?, ?, ?)
 		ON CONFLICT (repo_id, name) WHERE repo_id IS NOT NULL DO UPDATE SET color = excluded.color`,
 		repo.ID, name, color)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // DeleteLabel removes the repository's label and takes it off every issue.
 // An org's label is ErrOrgScoped; no label at all is ErrNotFound.
 func (s *Store) DeleteLabel(repo Repo, name string) error {
-	res, err := s.DB.Exec("DELETE FROM labels WHERE repo_id = ? AND name = ?", repo.ID, name)
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec("DELETE FROM labels WHERE repo_id = ? AND name = ?", repo.ID, name)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
-		return nil
+		return tx.Commit()
 	}
-	if held, err := orgHoldsLabel(s.DB, repo, name); err != nil || held {
+	if held, err := orgHoldsLabel(tx, repo, name); err != nil || held {
 		if err != nil {
 			return err
 		}
