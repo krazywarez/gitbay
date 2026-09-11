@@ -27,6 +27,9 @@ func init() {
 	register(Command{Path: []string{"notifications", "settings", "mail"},
 		Summary: "activity by mail as well as the inbox (login links are unaffected)",
 		Usage:   "notifications settings mail on|off", Run: runNotificationsSettingsMail})
+	register(Command{Path: []string{"notifications", "settings", "watch"},
+		Summary: "every issue and merge request on repositories you can write to",
+		Usage:   "notifications settings watch on|off", Run: runNotificationsSettingsWatch})
 	register(Command{Path: []string{"repo", "watch"},
 		Summary: "hear about all activity on a repository",
 		Usage:   "repo watch <owner/name>", Run: runRepoWatch})
@@ -144,16 +147,22 @@ func mrSubject(repo store.Repo, number int64, title string) string {
 }
 
 func emitNotificationSettings(c *Ctx) int {
-	on, err := c.Store.MailEnabled(c.User.ID)
+	mail, err := c.Store.MailEnabled(c.User.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]bool{"mail": on}, func(w io.Writer) {
-		state := "off"
-		if on {
-			state = "on"
+	watch, err := c.Store.WatchEnabled(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]bool{"mail": mail, "watch": watch}, func(w io.Writer) {
+		onOff := func(on bool) string {
+			if on {
+				return "on"
+			}
+			return "off"
 		}
-		fmt.Fprintf(w, "mail: %s\n", state)
+		fmt.Fprintf(w, "mail: %s\nwatch: %s\n", onOff(mail), onOff(watch))
 	})
 }
 
@@ -171,6 +180,19 @@ func runNotificationsSettingsMail(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "usage: notifications settings mail on|off")
 	}
 	if err := c.Store.SetMailEnabled(c.User.ID, args[0] == "on"); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return emitNotificationSettings(c)
+}
+
+// runNotificationsSettingsWatch is the default watch state for
+// repositories the account can write to: consulted when a notice is
+// delivered, so a grant or a revoke needs no watch row of its own (#194).
+func runNotificationsSettingsWatch(c *Ctx, args []string) int {
+	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
+		return c.fail(protocol.ExitUsage, "usage: notifications settings watch on|off")
+	}
+	if err := c.Store.SetWatchEnabled(c.User.ID, args[0] == "on"); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitNotificationSettings(c)

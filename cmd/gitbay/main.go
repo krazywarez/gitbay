@@ -69,6 +69,7 @@ func newRoot() *cobra.Command {
 			group("settings", "notification preferences",
 				pass("show", "your notification preferences", passOpts{server: []string{"notifications", "settings", "show"}}),
 				pass("mail", "activity by mail as well as the inbox: on|off", passOpts{server: []string{"notifications", "settings", "mail"}}),
+				pass("watch", "every issue and merge request on repositories you can write to: on|off", passOpts{server: []string{"notifications", "settings", "watch"}}),
 			),
 		),
 		group("wiki", "a repository's wiki pages",

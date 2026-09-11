@@ -298,6 +298,7 @@ client has no use for one (krz/gitbay#57).
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
 | activity mail on, off       | yes | yes | yes |
+| watch writable repos        | yes | yes | no  |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
@@ -311,8 +312,10 @@ configured. =notifications list= reads it, unread by default;
 web rail carry the unread count. =repo watch= adds you to a
 repository's notifications, =repo mute= silences it, and =repo unwatch=
 returns you to the default from either — told about work you are part
-of, nothing more. A mute wins over owning the repository or having
-written the thread.
+of, nothing more. =notifications settings watch on= widens that default
+to every repository you can write to, without a row per repository. A
+mute wins over owning the repository, having written the thread, or the
+preference.
 
 A login link is requested from the login page by username or verified
 address, and arrives by mail: it works once and expires in fifteen

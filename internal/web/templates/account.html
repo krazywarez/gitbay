@@ -109,6 +109,13 @@ account, and where notifications go.</p>
   <button type="submit">Save</button>
 </form>
 <p class="meta">The inbox is filed either way; this is the mail half. Login links are not activity and still arrive.</p>
+<form method="post" action="/settings" class="setform">
+  <input type="hidden" name="field" value="notify-watch">
+  <label for="notify-watch">Watch repositories you can write to</label>
+  <input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}>
+  <button type="submit">Save</button>
+</form>
+<p class="meta">Every issue and merge request on those repositories, as if you had watched each. A watch or mute on a repository still wins.</p>
 
 <h2>Export</h2>
 <p class="meta">Your profile, repositories, issues and merge requests as one

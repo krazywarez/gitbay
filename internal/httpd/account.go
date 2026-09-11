@@ -54,6 +54,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	var profile control.ProfileOut
 	s.runControlInto(u, []string{"profile", "show"}, &profile)
 	mailOn, _ := s.st.MailEnabled(u.ID)
+	watchOn, _ := s.st.WatchEnabled(u.ID)
 
 	s.render(w, "account.html", struct {
 		basePage
@@ -67,8 +68,9 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		Notice    string
 		Message   string
 		MailOn    bool
+		WatchOn   bool
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn})
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -197,12 +199,13 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "primary address changed")
-	case "notify-mail":
+	case "notify-mail", "notify-watch":
+		pref := strings.TrimPrefix(r.FormValue("field"), "notify-")
 		state := "off"
-		if r.FormValue("mail") == "on" {
+		if r.FormValue(pref) == "on" {
 			state = "on"
 		}
-		if _, msg, ok := s.runControl(u, []string{"notifications", "settings", "mail", state}); !ok {
+		if _, msg, ok := s.runControl(u, []string{"notifications", "settings", pref, state}); !ok {
 			back(msg, "")
 			return
 		}

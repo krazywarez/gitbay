@@ -128,9 +128,10 @@ func (s *Store) RepoWatchState(repoID, userID int64) string {
 
 // NotifyRecipients is who actually hears about something on a repository:
 // the callers targets — owners, or a thread's participants — widened by
-// the repository's watchers, minus the actor and minus anyone who muted
-// it. Muting wins over every other reason to be told, including owning
-// the repository or having written the thread.
+// the repository's watchers and by accounts whose watch preference covers
+// it, minus the actor and minus anyone who muted it. Muting wins over
+// every other reason to be told, including owning the repository or
+// having written the thread.
 func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64, widen bool) ([]int64, error) {
 	rows, err := s.DB.Query("SELECT user_id, state FROM repo_watchers WHERE repo_id = ?", repoID)
 	if err != nil {
@@ -158,6 +159,12 @@ func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64, widen b
 	seen := map[int64]bool{}
 	if !widen {
 		watching = nil
+	} else {
+		byPref, err := s.defaultWatchers(repoID)
+		if err != nil {
+			return nil, err
+		}
+		watching = append(watching, byPref...)
 	}
 	for _, id := range append(append([]int64{}, targets...), watching...) {
 		if skip[id] || seen[id] {
@@ -165,6 +172,41 @@ func (s *Store) NotifyRecipients(repoID, actorID int64, targets []int64, widen b
 		}
 		seen[id] = true
 		out = append(out, id)
+	}
+	return out, nil
+}
+
+// defaultWatchers is every account with the watch preference on that can
+// write to the repository (#194). The preference is read first because
+// it is one column and usually off everywhere, which keeps the access
+// fold off the path of most notices.
+func (s *Store) defaultWatchers(repoID int64) ([]int64, error) {
+	rows, err := s.DB.Query("SELECT id, username FROM users WHERE notify_watch = 1")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := map[string]int64{}
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		ids[name] = id
+	}
+	if err := rows.Err(); err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	access, err := s.EffectiveAccess(repoID)
+	if err != nil {
+		return nil, err
+	}
+	var out []int64
+	for _, e := range access {
+		if id, ok := ids[e.Username]; ok && (e.Role == "write" || e.Role == "admin") {
+			out = append(out, id)
+		}
 	}
 	return out, nil
 }

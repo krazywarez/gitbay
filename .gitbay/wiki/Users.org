@@ -612,7 +612,13 @@ filing the inbox row: someone opens an issue or MR on your repository,
 comments where you are a participant (author, commenter, reviewer, or
 mentioned), reviews, closes, or merges. =notifications settings mail
 off= keeps the inbox and stops that mail (login links are not activity
-and still arrive); the account page has the same switch. Writing =@name= in an issue, merge request or
+and still arrive); the account page has the same switch.
+=notifications settings watch on= makes you a recipient of every issue
+and merge request on the repositories you can write to, as if you had
+run =repo watch= on each: it is consulted when a notice is delivered,
+so a grant or a revoke needs no watch row, and an explicit watch or
+mute on a repository still wins. Off by default; the account page has
+this switch too. Writing =@name= in an issue, merge request or
 comment files "mentioned you" in that account's inbox and makes them a
 participant of the thread, provided they can read the repository and
 have not muted it; watchers are not told about a mention addressed to

@@ -216,6 +216,27 @@ func (s *Store) SetMailEnabled(userID int64, on bool) error {
 	return err
 }
 
+// WatchEnabled reports whether the account hears about every issue and
+// merge request on the repositories it can write to, without a
+// repo_watchers row on each (#194).
+func (s *Store) WatchEnabled(userID int64) (bool, error) {
+	var on int
+	err := s.DB.QueryRow("SELECT notify_watch FROM users WHERE id = ?", userID).Scan(&on)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	return on != 0, err
+}
+
+func (s *Store) SetWatchEnabled(userID int64, on bool) error {
+	v := 0
+	if on {
+		v = 1
+	}
+	_, err := s.DB.Exec("UPDATE users SET notify_watch = ? WHERE id = ?", v, userID)
+	return err
+}
+
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
 	var admin, pending, disabled int

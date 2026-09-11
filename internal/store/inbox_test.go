@@ -172,3 +172,68 @@ func TestNotifyRecipients(t *testing.T) {
 		t.Fatal("watch did not replace mute")
 	}
 }
+
+// With the watch preference on, an account that can write to a
+// repository is a recipient without a repo_watchers row; read access,
+// the preference off, a mute, and a direct notice each leave it out.
+func TestNotifyRecipientsDefaultWatch(t *testing.T) {
+	s, repoID, owner, other := inboxFixture(t)
+	writer, err := s.CreateUser("lee", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := s.CreateUser("pat", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantAccess(repoID, writer, "write"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantAccess(repoID, reader, "read"); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{writer, reader} {
+		if on, err := s.WatchEnabled(id); err != nil || on {
+			t.Fatalf("default preference = %v, %v", on, err)
+		}
+		if err := s.SetWatchEnabled(id, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if on, _ := s.WatchEnabled(writer); !on {
+		t.Fatal("preference not recorded")
+	}
+
+	got, err := s.NotifyRecipients(repoID, other, []int64{owner}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != owner || got[1] != writer {
+		t.Fatalf("recipients = %v, want [%d %d]", got, owner, writer)
+	}
+	// The preference does not turn a direct notice into a broadcast.
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, false); len(got) != 1 {
+		t.Fatalf("direct notice widened: %v", got)
+	}
+	// The writer acting is not told about their own action.
+	if got, _ := s.NotifyRecipients(repoID, writer, []int64{owner}, true); len(got) != 1 || got[0] != owner {
+		t.Fatalf("actor notified: %v", got)
+	}
+	// A mute on the repository beats the preference.
+	if err := s.SetRepoWatch(repoID, writer, "muted"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, true); len(got) != 1 {
+		t.Fatalf("muted writer notified: %v", got)
+	}
+	if err := s.ClearRepoWatch(repoID, writer); err != nil {
+		t.Fatal(err)
+	}
+	// Turning it off returns the writer to the default.
+	if err := s.SetWatchEnabled(writer, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.NotifyRecipients(repoID, other, []int64{owner}, true); len(got) != 1 {
+		t.Fatalf("preference off still widens: %v", got)
+	}
+}
