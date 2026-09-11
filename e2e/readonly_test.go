@@ -107,6 +107,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"org members list":            {"theorg"},
 		"org team list":               {"theorg"},
 		"org team show":               {"theorg", "core"},
+		"org label list":              {"theorg"},
 		"repo search":                 {"app"},
 		"repo show":                   {"alice/app"},
 		"repo access list":            {"alice/app"},
