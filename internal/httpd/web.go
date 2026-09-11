@@ -1668,7 +1668,7 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 		issues = issues[:listPage]
 		older = olderLink(r, issues[len(issues)-1].Number)
 	}
-	if labels, err := s.st.ListIssueLabels(p.Repo.ID); err == nil {
+	if labels, err := s.st.ListIssueLabels(p.Repo); err == nil {
 		for i := range issues {
 			issues[i].Labels = labels[issues[i].ID]
 		}

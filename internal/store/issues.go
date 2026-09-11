@@ -271,13 +271,16 @@ func (s *Store) AddIssueSystemComment(issueID, actorID int64, body string) error
 }
 
 // ListIssueLabels returns the label names attached to each issue of a
-// repo, keyed by issue id. Used by the web issue listing; ListIssues
-// itself stays label-free for the CLI's lean list output.
-func (s *Store) ListIssueLabels(repoID int64) (map[int64][]string, error) {
+// repo, keyed by issue id, its org's labels included. Used by the web
+// issue listing; ListIssues itself stays label-free for the CLI's lean
+// list output.
+func (s *Store) ListIssueLabels(repo Repo) (map[int64][]string, error) {
+	where, args := scopeClause("l", repo)
 	rows, err := s.DB.Query(`
 		SELECT il.issue_id, l.name FROM issue_labels il
 		JOIN labels l ON l.id = il.label_id
-		WHERE l.repo_id = ? ORDER BY l.name`, repoID)
+		JOIN issues i ON i.id = il.issue_id
+		WHERE i.repo_id = ? AND `+where+` ORDER BY l.name`, append([]any{repo.ID}, args...)...)
 	if err != nil {
 		return nil, err
 	}

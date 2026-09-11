@@ -137,6 +137,31 @@ func TestIssueLabelResolvesOrgRowFirst(t *testing.T) {
 	}
 }
 
+// The web issue list reads labels per repository; an org label attached
+// to an issue has to come back from there like the repository's own.
+func TestListIssueLabelsIncludesOrgRows(t *testing.T) {
+	f := newAcme(t)
+	if _, err := f.s.SetOrgLabel(f.org, "bug", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetLabel(f.core, "docs", ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"bug", "docs"} {
+		if err := f.s.SetIssueLabel(f.core, f.coreIssue, name, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := f.s.ListIssueLabels(f.core)
+	if err != nil || len(got[f.coreIssue]) != 2 || got[f.coreIssue][0] != "bug" || got[f.coreIssue][1] != "docs" {
+		t.Fatalf("core issue labels = %v, %v", got, err)
+	}
+	// Another repository under the org does not pick up core's attachment.
+	if got, _ := f.s.ListIssueLabels(f.site); len(got) != 0 {
+		t.Fatalf("site issue labels = %v", got)
+	}
+}
+
 func TestRepoLabelRefusedWhenOrgHoldsName(t *testing.T) {
 	f := newAcme(t)
 	if _, err := f.s.SetOrgLabel(f.org, "bug", ""); err != nil {
