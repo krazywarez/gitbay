@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,5 +164,30 @@ func TestUGCHTMLOrgCannotReadServerFiles(t *testing.T) {
 
 	if out := string(ugcHTML(body, "org")); strings.Contains(out, orgSecret) {
 		t.Fatalf("an org body read a server file:\n%s", out)
+	}
+}
+
+// go-org's autolink parser takes every RFC 3986 character, trailing
+// punctuation included, so a bare URL at the end of a sentence or inside
+// parentheses swallowed the `).` after it. Org itself stops a plain link
+// before trailing punctuation and only keeps a `)` that closes a `(` inside
+// the link.
+func TestOrgAutolinkStopsBeforeTrailingPunctuation(t *testing.T) {
+	cases := []struct{ src, href, after string }{
+		{"fork of X (https://git.example/a/B). upstream", "https://git.example/a/B", "). upstream"},
+		{"see https://example.com.", "https://example.com", "."},
+		{"see https://example.com/q?x=1,", "https://example.com/q?x=1", ","},
+		{"see https://en.wikipedia.org/wiki/Foo_(bar) now", "https://en.wikipedia.org/wiki/Foo_(bar)", " now"},
+		{"(see https://en.wikipedia.org/wiki/Foo_(bar)).", "https://en.wikipedia.org/wiki/Foo_(bar)", ")."},
+	}
+	for _, c := range cases {
+		out := string(renderReadme("README.org", []byte(c.src+"\n")))
+		want := `href="` + c.href + `"`
+		if !strings.Contains(out, want) {
+			t.Errorf("%q: want %s in\n%s", c.src, want, out)
+		}
+		if !strings.Contains(out, "</a>"+template.HTMLEscapeString(c.after)) {
+			t.Errorf("%q: want %q after the link in\n%s", c.src, c.after, out)
+		}
 	}
 }

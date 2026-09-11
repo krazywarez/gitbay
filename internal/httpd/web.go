@@ -1221,11 +1221,54 @@ func renderOrg(name string, raw []byte, contents bool, fallback func() template.
 		}
 		return fenceHighlight(source, lang)
 	}
+	writer.ExtendingWriter = &orgWriter{writer}
 	out, err := doc.Write(writer)
 	if err != nil {
 		return fallback()
 	}
 	return template.HTML(ugcPolicy.Sanitize(out))
+}
+
+// orgWriter overrides go-org's autolink rendering. go-org ends a bare URL
+// at the first character outside RFC 3986's set, and that set includes
+// `.`, `,` and `)`, so a URL closing a sentence or a parenthesis took the
+// punctuation with it. Org stops a plain link before trailing punctuation
+// and keeps a `)` only when a `(` inside the link opened it.
+type orgWriter struct {
+	*org.HTMLWriter
+}
+
+func (w *orgWriter) WriteRegularLink(l org.RegularLink) {
+	if !l.AutoLink {
+		w.HTMLWriter.WriteRegularLink(l)
+		return
+	}
+	url, rest := splitAutolinkPunctuation(l.URL)
+	l.URL = url
+	w.HTMLWriter.WriteRegularLink(l)
+	if rest != "" {
+		w.WriteText(org.Text{Content: rest})
+	}
+}
+
+// splitAutolinkPunctuation returns the URL without trailing sentence
+// punctuation, and the punctuation it removed.
+func splitAutolinkPunctuation(url string) (string, string) {
+	end := len(url)
+	for end > 0 {
+		switch url[end-1] {
+		case '.', ',', ';', ':', '!', '?', '\'', '"':
+			end--
+			continue
+		case ')':
+			if strings.Count(url[:end], ")") > strings.Count(url[:end], "(") {
+				end--
+				continue
+			}
+		}
+		break
+	}
+	return url[:end], url[end:]
 }
 
 // headingTag matches an opening or closing h1..h5 tag, so a rendered
