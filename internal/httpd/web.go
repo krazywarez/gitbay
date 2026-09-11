@@ -1709,12 +1709,8 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := s.ugcFor(r, p.Repo)
-	readable, err := control.ReadableScope(s.st, s.viewer(r), p.Repo)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	milestones, _ := s.st.ListMilestones(p.Repo, "open", readable)
+	// nil readable: the picker lists titles, never the progress counts.
+	milestones, _ := s.st.ListMilestones(p.Repo, "open", nil)
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue       store.Issue
