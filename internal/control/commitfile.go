@@ -90,12 +90,21 @@ func runCommitFile(c *Ctx, args []string) int {
 	}
 
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	// The head before the commit bounds what landed; a branch that does
+	// not exist fails in CommitFileChange with its own message.
+	parent, _ := gitutil.ResolveRef(dir, "refs/heads/"+ref)
 	sha, err := gitutil.CommitFileChange(dir, ref, filePath, content,
 		c.User.Username, email, message)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
+	// This bypasses receive-pack like a merge does, so the commit-message
+	// issue actions (closes #N, references) run here for the default
+	// branch, with the session's scope (#210).
+	if ref == repo.DefaultBranch {
+		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, c.Scope, parent, sha)
+	}
 
 	d := struct {
 		Path string `json:"path"`

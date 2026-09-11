@@ -109,4 +109,28 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	if strings.Count(out, "referenced in commit") != 1 {
 		t.Fatalf("reference duplicated: %s", out)
 	}
+
+	// A commit written by repo commit-file (the web editor's path) lands
+	// on the default branch without receive-pack or a merge, and acts
+	// the same (#210). On another branch it does nothing.
+	if _, errOut, code := inst.ssh(t, aliceKey, "e\n", "repo", "commit-file", "alice/app", "e.txt",
+		"--ref", "feat", "--message", "'Closes #2 on a branch'", "--file", "-"); code != 0 {
+		t.Fatalf("commit-file on branch: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "2", "--json")
+	if !strings.Contains(out, `"state":"open"`) {
+		t.Fatalf("commit-file on a branch acted: %s", out)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "e\n", "repo", "commit-file", "alice/app", "e.txt",
+		"--ref", "main", "--message", "'Closes #2 from the editor'", "--file", "-"); code != 0 {
+		t.Fatalf("commit-file: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "2", "--json")
+	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") ||
+		!strings.Contains(out, "by [alice](/alice): Closes #2 from the editor") {
+		t.Fatalf("commit-file did not close issue 2: %s", out)
+	}
+	if strings.Count(out, "referenced in commit") != 1 {
+		t.Fatalf("commit-file re-acted on earlier commits: %s", out)
+	}
 }

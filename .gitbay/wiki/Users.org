@@ -345,7 +345,8 @@ activity on their public repositories at =/you/activity.atom=. The
 pages carry the discovery link.
 
 Commit messages act on issues when the commits land on the default
-branch (direct push or MR merge): =closes/fixes/resolves #4= closes the
+branch (direct push, MR merge, =repo commit-file= or the web editor):
+=closes/fixes/resolves #4= closes the
 issue with a linking comment, and a bare =#4= leaves a reference
 comment. Each issue/commit pair acts once, ever. =Closes owner/name#N= closes an issue in another repository when
 you hold write there; otherwise it stays a plain link. The comment left
