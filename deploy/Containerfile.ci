@@ -2,10 +2,14 @@
 # (#144). Without it a job runs in the runner's default image, which has
 # no toolchain, and the suite's prerequisite check fails immediately.
 #
-# Build it on the runner host, where podman keeps it:
+# Build it on the runner host, where podman keeps it. The file is staged in
+# the runner user's home first: a login shell under su cannot read root's
+# stdin, and root's session does not share /tmp with it.
 #
-#   ssh -p 2222 root@bay1 'su - ci-runner -s /bin/sh -c \
-#     "podman build -t localhost/gitbay-ci:2 -f - ." ' < deploy/Containerfile.ci
+#   scp -P 2222 deploy/Containerfile.ci root@gitbay.org:/var/lib/gitbay-runner/gitbay-ci.Containerfile
+#   ssh -p 2222 root@gitbay.org 'chown ci-runner /var/lib/gitbay-runner/gitbay-ci.Containerfile \
+#     && su - ci-runner -s /bin/sh -c "podman build -t localhost/gitbay-ci:2 -f gitbay-ci.Containerfile ." \
+#     && rm /var/lib/gitbay-runner/gitbay-ci.Containerfile'
 #
 # Tagged, not :latest, so a change to this file is a deliberate bump in
 # .gitbay/ci.yml rather than a silent change under a running branch.
