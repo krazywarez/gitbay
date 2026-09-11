@@ -1,0 +1,14 @@
+{{define "title"}}labels · {{.Org}}{{end}}
+{{define "content"}}
+<h1><a href="/{{.Org}}">{{.Org}}</a> labels</h1>
+<p class="meta">Every repository under {{.Org}} sees these beside its own. Managed with <code>gitbay org label set {{.Org}} &lt;label&gt;</code>; counts span the repositories you can read.</p>
+{{if .Labels}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">label</th><th scope="col">colour</th><th scope="col">issues</th></tr>
+{{range .Labels}}<tr>
+  <td><span class="chip label" style="{{index $.LabelColors .Name}}">{{.Name}}</span></td>
+  <td><span class="mono">{{if .Color}}{{.Color}}{{else}}—{{end}}</span></td>
+  <td>{{.Issues}}</td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No org labels yet.</p>{{end}}
+{{end}}

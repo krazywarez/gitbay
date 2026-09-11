@@ -71,6 +71,8 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/log.atom", Handler: s.logAtom},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/log.atom/{ref...}", Handler: s.logAtom},
 		Route{Method: "GET", Pattern: "/{owner}/activity.atom", Handler: s.ownerAtom},
+		Route{Method: "GET", Pattern: "/{owner}/-/labels", Handler: s.orgLabels},
+		Route{Method: "GET", Pattern: "/{owner}/-/milestones", Handler: s.orgMilestones},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/builds", Handler: s.builds},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/badge/build.svg", Handler: s.buildBadge},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/badge/build.png", Handler: s.buildBadgePNG},

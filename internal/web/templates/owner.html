@@ -7,6 +7,7 @@
 {{if .Profile.Links}}<p class="meta">{{range $i, $l := .Profile.Links}}{{if $i}} · {{end}}<a href="{{$l.URL}}" rel="nofollow me">{{if $l.Label}}{{$l.Label}}{{else}}{{$l.URL}}{{end}}</a>{{end}}</p>{{end}}
 {{if .Orgs}}<p class="meta">member of {{range .Orgs}}<a class="memberchip" href="/{{.Name}}">{{.Name}}</a> {{end}}</p>{{end}}
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
+{{if eq .Kind "org"}}<p class="meta"><a href="/{{.Owner}}/-/labels">labels</a> · <a href="/{{.Owner}}/-/milestones">milestones</a></p>{{end}}
 </section>
 {{if .AboutHTML}}<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>{{end}}
 <section class="activity">
