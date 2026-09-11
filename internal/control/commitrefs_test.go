@@ -1,6 +1,7 @@
 package control
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -55,22 +56,40 @@ func TestMRDescriptionClosesAcrossRepos(t *testing.T) {
 	}
 	// carol cannot write acme/priv: the issue stays open and no comment
 	// lands.
-	ProcessMRDescription(f.st, f.app, mr(1, "Closes acme/priv#1"), f.carol)
+	ProcessMRDescription(f.st, f.app, mr(1, "Closes acme/priv#1"), f.carol, "full")
 	if iss, _ := f.st.IssueByNumber(f.priv.ID, 1); iss.State != "open" {
 		t.Fatal("outsider closed a private repo's issue")
 	}
+	// A deploy key on alice/app is bound to alice/app: alice's own access
+	// to acme/priv is not the key's to use.
+	deploy := fmt.Sprintf("deploy:%d:rw", f.app.ID)
+	ProcessMRDescription(f.st, f.app, mr(2, "Closes acme/priv#1"), f.alice, deploy)
+	if iss, _ := f.st.IssueByNumber(f.priv.ID, 1); iss.State != "open" {
+		t.Fatal("a deploy key closed an issue outside its binding")
+	}
+	// An archived target is read-only, cross-repo closes included.
+	if _, err := f.st.UpdateRepoSettings(f.priv.ID, func(rs *store.RepoSettings) { rs.Archived = true }); err != nil {
+		t.Fatal(err)
+	}
+	ProcessMRDescription(f.st, f.app, mr(3, "Closes acme/priv#1"), f.alice, "full")
+	if iss, _ := f.st.IssueByNumber(f.priv.ID, 1); iss.State != "open" {
+		t.Fatal("an archived repository's issue was closed")
+	}
+	if _, err := f.st.UpdateRepoSettings(f.priv.ID, func(rs *store.RepoSettings) { rs.Archived = false }); err != nil {
+		t.Fatal(err)
+	}
 	// alice can: it closes with a comment naming the source repository.
-	ProcessMRDescription(f.st, f.app, mr(2, "Closes acme/priv#1"), f.alice)
+	ProcessMRDescription(f.st, f.app, mr(4, "Closes acme/priv#1"), f.alice, "full")
 	iss, _ := f.st.IssueByNumber(f.priv.ID, 1)
 	if iss.State != "closed" {
 		t.Fatal("writer did not close across repos")
 	}
 	comments, _ := f.st.ListIssueComments(iss.ID)
-	if len(comments) != 1 || !strings.Contains(comments[0].Body, "(/alice/app/mrs/2)") {
+	if len(comments) != 1 || !strings.Contains(comments[0].Body, "(/alice/app/mrs/4)") {
 		t.Fatalf("close comment = %+v", comments)
 	}
 	// An unknown path is text; a bare #N still acts in the source repo.
-	ProcessMRDescription(f.st, f.app, mr(3, "Closes nobody/nothing#1 and closes #1"), f.alice)
+	ProcessMRDescription(f.st, f.app, mr(5, "Closes nobody/nothing#1 and closes #1"), f.alice, "full")
 	if iss, _ := f.st.IssueByNumber(f.app.ID, 1); iss.State != "closed" {
 		t.Fatal("bare #N stopped working")
 	}

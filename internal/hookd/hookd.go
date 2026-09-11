@@ -35,12 +35,17 @@ const (
 	EnvSocket = "GITBAY_HOOK_SOCKET"
 	EnvRepoID = "GITBAY_REPO_ID"
 	EnvUserID = "GITBAY_USER_ID"
+	EnvScope  = "GITBAY_KEY_SCOPE"
 )
 
 type Request struct {
-	Hook    string             `json:"hook"` // pre-receive | post-receive
-	RepoID  int64              `json:"repo_id"`
-	UserID  int64              `json:"user_id"`
+	Hook   string `json:"hook"` // pre-receive | post-receive
+	RepoID int64  `json:"repo_id"`
+	UserID int64  `json:"user_id"`
+	// Scope is the pushing key's scope. The user id alone is the account
+	// the key belongs to, and a deploy key grants nothing outside its
+	// binding, so anything acting on another repository needs this too.
+	Scope   string             `json:"scope"`
 	Updates []policy.RefUpdate `json:"updates"`
 }
 
@@ -237,7 +242,7 @@ func (s *Server) postReceive(req Request) {
 		// in their messages (closes #N, plain #N).
 		if pushedRepoErr == nil && branch == pushedRepo.DefaultBranch && !u.IsDelete {
 			dir := control.RepoDir(s.cfg.Server.Root, pushedRepo.OwnerName, pushedRepo.Name)
-			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, u.Old, u.New)
+			control.ProcessCommitMessages(s.st, dir, pushedRepo, req.UserID, req.Scope, u.Old, u.New)
 			control.RecordLandedCommits(s.st, dir, pushedRepo, u.Old, u.New)
 		}
 		// A branch push with a .gitbay/ci.yml queues one build per job.

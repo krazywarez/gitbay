@@ -171,6 +171,7 @@ func hookCmd() *cobra.Command {
 				Hook:    args[0],
 				RepoID:  repoID,
 				UserID:  userID,
+				Scope:   os.Getenv(hookd.EnvScope),
 				Updates: updates,
 			}, func(emit func(hookd.RawCommit) error) error {
 				return streamIncomingCommits(updates, emit)

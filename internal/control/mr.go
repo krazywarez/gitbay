@@ -1208,8 +1208,8 @@ func runMRMerge(c *Ctx, args []string) int {
 	// description is scanned after them, so a commit wins the attribution
 	// when both name the same issue.
 	if mr.TargetRef == repo.DefaultBranch {
-		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, targetSHA, newSHA)
-		ProcessMRDescription(c.Store, repo, mr, c.User.ID)
+		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, c.Scope, targetSHA, newSHA)
+		ProcessMRDescription(c.Store, repo, mr, c.User.ID, c.Scope)
 		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
 	}
 	// A merge moves the ref directly, so it never reaches post-receive and

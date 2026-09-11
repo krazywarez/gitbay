@@ -34,13 +34,31 @@ const maxMessageCommits = 100
 // landed on the default branch (old..new): closing keywords close the
 // issue, bare #N leaves a reference comment. Each (issue, sha) pair acts
 // at most once, ever. actorID — the pusher or merger — authorizes and
-// signs the resulting comments; failures are logged, never fatal, because
-// this runs after the push or merge already succeeded.
-func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID int64, old, new string) {
+// signs the resulting comments, and scope is the key they used, which a
+// cross-repo close is checked against too; failures are logged, never
+// fatal, because this runs after the push or merge already succeeded.
+func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID int64, scope, old, new string) {
 	msgs, err := gitutil.RevListMessages(dir, old, new, maxMessageCommits)
 	if err != nil {
 		slog.Error("commit refs: listing messages", "repo", repo.Path(), "err", err)
 		return
+	}
+	// Commits in one push name the same repositories over and over, and
+	// each resolution is three queries; keep the answers, refusals too.
+	resolved := map[string]struct {
+		repo store.Repo
+		ok   bool
+	}{}
+	target := func(path string) (store.Repo, bool) {
+		if r, seen := resolved[path]; seen {
+			return r.repo, r.ok
+		}
+		t, ok := closeTarget(st, repo, actorID, scope, path)
+		resolved[path] = struct {
+			repo store.Repo
+			ok   bool
+		}{t, ok}
+		return t, ok
 	}
 	for _, m := range msgs {
 		closes := closingRefs(m.Message)
@@ -59,11 +77,11 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 		subject, _, _ := strings.Cut(m.Message, "\n")
 		author := authorLink(st, m.AuthorName, m.AuthorEmail)
 		for _, ref := range closes {
-			target, ok := closeTarget(st, repo, actorID, ref.Path)
+			t, ok := target(ref.Path)
 			if !ok {
 				continue
 			}
-			actOnIssue(st, repo, target, actorID, m.SHA, ref.N, true, subject, author)
+			actOnIssue(st, repo, t, actorID, m.SHA, ref.N, true, subject, author)
 		}
 		for n := range refs {
 			actOnIssue(st, repo, repo, actorID, m.SHA, n, false, subject, author)
@@ -81,9 +99,9 @@ func ProcessCommitMessages(st *store.Store, dir string, repo store.Repo, actorID
 // key is per merge request rather than the merged sha, because sharing
 // the sha let a bare "#N" in a commit message claim it first and silently
 // suppress the close.
-func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID int64) {
+func ProcessMRDescription(st *store.Store, repo store.Repo, mr store.MR, actorID int64, scope string) {
 	for _, ref := range closingRefs(mr.Title + "\n" + mr.Body) {
-		target, ok := closeTarget(st, repo, actorID, ref.Path)
+		target, ok := closeTarget(st, repo, actorID, scope, ref.Path)
 		if !ok {
 			continue
 		}
@@ -134,9 +152,10 @@ func closingRefs(text string) []closeRef {
 
 // closeTarget resolves where a closing reference acts: the source
 // repository for a bare #N, or the named repository when the actor holds
-// write there. false means the reference stays text; nothing is logged
-// above debug, since a refusal must not confirm the target exists.
-func closeTarget(st *store.Store, source store.Repo, actorID int64, path string) (store.Repo, bool) {
+// write there with a key whose scope reaches it. false means the
+// reference stays text; nothing is logged above debug, since a refusal
+// must not confirm the target exists.
+func closeTarget(st *store.Store, source store.Repo, actorID int64, scope, path string) (store.Repo, bool) {
 	if path == "" {
 		return source, true
 	}
@@ -152,8 +171,14 @@ func closeTarget(st *store.Store, source store.Repo, actorID int64, path string)
 	if err != nil {
 		return store.Repo{}, false
 	}
-	if !policy.CanWrite(actor, target, grant) {
+	// The account's access and the key's reach both have to hold: a deploy
+	// key is bound to one repository and inherits nothing from whoever
+	// registered it, so its scope allows no write anywhere else.
+	if !policy.CanWrite(actor, target, grant) || !policy.ScopeAllowsGit(scope, target.Path(), true) {
 		slog.Debug("commit refs: cross-repo close refused", "source", source.Path(), "target", path)
+		return store.Repo{}, false
+	}
+	if target.Settings.Archived {
 		return store.Repo{}, false
 	}
 	return target, true

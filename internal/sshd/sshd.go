@@ -404,6 +404,7 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		hookd.EnvSocket + "=" + hookd.SocketPath(cfg.Server.Root),
 		hookd.EnvRepoID + "=" + strconv.FormatInt(repo.ID, 10),
 		hookd.EnvUserID + "=" + strconv.FormatInt(user.ID, 10),
+		hookd.EnvScope + "=" + scope,
 	}
 	// A storage quota on the owner rides the same mechanism as the pack
 	// cap: the pack may be no larger than what the owner has left.
