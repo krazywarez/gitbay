@@ -67,6 +67,15 @@ func TestMRDescriptionClosesAcrossRepos(t *testing.T) {
 	if iss, _ := f.st.IssueByNumber(f.priv.ID, 1); iss.State != "open" {
 		t.Fatal("a deploy key closed an issue outside its binding")
 	}
+	// The same key naming its own repository by full path is the bare
+	// form spelled out, not a cross-repo close (#213).
+	if _, err := f.st.CreateIssue(f.app.ID, f.alice, "in app too", "", "md"); err != nil {
+		t.Fatal(err)
+	}
+	ProcessMRDescription(f.st, f.app, mr(6, "Closes alice/app#2"), f.alice, deploy)
+	if iss, _ := f.st.IssueByNumber(f.app.ID, 2); iss.State != "closed" {
+		t.Fatal("a deploy key did not close its own repository's issue by full path")
+	}
 	// An archived target is read-only, cross-repo closes included.
 	if _, err := f.st.UpdateRepoSettings(f.priv.ID, func(rs *store.RepoSettings) { rs.Archived = true }); err != nil {
 		t.Fatal(err)

@@ -349,7 +349,10 @@ branch (direct push, MR merge, =repo commit-file= or the web editor):
 =closes/fixes/resolves #4= closes the
 issue with a linking comment, and a bare =#4= leaves a reference
 comment. Each issue/commit pair acts once, ever. =Closes owner/name#N= closes an issue in another repository when
-you hold write there; otherwise it stays a plain link. The comment left
+you hold write there with a key whose scope reaches it; otherwise it
+stays a plain link. A deploy key closes nothing outside the repository
+it is bound to, but naming that repository by full path works as the
+bare form does. The comment left
 on the closed issue links the closing commit by its repository path, so
 closing a public repository's issue from a private one names the private
 repository there. A bare =owner/name#N= links and does nothing.

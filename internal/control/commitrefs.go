@@ -163,6 +163,12 @@ func closeTarget(st *store.Store, source store.Repo, actorID int64, scope, path 
 	if err != nil {
 		return store.Repo{}, false
 	}
+	// The source repository named by its full path is the bare form
+	// spelled out, so a deploy key bound to it closes there as a bare #N
+	// would (#213).
+	if target.ID == source.ID {
+		return source, true
+	}
 	actor, err := st.UserByID(actorID)
 	if err != nil {
 		return store.Repo{}, false

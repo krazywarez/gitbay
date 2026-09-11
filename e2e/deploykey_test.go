@@ -77,8 +77,20 @@ func TestDeployKeys(t *testing.T) {
 	rwWork := t.TempDir()
 	mustGit(t, rwWork, rwEnv, "clone", inst.sshURL("alice/app"), "w")
 	rwDir := filepath.Join(rwWork, "w")
-	mustGit(t, rwDir, rwEnv, "commit", "-q", "--allow-empty", "-m", "ci push")
+	// Its push closes the bound repository's issue whether the message
+	// names it bare or by full path (#213).
+	for _, title := range []string{"'bare'", "'full path'"} {
+		if _, errOut, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/app", "--title", title); code != 0 {
+			t.Fatalf("issue create: %s", errOut)
+		}
+	}
+	mustGit(t, rwDir, rwEnv, "commit", "-q", "--allow-empty", "-m", "ci push\n\nCloses #1, closes alice/app#2")
 	mustGit(t, rwDir, rwEnv, "push", "-q", "origin", "main")
+	for _, n := range []string{"1", "2"} {
+		if out, _, _ := inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", n, "--json"); !strings.Contains(out, `"state":"closed"`) {
+			t.Fatalf("deploy key push did not close issue %s: %s", n, out)
+		}
+	}
 
 	// The binding survives an owner rename (keys bind to the repo ID).
 	if _, errOut, code = inst.ssh(t, aliceKey, "", "org", "create", "moved"); code != 0 {
