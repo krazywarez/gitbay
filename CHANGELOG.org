@@ -4,6 +4,59 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.19.0 — 2026-09-11
+
+Labels and milestones an org defines once for every repository under
+it, and =Closes owner/name#N= acting across repositories (#203).
+
+** Org labels and milestones
+
+- Migration 0052: =labels= and =milestones= rows belong to a
+  repository or to an org, exactly one, with a partial unique index
+  per scope. Existing rows and their memberships keep their ids.
+- A repository owned by an org sees the org's labels and milestones
+  beside its own; =issue label --add=, =issue milestone= and =mr
+  milestone= resolve the org's row first. A repository cannot create,
+  recolour, remove, close or reopen a name its org holds; the refusal
+  names the org command.
+- =org label set|list|remove= and =org milestone
+  create|list|close|reopen=, for org admins. Creating a name that
+  repositories under the org already use folds them in: their issues
+  and merge requests move to the org's row and the repository rows
+  go. =repo transfer= into an org folds the same way. Counts on org
+  rows span the repositories the caller can read.
+- Web: read-only =/<org>/-/labels= and =/<org>/-/milestones=, linked
+  from the org page; an "org" mark on repository label and milestone
+  pages, whose forms act on repository rows only.
+- =label list= and =milestone list= JSON carry =org: true= on an org
+  row.
+
+** Cross-repository closes
+
+- =Closes owner/name#N= in a commit on the default branch, or in a
+  merged merge request's title or body, closes that issue when the
+  actor holds write on the target and the pushing key's scope allows
+  it: a deploy key never acts outside its binding. An unknown or
+  refused target does nothing and logs nothing; the text stays a
+  plain autolink. An archived target is refused. Bare =owner/name#N=
+  without a keyword stays display-only.
+
+** Store
+
+- A migration whose first line is =-- foreign_keys: off= runs on one
+  pinned connection with foreign keys off, re-enabled afterwards and
+  =foreign_key_check= required empty. Rebuilding a table other tables
+  reference loses the children's rows otherwise, even under
+  =legacy_alter_table=.
+
+** Behaviour changes
+
+- =milestone create= exits 1 on a duplicate title, as =org milestone
+  create= does; it exited 2 before.
+
+Upgrade: replace the binary and restart; migration 0052 runs on
+start and copies every label and milestone row once.
+
 * v1.18.1 — 2026-09-11
 
 A runner that cannot hang on a dead connection, SSH keys with names,
