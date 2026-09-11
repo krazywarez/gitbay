@@ -40,7 +40,7 @@ func newAttachFixture(t *testing.T) attachFixture {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), "runner"); err != nil {
+		if err := st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), "runner", ""); err != nil {
 			t.Fatal(err)
 		}
 		k, _ := st.SSHKeyByFingerprint(fp)

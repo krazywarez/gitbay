@@ -89,11 +89,11 @@ func TestRepoRunnerAddRefusesWrongKeys(t *testing.T) {
 	}
 	// Someone else's runner key.
 	bob, _ := st.CreateUser("bob", false)
-	if err := st.AddSSHKey(bob, "SHA256:bobrunner", "ssh-ed25519", []byte("x"), "runner"); err != nil {
+	if err := st.AddSSHKey(bob, "SHA256:bobrunner", "ssh-ed25519", []byte("x"), "runner", ""); err != nil {
 		t.Fatal(err)
 	}
 	st.RemoveSSHKey(uid, keys[0].Fingerprint)
-	if err := st.AddSSHKey(bob, keys[0].Fingerprint, "ssh-ed25519", keys[0].Blob, "runner"); err != nil {
+	if err := st.AddSSHKey(bob, keys[0].Fingerprint, "ssh-ed25519", keys[0].Blob, "runner", ""); err != nil {
 		t.Fatal(err)
 	}
 	c, out = repoRunnerCtx(t, st, uid, false, testRunnerPub)

@@ -16,7 +16,7 @@ func runnerFixture(t *testing.T) (s *Store, uid, keyID, repoA, repoB int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddSSHKey(uid, "SHA256:runnerkey", "ssh-ed25519", []byte("blob"), "runner"); err != nil {
+	if err := s.AddSSHKey(uid, "SHA256:runnerkey", "ssh-ed25519", []byte("blob"), "runner", ""); err != nil {
 		t.Fatal(err)
 	}
 	k, err := s.SSHKeyByFingerprint("SHA256:runnerkey")
@@ -88,7 +88,7 @@ func TestRunnerAttachmentCascades(t *testing.T) {
 // repository's runner list shows each key's last poll and the build it holds.
 func TestRunnerSeenPerKeyAndRepoList(t *testing.T) {
 	s, uid, keyID, repoA, _ := runnerFixture(t)
-	if err := s.AddSSHKey(uid, "SHA256:second", "ssh-ed25519", []byte("blob2"), "runner"); err != nil {
+	if err := s.AddSSHKey(uid, "SHA256:second", "ssh-ed25519", []byte("blob2"), "runner", ""); err != nil {
 		t.Fatal(err)
 	}
 	k2, _ := s.SSHKeyByFingerprint("SHA256:second")

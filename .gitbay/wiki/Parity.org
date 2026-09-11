@@ -283,6 +283,7 @@ client has no use for one (krz/gitbay#57).
 | capability                  | cli | web | ios |
 |-----------------------------+-----+-----+-----|
 | SSH keys: list, add, remove | yes | yes | yes |
+| SSH key label               | yes | yes | no  |
 | PGP keys: list, add, remove | yes | yes | yes |
 | email add and verify        | yes | yes | yes |
 | email list, remove, primary | yes | yes | yes |

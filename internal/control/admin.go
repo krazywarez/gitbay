@@ -149,6 +149,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		Fingerprint string `json:"fingerprint"`
 		Algo        string `json:"algo"`
 		Scope       string `json:"scope"`
+		Label       string `json:"label"`
 		CreatedAt   string `json:"created_at"`
 		LastUsedAt  string `json:"last_used_at,omitempty"`
 	}
@@ -194,7 +195,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, k := range keys {
-		d.Keys = append(d.Keys, keyOut{k.Fingerprint, k.Algo, k.Scope, k.CreatedAt, k.LastUsedAt})
+		d.Keys = append(d.Keys, keyOut{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedAt, k.LastUsedAt})
 	}
 	emails, err := c.Store.ListEmails(u.ID)
 	if err != nil {

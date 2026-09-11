@@ -19,7 +19,7 @@ import (
 func runnerCtx(st *store.Store, uid int64, root string) (*Ctx, *bytes.Buffer) {
 	var out bytes.Buffer
 	fp := fmt.Sprintf("SHA256:runner-%d", uid)
-	st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), "full") // ErrDuplicateKey on reuse is fine
+	st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), "full", "") // ErrDuplicateKey on reuse is fine
 	c := &Ctx{
 		User:   store.User{ID: uid, Username: "ci", IsAdmin: true},
 		Scope:  "full",

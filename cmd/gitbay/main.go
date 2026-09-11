@@ -386,6 +386,7 @@ func authCmd() *cobra.Command {
 		group("keys", "manage SSH keys",
 			pass("list", "list registered SSH keys", passOpts{server: []string{"keys", "list"}}),
 			keysAdd,
+			pass("label", "name a key: <fingerprint> [<text>]; no text clears it", passOpts{server: []string{"keys", "label"}}),
 			pass("remove", "remove an SSH key by fingerprint", passOpts{server: []string{"keys", "remove"}}),
 		),
 		group("email", "manage email addresses",

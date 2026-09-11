@@ -115,3 +115,32 @@ func TestDatabaseFileIsNotWorldReadable(t *testing.T) {
 		t.Errorf("database mode %04o is other-readable", mode)
 	}
 }
+
+func TestSSHKeyLabel(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddSSHKey(uid, "SHA256:aaa", "ssh-ed25519", []byte{0}, "full", "laptop"); err != nil {
+		t.Fatal(err)
+	}
+	keys, err := s.ListSSHKeys(uid)
+	if err != nil || len(keys) != 1 || keys[0].Label != "laptop" {
+		t.Fatalf("ListSSHKeys = %+v, %v; want one key labelled laptop", keys, err)
+	}
+	if err := s.SetSSHKeyLabel(uid, "SHA256:aaa", "desk"); err != nil {
+		t.Fatal(err)
+	}
+	k, err := s.SSHKeyByFingerprint("SHA256:aaa")
+	if err != nil || k.Label != "desk" {
+		t.Fatalf("SSHKeyByFingerprint after relabel: %+v, %v", k, err)
+	}
+	// Only the owner may relabel; someone else's fingerprint is not found.
+	if err := s.SetSSHKeyLabel(uid+1, "SHA256:aaa", "x"); err != ErrNotFound {
+		t.Fatalf("relabel by another user: %v, want ErrNotFound", err)
+	}
+}

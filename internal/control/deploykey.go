@@ -50,13 +50,17 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "reading key: %v", err)
 	}
-	pub, _, _, _, err := ssh.ParseAuthorizedKey(raw)
+	pub, comment, _, _, err := ssh.ParseAuthorizedKey(raw)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "not a valid public key in authorized_keys format: %v", err)
 	}
+	label, err := keyLabel(comment)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
 	fp := ssh.FingerprintSHA256(pub)
 	scope := fmt.Sprintf("deploy:%d:%s", repo.ID, mode)
-	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope); err != nil {
+	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return c.failErr(err)
 		}
@@ -83,6 +87,7 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		Fingerprint string `json:"fingerprint"`
 		Algo        string `json:"algo"`
 		Mode        string `json:"mode"`
+		Label       string `json:"label"`
 	}
 	var ds []out
 	for _, k := range keys {
@@ -90,11 +95,11 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		if policy.DeployScopeAllows(k.Scope, repo.ID, true) {
 			mode = "rw"
 		}
-		ds = append(ds, out{k.Fingerprint, k.Algo, mode})
+		ds = append(ds, out{k.Fingerprint, k.Algo, mode, k.Label})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Fingerprint, d.Algo, d.Mode)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", d.Fingerprint, d.Algo, d.Mode, d.Label)
 		}
 	})
 }

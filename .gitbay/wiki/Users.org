@@ -58,8 +58,14 @@ username is always =git= — the key alone determines who you are.
 #+begin_src sh
 gitbay auth keys list
 gitbay auth keys add --scope git < ~/.ssh/ci_key.pub   # key on stdin
+gitbay auth keys add --label laptop < ~/.ssh/id_ed25519.pub
+gitbay auth keys label SHA256:... "work laptop"
 gitbay auth keys remove SHA256:...
 #+end_src
+
+A key's label is the comment on its =authorized_keys= line unless
+=--label= gives one; =keys label= renames a key, and with no text
+clears the name. Labels are one line of up to 64 bytes.
 
 Scopes: =full= (default; git plus every control command), =git= (git
 transport only — right for automation keys, which then cannot touch

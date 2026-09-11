@@ -43,7 +43,7 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "reading key: %v", err)
 	}
-	pub, _, _, _, err := ssh.ParseAuthorizedKey(raw)
+	pub, comment, _, _, err := ssh.ParseAuthorizedKey(raw)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "not a valid public key in authorized_keys format: %v", err)
 	}
@@ -51,7 +51,8 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 	key, err := c.Store.SSHKeyByFingerprint(fp)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), "runner"); err != nil {
+		label, _ := keyLabel(comment)
+		if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), "runner", label); err != nil {
 			return c.fail(protocol.ExitFailure, "adding key: %v", err)
 		}
 		if key, err = c.Store.SSHKeyByFingerprint(fp); err != nil {

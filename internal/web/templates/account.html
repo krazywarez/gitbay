@@ -25,8 +25,9 @@
 commands and push; a <code>git</code> key can only move git data, which is what
 a CI checkout wants.</p>
 {{if .Keys}}<div class="tablewrap"><table class="keys">
-<tr class="cols"><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
+<tr class="cols"><th scope="col">label</th><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
 {{range .Keys}}<tr>
+  <td>{{.Label}}</td>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{.Algo}}</td>
   <td>{{.Scope}}</td>
@@ -40,6 +41,8 @@ a CI checkout wants.</p>
     <input type="hidden" name="field" value="key-add">
     <label for="key">Public key</label>
     <textarea id="key" name="key" rows="3" required placeholder="ssh-ed25519 AAAA... you@machine"></textarea>
+    <label for="key-label">Label</label>
+    <input id="key-label" name="label" maxlength="64" placeholder="defaults to the key's comment">
     <label for="scope">Scope</label>
     <select id="scope" name="scope">
       <option value="full">full — commands and git</option>

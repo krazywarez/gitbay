@@ -22,6 +22,7 @@ type SSHKey struct {
 	Algo        string
 	Blob        []byte
 	Scope       string
+	Label       string // "" when the key was added with no name
 	CreatedAt   string
 	LastUsedAt  string // "" when the key has never authenticated
 }
@@ -230,15 +231,15 @@ func (s *Store) UserByID(id int64) (User, error) {
 }
 
 // AddSSHKey registers a key and bumps the key epoch in one transaction.
-func (s *Store) AddSSHKey(userID int64, fingerprint, algo string, blob []byte, scope string) error {
+func (s *Store) AddSSHKey(userID int64, fingerprint, algo string, blob []byte, scope, label string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(
-		"INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, ?, ?, ?, ?)",
-		userID, fingerprint, algo, blob, scope); err != nil {
+		"INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope, label) VALUES (?, ?, ?, ?, ?, ?)",
+		userID, fingerprint, algo, blob, scope, label); err != nil {
 		if isUniqueErr(err) {
 			return ErrDuplicateKey
 		}
@@ -270,11 +271,24 @@ func (s *Store) RemoveSSHKey(userID int64, fingerprint string) error {
 	return tx.Commit()
 }
 
+// SetSSHKeyLabel renames a key owned by userID. Labels do not touch the
+// key epoch: nothing about authentication changes.
+func (s *Store) SetSSHKeyLabel(userID int64, fingerprint, label string) error {
+	res, err := s.DB.Exec("UPDATE ssh_keys SET label = ? WHERE user_id = ? AND fingerprint = ?", label, userID, fingerprint)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) SSHKeyByFingerprint(fingerprint string) (SSHKey, error) {
 	var k SSHKey
 	err := s.DB.QueryRow(
-		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE fingerprint = ?",
-		fingerprint).Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope)
+		"SELECT id, user_id, fingerprint, algo, blob, scope, label FROM ssh_keys WHERE fingerprint = ?",
+		fingerprint).Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label)
 	if errors.Is(err, sql.ErrNoRows) {
 		return k, ErrNotFound
 	}
@@ -283,7 +297,7 @@ func (s *Store) SSHKeyByFingerprint(fingerprint string) (SSHKey, error) {
 
 func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	rows, err := s.DB.Query(
-		`SELECT id, user_id, fingerprint, algo, blob, scope, created_at, COALESCE(last_used_at, '')
+		`SELECT id, user_id, fingerprint, algo, blob, scope, label, created_at, COALESCE(last_used_at, '')
 		 FROM ssh_keys WHERE user_id = ? ORDER BY id`,
 		userID)
 	if err != nil {
@@ -293,7 +307,7 @@ func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	var keys []SSHKey
 	for rows.Next() {
 		var k SSHKey
-		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.CreatedAt, &k.LastUsedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label, &k.CreatedAt, &k.LastUsedAt); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)
@@ -451,8 +465,8 @@ func isUniqueErr(err error) bool {
 func (s *Store) SSHKeyByID(id int64) (SSHKey, error) {
 	var k SSHKey
 	err := s.DB.QueryRow(
-		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE id = ?",
-		id).Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope)
+		"SELECT id, user_id, fingerprint, algo, blob, scope, label FROM ssh_keys WHERE id = ?",
+		id).Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label)
 	if errors.Is(err, sql.ErrNoRows) {
 		return k, ErrNotFound
 	}
@@ -462,7 +476,7 @@ func (s *Store) SSHKeyByID(id int64) (SSHKey, error) {
 // ListDeployKeys returns the deploy keys bound to a repository.
 func (s *Store) ListDeployKeys(repoID int64) ([]SSHKey, error) {
 	rows, err := s.DB.Query(
-		"SELECT id, user_id, fingerprint, algo, blob, scope FROM ssh_keys WHERE scope LIKE 'deploy:' || ? || ':%' ORDER BY id",
+		"SELECT id, user_id, fingerprint, algo, blob, scope, label FROM ssh_keys WHERE scope LIKE 'deploy:' || ? || ':%' ORDER BY id",
 		repoID)
 	if err != nil {
 		return nil, err
@@ -471,7 +485,7 @@ func (s *Store) ListDeployKeys(repoID int64) ([]SSHKey, error) {
 	var keys []SSHKey
 	for rows.Next() {
 		var k SSHKey
-		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope); err != nil {
+		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)

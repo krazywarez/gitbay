@@ -227,6 +227,18 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 	if code != 0 || len(strings.Split(strings.TrimSpace(out), "\n")) != 2 {
 		t.Fatalf("keys list exit %d:\n%s", code, out)
 	}
+	// The key's comment (ssh-keygen -C) is its label; keys label renames it.
+	if !strings.Contains(out, "\tgit\talice2\n") {
+		t.Fatalf("keys list lacks the comment as label:\n%s", out)
+	}
+	secondFP := strings.Fields(strings.Split(strings.TrimSpace(out), "\n")[1])[0]
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "keys", "label", secondFP, "'build box'"); code != 0 {
+		t.Fatalf("keys label exit %d, stderr: %s", code, errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "keys", "list")
+	if !strings.Contains(out, "\tgit\tbuild box\n") {
+		t.Fatalf("keys list after label:\n%s", out)
+	}
 
 	// The git-scoped key authenticates but is denied control commands.
 	out, errOut, code = inst.ssh(t, secondKey, "", "whoami")

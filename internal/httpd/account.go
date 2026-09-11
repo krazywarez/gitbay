@@ -19,6 +19,7 @@ type accountKey struct {
 	Fingerprint string
 	Algo        string
 	Scope       string
+	Label       string
 }
 
 type accountPGP struct {
@@ -34,7 +35,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
-			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope})
+			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope, Label: k.Label})
 		}
 	}
 	var pgp []accountPGP
@@ -140,6 +141,9 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		argv := []string{"keys", "add"}
 		if scope := r.FormValue("scope"); scope == "git" {
 			argv = append(argv, "--scope", "git")
+		}
+		if label := strings.TrimSpace(r.FormValue("label")); label != "" {
+			argv = append(argv, "--label", label)
 		}
 		if msg, ok := s.runControlStdin(u, argv, body+"\n"); !ok {
 			back(msg, "")

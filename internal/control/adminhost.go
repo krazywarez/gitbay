@@ -77,12 +77,13 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	// Parse the key before creating anything, so a bad key leaves no
 	// half-made account behind.
 	var pub ssh.PublicKey
+	var comment string
 	if withKey {
 		raw, err := io.ReadAll(io.LimitReader(c.Stdin, 64<<10))
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "reading key: %v", err)
 		}
-		if pub, _, _, _, err = ssh.ParseAuthorizedKey(raw); err != nil {
+		if pub, comment, _, _, err = ssh.ParseAuthorizedKey(raw); err != nil {
 			return c.fail(protocol.ExitUsage, "not a public key in authorized_keys format: %v", err)
 		}
 	}
@@ -102,7 +103,8 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	fp := ""
 	if pub != nil {
 		fp = ssh.FingerprintSHA256(pub)
-		if err := c.Store.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full"); err != nil {
+		label, _ := keyLabel(comment)
+		if err := c.Store.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full", label); err != nil {
 			return c.failErr(err)
 		}
 	}
