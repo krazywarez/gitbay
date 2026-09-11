@@ -166,10 +166,17 @@ func TestMigration0052KeepsMembershipsAndForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	iid, err := s.CreateIssue(rid, uid, "one", "", "md")
+	number, err := s.CreateIssue(rid, uid, "one", "", "md")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// CreateIssue returns the per-repo number; the rows below reference
+	// the issues.id row.
+	issue, err := s.IssueByNumber(rid, number)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iid := issue.ID
 	if _, err := s.DB.Exec("INSERT INTO labels (repo_id, name, color) VALUES (?, 'bug', '#ff0000')", rid); err != nil {
 		t.Fatal(err)
 	}

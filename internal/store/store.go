@@ -173,7 +173,7 @@ func (s *Store) migrateTo(target int) error {
 	if err != nil {
 		return err
 	}
-	step := func(sqlText string, newVersion int, fkOff bool) error {
+	step := func(sqlText string, newVersion int, fkOff bool) (retErr error) {
 		if !fkOff {
 			tx, err := s.DB.Begin()
 			if err != nil {
@@ -206,6 +206,17 @@ func (s *Store) migrateTo(target int) error {
 		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
 			return err
 		}
+		// The connection goes back to the pool when this returns, so every
+		// path out of here has to put foreign keys back on first.
+		restoreFK := func() error {
+			_, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON")
+			return err
+		}
+		defer func() {
+			if err := restoreFK(); err != nil && retErr == nil {
+				retErr = err
+			}
+		}()
 		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return err
@@ -220,7 +231,7 @@ func (s *Store) migrateTo(target int) error {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		if err := restoreFK(); err != nil {
 			return err
 		}
 		rows, err := conn.QueryContext(ctx, "PRAGMA foreign_key_check")
