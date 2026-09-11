@@ -4,6 +4,42 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.18.1 — 2026-09-11
+
+A runner that cannot hang on a dead connection, SSH keys with names,
+and dependency updates.
+
+** CI runner
+
+- Every ssh invocation carries =ConnectTimeout=10=,
+  =ServerAliveInterval=15= and =ServerAliveCountMax=3=, placed after
+  the identity and the operator's =-ssh-opts= so an operator's value
+  wins. A claim whose TCP session had died under it blocked a laptop
+  runner's poll loop for thirteen hours; it now fails within a minute
+  and the loop resumes.
+- The build comment in =deploy/Containerfile.ci= stages the file in
+  the runner user's home before =podman build=: a login shell under
+  =su= cannot read root's stdin and does not share root's =/tmp=.
+
+** Keys
+
+- SSH keys carry a label (migration 0051). =keys add --label= defaults
+  to the authorized_keys comment; =keys label <fingerprint> [<text>]=
+  renames or clears it. =keys list=, =admin user show=, =repo
+  deploy-key list= and the settings page show it. Deploy, runner and
+  admin-created keys take the comment as their label. Closes #208.
+
+** Web
+
+- Org autolinks stop before trailing punctuation: a bare URL closing a
+  sentence or a parenthesis no longer takes the =.=, =,= or =)= into
+  the href. Closes #209.
+
+** Dependencies
+
+- golang.org/x/crypto 0.57, x/image 0.46, x/net 0.59, x/term 0.46.
+  Closes #205.
+
 * v1.18.0 — 2026-09-10
 
 What the first real job on a user's runner needed. A twice-daily
