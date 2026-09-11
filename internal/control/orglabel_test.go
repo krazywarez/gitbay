@@ -69,3 +69,57 @@ func TestOrgLabelListVisibility(t *testing.T) {
 		t.Fatalf("outsider list: exit %d %s", code, out.String())
 	}
 }
+
+func TestOrgMilestoneLifecycle(t *testing.T) {
+	f := newOrgFixture(t)
+	f.st.CreateMilestone(f.core, "v1", "", "")
+	c, out := f.ctx(f.alice)
+	if code := runOrgMilestoneCreate(c, []string{"acme", "v1", "--due", "2027-01-01"}); code != protocol.ExitOK ||
+		!strings.Contains(out.String(), `"folded":1`) {
+		t.Fatalf("create: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneCreate(c, []string{"acme", "v1"}); code != protocol.ExitFailure {
+		t.Fatalf("duplicate create: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneCreate(c, []string{"acme", "v2", "--due", "soon"}); code != protocol.ExitUsage {
+		t.Fatalf("bad due: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	// An issue in each repo attaches by title; progress spans both.
+	f.st.CreateIssue(f.core.ID, f.alice, "c1", "", "md")
+	f.st.CreateIssue(f.priv.ID, f.alice, "p1", "", "md")
+	runIssueMilestone(c, []string{"acme/core", "1", "v1"})
+	runIssueMilestone(c, []string{"acme/priv", "1", "v1"})
+	out.Reset()
+	if code := runOrgMilestoneList(c, []string{"acme"}); code != protocol.ExitOK ||
+		!strings.Contains(out.String(), `"open":2`) || !strings.Contains(out.String(), `"due":"2027-01-01"`) {
+		t.Fatalf("list: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	// carol reads only the public repo's count.
+	cc, cout := f.ctx(f.carol)
+	if code := runOrgMilestoneList(cc, []string{"acme"}); code != protocol.ExitOK || !strings.Contains(cout.String(), `"open":1`) {
+		t.Fatalf("outsider list: exit %d %s", code, cout.String())
+	}
+	if code := runOrgMilestoneClose(c, []string{"acme", "v1"}); code != protocol.ExitOK {
+		t.Fatalf("close: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneList(c, []string{"acme"}); code != protocol.ExitOK || strings.Contains(out.String(), `"title":"v1"`) {
+		t.Fatalf("closed still listed as open: %s", out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneReopen(c, []string{"acme", "v1"}); code != protocol.ExitOK {
+		t.Fatalf("reopen: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneClose(c, []string{"acme", "nope"}); code != protocol.ExitNotFound {
+		t.Fatalf("close missing: exit %d %s", code, out.String())
+	}
+	bc, bout := f.ctx(f.bob)
+	if code := runOrgMilestoneClose(bc, []string{"acme", "v1"}); code != protocol.ExitDenied {
+		t.Fatalf("member close: exit %d %s", code, bout.String())
+	}
+}

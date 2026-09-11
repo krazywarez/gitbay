@@ -95,6 +95,11 @@ func runMilestoneList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	return emitMilestones(c, ms)
+}
+
+// emitMilestones renders a milestone list for the caller, JSON or plain.
+func emitMilestones(c *Ctx, ms []store.Milestone) int {
 	type out struct {
 		Title       string `json:"title"`
 		Description string `json:"description,omitempty"`

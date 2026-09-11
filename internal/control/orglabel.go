@@ -20,6 +20,18 @@ func init() {
 	register(Command{Path: []string{"org", "label", "remove"},
 		Summary: "remove an org label from the org and from every issue under it",
 		Usage:   "org label remove <org> <label>", Run: runOrgLabelRemove})
+	register(Command{Path: []string{"org", "milestone", "create"},
+		Summary: "create an org milestone spanning every org repository; folds in same-titled repo milestones",
+		Usage:   "org milestone create <org> <title> [--description <d>] [--due YYYY-MM-DD]", Run: runOrgMilestoneCreate})
+	register(Command{Path: []string{"org", "milestone", "list"},
+		Summary: "list an org's milestones with progress across the repositories you can read",
+		Usage:   "org milestone list <org> [--state open|closed|all]", ReadOnly: true, Run: runOrgMilestoneList})
+	register(Command{Path: []string{"org", "milestone", "close"},
+		Summary: "close an org milestone",
+		Usage:   "org milestone close <org> <title>", Run: runOrgMilestoneClose})
+	register(Command{Path: []string{"org", "milestone", "reopen"},
+		Summary: "reopen an org milestone",
+		Usage:   "org milestone reopen <org> <title>", Run: runOrgMilestoneReopen})
 }
 
 // orgReader resolves an org for a read of its labels or milestones.
@@ -139,5 +151,91 @@ func runOrgLabelRemove(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]string{"removed": args[1]}, func(w io.Writer) {
 		fmt.Fprintf(w, "removed org label %s from %s\n", args[1], org.Name)
+	})
+}
+
+func runOrgMilestoneCreate(c *Ctx, args []string) int {
+	const usage = "usage: org milestone create <org> <title> [--description <d>] [--due YYYY-MM-DD]"
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2, Usage: usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	orgName, title, description, due := f.pos(0), f.pos(1), f.Value("--description"), f.Value("--due")
+	if orgName == "" || title == "" {
+		return c.fail(protocol.ExitUsage, usage)
+	}
+	if due != "" && !duePat.MatchString(due) {
+		return c.fail(protocol.ExitUsage, "--due must be YYYY-MM-DD")
+	}
+	org, code := orgAdmin(c, orgName)
+	if code >= 0 {
+		return code
+	}
+	_, folded, err := c.Store.CreateOrgMilestone(org.ID, title, description, due)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(struct {
+		Milestone string `json:"milestone"`
+		Folded    int    `json:"folded"`
+	}{title, folded}, func(w io.Writer) {
+		fmt.Fprintf(w, "created org milestone %q on %s", title, org.Name)
+		if folded > 0 {
+			fmt.Fprintf(w, "; folded in %d repositor%s", folded, map[bool]string{true: "y", false: "ies"}[folded == 1])
+		}
+		fmt.Fprintln(w)
+	})
+}
+
+func runOrgMilestoneList(c *Ctx, args []string) int {
+	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "org milestone list <org> [--state open|closed|all]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	state, orgName := "open", f.pos(0)
+	if f.Has("--state") {
+		state = f.Value("--state")
+	}
+	if orgName == "" || (state != "open" && state != "closed" && state != "all") {
+		return c.fail(protocol.ExitUsage, "usage: org milestone list <org> [--state open|closed|all]")
+	}
+	org, readable, code := orgReader(c, orgName)
+	if code >= 0 {
+		return code
+	}
+	ms, err := c.Store.ListOrgMilestones(org.ID, state, readable)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return emitMilestones(c, ms)
+}
+
+func runOrgMilestoneClose(c *Ctx, args []string) int  { return setOrgMilestoneState(c, args, "closed") }
+func runOrgMilestoneReopen(c *Ctx, args []string) int { return setOrgMilestoneState(c, args, "open") }
+
+func setOrgMilestoneState(c *Ctx, args []string, state string) int {
+	verb := "close"
+	if state == "open" {
+		verb = "reopen"
+	}
+	if len(args) != 2 {
+		return c.fail(protocol.ExitUsage, "usage: org milestone %s <org> <title>", verb)
+	}
+	org, code := orgAdmin(c, args[0])
+	if code >= 0 {
+		return code
+	}
+	m, err := c.Store.OrgMilestoneByTitle(org.ID, args[1])
+	if errors.Is(err, store.ErrNotFound) {
+		return c.fail(protocol.ExitNotFound, "no org milestone %q on %s", args[1], org.Name)
+	}
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if err := c.Store.SetMilestoneState(m.ID, state); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"milestone": m.Title, "state": state}, func(w io.Writer) {
+		fmt.Fprintf(w, "%sd org milestone %q on %s\n", verb, m.Title, org.Name)
 	})
 }
