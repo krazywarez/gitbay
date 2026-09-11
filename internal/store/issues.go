@@ -294,10 +294,11 @@ func (s *Store) ListIssueLabels(repoID int64) (map[int64][]string, error) {
 	return out, rows.Err()
 }
 
-// LabelColors returns the repo's label colors keyed by label name. Labels
-// with no stored color map to "".
-func (s *Store) LabelColors(repoID int64) (map[string]string, error) {
-	rows, err := s.DB.Query("SELECT name, color FROM labels WHERE repo_id = ?", repoID)
+// LabelColors returns the colours of the labels a repository sees, keyed
+// by name. Labels with no stored colour map to "".
+func (s *Store) LabelColors(repo Repo) (map[string]string, error) {
+	where, args := scopeClause("l", repo)
+	rows, err := s.DB.Query("SELECT l.name, l.color FROM labels l WHERE "+where, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -313,30 +314,35 @@ func (s *Store) LabelColors(repoID int64) (map[string]string, error) {
 	return out, rows.Err()
 }
 
-// SetIssueLabel attaches (add) or detaches a label, creating the repo label
-// on first use.
-func (s *Store) SetIssueLabel(repoID, issueID int64, name string, add bool) error {
+// SetIssueLabel attaches (add) or detaches a label by name. Adding
+// resolves the org's row when the org has the name, else the repository's,
+// creating that on first use.
+func (s *Store) SetIssueLabel(repo Repo, issueID int64, name string, add bool) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	where, args := scopeClause("l", repo)
 	if add {
-		if _, err := tx.Exec(
-			"INSERT INTO labels (repo_id, name) VALUES (?, ?) ON CONFLICT (repo_id, name) DO NOTHING",
-			repoID, name); err != nil {
+		if held, err := orgHoldsLabel(tx, repo, name); err != nil {
 			return err
+		} else if !held {
+			if _, err := tx.Exec(`INSERT INTO labels (repo_id, name) VALUES (?, ?)
+				ON CONFLICT (repo_id, name) WHERE repo_id IS NOT NULL DO NOTHING`, repo.ID, name); err != nil {
+				return err
+			}
 		}
-		if _, err := tx.Exec(`
-			INSERT INTO issue_labels (issue_id, label_id)
-			SELECT ?, id FROM labels WHERE repo_id = ? AND name = ?
-			ON CONFLICT DO NOTHING`, issueID, repoID, name); err != nil {
+		if _, err := tx.Exec(`INSERT INTO issue_labels (issue_id, label_id)
+			SELECT ?, l.id FROM labels l WHERE `+where+` AND l.name = ?
+			ORDER BY l.org_id IS NULL LIMIT 1
+			ON CONFLICT DO NOTHING`, append(append([]any{issueID}, args...), name)...); err != nil {
 			return err
 		}
 	} else {
-		res, err := tx.Exec(`
-			DELETE FROM issue_labels WHERE issue_id = ? AND label_id IN
-			(SELECT id FROM labels WHERE repo_id = ? AND name = ?)`, issueID, repoID, name)
+		res, err := tx.Exec(`DELETE FROM issue_labels WHERE issue_id = ? AND label_id IN
+			(SELECT l.id FROM labels l WHERE `+where+` AND l.name = ?)`,
+			append(append([]any{issueID}, args...), name)...)
 		if err != nil {
 			return err
 		}
