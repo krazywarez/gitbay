@@ -388,12 +388,12 @@ func runIssueLabel(c *Ctx, args []string) int {
 		return code
 	}
 	for _, l := range adds {
-		if err := c.Store.SetIssueLabel(repo.ID, issue.ID, l, true); err != nil {
+		if err := c.Store.SetIssueLabel(repo, issue.ID, l, true); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
 	for _, l := range removes {
-		if err := c.Store.SetIssueLabel(repo.ID, issue.ID, l, false); err != nil {
+		if err := c.Store.SetIssueLabel(repo, issue.ID, l, false); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				return c.fail(protocol.ExitNotFound, "%v", err)
 			}

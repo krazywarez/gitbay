@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -17,7 +18,12 @@ func (s *Server) labels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "issues"
-	labels, err := s.st.ListLabels(p.Repo.ID)
+	readable, err := control.ReadableScope(s.st, s.viewer(r), p.Repo)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	labels, err := s.st.ListLabels(p.Repo, readable)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -28,7 +34,7 @@ func (s *Server) labels(w http.ResponseWriter, r *http.Request) {
 		LabelColors map[string]template.CSS
 		CanWrite    bool
 		Notice      string
-	}{p, labels, s.labelColors(p.Repo.ID), s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
+	}{p, labels, s.labelColors(p.Repo), s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 
 // labelSubmit creates a label, sets its colour, or removes it, through

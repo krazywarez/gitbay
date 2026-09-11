@@ -37,13 +37,17 @@ func runLabelList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	labels, err := c.Store.ListLabels(repo.ID)
+	readable, err := ReadableScope(c.Store, c.User, repo)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	labels, err := c.Store.ListLabels(repo, readable)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(labels, func(w io.Writer) {
 		for _, l := range labels {
-			fmt.Fprintf(w, "%s\t%s\t%d\n", l.Name, l.Color, l.Issues)
+			fmt.Fprintf(w, "%s\t%s\t%d%s\n", l.Name, l.Color, l.Issues, map[bool]string{true: "\torg"}[l.Org])
 		}
 	})
 }
@@ -78,15 +82,14 @@ func runLabelSet(c *Ctx, args []string) int {
 	}
 	if !colorSet {
 		// Keep the colour it has, if any; this is "make sure it exists".
-		if labels, err := c.Store.ListLabels(repo.ID); err == nil {
-			for _, l := range labels {
-				if l.Name == name {
-					color = l.Color
-				}
-			}
+		if l, err := c.Store.LabelByName(repo, name); err == nil && !l.Org {
+			color = l.Color
 		}
 	}
-	if err := c.Store.SetLabel(repo.ID, name, color); err != nil {
+	if err := c.Store.SetLabel(repo, name, color); err != nil {
+		if errors.Is(err, store.ErrOrgScoped) {
+			return c.fail(protocol.ExitFailure, "%s", orgScopedMsg(repo, "label", name, "set"))
+		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(store.Label{Name: name, Color: color}, func(w io.Writer) {
@@ -109,7 +112,10 @@ func runLabelRemove(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	if err := c.Store.DeleteLabel(repo.ID, args[1]); err != nil {
+	if err := c.Store.DeleteLabel(repo, args[1]); err != nil {
+		if errors.Is(err, store.ErrOrgScoped) {
+			return c.fail(protocol.ExitFailure, "%s", orgScopedMsg(repo, "label", args[1], "remove"))
+		}
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "no label %q in %s", args[1], repo.Path())
 		}

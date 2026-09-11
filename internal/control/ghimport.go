@@ -256,7 +256,7 @@ func runImportIssues(c *Ctx, args []string) int {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
 				for _, l := range it.Labels {
-					c.Store.SetIssueLabel(repo.ID, iss.ID, l.Name, true)
+					c.Store.SetIssueLabel(repo, iss.ID, l.Name, true)
 				}
 				if it.State != "open" {
 					c.Store.SetIssueState(iss.ID, "closed")

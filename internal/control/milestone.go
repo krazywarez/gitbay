@@ -60,7 +60,10 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	if _, err := c.Store.CreateMilestone(repo.ID, title, description, due); err != nil {
+	if _, err := c.Store.CreateMilestone(repo, title, description, due); err != nil {
+		if errors.Is(err, store.ErrOrgScoped) {
+			return c.fail(protocol.ExitFailure, "%s", orgScopedMsg(repo, "milestone", title, "create"))
+		}
 		return c.failErr(err)
 	}
 	return c.emit(map[string]string{"milestone": title}, func(w io.Writer) {
@@ -84,7 +87,11 @@ func runMilestoneList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	ms, err := c.Store.ListMilestones(repo.ID, state)
+	readable, err := ReadableScope(c.Store, c.User, repo)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	ms, err := c.Store.ListMilestones(repo, state, readable)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -93,12 +100,13 @@ func runMilestoneList(c *Ctx, args []string) int {
 		Description string `json:"description,omitempty"`
 		Due         string `json:"due,omitempty"`
 		State       string `json:"state"`
+		Org         bool   `json:"org,omitempty"`
 		Open        int    `json:"open"`
 		Closed      int    `json:"closed"`
 	}
 	var ds []out
 	for _, m := range ms {
-		ds = append(ds, out{m.Title, m.Description, m.DueDate, m.State, m.OpenItems, m.ClosedItems})
+		ds = append(ds, out{m.Title, m.Description, m.DueDate, m.State, m.OrgID != 0, m.OpenItems, m.ClosedItems})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		for _, d := range ds {
@@ -106,7 +114,11 @@ func runMilestoneList(c *Ctx, args []string) int {
 			if due == "" {
 				due = "-"
 			}
-			fmt.Fprintf(w, "%s\t%s\tdue %s\t%d open, %d closed\n", d.Title, d.State, due, d.Open, d.Closed)
+			mark := ""
+			if d.Org {
+				mark = "\torg"
+			}
+			fmt.Fprintf(w, "%s\t%s\tdue %s\t%d open, %d closed%s\n", d.Title, d.State, due, d.Open, d.Closed, mark)
 		}
 	})
 }
@@ -129,9 +141,12 @@ func setMilestoneState(c *Ctx, args []string, state string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	m, err := c.Store.MilestoneByTitle(repo.ID, args[1])
+	m, err := c.Store.MilestoneByTitle(repo, args[1])
 	if err != nil {
 		return milestoneErr(c, repo, args[1], err)
+	}
+	if m.OrgID != 0 {
+		return c.fail(protocol.ExitFailure, "%s", orgScopedMsg(repo, "milestone", m.Title, verb))
 	}
 	if err := c.Store.SetMilestoneState(m.ID, state); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -184,7 +199,7 @@ func runMRMilestone(c *Ctx, args []string) int {
 func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title string, set func(int64) error) int {
 	var id int64
 	if title != "none" {
-		m, err := c.Store.MilestoneByTitle(repo.ID, title)
+		m, err := c.Store.MilestoneByTitle(repo, title)
 		if err != nil {
 			return milestoneErr(c, repo, title, err)
 		}

@@ -702,7 +702,12 @@ func (s *Server) milestones(w http.ResponseWriter, r *http.Request) {
 	if state != "closed" && state != "all" {
 		state = "open"
 	}
-	ms, err := s.st.ListMilestones(p.Repo.ID, state)
+	readable, err := control.ReadableScope(s.st, s.viewer(r), p.Repo)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	ms, err := s.st.ListMilestones(p.Repo, state, readable)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -1603,8 +1608,15 @@ func hexByte(s string) int64 {
 // labelColors returns a complete label-name -> chip color map for a repo:
 // the stored labels.color when it is a valid hex color, otherwise a
 // stable default picked from the palette by name hash.
-func (s *Server) labelColors(repoID int64) map[string]template.CSS {
-	stored, _ := s.st.LabelColors(repoID)
+func (s *Server) labelColors(repo store.Repo) map[string]template.CSS {
+	stored, _ := s.st.LabelColors(repo)
+	return colorStyles(stored)
+}
+
+// colorStyles turns a label-name -> stored color map into chip styles: the
+// stored color when it is a valid hex color, otherwise a stable default
+// picked from the palette by name hash.
+func colorStyles(stored map[string]string) map[string]template.CSS {
 	out := make(map[string]template.CSS, len(stored))
 	for name, color := range stored {
 		if !hexColorPat.MatchString(color) {
@@ -1672,7 +1684,7 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 		Older       string
 	}{p, state, f.Label, f.Search,
 		activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
-		issues, s.labelColors(p.Repo.ID), older})
+		issues, s.labelColors(p.Repo), older})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
@@ -1697,7 +1709,12 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := s.ugcFor(r, p.Repo)
-	milestones, _ := s.st.ListMilestones(p.Repo.ID, "open")
+	readable, err := control.ReadableScope(s.st, s.viewer(r), p.Repo)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	milestones, _ := s.st.ListMilestones(p.Repo, "open", readable)
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue       store.Issue
@@ -1710,7 +1727,7 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		LabelColors map[string]template.CSS
 	}{p, iss, md(iss.Body, iss.BodyFormat), renderComments(comments, md),
 		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
-		milestones, s.takeFlash(w, r), s.labelColors(p.Repo.ID)})
+		milestones, s.takeFlash(w, r), s.labelColors(p.Repo)})
 }
 
 // canEditItem: the author or anyone with write access may edit.
