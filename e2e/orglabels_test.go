@@ -77,8 +77,9 @@ func TestOrgLabelsMilestonesAndCrossRepoCloses(t *testing.T) {
 		t.Fatalf("org milestone progress after close: %s", out)
 	}
 
-	// carol is outside: she reads the org pages because acme/lib is public,
-	// and the counts stop at it.
+	// carol is outside: her counts stop at acme/lib, the public one. The
+	// page checks below are anonymous, which acme/lib being public allows
+	// just the same.
 	out = must(carolKey, "org", "milestone", "list", "acme", "--json")
 	if !strings.Contains(out, `"open":1`) || !strings.Contains(out, `"closed":0`) {
 		t.Fatalf("outsider progress: %s", out)

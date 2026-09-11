@@ -152,3 +152,25 @@ func TestRepoMilestoneCommandsRefuseOrgTitles(t *testing.T) {
 		t.Fatalf("milestone list: exit %d %s", code, out.String())
 	}
 }
+
+// A duplicate title fails; it is not a usage error, and the repo-level
+// and org-level commands answer with the same code.
+func TestDuplicateMilestoneTitleFails(t *testing.T) {
+	f := newOrgFixture(t)
+	c, out := f.ctx(f.alice)
+	if code := runMilestoneCreate(c, []string{"alice/app", "v1"}); code != protocol.ExitOK {
+		t.Fatalf("first create: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runMilestoneCreate(c, []string{"alice/app", "v1"}); code != protocol.ExitFailure {
+		t.Fatalf("duplicate create: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneCreate(c, []string{"acme", "v1"}); code != protocol.ExitOK {
+		t.Fatalf("first org create: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runOrgMilestoneCreate(c, []string{"acme", "v1"}); code != protocol.ExitFailure {
+		t.Fatalf("duplicate org create: exit %d %s", code, out.String())
+	}
+}

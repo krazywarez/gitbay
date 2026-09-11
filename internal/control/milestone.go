@@ -64,7 +64,9 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 		if errors.Is(err, store.ErrOrgScoped) {
 			return c.fail(protocol.ExitFailure, "%s", orgScopedMsg(repo, "milestone", title, "create"))
 		}
-		return c.failErr(err)
+		// A duplicate title is a failure, not a usage error, which is what
+		// failErr would make of it; org milestone create answers the same.
+		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]string{"milestone": title}, func(w io.Writer) {
 		fmt.Fprintf(w, "created milestone %q on %s\n", title, repo.Path())

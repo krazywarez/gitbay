@@ -348,8 +348,10 @@ Commit messages act on issues when the commits land on the default
 branch (direct push or MR merge): =closes/fixes/resolves #4= closes the
 issue with a linking comment, and a bare =#4= leaves a reference
 comment. Each issue/commit pair acts once, ever. =Closes owner/name#N= closes an issue in another repository when
-you hold write there; otherwise it stays a plain link. A bare
-=owner/name#N= links and does nothing.
+you hold write there; otherwise it stays a plain link. The comment left
+on the closed issue links the closing commit by its repository path, so
+closing a public repository's issue from a private one names the private
+repository there. A bare =owner/name#N= links and does nothing.
 
 Milestones group issues and MRs toward a release (write access to
 manage, attach with =issue milestone= / =mr milestone=; progress shows
