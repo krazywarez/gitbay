@@ -1,11 +1,12 @@
 package store
 
-// Label is one of a repository's issue labels with its colour, "" when
-// none was set (the web then derives one from the name), and how many
-// issues carry it.
+// Label is an issue label with its colour, "" when none was set (the web
+// then derives one from the name), and how many issues carry it. Org is
+// true for a label the repository sees through its org.
 type Label struct {
 	Name   string `json:"name"`
 	Color  string `json:"color,omitempty"`
+	Org    bool   `json:"org,omitempty"`
 	Issues int64  `json:"issues"`
 }
 

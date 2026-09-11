@@ -161,6 +161,13 @@ func (s *Store) migrateTo(target int) error {
 		return err
 	}
 	step := func(sqlText string, newVersion int) error {
+		needsFKOff := strings.Contains(sqlText, "PRAGMA foreign_keys = OFF")
+		if needsFKOff {
+			if _, err := s.DB.Exec("PRAGMA foreign_keys = OFF"); err != nil {
+				return err
+			}
+			defer s.DB.Exec("PRAGMA foreign_keys = ON")
+		}
 		tx, err := s.DB.Begin()
 		if err != nil {
 			return err

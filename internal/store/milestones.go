@@ -9,6 +9,7 @@ import (
 type Milestone struct {
 	ID          int64
 	RepoID      int64
+	OrgID       int64 // set instead of RepoID for an org milestone
 	Title       string
 	Description string
 	DueDate     string

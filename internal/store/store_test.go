@@ -144,3 +144,87 @@ func TestSSHKeyLabel(t *testing.T) {
 		t.Fatalf("relabel by another user: %v, want ErrNotFound", err)
 	}
 }
+
+// Migration 0052 rebuilds labels and milestones with an org scope. The
+// rebuild renames the old tables; since SQLite 3.26 a rename rewrites the
+// children's foreign keys to follow it, which would bind them to the *_old
+// tables. legacy_alter_table keeps the children naming labels and milestones,
+// which the new tables then are. foreign_keys stays on: nothing references the
+// *_old tables, so dropping them cascades nothing.
+// This checks the ids, the memberships and the foreign keys all survive.
+func TestMigration0052KeepsMembershipsAndForeignKeys(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateTo(51); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rid, err := s.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	iid, err := s.CreateIssue(rid, uid, "one", "", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO labels (repo_id, name, color) VALUES (?, 'bug', '#ff0000')", rid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO issue_labels (issue_id, label_id) SELECT ?, id FROM labels WHERE name = 'bug'", iid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO milestones (repo_id, title) VALUES (?, 'v1')", rid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("UPDATE issues SET milestone_id = (SELECT id FROM milestones WHERE title = 'v1') WHERE id = ?", iid); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MigrateTo(52); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM issue_labels il JOIN labels l ON l.id = il.label_id
+		WHERE il.issue_id = ? AND l.name = 'bug' AND l.repo_id = ? AND l.org_id IS NULL`, iid, rid).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("label membership after 0052: %d, %v", n, err)
+	}
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM issues i JOIN milestones m ON m.id = i.milestone_id
+		WHERE i.id = ? AND m.title = 'v1' AND m.repo_id = ?`, iid, rid).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("milestone attachment after 0052: %d, %v", n, err)
+	}
+	rows, err := s.DB.Query("PRAGMA foreign_key_check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t.Fatal("foreign_key_check reported a violation after 0052")
+	}
+	// The scope CHECK holds: a row with neither or both scopes is refused.
+	if _, err := s.DB.Exec("INSERT INTO labels (name) VALUES ('neither')"); err == nil {
+		t.Fatal("label with no scope was accepted")
+	}
+	if _, err := s.DB.Exec("INSERT INTO labels (repo_id, org_id, name) VALUES (?, 1, 'both')", rid); err == nil {
+		t.Fatal("label with both scopes was accepted")
+	}
+	// Down refuses while an org-scoped row exists, and works once it is gone.
+	if _, err := s.DB.Exec("INSERT INTO orgs (name) VALUES ('acme')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO labels (org_id, name) VALUES ((SELECT id FROM orgs WHERE name = 'acme'), 'org-only')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MigrateTo(51); err == nil {
+		t.Fatal("down migration accepted an org-scoped label")
+	}
+	if _, err := s.DB.Exec("DELETE FROM labels WHERE org_id IS NOT NULL"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MigrateTo(51); err != nil {
+		t.Fatalf("down migration: %v", err)
+	}
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM issue_labels il JOIN labels l ON l.id = il.label_id WHERE il.issue_id = ?`, iid).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("label membership after down: %d, %v", n, err)
+	}
+}
