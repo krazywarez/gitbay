@@ -426,21 +426,23 @@ func runRepoTransfer(c *Ctx, args []string) int {
 	if _, err := os.Stat(newDir); err == nil {
 		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", newOwner, repo.Name)
 	}
-	if err := c.Store.TransferRepo(repo.ID, newKind, newID); err != nil {
-		return c.failErr(err)
-	}
+	// The directory moves before the record changes: a move that fails
+	// leaves nothing to undo, whereas the record's change into an org
+	// folds labels and milestones into the org's rows, which a revert
+	// cannot unfold (#212). A record that then fails moves the directory
+	// back, and says so if even that fails, since the operator then has
+	// a row pointing at a directory that is not there.
 	if err := os.MkdirAll(filepath.Dir(newDir), 0o750); err != nil {
-		c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID)
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if err := os.Rename(oldDir, newDir); err != nil {
-		// Keep name and disk consistent: revert the database change, and
-		// say so if even that fails, since the operator then has a row
-		// pointing at a directory that is not there.
-		if rerr := c.Store.TransferRepo(repo.ID, repo.OwnerKind, repo.OwnerID); rerr != nil {
-			return c.fail(protocol.ExitFailure, "moving repository: %v; and reverting the record failed: %v (the record now names %s but the directory is still %s)", err, rerr, newOwner+"/"+repo.Name, repo.Path())
-		}
 		return c.fail(protocol.ExitFailure, "moving repository: %v", err)
+	}
+	if err := c.Store.TransferRepo(repo.ID, newKind, newID); err != nil {
+		if rerr := os.Rename(newDir, oldDir); rerr != nil {
+			return c.fail(protocol.ExitFailure, "%v; and moving the directory back failed: %v (the record still names %s but the directory is now %s)", err, rerr, repo.Path(), newOwner+"/"+repo.Name)
+		}
+		return c.failErr(err)
 	}
 	newPath := newOwner + "/" + repo.Name
 	return c.emit(map[string]string{"repo": newPath, "was": repo.Path()}, func(w io.Writer) {
