@@ -15,3 +15,12 @@ func confirmed(r *http.Request, want string) (bool, string) {
 	}
 	return false, "type " + want + " to confirm"
 }
+
+// prefix8 returns s truncated to its first 8 characters, or s unchanged
+// if it is shorter.
+func prefix8(s string) string {
+	if len(s) > 8 {
+		return s[:8]
+	}
+	return s
+}

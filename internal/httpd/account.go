@@ -37,10 +37,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
-			confirm := strings.TrimPrefix(k.Fingerprint, "SHA256:")
-			if len(confirm) > 8 {
-				confirm = confirm[:8]
-			}
+			confirm := prefix8(strings.TrimPrefix(k.Fingerprint, "SHA256:"))
 			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope, Label: k.Label, Confirm: confirm})
 		}
 	}
@@ -49,10 +46,7 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		for _, k := range list {
 			var uids []string
 			json.Unmarshal([]byte(k.UIDsJSON), &uids)
-			confirm := k.Fingerprint
-			if len(confirm) > 8 {
-				confirm = confirm[:8]
-			}
+			confirm := prefix8(k.Fingerprint)
 			pgp = append(pgp, accountPGP{
 				Fingerprint: k.Fingerprint, UIDs: uids,
 				Expired: k.ExpiresAt != nil, Revoked: k.RevokedAt != nil, Confirm: confirm,
@@ -163,10 +157,7 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "key registered")
 	case "key-remove":
-		want := strings.TrimPrefix(r.FormValue("fingerprint"), "SHA256:")
-		if len(want) > 8 {
-			want = want[:8]
-		}
+		want := prefix8(strings.TrimPrefix(r.FormValue("fingerprint"), "SHA256:"))
 		if ok, msg := confirmed(r, want); !ok {
 			back(msg, "")
 			return
@@ -189,10 +180,7 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		back("", "PGP key registered")
 	case "pgp-remove":
 		fp := r.FormValue("fingerprint")
-		want := fp
-		if len(want) > 8 {
-			want = want[:8]
-		}
+		want := prefix8(fp)
 		if ok, msg := confirmed(r, want); !ok {
 			back(msg, "")
 			return

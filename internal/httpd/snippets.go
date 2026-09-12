@@ -178,14 +178,12 @@ func (s *Server) snippetNewSubmit(w http.ResponseWriter, r *http.Request, u stor
 	http.Redirect(w, r, "/"+u.Username+"/-/snippets/"+out.ID, http.StatusSeeOther)
 }
 
-// snippetAction runs a write on the snippet in the URL and returns to its
-// page with the message, or to dest (the list, for a delete) on success.
-// A snippet the viewer may not read is the 404 page, as on every read.
-func (s *Server) snippetAction(w http.ResponseWriter, r *http.Request, u store.User, argv []string, stdin string, dest string) {
-	sn, _, ok := s.snippetScope(w, r)
-	if !ok {
-		return
-	}
+// snippetAction runs a write on an already-resolved snippet and returns to
+// its page with the message, or to dest (the list, for a delete) on
+// success. Callers resolve the snippet with snippetScope first, so a
+// snippet the viewer may not read is the 404 page before any confirmation
+// or write is considered.
+func (s *Server) snippetAction(w http.ResponseWriter, r *http.Request, u store.User, sn store.Snippet, argv []string, stdin string, dest string) {
 	page := "/" + sn.OwnerName + "/-/snippets/" + sn.PublicID
 	if dest == "" {
 		dest = page
@@ -207,35 +205,50 @@ func (s *Server) snippetAction(w http.ResponseWriter, r *http.Request, u store.U
 }
 
 func (s *Server) snippetEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.snippetAction(w, r, u, []string{"snippet", "edit", r.PathValue("id"),
+	sn, _, ok := s.snippetScope(w, r)
+	if !ok {
+		return
+	}
+	s.snippetAction(w, r, u, sn, []string{"snippet", "edit", r.PathValue("id"),
 		"--description", strings.TrimSpace(r.FormValue("description")),
 		"--visibility", r.FormValue("visibility")}, "", "")
 }
 
 func (s *Server) snippetDeleteSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	id := r.PathValue("id")
-	if ok, msg := confirmed(r, id); !ok {
-		s.setFlash(w, msg)
-		http.Redirect(w, r, "/"+r.PathValue("owner")+"/-/snippets/"+id, http.StatusSeeOther)
+	sn, _, ok := s.snippetScope(w, r)
+	if !ok {
 		return
 	}
-	s.snippetAction(w, r, u, []string{"snippet", "delete", id}, "",
-		"/"+r.PathValue("owner")+"/-/snippets")
+	if ok, msg := confirmed(r, sn.PublicID); !ok {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/"+sn.OwnerName+"/-/snippets/"+sn.PublicID, http.StatusSeeOther)
+		return
+	}
+	s.snippetAction(w, r, u, sn, []string{"snippet", "delete", sn.PublicID}, "",
+		"/"+sn.OwnerName+"/-/snippets")
 }
 
 // An empty textarea reaches the command as empty stdin, which it refuses;
 // the message lands on the page like any other.
 func (s *Server) snippetFileSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.snippetAction(w, r, u, []string{"snippet", "file", "set", r.PathValue("id"), strings.TrimSpace(r.FormValue("name"))},
+	sn, _, ok := s.snippetScope(w, r)
+	if !ok {
+		return
+	}
+	s.snippetAction(w, r, u, sn, []string{"snippet", "file", "set", r.PathValue("id"), strings.TrimSpace(r.FormValue("name"))},
 		r.FormValue("content"), "")
 }
 
 func (s *Server) snippetFileRemoveSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	sn, _, ok := s.snippetScope(w, r)
+	if !ok {
+		return
+	}
 	name := strings.TrimSpace(r.FormValue("name"))
 	if ok, msg := confirmed(r, name); !ok {
 		s.setFlash(w, msg)
-		http.Redirect(w, r, "/"+r.PathValue("owner")+"/-/snippets/"+r.PathValue("id"), http.StatusSeeOther)
+		http.Redirect(w, r, "/"+sn.OwnerName+"/-/snippets/"+sn.PublicID, http.StatusSeeOther)
 		return
 	}
-	s.snippetAction(w, r, u, []string{"snippet", "file", "remove", r.PathValue("id"), name}, "", "")
+	s.snippetAction(w, r, u, sn, []string{"snippet", "file", "remove", r.PathValue("id"), name}, "", "")
 }

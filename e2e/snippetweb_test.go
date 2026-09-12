@@ -138,6 +138,15 @@ func TestSnippetsWeb(t *testing.T) {
 	if status, _ := browserPost(t, alice, page+"/file", url.Values{"name": {"b.txt"}, "content": {"b\n"}}); status != 200 {
 		t.Fatal("file add failed")
 	}
+	// Removing a file needs its name typed; a bare post is refused and
+	// the file stays.
+	_, body = browserPost(t, alice, page+"/file/remove", url.Values{"name": {"b.txt"}})
+	if !strings.Contains(body, "type b.txt to confirm") {
+		t.Fatalf("unconfirmed file remove was not refused:\n%s", body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "file", "get", created, "b.txt"); code != 0 {
+		t.Fatalf("b.txt removed without confirmation: exit %d", code)
+	}
 	if status, _ := browserPost(t, alice, page+"/file/remove", url.Values{"name": {"b.txt"}, "confirm": {"b.txt"}}); status != 200 {
 		t.Fatal("file remove failed")
 	}
@@ -168,6 +177,12 @@ func TestSnippetsWeb(t *testing.T) {
 	}
 	if status, _ := browserGet(t, bob, inst.base()+"/alice/-/snippets/"+unlisted); status != 200 {
 		t.Fatalf("stranger on an unlisted page: %d", status)
+	}
+	// An unconfirmed delete on a private snippet is still 404 for a
+	// stranger: the snippet is resolved, and refused, before the
+	// confirmation is even checked.
+	if status, _ := browserPost(t, bob, inst.base()+"/alice/-/snippets/"+private+"/delete", nil); status != 404 {
+		t.Fatalf("stranger's unconfirmed delete on a private snippet: %d", status)
 	}
 	if status, _ := browserPost(t, bob, inst.base()+"/alice/-/snippets/"+public+"/edit", url.Values{"description": {"x"}, "visibility": {"public"}}); status != 403 {
 		t.Fatalf("bob editing alice's snippet: %d", status)

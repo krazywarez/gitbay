@@ -44,7 +44,7 @@ func (s *Server) labelSubmit(w http.ResponseWriter, r *http.Request, u store.Use
 	name := strings.TrimSpace(r.FormValue("name"))
 	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "labels", msg) }
 	if name == "" {
-		s.backTo(w, r, "labels", "name the label")
+		back(w, r, "name the label")
 		return
 	}
 	argv := []string{"label", "set", repo, name, "--color", strings.TrimSpace(r.FormValue("color"))}
