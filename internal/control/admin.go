@@ -33,8 +33,14 @@ func init() {
 		Summary:  "the build queue and runner accounts: last poll, scope, the build each holds (instance admins)",
 		Usage:    "admin runners",
 		ReadOnly: true, SSHOnly: true, Run: runAdminRunners})
-	register(Command{Path: []string{"admin", "runners", "forget"},
+	register(Command{Path: []string{"admin", "runners", "remove"},
 		Summary: "drop a key's runner heartbeat row, e.g. one that polled once by mistake (instance admins)",
+		Usage:   "admin runners remove <fingerprint>",
+		SSHOnly: true, Run: runAdminRunnersForget})
+	// forget is the name this shipped under in v1.18; remove is the verb
+	// every other noun uses. Both stay for one release.
+	register(Command{Path: []string{"admin", "runners", "forget"},
+		Summary: "alias of admin runners remove",
 		Usage:   "admin runners forget <fingerprint>",
 		SSHOnly: true, Run: runAdminRunnersForget})
 	register(Command{Path: []string{"admin", "repo", "list"},
@@ -62,7 +68,7 @@ func init() {
 // requireInstanceAdmin gates the admin noun. -1 means proceed.
 func requireInstanceAdmin(c *Ctx) int {
 	if !c.User.IsAdmin {
-		return c.fail(protocol.ExitDenied, "admin commands are for instance admins")
+		return c.fail(protocol.ExitDenied, "admin commands are for instance admins; ask one")
 	}
 	return -1
 }
