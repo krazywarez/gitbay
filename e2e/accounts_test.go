@@ -129,6 +129,16 @@ func TestWebAccounts(t *testing.T) {
 		t.Fatalf("edit submit: %d", status)
 	}
 
+	// A branch that does not exist is a 404; a path that does not exist
+	// on a real branch is a new-file form that says so.
+	if status, _ := browserGet(t, browser, inst.base()+"/alice/site/edit/nope/notes.txt"); status != 404 {
+		t.Fatalf("edit form on a missing branch: %d", status)
+	}
+	status, body = browserGet(t, browser, inst.base()+"/alice/site/edit/main/new.txt")
+	if status != 200 || !strings.Contains(body, "does not exist on main; committing creates it") || !strings.Contains(body, "<textarea") {
+		t.Fatalf("edit form for a new file: %d\n%s", status, body)
+	}
+
 	// The edit is a real commit: authored with the verified email, and it
 	// displays as unsigned — the honest outcome for a server-side commit.
 	logOut, _, code := inst.ssh(t, aliceKey, "", "repo", "log", "alice/site", "--limit", "1", "--json")

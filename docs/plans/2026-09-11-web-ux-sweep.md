@@ -533,7 +533,7 @@ In `editForm`, after `repo` is resolved and before reading the blob, compute:
 	}
 ```
 
-Pass `Blocked: blocked` in the page struct. Still read the blob so a missing file is a 404 either way. Add `"slices"` to the imports.
+Pass `Blocked: blocked` in the page struct. Still read the blob; a missing path on a real branch is a new-file form. Add `"slices"` to the imports.
 
 - [ ] **Step 4: The template**
 

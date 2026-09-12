@@ -3,6 +3,7 @@
 <h1>edit {{.Repo.OwnerName}}/{{.Repo.Name}} : {{.Path}} @ {{.Ref}}</h1>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 {{if .Blocked}}<p class="empty-note">{{.Blocked}}</p>{{else}}
+{{if .Creating}}<p class="meta"><code>{{.Path}}</code> does not exist on {{.Ref}}; committing creates it.</p>{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}" class="editform">
 <p><textarea name="content" aria-label="File contents" rows="24" spellcheck="false">{{.Content}}</textarea></p>
 <p><input name="message" aria-label="Commit message" placeholder="commit message">

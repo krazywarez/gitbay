@@ -32,6 +32,9 @@ in, and the rules chosen to fix them.
   does not parse as a version sorts after the ones that do, by name.
 - **Editor.** When the repository requires signed commits, or the ref
   refuses direct pushes, the edit page explains that and shows no form.
+  A branch that does not exist is a 404; a path that does not exist on
+  a real branch is a new-file form that says so, since `commit-file`
+  creates it.
 - **Repository settings.** Every Save names its field.
 - **Empty states.** Sidebars use "none yet" for things and "nobody yet"
   for people; lists keep their sentence and, where a command creates the

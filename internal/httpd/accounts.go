@@ -480,6 +480,8 @@ type editPage struct {
 	Content string
 	Error   string
 	Blocked string
+	// Creating marks a path the branch does not have yet.
+	Creating bool
 }
 
 func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -499,9 +501,16 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 	}
 
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
+	// A branch that does not exist has nothing to edit. A path that does
+	// not exist on a real branch is a new file: commit-file creates it.
+	if _, err := gitutil.ResolveRef(dir, "refs/heads/"+ref); err != nil {
+		s.notFound(w, r)
+		return
+	}
 	content, err := gitutil.ReadBlob(dir, "refs/heads/"+ref, filePath, maxRenderBytes)
-	if err != nil {
-		content = nil // new file
+	creating := err != nil
+	if creating {
+		content = nil
 	}
 	if gitutil.IsBinary(content) {
 		http.Error(w, "binary files cannot be edited in the browser", http.StatusBadRequest)
@@ -509,7 +518,7 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 	}
 	s.render(w, "edit.html", editPage{
 		basePage: s.baseFor(u), Repo: repo,
-		Ref: ref, Path: filePath, Content: string(content), Blocked: blocked,
+		Ref: ref, Path: filePath, Content: string(content), Blocked: blocked, Creating: creating,
 	})
 }
 
