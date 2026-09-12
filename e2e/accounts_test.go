@@ -189,6 +189,13 @@ func TestWebAccounts(t *testing.T) {
 		t.Fatalf("require-signed web edit not refused:\n%s", body)
 	}
 
+	// With signed commits required the editor cannot succeed, so the GET
+	// form says so instead of offering a textarea.
+	status, body = browserGet(t, browser, inst.base()+"/alice/site/edit/main/notes.txt")
+	if status != 200 || !strings.Contains(body, "requires signed commits") || strings.Contains(body, "<textarea") {
+		t.Fatalf("edit page under require-signed: %d\n%s", status, body)
+	}
+
 	// Issue participation through the web.
 	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/site", "--title", "'from ssh'"); code != 0 {
 		t.Fatal("issue create failed")

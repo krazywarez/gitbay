@@ -2,10 +2,12 @@
 {{define "content"}}
 <h1>edit {{.Repo.OwnerName}}/{{.Repo.Name}} : {{.Path}} @ {{.Ref}}</h1>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{if .Blocked}}<p class="empty-note">{{.Blocked}}</p>{{else}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}" class="editform">
 <p><textarea name="content" aria-label="File contents" rows="24" spellcheck="false">{{.Content}}</textarea></p>
 <p><input name="message" aria-label="Commit message" placeholder="commit message">
 <button type="submit">Commit to {{.Ref}}</button></p>
 <p class="crumbs">this commit will be unsigned and authored as {{.Viewer}}</p>
 </form>
+{{end}}
 {{end}}

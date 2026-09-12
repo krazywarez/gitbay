@@ -479,6 +479,7 @@ type editPage struct {
 	Path    string
 	Content string
 	Error   string
+	Blocked string
 }
 
 func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -488,6 +489,15 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 	}
 	ref := r.PathValue("ref")
 	filePath := strings.Trim(r.PathValue("path"), "/")
+
+	blocked := ""
+	switch {
+	case repo.Settings.RequireSignedCommits:
+		blocked = repo.Path() + " requires signed commits and the web editor cannot sign; edit locally and push a signed commit."
+	case repo.Settings.RequireMR && slices.Contains(repo.Settings.ProtectedBranches, ref):
+		blocked = "branch " + ref + " accepts changes through merge requests only; edit on another branch and open one."
+	}
+
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
 	content, err := gitutil.ReadBlob(dir, "refs/heads/"+ref, filePath, maxRenderBytes)
 	if err != nil {
@@ -499,7 +509,7 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 	}
 	s.render(w, "edit.html", editPage{
 		basePage: s.baseFor(u), Repo: repo,
-		Ref: ref, Path: filePath, Content: string(content),
+		Ref: ref, Path: filePath, Content: string(content), Blocked: blocked,
 	})
 }
 
