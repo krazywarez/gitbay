@@ -93,7 +93,7 @@ func snippetRef(c *Ctx, id string, write bool) (store.Snippet, int) {
 		return sn, c.fail(protocol.ExitNotFound, "no snippet %q", id)
 	}
 	if write && !policy.CanWriteSnippet(c.User, sn) {
-		return sn, c.fail(protocol.ExitDenied, "snippet %s belongs to %s", id, sn.OwnerName)
+		return sn, c.fail(protocol.ExitDenied, "snippet %s belongs to %s; only they can change it", id, sn.OwnerName)
 	}
 	return sn, -1
 }

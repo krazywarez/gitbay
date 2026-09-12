@@ -376,7 +376,7 @@ func runRunnerNext(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		if !ok {
-			return c.fail(protocol.ExitDenied, "this key is not attached to %s", repo.Path())
+			return c.fail(protocol.ExitDenied, "this key is not attached to %s; a repository admin attaches it with repo runner add", repo.Path())
 		}
 		repoIDs = append(repoIDs, repo.ID)
 	}
@@ -475,7 +475,7 @@ func runRunnerLog(c *Ctx, args []string) int {
 	} else if ok, err := runnerMayBuild(c, key, b.RepoID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	} else if !ok {
-		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository")
+		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository; a repository admin attaches it with repo runner add")
 	}
 	// Stream stdin into the log in chunks so long builds appear live. An
 	// append that fails drops its chunk and the loop keeps draining: ending
@@ -555,7 +555,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if ok, err := runnerMayBuild(c, key, b.RepoID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	} else if !ok {
-		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository")
+		return c.fail(protocol.ExitDenied, "this key is not attached to the build's repository; a repository admin attaches it with repo runner add")
 	}
 	// Cancelled underneath the runner: its report is late, not wrong.
 	// The row, the status and the log were settled by the cancel.
@@ -829,7 +829,7 @@ func runBuildCancel(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if !policy.CanWrite(c.User, repo, grant) {
-		return c.fail(protocol.ExitDenied, "cancelling a build needs write access to %s", repo.Path())
+		return c.fail(protocol.ExitDenied, "cancelling a build needs write access to %s; ask its owner", repo.Path())
 	}
 	if b.Status != "pending" && b.Status != "running" {
 		return c.fail(protocol.ExitUsage, "build %d is %s; only a queued or running build can be cancelled", b.Number, b.Status)

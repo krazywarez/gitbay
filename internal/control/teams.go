@@ -53,7 +53,7 @@ func orgAdminRef(c *Ctx, name string) (store.Org, int) {
 		return org, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if role != "admin" {
-		return org, c.fail(protocol.ExitDenied, "only admins of %s can manage teams", name)
+		return org, c.fail(protocol.ExitDenied, "only admins of %s can manage teams; ask one to add you", name)
 	}
 	return org, -1
 }
@@ -71,7 +71,7 @@ func orgMemberRef(c *Ctx, name string) (store.Org, int) {
 		return org, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if role == "" {
-		return org, c.fail(protocol.ExitDenied, "teams of %s are visible to its members", name)
+		return org, c.fail(protocol.ExitDenied, "teams of %s are visible to its members; ask an admin to add you", name)
 	}
 	return org, -1
 }

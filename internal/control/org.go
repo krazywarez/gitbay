@@ -53,7 +53,7 @@ func orgAdmin(c *Ctx, name string) (store.Org, int) {
 		return org, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if role != "admin" {
-		return org, c.fail(protocol.ExitDenied, "only admins of %s can do that", name)
+		return org, c.fail(protocol.ExitDenied, "only admins of %s can do that; ask one", name)
 	}
 	return org, -1
 }

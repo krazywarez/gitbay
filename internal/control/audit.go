@@ -20,7 +20,7 @@ func init() {
 
 func runAudit(c *Ctx, args []string) int {
 	if !c.User.IsAdmin {
-		return c.fail(protocol.ExitDenied, "the audit log is for instance admins")
+		return c.fail(protocol.ExitDenied, "the audit log is for instance admins; ask one")
 	}
 	f := store.AuditFilter{Limit: 100}
 	fl, err := parseFlags(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: c.Cmd.Usage})

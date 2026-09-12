@@ -56,7 +56,7 @@ func orgReader(c *Ctx, name string) (store.Org, []int64, int) {
 		return org, nil, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if role == "" && len(readable) == 0 {
-		return org, nil, c.fail(protocol.ExitDenied, "labels and milestones of %s are visible to its members", name)
+		return org, nil, c.fail(protocol.ExitDenied, "labels and milestones of %s are visible to its members; ask an admin to add you", name)
 	}
 	return org, readable, -1
 }

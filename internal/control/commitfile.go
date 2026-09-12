@@ -56,7 +56,7 @@ func runCommitFile(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "path must stay inside the repository")
 	}
 	if repo.Settings.RequireMR && slices.Contains(repo.Settings.ProtectedBranches, ref) {
-		return c.fail(protocol.ExitDenied, "branch %s accepts changes through merge requests only", ref)
+		return c.fail(protocol.ExitDenied, "branch %s accepts changes through merge requests only; push another branch and open one", ref)
 	}
 	// The server authors this commit, so it cannot sign it.
 	if repo.Settings.RequireSignedCommits {
