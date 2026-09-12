@@ -192,9 +192,9 @@ always markdown.
 | release delete              | yes | yes | yes |
 | release asset add           | yes | no  | n/a |
 | release asset remove        | yes | no  | yes |
-| snippet create, edit, delete| yes | yes | no  |
-| snippet show, list          | yes | yes | no  |
-| snippet file set, get, remove| yes | yes | no  |
+| snippet create, edit, delete  | yes | yes | no  |
+| snippet show, list            | yes | yes | no  |
+| snippet file set, get, remove | yes | yes | no  |
 
 No row is web-only any more. Blame, file editing, log at a ref,
 archive, the public listing and the wiki were all in that state — a

@@ -69,7 +69,7 @@ CREATE TABLE snippets (
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE INDEX snippets_owner ON snippets(owner_id, created_at);
+CREATE INDEX snippets_owner ON snippets(owner_id, id);
 
 CREATE TABLE snippet_files (
     snippet_id INTEGER NOT NULL REFERENCES snippets(id) ON DELETE CASCADE,
@@ -196,7 +196,7 @@ a description and visibility form, and delete. All POSTs go through
 returns to the page with the message and a missing snippet is the 404
 page.
 
-The owner page shows a `snippets` link beside the repositories heading
+The owner page shows a `snippets` link below the repository list
 when the owner has a public snippet, or when the viewer is the owner.
 
 Templates: `snippets.html`, `snippet.html`, `snippetnew.html`. Stylesheet
