@@ -3,14 +3,14 @@
 <h1>Labels</h1>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if .Labels}}<div class="tablewrap"><table class="keys">
-<tr class="cols"><th scope="col">label</th><th scope="col">colour</th><th scope="col">issues</th><th scope="col"></th></tr>
+<tr class="cols"><th scope="col">label</th>{{if or $.CanWrite $.AnyColor}}<th scope="col">colour</th>{{end}}<th scope="col">issues</th><th scope="col"></th></tr>
 {{range .Labels}}<tr>
   <td><a class="chip label" style="{{index $.LabelColors .Name}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.Name}}">{{.Name}}</a>{{if .Org}} <span class="chip chip-neutral">org</span>{{end}}</td>
-  <td>{{if and $.CanWrite (not .Org)}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
+  {{if or $.CanWrite $.AnyColor}}<td>{{if and $.CanWrite (not .Org)}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
     <input type="hidden" name="name" value="{{.Name}}">
     <input type="text" name="color" value="{{.Color}}" aria-label="Colour for {{.Name}}" placeholder="rrggbb" size="8">
     <button type="submit" class="btn">Save</button>
-  </form>{{else}}<span class="mono">{{if .Color}}{{.Color}}{{else}}—{{end}}</span>{{end}}</td>
+  </form>{{else}}<span class="mono">{{if .Color}}{{.Color}}{{else}}—{{end}}</span>{{end}}</td>{{end}}
   <td>{{.Issues}}</td>
   <td class="act">{{if and $.CanWrite (not .Org)}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
     <input type="hidden" name="action" value="remove">

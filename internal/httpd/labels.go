@@ -28,13 +28,21 @@ func (s *Server) labels(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	anyColor := false
+	for _, l := range labels {
+		if l.Color != "" {
+			anyColor = true
+			break
+		}
+	}
 	s.render(w, "labels.html", struct {
 		repoPage
 		Labels      []store.Label
 		LabelColors map[string]template.CSS
 		CanWrite    bool
+		AnyColor    bool
 		Notice      string
-	}{p, labels, s.labelColors(p.Repo), s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
+	}{p, labels, s.labelColors(p.Repo), s.canWriteRepo(r, p.Repo), anyColor, s.takeFlash(w, r)})
 }
 
 // labelSubmit creates a label, sets its colour, or removes it, through
