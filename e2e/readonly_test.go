@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -71,6 +72,8 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	must("", "status", "set", "alice/app", sha, "--context", "ci/x", "--state", "success")
 	must("", "release", "create", "alice/app", "v1", "--title", "first")
 	must("data\n", "release", "asset", "add", "alice/app", "v1", "a.txt")
+	snippetOut := must("hello\n", "snippet", "create", "a.txt", "--json")
+	snippetID := regexp.MustCompile(`"id":"([0-9a-f]{12})"`).FindStringSubmatch(snippetOut)[1]
 	must("", "org", "create", "theorg")
 	must("", "org", "team", "create", "theorg", "core")
 	must("", "token", "create", "--name", "t")
@@ -146,6 +149,9 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"release list":                {"alice/app"},
 		"release show":                {"alice/app", "v1"},
 		"release asset get":           {"alice/app", "v1", "a.txt"},
+		"snippet show":                {snippetID},
+		"snippet list":                {},
+		"snippet file get":            {snippetID, "a.txt"},
 		"notifications list":          nil,
 		"notifications settings show": nil,
 		"repo bookmarks":              nil,

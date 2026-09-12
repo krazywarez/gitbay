@@ -175,7 +175,8 @@ type Deps struct {
 type Limits struct {
 	MaxPackBytes    int64 `toml:"max_pack_bytes"`
 	MaxBlobBytes    int64 `toml:"max_blob_bytes"`
-	MaxAssetBytes   int64 `toml:"max_asset_bytes"` // per release asset
+	MaxAssetBytes   int64 `toml:"max_asset_bytes"`   // per release asset
+	MaxSnippetBytes int64 `toml:"max_snippet_bytes"` // per snippet file
 	CloneTimeoutSec int   `toml:"clone_timeout"`
 	SSHAuthRate     int   `toml:"ssh_auth_rate"`
 	// APIRate is sustained JSON-API requests per minute per caller; writes
@@ -216,6 +217,7 @@ func Default() Config {
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,
 			MaxAssetBytes:   512 << 20,
+			MaxSnippetBytes: 1 << 20,
 			CloneTimeoutSec: 3600,
 			SSHAuthRate:     10,
 			APIRate:         120,
