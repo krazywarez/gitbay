@@ -910,7 +910,22 @@ var chromaFormatter = html.New(html.WithClasses(true),
 	html.WithLineNumbers(true), html.LineNumbersInTable(false),
 	html.WithLinkableLineNumbers(true, "L"))
 
+// chromaFormatterPlain is chromaFormatter without linkable line numbers,
+// for a page that highlights more than one file: linkable ids are
+// per-file line numbers, so several files on one page would repeat
+// id="L1", id="L2", ...
+var chromaFormatterPlain = html.New(html.WithClasses(true),
+	html.WithLineNumbers(true), html.LineNumbersInTable(false))
+
 func highlight(filePath string, data []byte) template.HTML {
+	return highlightWith(chromaFormatter, filePath, data)
+}
+
+func highlightPlain(filePath string, data []byte) template.HTML {
+	return highlightWith(chromaFormatterPlain, filePath, data)
+}
+
+func highlightWith(formatter *html.Formatter, filePath string, data []byte) template.HTML {
 	lexer := lexers.Match(filePath)
 	if lexer == nil {
 		lexer = lexers.Fallback
@@ -920,7 +935,7 @@ func highlight(filePath string, data []byte) template.HTML {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	var buf bytes.Buffer
-	if err := chromaFormatter.Format(&buf, styles.Get(lightStyle), iterator); err != nil {
+	if err := formatter.Format(&buf, styles.Get(lightStyle), iterator); err != nil {
 		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
 	}
 	return template.HTML(buf.String())

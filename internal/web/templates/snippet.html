@@ -12,7 +12,7 @@
   <span class="actions"><a href="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/raw/{{.Name}}">raw</a></span>
 </div>
 <p class="filefacts">{{.Lines}} lines · {{.Size}} bytes</p>
-<div class="code">{{.HTML}}</div>
+{{if .TooLarge}}<p class="empty-note">too large to render here — <a href="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/raw/{{.Name}}">raw</a></p>{{else}}<div class="code">{{.HTML}}</div>{{end}}
 {{if $.CanWrite}}<details class="editbox"><summary>edit {{.Name}}</summary>
 <form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file" class="commentform">
 <input type="hidden" name="name" value="{{.Name}}">

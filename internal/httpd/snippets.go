@@ -66,13 +66,18 @@ func (s *Server) snippetsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 type snippetFileView struct {
-	Name    string
-	Size    int64
-	Lines   int
-	Content string
-	HTML    template.HTML
+	Name     string
+	Size     int64
+	Lines    int
+	Content  string
+	HTML     template.HTML
+	TooLarge bool
 }
 
+// snippetPage highlights files up to a shared budget across the page: a
+// snippet with many or large files does not make one request highlight
+// megabytes of markup. Content is filled only for the owner, whose edit
+// textarea needs the raw text regardless of the budget.
 func (s *Server) snippetPage(w http.ResponseWriter, r *http.Request) {
 	sn, viewer, ok := s.snippetScope(w, r)
 	if !ok {
@@ -83,13 +88,25 @@ func (s *Server) snippetPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	canWrite := policy.CanWriteSnippet(viewer, sn)
+	budget := int64(maxRenderBytes)
 	views := make([]snippetFileView, 0, len(files))
 	for _, f := range files {
 		lines := bytes.Count(f.Content, []byte("\n"))
 		if len(f.Content) > 0 && f.Content[len(f.Content)-1] != '\n' {
 			lines++
 		}
-		views = append(views, snippetFileView{f.Name, f.Size, lines, string(f.Content), highlight(f.Name, f.Content)})
+		view := snippetFileView{Name: f.Name, Size: f.Size, Lines: lines}
+		if canWrite {
+			view.Content = string(f.Content)
+		}
+		if f.Size <= budget {
+			view.HTML = highlightPlain(f.Name, f.Content)
+			budget -= f.Size
+		} else {
+			view.TooLarge = true
+		}
+		views = append(views, view)
 	}
 	s.render(w, "snippet.html", struct {
 		basePage
@@ -98,7 +115,7 @@ func (s *Server) snippetPage(w http.ResponseWriter, r *http.Request) {
 		Files    []snippetFileView
 		CanWrite bool
 		Notice   string
-	}{s.baseFor(viewer), sn.OwnerName, sn, views, policy.CanWriteSnippet(viewer, sn), s.takeFlash(w, r)})
+	}{s.baseFor(viewer), sn.OwnerName, sn, views, canWrite, s.takeFlash(w, r)})
 }
 
 // snippetRaw serves one file as text, inert on the forge's origin.
@@ -147,28 +164,27 @@ func (s *Server) snippetNewSubmit(w http.ResponseWriter, r *http.Request, u stor
 	http.Redirect(w, r, "/"+u.Username+"/-/snippets/"+out.ID, http.StatusSeeOther)
 }
 
-// snippetAction runs a write on the snippet in the URL and returns to
-// its page with the message, or to the list after a delete. A snippet
-// the viewer may not read is the 404 page, as on every read.
+// snippetAction runs a write on the snippet in the URL and returns to its
+// page with the message, or to dest (the list, for a delete) on success.
+// A snippet the viewer may not read is the 404 page, as on every read.
 func (s *Server) snippetAction(w http.ResponseWriter, r *http.Request, u store.User, argv []string, stdin string, dest string) {
 	sn, _, ok := s.snippetScope(w, r)
 	if !ok {
 		return
 	}
+	page := "/" + sn.OwnerName + "/-/snippets/" + sn.PublicID
 	if dest == "" {
-		dest = "/" + sn.OwnerName + "/-/snippets/" + sn.PublicID
+		dest = page
 	}
 	back := func(w http.ResponseWriter, r *http.Request, msg string) {
 		s.setFlash(w, msg)
-		http.Redirect(w, r, dest, http.StatusSeeOther)
+		to := dest
+		if msg != "" {
+			to = page
+		}
+		http.Redirect(w, r, to, http.StatusSeeOther)
 	}
-	var msg string
-	var code int
-	if stdin == "" {
-		_, msg, code = s.runControlCode(u, argv)
-	} else {
-		msg, code = s.runControlStdinCode(u, argv, stdin)
-	}
+	msg, code := s.runControlStdinCode(u, argv, stdin)
 	if code == protocol.ExitDenied {
 		http.Error(w, msg, http.StatusForbidden)
 		return
