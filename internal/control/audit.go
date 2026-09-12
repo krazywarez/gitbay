@@ -18,14 +18,12 @@ func init() {
 		ReadOnly: true, SSHOnly: true, Run: runAudit})
 }
 
-const auditUsage = "usage: audit [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]"
-
 func runAudit(c *Ctx, args []string) int {
 	if !c.User.IsAdmin {
 		return c.fail(protocol.ExitDenied, "the audit log is for instance admins")
 	}
 	f := store.AuditFilter{Limit: 100}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: auditUsage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

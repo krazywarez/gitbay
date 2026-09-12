@@ -81,7 +81,7 @@ type bundle struct {
 
 func runAccountExport(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: account export > bundle.json")
+		return c.usage()
 	}
 	b := bundle{Bundle: bundleVersion, Username: c.User.Username}
 	b.Profile, _ = c.Store.OwnerProfile("user", c.User.ID)

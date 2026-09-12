@@ -131,7 +131,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: admin user show <username>")
+		return c.usage()
 	}
 	name := args[0]
 	u, err := c.Store.UserByUsername(name)
@@ -291,7 +291,7 @@ func setAdmin(c *Ctx, args []string, admin bool) int {
 		verb = "promote"
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: admin user %s <username>", verb)
+		return c.usage()
 	}
 	u, err := c.Store.UserByUsername(args[0])
 	if errors.Is(err, store.ErrNotFound) {
@@ -389,7 +389,7 @@ func adminArchive(c *Ctx, args []string, archived bool) int {
 		verb = "unarchive"
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: admin repo %s <owner/name>", verb)
+		return c.usage()
 	}
 	repo, code := adminRepo(c, args[0])
 	if code >= 0 {
@@ -404,7 +404,7 @@ func adminArchive(c *Ctx, args []string, archived bool) int {
 
 func runAdminRepoVisibility(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "public" && args[1] != "private") {
-		return c.fail(protocol.ExitUsage, "usage: admin repo visibility <owner/name> public|private")
+		return c.usage()
 	}
 	repo, code := adminRepo(c, args[0])
 	if code >= 0 {
@@ -426,11 +426,11 @@ func runAdminRepoDelete(c *Ctx, args []string) int {
 		} else if path == "" {
 			path = a
 		} else {
-			return c.fail(protocol.ExitUsage, "usage: admin repo delete <owner/name> --yes")
+			return c.usage()
 		}
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: admin repo delete <owner/name> --yes")
+		return c.usage()
 	}
 	repo, code := adminRepo(c, path)
 	if code >= 0 {
@@ -451,7 +451,7 @@ func runAdminRunnersForget(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: admin runners forget <fingerprint>")
+		return c.usage()
 	}
 	if err := c.Store.ForgetRunner(args[0]); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -470,7 +470,7 @@ func runAdminRunners(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: admin runners")
+		return c.usage()
 	}
 	runners, err := c.Store.ListRunners()
 	if err != nil {

@@ -89,7 +89,7 @@ func teamRef(c *Ctx, org store.Org, name string) (store.Team, int) {
 
 func runTeamCreate(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org team create <org> <team>")
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {
@@ -108,7 +108,7 @@ func runTeamCreate(c *Ctx, args []string) int {
 
 func runTeamDelete(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org team delete <org> <team>")
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {
@@ -128,7 +128,7 @@ func runTeamDelete(c *Ctx, args []string) int {
 
 func runTeamList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org team list <org>")
+		return c.usage()
 	}
 	org, code := orgMemberRef(c, args[0])
 	if code >= 0 {
@@ -151,7 +151,7 @@ func runTeamList(c *Ctx, args []string) int {
 
 func runTeamShow(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org team show <org> <team>")
+		return c.usage()
 	}
 	org, code := orgMemberRef(c, args[0])
 	if code >= 0 {
@@ -191,7 +191,7 @@ func editTeamMembers(c *Ctx, args []string, add bool) int {
 		verb = "remove"
 	}
 	if len(args) < 3 {
-		return c.fail(protocol.ExitUsage, "usage: org team %s <org> <team> <user>...", verb)
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {
@@ -233,7 +233,7 @@ func editTeamMembers(c *Ctx, args []string, add bool) int {
 
 func runTeamGrant(c *Ctx, args []string) int {
 	if len(args) != 4 || !slices.Contains([]string{"read", "write", "admin"}, args[3]) {
-		return c.fail(protocol.ExitUsage, "usage: org team grant <org> <team> <owner/name> read|write|admin")
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {
@@ -257,7 +257,7 @@ func runTeamGrant(c *Ctx, args []string) int {
 
 func runTeamRevoke(c *Ctx, args []string) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: org team revoke <org> <team> <owner/name>")
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {
@@ -284,7 +284,7 @@ func runTeamRevoke(c *Ctx, args []string) int {
 
 func runOrgMembersRole(c *Ctx, args []string) int {
 	if len(args) != 2 || !slices.Contains([]string{"write", "read", "none"}, args[1]) {
-		return c.fail(protocol.ExitUsage, "usage: org settings members-role <org> write|read|none")
+		return c.usage()
 	}
 	org, code := orgAdminRef(c, args[0])
 	if code >= 0 {

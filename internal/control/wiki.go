@@ -79,7 +79,7 @@ func wikiPages(dir, branch string) []string {
 
 func runWikiList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: wiki list <owner/name>")
+		return c.usage()
 	}
 	repo, dir, branch, code := wikiDir(c, args[0])
 	if code >= 0 {
@@ -120,7 +120,7 @@ func wikiHome(pages []string) string {
 
 func runWikiShow(c *Ctx, args []string) int {
 	if len(args) < 1 || len(args) > 2 {
-		return c.fail(protocol.ExitUsage, "usage: wiki show <owner/name> [<page>]")
+		return c.usage()
 	}
 	repo, dir, branch, code := wikiDir(c, args[0])
 	if code >= 0 {

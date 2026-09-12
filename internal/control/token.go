@@ -48,7 +48,7 @@ func runTokenCreate(c *Ctx, args []string) int {
 		scope = f.Value("--scope")
 	}
 	if name == "" || (scope != "full" && scope != "read") {
-		return c.fail(protocol.ExitUsage, "usage: token create --name <n> [--scope full|read] [--ttl 30d]")
+		return c.usage()
 	}
 	var expires *time.Time
 	if ttl != "" {
@@ -108,7 +108,7 @@ func runTokenList(c *Ctx, args []string) int {
 
 func runTokenRevoke(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: token revoke <name>")
+		return c.usage()
 	}
 	if err := c.Store.RevokeAPIToken(c.User.ID, args[0]); err != nil {
 		if errors.Is(err, store.ErrNotFound) {

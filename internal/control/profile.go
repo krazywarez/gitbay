@@ -257,7 +257,7 @@ func runProfileShow(c *Ctx, args []string) int {
 	if len(args) == 1 {
 		name = args[0]
 	} else if len(args) > 1 {
-		return c.fail(protocol.ExitUsage, "usage: profile show [name]")
+		return c.usage()
 	}
 	kind, id := "", int64(0)
 	if u, err := c.Store.UserByUsername(name); err == nil {
@@ -360,8 +360,7 @@ func runProfileSet(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if len(rest) != 0 {
-		return c.fail(protocol.ExitUsage,
-			"usage: profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...")
+		return c.usage()
 	}
 	if e.empty() {
 		return c.fail(protocol.ExitUsage, "nothing to set: pass --description, --website, --about and/or --link")
@@ -388,8 +387,7 @@ func runOrgProfile(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if len(rest) != 1 {
-		return c.fail(protocol.ExitUsage,
-			"usage: org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...")
+		return c.usage()
 	}
 	name := rest[0]
 	if e.empty() {

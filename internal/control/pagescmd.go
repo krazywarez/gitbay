@@ -70,7 +70,7 @@ func challengeRecord(domain, token string) (name, value string) {
 
 func runDomainAdd(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo domain add <owner/name> <domain>")
+		return c.usage()
 	}
 	domain := strings.ToLower(args[1])
 	if err := validatePageDomain(c, domain); err != nil {
@@ -121,7 +121,7 @@ func lookupTXT(name string) ([]string, error) {
 
 func runDomainVerify(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo domain verify <owner/name> <domain>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -167,7 +167,7 @@ func runDomainVerify(c *Ctx, args []string) int {
 
 func runDomainRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo domain remove <owner/name> <domain>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -187,7 +187,7 @@ func runDomainRemove(c *Ctx, args []string) int {
 
 func runDomainList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo domain list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {

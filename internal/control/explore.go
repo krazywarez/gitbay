@@ -37,7 +37,7 @@ func runExplore(c *Ctx, args []string) int {
 		return code
 	}
 	if len(rest) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: explore [--limit <n>] [--cursor <c>]")
+		return c.usage()
 	}
 	repos, err := c.Store.ListPublicRepos()
 	if err != nil {
@@ -79,14 +79,13 @@ func runExplore(c *Ctx, args []string) int {
 // release asset get writes an asset. The web's /archive route is the
 // same bytes with a Content-Disposition on them.
 func runRepoDownload(c *Ctx, args []string) int {
-	const usage = "repo download <owner/name> [--ref <r>] > repo.tar.gz"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: -1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	rest, ref := f.Pos, f.Value("--ref")
 	if len(rest) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, rest[0], policy.CanRead)
 	if code >= 0 {

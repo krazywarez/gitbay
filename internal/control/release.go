@@ -76,15 +76,14 @@ func releaseRef(c *Ctx, args []string, perm func(store.User, store.Repo, string)
 }
 
 func runReleaseCreate(c *Ctx, args []string) int {
-	const usage = "usage: release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	path, tag := f.pos(0), f.pos(1)
 	title, notes, file, format := f.Value("--title"), f.Value("--notes"), f.Value("--file"), f.Value("--format")
 	if path == "" || tag == "" {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
@@ -149,8 +148,7 @@ func releaseToOut(r store.Release, withNotes bool) releaseOut {
 }
 
 func runReleaseEdit(c *Ctx, args []string) int {
-	const usage = "usage: release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -162,7 +160,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if path == "" || tag == "" || (!setTitle && !setNotes && fmtName == "") {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanWrite)
 	if code >= 0 {
@@ -200,7 +198,7 @@ func runReleaseEdit(c *Ctx, args []string) int {
 
 func runReleaseList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: release list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -267,7 +265,7 @@ func runReleaseDelete(c *Ctx, args []string) int {
 
 func runAssetAdd(c *Ctx, args []string) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: release asset add <owner/name> <tag> <filename> < file")
+		return c.usage()
 	}
 	repo, rel, code := releaseRef(c, args[:2], policy.CanWrite)
 	if code >= 0 {
@@ -319,7 +317,7 @@ func runAssetAdd(c *Ctx, args []string) int {
 
 func runAssetGet(c *Ctx, args []string) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: release asset get <owner/name> <tag> <filename> > file")
+		return c.usage()
 	}
 	repo, rel, code := releaseRef(c, args[:2], policy.CanRead)
 	if code >= 0 {
@@ -342,7 +340,7 @@ func runAssetGet(c *Ctx, args []string) int {
 
 func runAssetRemove(c *Ctx, args []string) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: release asset remove <owner/name> <tag> <filename>")
+		return c.usage()
 	}
 	repo, rel, code := releaseRef(c, args[:2], policy.CanWrite)
 	if code >= 0 {

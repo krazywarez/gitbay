@@ -33,7 +33,7 @@ func init() {
 func runRepoRunnerAdd(c *Ctx, args []string) int {
 	f, err := parseFlags(args, flagSpec{MaxPos: 1, Usage: "repo runner add <owner/name> < key.pub"})
 	if err != nil || len(f.Pos) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo runner add <owner/name> < key.pub")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, f.Pos[0], policy.CanAdmin)
 	if code >= 0 {
@@ -95,7 +95,7 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 
 func runRepoRunnerList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo runner list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -125,7 +125,7 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 
 func runRepoRunnerRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo runner remove <owner/name> <fingerprint>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {

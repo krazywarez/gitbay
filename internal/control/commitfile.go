@@ -35,15 +35,14 @@ const maxCommitFileBytes = 1 << 20
 // A repository that requires verified signatures therefore refuses the
 // command rather than writing a commit its own policy would reject.
 func runCommitFile(c *Ctx, args []string) int {
-	const usage = "repo commit-file <owner/name> <path> --ref <branch> [--message <m>] [--file -]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--message", "--file"}, MaxPos: -1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--message", "--file"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	rest := f.Pos
 	ref, message, file := f.Value("--ref"), f.Value("--message"), f.Value("--file")
 	if len(rest) != 2 || ref == "" {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, rest[0], policy.CanWrite)
 	if code >= 0 {

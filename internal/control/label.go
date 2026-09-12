@@ -31,7 +31,7 @@ var labelColorPat = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
 
 func runLabelList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: label list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -53,15 +53,14 @@ func runLabelList(c *Ctx, args []string) int {
 }
 
 func runLabelSet(c *Ctx, args []string) int {
-	const usage = "usage: label set <owner/name> <label> [--color #rrggbb|'']"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: -1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	rest := f.Pos
 	color, colorSet := strings.ToLower(f.Value("--color")), f.Has("--color")
 	if len(rest) != 2 {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if colorSet && color != "" {
 		if !labelColorPat.MatchString(color) {
@@ -103,7 +102,7 @@ func runLabelSet(c *Ctx, args []string) int {
 
 func runLabelRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: label remove <owner/name> <label>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanWrite)
 	if code >= 0 {

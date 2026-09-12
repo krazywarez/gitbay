@@ -84,7 +84,7 @@ type DashboardOut struct {
 
 func runDashboard(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: dashboard")
+		return c.usage()
 	}
 	d := DashboardOut{
 		Reviews: []DashboardItem{}, Assigned: []DashboardItem{}, MRs: []DashboardItem{},
@@ -260,7 +260,7 @@ func runFeed(c *Ctx, args []string) int {
 		return code
 	}
 	if len(rest) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: feed [--limit <n>] [--cursor <c>]")
+		return c.usage()
 	}
 	if p.limit == 0 {
 		p.limit = feedDefaultLimit

@@ -51,7 +51,7 @@ func init() {
 
 func runWhoami(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: whoami [--json]")
+		return c.usage()
 	}
 	type out struct {
 		Username string `json:"username"`
@@ -66,7 +66,7 @@ func runWhoami(c *Ctx, args []string) int {
 
 func runKeysList(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: keys list [--json]")
+		return c.usage()
 	}
 	keys, err := c.Store.ListSSHKeys(c.User.ID)
 	if err != nil {
@@ -161,7 +161,7 @@ func runKeysAdd(c *Ctx, args []string) int {
 
 func runKeysLabel(c *Ctx, args []string) int {
 	if len(args) < 1 || len(args) > 2 {
-		return c.fail(protocol.ExitUsage, "usage: keys label <fingerprint> [<text>]")
+		return c.usage()
 	}
 	label := ""
 	if len(args) == 2 {
@@ -189,7 +189,7 @@ func runKeysLabel(c *Ctx, args []string) int {
 
 func runKeysRemove(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: keys remove <fingerprint>")
+		return c.usage()
 	}
 	if err := c.Store.RemoveSSHKey(c.User.ID, args[0]); err != nil {
 		if errors.Is(err, store.ErrNotFound) {

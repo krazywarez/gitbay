@@ -26,7 +26,7 @@ func init() {
 
 func runWebSessionsList(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: web sessions list")
+		return c.usage()
 	}
 	sessions, err := c.Store.ListWebSessions(c.User.ID)
 	if err != nil {
@@ -41,7 +41,7 @@ func runWebSessionsList(c *Ctx, args []string) int {
 
 func runWebSessionsRevoke(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: web sessions revoke <id>|--all")
+		return c.usage()
 	}
 	if args[0] == "--all" {
 		n, err := c.Store.RevokeAllWebSessions(c.User.ID)
@@ -65,7 +65,7 @@ func runWebSessionsRevoke(c *Ctx, args []string) int {
 
 func runWebLogin(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: web login [--json]")
+		return c.usage()
 	}
 	if c.Cfg.Web.Mode != "accounts" {
 		return c.fail(protocol.ExitDenied,

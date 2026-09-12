@@ -39,7 +39,7 @@ func runMirrorAdd(c *Ctx, args []string) int {
 	path, urlArg := f.pos(0), f.pos(1)
 	direction, username, tokenStdin := f.Value("--direction"), f.Value("--username"), f.Has("--token-stdin")
 	if path == "" || urlArg == "" || (direction != "push" && direction != "pull") {
-		return c.fail(protocol.ExitUsage, "usage: repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]")
+		return c.usage()
 	}
 	// The worker's git process dials this URL from the server: same SSRF
 	// surface as a webhook target, same rules.
@@ -76,7 +76,7 @@ func runMirrorAdd(c *Ctx, args []string) int {
 
 func runMirrorList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo mirror list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -123,7 +123,7 @@ func orDash(s string) string {
 
 func runMirrorRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo mirror remove <owner/name> <id>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -146,7 +146,7 @@ func runMirrorRemove(c *Ctx, args []string) int {
 
 func runMirrorSync(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo mirror sync <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {

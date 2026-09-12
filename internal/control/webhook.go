@@ -40,7 +40,7 @@ func runWebhookAdd(c *Ctx, args []string) int {
 		events = f.Value("--events")
 	}
 	if path == "" || url == "" {
-		return c.fail(protocol.ExitUsage, "usage: webhook add <owner/name> <url> [--secret <s>] [--events <k1,k2>|*]")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -68,7 +68,7 @@ func runWebhookAdd(c *Ctx, args []string) int {
 
 func runWebhookList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: webhook list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -98,7 +98,7 @@ func runWebhookList(c *Ctx, args []string) int {
 
 func runWebhookRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: webhook remove <owner/name> <id>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -133,7 +133,7 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 		limit = n
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: webhook deliveries <owner/name> [--limit n]")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -169,7 +169,7 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 
 func runWebhookRedeliver(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: webhook redeliver <owner/name> <delivery-id>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {

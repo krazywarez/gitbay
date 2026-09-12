@@ -149,7 +149,7 @@ func runImportIssues(c *Ctx, args []string) int {
 	}
 	path, from, apiBase, tokenStdin := f.pos(0), f.Value("--from"), f.Value("--api-base"), f.Has("--token-stdin")
 	if path == "" || from == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo import-issues <owner/name> --from <owner/repo> [--token-stdin] [--api-base <url>]")
+		return c.usage()
 	}
 	if apiBase == "" {
 		apiBase = "https://api.github.com"

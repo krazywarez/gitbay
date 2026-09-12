@@ -60,7 +60,7 @@ func orgAdmin(c *Ctx, name string) (store.Org, int) {
 
 func runOrgCreate(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org create <name>")
+		return c.usage()
 	}
 	if err := policy.ValidateOwnerName(args[0]); err != nil {
 		return c.failInput(err)
@@ -95,7 +95,7 @@ func runOrgList(c *Ctx, args []string) int {
 
 func runOrgShow(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org show <name>")
+		return c.usage()
 	}
 	org, err := c.Store.OrgByName(args[0])
 	if errors.Is(err, store.ErrNotFound) {
@@ -130,7 +130,7 @@ func runOrgShow(c *Ctx, args []string) int {
 
 func runOrgRename(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org rename <old> <new>")
+		return c.usage()
 	}
 	org, code := orgAdmin(c, args[0])
 	if code >= 0 {
@@ -170,11 +170,11 @@ func runOrgDelete(c *Ctx, args []string) int {
 		} else if name == "" {
 			name = a
 		} else {
-			return c.fail(protocol.ExitUsage, "usage: org delete <name> --yes")
+			return c.usage()
 		}
 	}
 	if name == "" {
-		return c.fail(protocol.ExitUsage, "usage: org delete <name> --yes")
+		return c.usage()
 	}
 	org, code := orgAdmin(c, name)
 	if code >= 0 {
@@ -201,7 +201,7 @@ func runOrgMembersAdd(c *Ctx, args []string) int {
 		role = f.Value("--role")
 	}
 	if len(rest) != 2 || (role != "member" && role != "admin") {
-		return c.fail(protocol.ExitUsage, "usage: org members add <org> <user> [--role member|admin]")
+		return c.usage()
 	}
 	org, code := orgAdmin(c, rest[0])
 	if code >= 0 {
@@ -224,7 +224,7 @@ func runOrgMembersAdd(c *Ctx, args []string) int {
 
 func runOrgMembersRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org members remove <org> <user>")
+		return c.usage()
 	}
 	org, code := orgAdmin(c, args[0])
 	if code >= 0 {
@@ -250,7 +250,7 @@ func runOrgMembersRemove(c *Ctx, args []string) int {
 
 func runOrgMembersList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org members list <org>")
+		return c.usage()
 	}
 	return runOrgShow(c, args)
 }

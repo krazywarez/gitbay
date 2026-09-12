@@ -48,7 +48,7 @@ func init() {
 
 func runRepoRefs(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo refs <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -93,8 +93,7 @@ func runRepoRefs(c *Ctx, args []string) int {
 const BlameSpan = 1000
 
 func runRepoBlame(c *Ctx, args []string) int {
-	const usage = "repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--from", "--to"}, MaxPos: -1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--from", "--to"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -111,7 +110,7 @@ func runRepoBlame(c *Ctx, args []string) int {
 		*dst = n
 	}
 	if len(rest) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, rest[0], policy.CanRead)
 	if code >= 0 {
@@ -204,7 +203,7 @@ func runRepoBlame(c *Ctx, args []string) int {
 // off argv. Positionals are returned in order so each command can name them
 // in its own usage message.
 func readArgs(c *Ctx, args []string, usage string, maxPos int) (pos []string, ref string, code int) {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: maxPos, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: maxPos, Usage: c.Cmd.Usage})
 	if err != nil {
 		return nil, "", c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -239,13 +238,12 @@ type entryOut struct {
 }
 
 func runRepoTree(c *Ctx, args []string) int {
-	const usage = "repo tree <owner/name> [<path>] [--ref <ref>]"
-	pos, ref, code := readArgs(c, args, usage, 2)
+	pos, ref, code := readArgs(c, args, c.Cmd.Usage, 2)
 	if code >= 0 {
 		return code
 	}
 	if len(pos) == 0 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, pos[0], policy.CanRead)
 	if code >= 0 {
@@ -303,13 +301,12 @@ func sizeCol(e entryOut) string {
 }
 
 func runRepoCat(c *Ctx, args []string) int {
-	const usage = "repo cat <owner/name> <path> [--ref <ref>]"
-	pos, ref, code := readArgs(c, args, usage, 2)
+	pos, ref, code := readArgs(c, args, c.Cmd.Usage, 2)
 	if code >= 0 {
 		return code
 	}
 	if len(pos) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, pos[0], policy.CanRead)
 	if code >= 0 {

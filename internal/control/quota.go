@@ -93,7 +93,7 @@ func runAdminUserLimits(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) < 1 {
-		return c.fail(protocol.ExitUsage, "usage: admin user limits <username> [--repos <n>|default] [--bytes <n>|default]")
+		return c.usage()
 	}
 	u, err := c.Store.UserByUsername(args[0])
 	if err != nil {
@@ -116,7 +116,7 @@ func runAdminUserLimits(c *Ctx, args []string) int {
 		case "--bytes":
 			target = &l.Bytes
 		default:
-			return c.fail(protocol.ExitUsage, "usage: admin user limits <username> [--repos <n>|default] [--bytes <n>|default]")
+			return c.usage()
 		}
 		if v == "default" {
 			*target = nil

@@ -104,7 +104,7 @@ func runRepoFork(c *Ctx, args []string) int {
 	}
 	path, name := f.pos(0), f.Value("--name")
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo fork <owner/name> [--name <n>]")
+		return c.usage()
 	}
 	src, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -150,7 +150,7 @@ func runRepoFork(c *Ctx, args []string) int {
 
 func runRequireApprovals(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-approvals <owner/name> <n>")
+		return c.usage()
 	}
 	n, err := strconv.Atoi(args[1])
 	if err != nil || n < 0 || n > 20 {
@@ -171,7 +171,7 @@ func runRequireApprovals(c *Ctx, args []string) int {
 
 func runRequireResolved(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-resolved <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -188,7 +188,7 @@ func runRequireResolved(c *Ctx, args []string) int {
 
 func runRequireCodeowners(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-codeowners <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -205,7 +205,7 @@ func runRequireCodeowners(c *Ctx, args []string) int {
 
 func runRequireChecks(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-checks <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -222,7 +222,7 @@ func runRequireChecks(c *Ctx, args []string) int {
 
 func runRequireMR(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-mr <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -239,7 +239,7 @@ func runRequireMR(c *Ctx, args []string) int {
 
 func runRequireSigned(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings require-signed <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -282,7 +282,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	path, source, target := f.pos(0), f.Value("--source"), f.Value("--target")
 	title, body, file, format := f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
 	if path == "" || source == "" || title == "" {
-		return c.fail(protocol.ExitUsage, "usage: mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--draft]")
+		return c.usage()
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
@@ -441,9 +441,8 @@ func runMRList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	const usage = "usage: mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]"
 	f := store.MRFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: usage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -460,7 +459,7 @@ func runMRList(c *Ctx, args []string) int {
 	}
 	valid := map[string]bool{"open": true, "merged": true, "closed": true, "source_gone": true, "all": true}
 	if path == "" || !valid[f.State] {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -510,7 +509,7 @@ func runMRShow(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: mr show <owner/name> <n>")
+		return c.usage()
 	}
 	comments, err := c.Store.ListMRComments(mr.ID)
 	if err != nil {
@@ -701,7 +700,7 @@ func runMREdit(c *Ctx, args []string) int {
 // same repository.
 func runMRRetarget(c *Ctx, args []string) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: mr retarget <owner/name> <n> <branch>")
+		return c.usage()
 	}
 	repo, mr, code := mrRef(c, args[:2], policy.CanRead)
 	if code >= 0 {
@@ -779,12 +778,11 @@ func runMRReview(c *Ctx, args []string) int {
 			rest = append(rest, a)
 		}
 	}
-	const usage = "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard"
 	if discard && verdict != "" {
 		return c.fail(protocol.ExitUsage, "--discard throws the batch away; it takes no verdict")
 	}
 	if verdict == "" && !discard {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanRead)
 	if code >= 0 {
@@ -848,7 +846,7 @@ func runMRReviewRequest(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if len(adds)+len(removes) == 0 {
-		return c.fail(protocol.ExitUsage, "usage: mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...")
+		return c.usage()
 	}
 	repo, mr, code := mrRef(c, rest, policy.CanWrite)
 	if code >= 0 {
@@ -1404,10 +1402,6 @@ func runMRDraft(c *Ctx, args []string) int { return setMRDraft(c, args, true) }
 func runMRReady(c *Ctx, args []string) int { return setMRDraft(c, args, false) }
 
 func setMRDraft(c *Ctx, args []string, draft bool) int {
-	verb := "ready"
-	if draft {
-		verb = "draft"
-	}
 	repo, mr, code := mrRef(c, args, policy.CanRead)
 	if code >= 0 {
 		return code
@@ -1416,7 +1410,7 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: mr %s <owner/name> <n>", verb)
+		return c.usage()
 	}
 	if code := authorOrWrite(c, repo, mr.Author, "change this merge request"); code >= 0 {
 		return code
@@ -1471,7 +1465,7 @@ func runMRClose(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: mr close <owner/name> <n>")
+		return c.usage()
 	}
 	if code := authorOrWrite(c, repo, mr.Author, "close this merge request"); code >= 0 {
 		return code
@@ -1532,7 +1526,7 @@ func runMRRevisions(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: mr revisions <owner/name> <n>")
+		return c.usage()
 	}
 	revs, err := mrRevisions(c, mr)
 	if err != nil {
@@ -1554,8 +1548,7 @@ func runMRRevisions(c *Ctx, args []string) int {
 }
 
 func runMRRangeDiff(c *Ctx, args []string) int {
-	const usage = "mr range-diff <owner/name> <n> [--from <sha>] [--to <sha>]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--to"}, MaxPos: 2, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--to"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1564,7 +1557,7 @@ func runMRRangeDiff(c *Ctx, args []string) int {
 		return code
 	}
 	if len(f.Pos) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	revs, err := mrRevisions(c, mr)
 	if err != nil {

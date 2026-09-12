@@ -40,11 +40,11 @@ func runRepoImport(c *Ctx, args []string) int {
 	}
 	path, from, private, tokenStdin := f.pos(0), f.Value("--from"), f.Has("--private"), f.Has("--token-stdin")
 	if path == "" || from == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url> [--private] [--token-stdin]")
+		return c.usage()
 	}
 	owner, name, ok := strings.Cut(path, "/")
 	if !ok {
-		return c.fail(protocol.ExitUsage, "usage: repo import <owner/name> --from <url>")
+		return c.usage()
 	}
 	if err := policy.ValidateName(name); err != nil {
 		return c.failInput(err)

@@ -181,7 +181,7 @@ func runRepoCreate(c *Ctx, args []string) int {
 	}
 	owner, name, ok := strings.Cut(path, "/")
 	if !ok {
-		return c.fail(protocol.ExitUsage, "usage: repo create <owner/name> [--private]")
+		return c.usage()
 	}
 	if err := policyValidateRepoName(name); err != nil {
 		return c.failInput(err)
@@ -247,7 +247,7 @@ func runRepoList(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: repo list [--limit <n>] [--cursor <c>]")
+		return c.usage()
 	}
 	repos, err := c.Store.ListReposForUser(c.User.ID, p.queryLimit(), p.key)
 	if err != nil {
@@ -278,7 +278,7 @@ func runRepoList(c *Ctx, args []string) int {
 
 func runRepoShow(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo show <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -393,7 +393,7 @@ func runRepoShow(c *Ctx, args []string) int {
 
 func runRepoTransfer(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo transfer <owner/name> <new-owner>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -452,7 +452,7 @@ func runRepoTransfer(c *Ctx, args []string) int {
 
 func runRepoRename(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo rename <owner/name> <new-name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -496,11 +496,11 @@ func runRepoDelete(c *Ctx, args []string) int {
 		} else if path == "" {
 			path = a
 		} else {
-			return c.fail(protocol.ExitUsage, "usage: repo delete <owner/name> --yes")
+			return c.usage()
 		}
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo delete <owner/name> --yes")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -540,7 +540,7 @@ func deleteRepo(c *Ctx, repo store.Repo) int {
 
 func runAccessGrant(c *Ctx, args []string) int {
 	if len(args) != 3 || !slices.Contains([]string{"read", "write", "admin"}, args[2]) {
-		return c.fail(protocol.ExitUsage, "usage: repo access grant <owner/name> <user> read|write|admin")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -559,7 +559,7 @@ func runAccessGrant(c *Ctx, args []string) int {
 
 func runAccessRevoke(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo access revoke <owner/name> <user>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -581,7 +581,7 @@ func runAccessRevoke(c *Ctx, args []string) int {
 
 func runAccessList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo access list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -609,7 +609,7 @@ func runAccessList(c *Ctx, args []string) int {
 
 func runSettingsShow(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings show <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -623,7 +623,7 @@ func runSettingsShow(c *Ctx, args []string) int {
 
 func runSetDescription(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings description <owner/name> <text>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -640,7 +640,7 @@ func runSetDescription(c *Ctx, args []string) int {
 
 func runSetDefaultBranch(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings default-branch <owner/name> <branch>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -664,7 +664,7 @@ func runSetDefaultBranch(c *Ctx, args []string) int {
 
 func runSetWebsite(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings website <owner/name> <url>")
+		return c.usage()
 	}
 	site := strings.TrimSpace(args[1])
 	if err := validateWebsite(site); err != nil {
@@ -691,7 +691,7 @@ func runSetWebsite(c *Ctx, args []string) int {
 
 func runSetVisibility(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "public" && args[1] != "private") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings visibility <owner/name> public|private")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -724,7 +724,7 @@ func setRepoVisibility(c *Ctx, repo store.Repo, visibility string) int {
 
 func runGitDaemon(c *Ctx, args []string) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: repo settings git-daemon <owner/name> on|off")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -748,12 +748,8 @@ func runArchive(c *Ctx, args []string) int   { return setArchived(c, args, true)
 func runUnarchive(c *Ctx, args []string) int { return setArchived(c, args, false) }
 
 func setArchived(c *Ctx, args []string, archived bool) int {
-	verb := "archive"
-	if !archived {
-		verb = "unarchive"
-	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -782,7 +778,7 @@ func archiveRepo(c *Ctx, repo store.Repo, archived bool) int {
 
 func runTopicsList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo topics <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -803,12 +799,8 @@ func runTopicsAdd(c *Ctx, args []string) int    { return editTopics(c, args, tru
 func runTopicsRemove(c *Ctx, args []string) int { return editTopics(c, args, false) }
 
 func editTopics(c *Ctx, args []string, add bool) int {
-	verb := "add"
-	if !add {
-		verb = "remove"
-	}
 	if len(args) < 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo topics %s <owner/name> <topic>...", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -862,7 +854,7 @@ func editTopics(c *Ctx, args []string, add bool) int {
 // and topics of every repository the caller can see.
 func runRepoSearch(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo search <query>")
+		return c.usage()
 	}
 	if err := validQuery(args[0]); err != nil {
 		return c.failInput(err)
@@ -929,7 +921,7 @@ func runRepoGrep(c *Ctx, args []string) int {
 	}
 	path, query, ref := f.pos(0), f.pos(1), f.Value("--ref")
 	if path == "" || query == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo grep <owner/name> <query> [--ref <ref>]")
+		return c.usage()
 	}
 	if err := validQuery(query); err != nil {
 		return c.failInput(err)
@@ -974,7 +966,7 @@ func setPinned(c *Ctx, args []string, pin bool) int {
 		verb = "unpin"
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -1008,7 +1000,7 @@ func setBookmarked(c *Ctx, args []string, on bool) int {
 		verb = "unbookmark"
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -1040,7 +1032,7 @@ type BookmarkOut struct {
 
 func runRepoBookmarks(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: repo bookmarks")
+		return c.usage()
 	}
 	repos, err := c.Store.ListBookmarks(c.User.ID)
 	if err != nil {
@@ -1077,7 +1069,7 @@ func runUnprotectTag(c *Ctx, args []string) int { return setProtectTag(c, args, 
 
 func setProtectTag(c *Ctx, args []string, protect bool) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings protect-tag|unprotect-tag <owner/name> <glob>")
+		return c.usage()
 	}
 	glob := args[1]
 	if _, err := path.Match(glob, "x"); err != nil || glob == "" {
@@ -1114,7 +1106,7 @@ func runUnprotect(c *Ctx, args []string) int { return setProtect(c, args, false)
 
 func setProtect(c *Ctx, args []string, protect bool) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo settings protect|unprotect <owner/name> <branch>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -1149,7 +1141,7 @@ func setProtect(c *Ctx, args []string, protect bool) int {
 func runRepoDiff(c *Ctx, args []string) int {
 	f, err := parseFlags(args, flagSpec{MaxPos: 3, Usage: "repo diff <owner/name> <base> <head>"})
 	if err != nil || len(f.Pos) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: repo diff <owner/name> <base> <head>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, f.pos(0), policy.CanRead)
 	if code >= 0 {

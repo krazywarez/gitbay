@@ -55,8 +55,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	if code := requireInstanceAdmin(c); code >= 0 {
 		return code
 	}
-	const usage = "usage: admin user create <username> [--admin] [--email <address> [--verified]] [--key -] < key.pub"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--email", "--key"}, Bools: []string{"--admin", "--verified"}, MaxPos: 1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--email", "--key"}, Bools: []string{"--admin", "--verified"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -66,10 +65,10 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "--key only supports - (the public key on stdin)")
 	}
 	if username == "" || username[0] == '-' {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if username == "" || (verified && email == "") {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if err := policy.ValidateOwnerName(username); err != nil {
 		return c.failInput(err)
@@ -128,7 +127,7 @@ func adminUserArg(c *Ctx, args []string, usage string) (store.User, int) {
 		return store.User{}, code
 	}
 	if len(args) != 1 {
-		return store.User{}, c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return store.User{}, c.usage()
 	}
 	u, err := c.Store.UserByUsername(args[0])
 	if errors.Is(err, store.ErrNotFound) {
@@ -201,7 +200,7 @@ func runAdminEmailVerify(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: admin email verify <username> <address>")
+		return c.usage()
 	}
 	u, err := c.Store.UserByUsername(args[0])
 	if errors.Is(err, store.ErrNotFound) {
@@ -228,7 +227,7 @@ func runAdminInvite(c *Ctx, args []string) int {
 		email = args[1]
 	}
 	if email == "" {
-		return c.fail(protocol.ExitUsage, "usage: admin invite --email <address>")
+		return c.usage()
 	}
 	if used, err := c.Store.EmailInUse(email); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -271,7 +270,7 @@ func runAdminStats(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: admin stats")
+		return c.usage()
 	}
 	counts, err := c.Store.InstanceCounts()
 	if err != nil {

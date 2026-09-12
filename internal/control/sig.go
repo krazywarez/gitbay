@@ -37,7 +37,7 @@ func init() {
 
 func runPGPAdd(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: pgp add < key.asc")
+		return c.usage()
 	}
 	raw, err := io.ReadAll(io.LimitReader(c.Stdin, 1<<20))
 	if err != nil {
@@ -88,7 +88,7 @@ func runPGPList(c *Ctx, args []string) int {
 
 func runPGPRemove(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: pgp remove <fingerprint>")
+		return c.usage()
 	}
 	if err := c.Store.RemovePGPKey(c.User.ID, args[0]); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -140,7 +140,7 @@ func runRepoLog(c *Ctx, args []string) int {
 		limit = n
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -221,9 +221,8 @@ func runRepoLog(c *Ctx, args []string) int {
 // statuses, and its patch. The web's commit page read these straight from
 // git, which is why no other surface could open a commit.
 func runRepoCommit(c *Ctx, args []string) int {
-	const usage = "repo commit <owner/name> <sha>"
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {

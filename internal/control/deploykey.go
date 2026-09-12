@@ -34,13 +34,13 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 			mode = "rw"
 		default:
 			if path != "" {
-				return c.fail(protocol.ExitUsage, "usage: repo deploy-key add <owner/name> [--rw] < key.pub")
+				return c.usage()
 			}
 			path = a
 		}
 	}
 	if path == "" {
-		return c.fail(protocol.ExitUsage, "usage: repo deploy-key add <owner/name> [--rw] < key.pub")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -73,7 +73,7 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 
 func runDeployKeyList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo deploy-key list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -106,7 +106,7 @@ func runDeployKeyList(c *Ctx, args []string) int {
 
 func runDeployKeyRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo deploy-key remove <owner/name> <fingerprint>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {

@@ -77,13 +77,12 @@ func Search(st *store.Store, root string, userID int64, q string, kinds []string
 }
 
 func runSearch(c *Ctx, args []string) int {
-	const usage = "search <query> [--kind repo|issue|mr]"
-	f, err := parseFlags(args, flagSpec{Multi: []string{"--kind"}, MaxPos: 1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Multi: []string{"--kind"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	if len(f.Pos) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	if err := validQuery(f.Pos[0]); err != nil {
 		return c.failInput(err)

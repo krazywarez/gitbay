@@ -132,14 +132,13 @@ func newSnippetID() string {
 }
 
 func runSnippetCreate(c *Ctx, args []string) int {
-	const usage = "usage: snippet create <filename> [--description <d>] [--visibility public|unlisted|private] < file"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	name := f.pos(0)
 	if name == "" {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if code := checkSnippetFileName(c, name); code >= 0 {
 		return code
@@ -186,7 +185,7 @@ func runSnippetCreate(c *Ctx, args []string) int {
 
 func runSnippetShow(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: snippet show <id>")
+		return c.usage()
 	}
 	sn, code := snippetRef(c, args[0], false)
 	if code >= 0 {
@@ -215,7 +214,7 @@ func runSnippetList(c *Ctx, args []string) int {
 		return code
 	}
 	if len(rest) > 1 {
-		return c.fail(protocol.ExitUsage, "usage: snippet list [<owner>] [--limit n] [--cursor c]")
+		return c.usage()
 	}
 	owner := c.User
 	if len(rest) == 1 {
@@ -253,13 +252,12 @@ func runSnippetList(c *Ctx, args []string) int {
 }
 
 func runSnippetEdit(c *Ctx, args []string) int {
-	const usage = "usage: snippet edit <id> [--description <d>] [--visibility public|unlisted|private]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	if f.pos(0) == "" || (!f.Has("--description") && !f.Has("--visibility")) {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	sn, code := snippetRef(c, f.pos(0), true)
 	if code >= 0 {
@@ -289,7 +287,7 @@ func runSnippetEdit(c *Ctx, args []string) int {
 
 func runSnippetDelete(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: snippet delete <id>")
+		return c.usage()
 	}
 	sn, code := snippetRef(c, args[0], true)
 	if code >= 0 {
@@ -305,7 +303,7 @@ func runSnippetDelete(c *Ctx, args []string) int {
 
 func runSnippetFileSet(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: snippet file set <id> <filename> < file")
+		return c.usage()
 	}
 	sn, code := snippetRef(c, args[0], true)
 	if code >= 0 {
@@ -336,7 +334,7 @@ func runSnippetFileSet(c *Ctx, args []string) int {
 
 func runSnippetFileGet(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: snippet file get <id> <filename> > file")
+		return c.usage()
 	}
 	sn, code := snippetRef(c, args[0], false)
 	if code >= 0 {
@@ -360,7 +358,7 @@ func runSnippetFileGet(c *Ctx, args []string) int {
 
 func runSnippetFileRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: snippet file remove <id> <filename>")
+		return c.usage()
 	}
 	sn, code := snippetRef(c, args[0], true)
 	if code >= 0 {

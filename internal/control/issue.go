@@ -123,7 +123,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	path, title, body, file, format := f.pos(0), f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
 	if path == "" || title == "" {
-		return c.fail(protocol.ExitUsage, "usage: issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]")
+		return c.usage()
 	}
 	fmtName, err := markupFormat(format)
 	if err != nil {
@@ -168,9 +168,8 @@ func runIssueList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	const usage = "usage: issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]"
 	f := store.IssueFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: usage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -186,7 +185,7 @@ func runIssueList(c *Ctx, args []string) int {
 		}
 	}
 	if path == "" || (f.State != "open" && f.State != "closed" && f.State != "all") {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -217,7 +216,7 @@ func runIssueShow(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: issue show <owner/name> <n>")
+		return c.usage()
 	}
 	comments, err := c.Store.ListIssueComments(issue.ID)
 	if err != nil {
@@ -265,7 +264,7 @@ func setIssueState(c *Ctx, args []string, state string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: issue %s <owner/name> <n>", state)
+		return c.usage()
 	}
 	if code := authorOrWrite(c, repo, issue.Author, map[string]string{"open": "reopen", "closed": "close"}[state]+" this issue"); code >= 0 {
 		return code
@@ -312,7 +311,7 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body, f
 		return nil, nil, nil, nil, c.failInput(err)
 	}
 	if !haveTitle && !haveBody && fmtName == "" {
-		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "usage: %s edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]", kind)
+		return nil, nil, nil, nil, c.usage()
 	}
 	if haveTitle {
 		if strings.TrimSpace(titleV) == "" {
@@ -378,7 +377,7 @@ func runIssueLabel(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if len(adds)+len(removes) == 0 {
-		return c.fail(protocol.ExitUsage, "usage: issue label <owner/name> <n> [--add <l>]... [--remove <l>]...")
+		return c.usage()
 	}
 	repo, issue, code := issueRef(c, rest, policy.CanWrite)
 	if code >= 0 {
@@ -417,7 +416,7 @@ func runIssueAssign(c *Ctx, args []string) int {
 		return c.failInput(err)
 	}
 	if len(adds)+len(removes) == 0 {
-		return c.fail(protocol.ExitUsage, "usage: issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...")
+		return c.usage()
 	}
 	repo, issue, code := issueRef(c, rest, policy.CanWrite)
 	if code >= 0 {

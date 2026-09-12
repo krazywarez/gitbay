@@ -48,7 +48,7 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 	}
 	path, title, description, due := f.pos(0), f.pos(1), f.Value("--description"), f.Value("--due")
 	if path == "" || title == "" {
-		return c.fail(protocol.ExitUsage, "usage: milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]")
+		return c.usage()
 	}
 	if due != "" && !duePat.MatchString(due) {
 		return c.fail(protocol.ExitUsage, "--due must be YYYY-MM-DD")
@@ -81,7 +81,7 @@ func runMilestoneList(c *Ctx, args []string) int {
 		state = f.Value("--state")
 	}
 	if path == "" || (state != "open" && state != "closed" && state != "all") {
-		return c.fail(protocol.ExitUsage, "usage: milestone list <owner/name> [--state open|closed|all]")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
@@ -137,7 +137,7 @@ func setMilestoneState(c *Ctx, args []string, state string) int {
 		verb = "reopen"
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: milestone %s <owner/name> <title>", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanWrite)
 	if code >= 0 {
@@ -177,7 +177,7 @@ func runIssueMilestone(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: issue milestone <owner/name> <n> <title|none>")
+		return c.usage()
 	}
 	return setItemMilestone(c, repo, "issue", issue.Number, args[2], func(id int64) error {
 		return c.Store.SetIssueMilestone(issue.ID, id)
@@ -193,7 +193,7 @@ func runMRMilestone(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: mr milestone <owner/name> <n> <title|none>")
+		return c.usage()
 	}
 	return setItemMilestone(c, repo, "mr", mr.Number, args[2], func(id int64) error {
 		return c.Store.SetMRMilestone(mr.ID, id)
@@ -232,7 +232,7 @@ func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title 
 // runIssueTemplates lists .gitbay/issue-template*.md at the default branch.
 func runIssueTemplates(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: issue templates <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {

@@ -104,7 +104,7 @@ func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
 
 func runBuildList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: build list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -182,7 +182,7 @@ func repoJobs(c *Ctx, repo store.Repo) ([]ci.Job, string, int) {
 // that can read the repository's git could offer the choice.
 func runBuildJobs(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: build jobs <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
@@ -212,7 +212,7 @@ func runBuildJobs(c *Ctx, args []string) int {
 
 func runBuildTrigger(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: build trigger <owner/name> <job>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanWrite)
 	if code >= 0 {
@@ -246,7 +246,7 @@ var secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
 
 func runSecretSet(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo secret set <owner/name> <NAME> (value on stdin)")
+		return c.usage()
 	}
 	if !secretName.MatchString(args[1]) {
 		return c.fail(protocol.ExitUsage, "secret names are env-var shaped: uppercase letters, digits, _")
@@ -273,7 +273,7 @@ func runSecretSet(c *Ctx, args []string) int {
 
 func runSecretRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: repo secret remove <owner/name> <NAME>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -292,7 +292,7 @@ func runSecretRemove(c *Ctx, args []string) int {
 
 func runSecretList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo secret list <owner/name>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
 	if code >= 0 {
@@ -464,7 +464,7 @@ func runRunnerLog(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: runner log <build-id> (chunk on stdin)")
+		return c.usage()
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil {
@@ -542,7 +542,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 || (args[1] != "success" && args[1] != "failure") {
-		return c.fail(protocol.ExitUsage, "usage: runner done <build-id> success|failure")
+		return c.usage()
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil {

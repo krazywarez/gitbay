@@ -55,7 +55,7 @@ func runStatusSet(c *Ctx, args []string) int {
 		}
 	}
 	if path == "" || sha == "" || context == "" || !validStatusState[state] {
-		return c.fail(protocol.ExitUsage, "usage: status set <owner/name> <sha> --context <c> --state pending|success|failure|error")
+		return c.usage()
 	}
 	if url != "" && !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
 		return c.fail(protocol.ExitUsage, "--url must be http(s)")
@@ -86,7 +86,7 @@ func runStatusSet(c *Ctx, args []string) int {
 
 func runStatusList(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: status list <owner/name> <sha>")
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {

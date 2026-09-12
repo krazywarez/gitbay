@@ -168,7 +168,7 @@ func emitNotificationSettings(c *Ctx) int {
 
 func runNotificationsSettingsShow(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: notifications settings show")
+		return c.usage()
 	}
 	return emitNotificationSettings(c)
 }
@@ -177,7 +177,7 @@ func runNotificationsSettingsShow(c *Ctx, args []string) int {
 // inbox is filed either way, the mail half consults it (#194).
 func runNotificationsSettingsMail(c *Ctx, args []string) int {
 	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: notifications settings mail on|off")
+		return c.usage()
 	}
 	if err := c.Store.SetMailEnabled(c.User.ID, args[0] == "on"); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -190,7 +190,7 @@ func runNotificationsSettingsMail(c *Ctx, args []string) int {
 // delivered, so a grant or a revoke needs no watch row of its own (#194).
 func runNotificationsSettingsWatch(c *Ctx, args []string) int {
 	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
-		return c.fail(protocol.ExitUsage, "usage: notifications settings watch on|off")
+		return c.usage()
 	}
 	if err := c.Store.SetWatchEnabled(c.User.ID, args[0] == "on"); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
@@ -202,12 +202,11 @@ func runNotificationsSettingsWatch(c *Ctx, args []string) int {
 const noticesDefaultLimit = 50
 
 func runNotificationsList(c *Ctx, args []string) int {
-	const usage = "notifications list [--all] [--limit <n>] [--cursor <c>]"
 	rest, p, code := parsePageFlags(c, args, "notifications", true)
 	if code >= 0 {
 		return code
 	}
-	fl, err := parseFlags(rest, flagSpec{Bools: []string{"--all"}, Usage: usage})
+	fl, err := parseFlags(rest, flagSpec{Bools: []string{"--all"}, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -249,15 +248,14 @@ func runNotificationsList(c *Ctx, args []string) int {
 }
 
 func runNotificationsRead(c *Ctx, args []string) int {
-	const usage = "notifications read <id>... | --all"
-	fl, err := parseFlags(args, flagSpec{Bools: []string{"--all"}, MaxPos: -1, Usage: usage})
+	fl, err := parseFlags(args, flagSpec{Bools: []string{"--all"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	// --all and a list of ids are two ways of saying which rows: taking
 	// both would leave which one won unstated.
 	if fl.Has("--all") == (len(fl.Pos) > 0) {
-		return c.fail(protocol.ExitUsage, "usage: %s", usage)
+		return c.usage()
 	}
 	var ids []int64
 	for _, a := range fl.Pos {
@@ -285,7 +283,7 @@ func runRepoUnwatch(c *Ctx, args []string) int { return setWatch(c, args, "unwat
 // same way.
 func setWatch(c *Ctx, args []string, verb, state string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: repo %s <owner/name>", verb)
+		return c.usage()
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {

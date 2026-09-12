@@ -62,15 +62,14 @@ func orgReader(c *Ctx, name string) (store.Org, []int64, int) {
 }
 
 func runOrgLabelSet(c *Ctx, args []string) int {
-	const usage = "usage: org label set <org> <label> [--color rrggbb|'']"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: 2, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	orgName, name := f.pos(0), f.pos(1)
 	color, colorSet := strings.ToLower(f.Value("--color")), f.Has("--color")
 	if orgName == "" || name == "" {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if name == "" || len(name) > 50 {
 		return c.fail(protocol.ExitUsage, "a label is 1 to 50 characters")
@@ -118,7 +117,7 @@ func runOrgLabelSet(c *Ctx, args []string) int {
 
 func runOrgLabelList(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: org label list <org>")
+		return c.usage()
 	}
 	org, readable, code := orgReader(c, args[0])
 	if code >= 0 {
@@ -137,7 +136,7 @@ func runOrgLabelList(c *Ctx, args []string) int {
 
 func runOrgLabelRemove(c *Ctx, args []string) int {
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org label remove <org> <label>")
+		return c.usage()
 	}
 	org, code := orgAdmin(c, args[0])
 	if code >= 0 {
@@ -155,14 +154,13 @@ func runOrgLabelRemove(c *Ctx, args []string) int {
 }
 
 func runOrgMilestoneCreate(c *Ctx, args []string) int {
-	const usage = "usage: org milestone create <org> <title> [--description <d>] [--due YYYY-MM-DD]"
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2, Usage: usage})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	orgName, title, description, due := f.pos(0), f.pos(1), f.Value("--description"), f.Value("--due")
 	if orgName == "" || title == "" {
-		return c.fail(protocol.ExitUsage, usage)
+		return c.usage()
 	}
 	if due != "" && !duePat.MatchString(due) {
 		return c.fail(protocol.ExitUsage, "--due must be YYYY-MM-DD")
@@ -197,7 +195,7 @@ func runOrgMilestoneList(c *Ctx, args []string) int {
 		state = f.Value("--state")
 	}
 	if orgName == "" || (state != "open" && state != "closed" && state != "all") {
-		return c.fail(protocol.ExitUsage, "usage: org milestone list <org> [--state open|closed|all]")
+		return c.usage()
 	}
 	org, readable, code := orgReader(c, orgName)
 	if code >= 0 {
@@ -219,7 +217,7 @@ func setOrgMilestoneState(c *Ctx, args []string, state string) int {
 		verb = "reopen"
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: org milestone %s <org> <title>", verb)
+		return c.usage()
 	}
 	org, code := orgAdmin(c, args[0])
 	if code >= 0 {

@@ -143,7 +143,7 @@ func runMRThreads(c *Ctx, args []string) int {
 		return code
 	}
 	if len(args) != 2 {
-		return c.fail(protocol.ExitUsage, "usage: mr threads <owner/name> <n>")
+		return c.usage()
 	}
 	comments, err := c.Store.ListDiffComments(mr.ID, c.User.ID)
 	if err != nil {
@@ -202,7 +202,7 @@ func runMRThreads(c *Ctx, args []string) int {
 
 func setThreadResolved(c *Ctx, args []string, resolved bool) int {
 	if len(args) != 3 {
-		return c.fail(protocol.ExitUsage, "usage: mr resolve|unresolve <owner/name> <n> <thread-id>")
+		return c.usage()
 	}
 	repo, mr, code := mrRef(c, args[:2], policy.CanRead)
 	if code >= 0 {

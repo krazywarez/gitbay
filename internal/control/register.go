@@ -45,7 +45,7 @@ func init() {
 
 func runEmailList(c *Ctx, args []string) int {
 	if len(args) != 0 {
-		return c.fail(protocol.ExitUsage, "usage: email list [--json]")
+		return c.usage()
 	}
 	emails, err := c.Store.ListEmails(c.User.ID)
 	if err != nil {
@@ -89,7 +89,7 @@ func emailErr(c *Ctx, verb string, err error) int {
 
 func runEmailRemove(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: email remove <address>")
+		return c.usage()
 	}
 	if err := c.Store.RemoveEmail(c.User.ID, args[0]); err != nil {
 		return emailErr(c, "removing address", err)
@@ -101,7 +101,7 @@ func runEmailRemove(c *Ctx, args []string) int {
 
 func runEmailPrimary(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: email primary <address>")
+		return c.usage()
 	}
 	if err := c.Store.SetPrimaryEmail(c.User.ID, args[0]); err != nil {
 		return emailErr(c, "setting primary", err)
@@ -136,7 +136,7 @@ const maxEmailAddsPerHour = 5
 
 func runEmailAdd(c *Ctx, args []string) int {
 	if len(args) != 1 || !strings.Contains(args[0], "@") {
-		return c.fail(protocol.ExitUsage, "usage: email add <address>")
+		return c.usage()
 	}
 	if c.Cfg.Mail.SMTPHost == "" {
 		return c.fail(protocol.ExitFailure, "this instance has no SMTP configured; ask an admin to verify the address (gitbayd admin email verify)")
@@ -161,7 +161,7 @@ func runEmailAdd(c *Ctx, args []string) int {
 
 func runEmailVerify(c *Ctx, args []string) int {
 	if len(args) != 1 {
-		return c.fail(protocol.ExitUsage, "usage: email verify <code>")
+		return c.usage()
 	}
 	hash := store.HashToken(args[0])
 	address, err := c.Store.ConsumeEmailToken(c.User.ID, hash)

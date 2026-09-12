@@ -36,6 +36,15 @@ type Ctx struct {
 	// Source identifies the credential behind this session for the audit
 	// log: an SSH key fingerprint, or "api" for token requests.
 	Source string
+	// Cmd is the command being run, set by Dispatch, so a usage error can
+	// print the registered usage rather than a copy of it.
+	Cmd Command
+}
+
+// usage reports a bad invocation with the command's registered usage,
+// the one source of it.
+func (c *Ctx) usage() int {
+	return c.fail(protocol.ExitUsage, "usage: %s", c.Cmd.Usage)
 }
 
 type Command struct {
@@ -82,6 +91,7 @@ func Dispatch(c *Ctx, argv []string) int {
 		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
 	}
 	cmd, rest, ok := Lookup(argv)
+	c.Cmd = cmd
 	if !ok {
 		return c.fail(protocol.ExitUsage, "unknown command %q", argv[0])
 	}
