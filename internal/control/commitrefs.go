@@ -240,7 +240,7 @@ func actOnIssue(st *store.Store, source, target store.Repo, actorID int64, sha s
 			slog.Error("commit refs: closing issue", "issue", number, "err", err)
 			return
 		}
-		st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("closed by commit %s by %s: %s", link, author, subject))
+		st.AddIssueSystemComment(issue.ID, actorID, fmt.Sprintf("closed by %s in commit %s: %s", author, link, subject))
 		st.RecordEvent(target.ID, actorID, "issue.closed", fmt.Sprintf(`{"number":%d,"sha":%q}`, number, sha))
 		return
 	}

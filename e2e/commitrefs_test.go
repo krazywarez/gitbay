@@ -41,7 +41,7 @@ func TestCommitMessageIssueActions(t *testing.T) {
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
 
 	out, _, _ := inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "1", "--json")
-	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") {
+	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by ") {
 		t.Fatalf("issue 1 not closed by commit: %s", out)
 	}
 	// The entry is a system message with a linked sha, not a user comment.
@@ -86,15 +86,15 @@ func TestCommitMessageIssueActions(t *testing.T) {
 		t.Fatalf("merge: %s", errOut)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "3", "--json")
-	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") {
+	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by ") {
 		t.Fatalf("merge did not close issue 3: %s", out)
 	}
 	// This one was authored by an address nobody has verified, so it names
 	// git's author without inventing a profile link for them.
-	if !strings.Contains(out, "by t:") || strings.Contains(out, "by [t]") {
+	if !strings.Contains(out, "closed by t in commit") || strings.Contains(out, "closed by [t]") {
 		t.Fatalf("unresolved author should stay plain text: %s", out)
 	}
-	if strings.Count(out, "closed by commit") != 1 {
+	if strings.Count(out, "closed by ") != 1 {
 		t.Fatalf("duplicate close comments: %s", out)
 	}
 
@@ -126,8 +126,9 @@ func TestCommitMessageIssueActions(t *testing.T) {
 		t.Fatalf("commit-file: %s", errOut)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "2", "--json")
-	if !strings.Contains(out, `"state":"closed"`) || !strings.Contains(out, "closed by commit") ||
-		!strings.Contains(out, "by [alice](/alice): Closes #2 from the editor") {
+	if !strings.Contains(out, `"state":"closed"`) ||
+		!strings.Contains(out, "closed by [alice](/alice) in commit") ||
+		!strings.Contains(out, ": Closes #2 from the editor") {
 		t.Fatalf("commit-file did not close issue 2: %s", out)
 	}
 	if strings.Count(out, "referenced in commit") != 1 {
