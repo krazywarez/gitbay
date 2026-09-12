@@ -126,7 +126,7 @@ never included; a replayed bundle's emails arrive unverified.</p>
 <h2>On SSH only</h2>
 <p class="meta">Anything whose input is a credential stays on the command line,
 where it can be piped instead of pasted:</p>
-<pre class="message">gitbay auth token mint --name laptop   # API tokens
+<pre class="message">gitbay auth token create --name laptop # API tokens
 gitbay admin ...                       # instance administration</pre>
 <p class="meta">All of the above works from stock OpenSSH too:
 <code>ssh git@{{.Host}} auth whoami</code>.</p>
