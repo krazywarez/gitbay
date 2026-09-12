@@ -9,7 +9,7 @@ anything beyond "replace the binary and restart" is needed.
 Snippets (#195): named text files a user owns outside any repository,
 shared by URL and edited in place.
 
-- Migration 0053: =snippets= and =snippet_files=.
+- Migration 0054: =snippets= and =snippet_files=.
 - =snippet create|show|list|edit|delete= and =snippet file
   set|get|remove=. Files are UTF-8 under =limits.max_snippet_bytes=
   (1MB), at most 64 per snippet; a snippet keeps at least one.

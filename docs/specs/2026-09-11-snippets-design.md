@@ -57,7 +57,7 @@ Decisions taken on the way, with the alternatives rejected:
 
 ## Data
 
-Migration 0053, no rebuild:
+Migration 0054, no rebuild:
 
 ```sql
 CREATE TABLE snippets (
