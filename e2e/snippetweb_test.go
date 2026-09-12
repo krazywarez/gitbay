@@ -119,6 +119,14 @@ func TestSnippetsWeb(t *testing.T) {
 		t.Fatalf("new form under another owner: %d", status)
 	}
 
+	// A refused create re-renders the form with the paste kept, not a
+	// bare error page.
+	_, body = browserPost(t, alice, inst.base()+"/alice/-/snippets/new", url.Values{
+		"name": {"../x"}, "content": {"kept content\n"}})
+	if !strings.Contains(body, `class="error"`) || !strings.Contains(body, "kept content") {
+		t.Fatalf("refused create form:\n%s", body)
+	}
+
 	// The file form replaces a file and adds one; remove drops it.
 	page := inst.base() + "/alice/-/snippets/" + created
 	if status, _ := browserPost(t, alice, page+"/file", url.Values{"name": {"notes.md"}, "content": {"# changed\n"}}); status != 200 {
@@ -151,6 +159,14 @@ func TestSnippetsWeb(t *testing.T) {
 	}
 	// bob cannot write alice's snippet from the browser either.
 	bob := inst.login(t, bobKey)
+	// A logged-in stranger sees the same visibility rule as anonymous:
+	// 404 for a private snippet, 200 for an unlisted one.
+	if status, _ := browserGet(t, bob, inst.base()+"/alice/-/snippets/"+private); status != 404 {
+		t.Fatalf("stranger on a private page: %d", status)
+	}
+	if status, _ := browserGet(t, bob, inst.base()+"/alice/-/snippets/"+unlisted); status != 200 {
+		t.Fatalf("stranger on an unlisted page: %d", status)
+	}
 	if status, _ := browserPost(t, bob, inst.base()+"/alice/-/snippets/"+public+"/edit", url.Values{"description": {"x"}, "visibility": {"public"}}); status != 403 {
 		t.Fatalf("bob editing alice's snippet: %d", status)
 	}

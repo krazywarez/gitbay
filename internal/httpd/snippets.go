@@ -134,6 +134,16 @@ func (s *Server) snippetRaw(w http.ResponseWriter, r *http.Request) {
 	w.Write(f.Content)
 }
 
+type snippetNewPage struct {
+	basePage
+	Owner       string
+	Name        string
+	Description string
+	Visibility  string
+	Content     string
+	Error       string
+}
+
 // snippetNewForm is the owner's own page only: the URL names the owner
 // and a snippet cannot be created for someone else.
 func (s *Server) snippetNewForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -141,24 +151,28 @@ func (s *Server) snippetNewForm(w http.ResponseWriter, r *http.Request, u store.
 		s.notFound(w, r)
 		return
 	}
-	s.render(w, "snippetnew.html", struct {
-		basePage
-		Owner string
-	}{s.baseFor(u), u.Username})
+	s.render(w, "snippetnew.html", snippetNewPage{basePage: s.baseFor(u), Owner: u.Username})
 }
 
+// snippetNewSubmit re-renders the form with the submitted values on a
+// refusal, so a typo in the name does not throw away a pasted body.
 func (s *Server) snippetNewSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	if r.PathValue("owner") != u.Username {
 		s.notFound(w, r)
 		return
 	}
-	argv := []string{"snippet", "create", strings.TrimSpace(r.FormValue("name")),
-		"--description", strings.TrimSpace(r.FormValue("description")),
-		"--visibility", r.FormValue("visibility")}
+	name := strings.TrimSpace(r.FormValue("name"))
+	description := strings.TrimSpace(r.FormValue("description"))
+	visibility := r.FormValue("visibility")
+	content := r.FormValue("content")
+	argv := []string{"snippet", "create", name, "--description", description, "--visibility", visibility}
 	var out control.SnippetOut
-	code, msg := s.dispatchIntoStdin(u, argv, r.FormValue("content"), &out)
+	code, msg := s.dispatchIntoStdin(u, argv, content, &out)
 	if code != protocol.ExitOK {
-		http.Error(w, msg, statusForExit(code))
+		s.render(w, "snippetnew.html", snippetNewPage{
+			basePage: s.baseFor(u), Owner: u.Username,
+			Name: name, Description: description, Visibility: visibility, Content: content, Error: msg,
+		})
 		return
 	}
 	http.Redirect(w, r, "/"+u.Username+"/-/snippets/"+out.ID, http.StatusSeeOther)
