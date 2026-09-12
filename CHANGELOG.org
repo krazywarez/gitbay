@@ -4,7 +4,7 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* v1.22.0 — unreleased
+* v1.22.0 — 2026-09-12
 
 The CLI output sweep (#183). The rules are on the wiki's Users page,
 under "Output rules".
@@ -19,6 +19,8 @@ under "Output rules".
 - =status list= and =repo topics= print rows.
 - =admin runners remove=; =forget= stays as an alias until the next
   release.
+- A missing positional argument prints the hint and the usage line
+  (#215).
 
 * v1.21.0 — 2026-09-12
 
