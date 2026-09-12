@@ -49,6 +49,9 @@ func (s *Server) requireUser(h func(http.ResponseWriter, *http.Request, store.Us
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := s.viewer(r)
 		if u.ID == 0 {
+			if r.Method == http.MethodGet {
+				s.setNext(w, r.URL.RequestURI())
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -76,15 +79,16 @@ func (s *Server) checkOrigin(h http.HandlerFunc) http.HandlerFunc {
 // the page can tell a brand-new visitor how to get an account. EmailLogin
 // says whether this instance can mail a link; Sent switches the page to the
 // confirmation that follows a request.
-func (s *Server) renderLogin(w http.ResponseWriter, errMsg string, sent bool) {
+func (s *Server) renderLogin(w http.ResponseWriter, errMsg string, sent bool, next string) {
 	s.render(w, "login.html", struct {
 		basePage
 		Mode       string // closed | invite | open
 		Error      string
 		EmailLogin bool
 		Sent       bool
+		Next       string
 	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()},
-		s.cfg.Registration.Mode, errMsg, s.emailLoginEnabled(), sent})
+		s.cfg.Registration.Mode, errMsg, s.emailLoginEnabled(), sent, next})
 }
 
 // emailLoginEnabled reports whether a link can be mailed at all. There is no
@@ -111,18 +115,18 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	if err := control.RequestLoginLink(s.cfg, s.st, r.FormValue("identifier")); err != nil {
 		log.Printf("login link: %v", err)
 	}
-	s.renderLogin(w, "", true)
+	s.renderLogin(w, "", true, "")
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		s.renderLogin(w, "", false)
+		s.renderLogin(w, "", false, s.peekNext(r))
 		return
 	}
 	userID, err := s.st.ConsumeLoginToken(store.HashToken(token))
 	if err != nil {
-		s.renderLogin(w, badLoginToken, false)
+		s.renderLogin(w, badLoginToken, false, "")
 		return
 	}
 	// A token minted before the account was suspended is still consumable,
@@ -130,7 +134,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	// read. Checking here covers every mint path. The message is the one a
 	// bad token gets: a distinct one would confirm the account exists.
 	if u, err := s.st.UserByID(userID); err != nil || u.Disabled {
-		s.renderLogin(w, badLoginToken, false)
+		s.renderLogin(w, badLoginToken, false, "")
 		return
 	}
 	sessTok, sessHash, err := store.NewToken()
@@ -143,7 +147,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, s.sessionCookieFor(sessTok))
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	dest := s.takeNext(w, r)
+	if dest == "" {
+		dest = "/"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 // sessionCookieFor is the cookie a new session ships in. Secure follows TLS

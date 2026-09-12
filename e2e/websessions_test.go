@@ -84,4 +84,27 @@ func TestWebSessionsListRevoke(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "web", "sessions", "revoke", "abcdefabcdef"); code != 3 {
 		t.Fatal("unknown id accepted")
 	}
+	// An anonymous visit to a page that needs a session lands on the
+	// login page, which says where the visitor was going; the login
+	// link then returns them there.
+	anon := newBrowser(t)
+	status, body := browserGet(t, anon, inst.base()+"/settings")
+	if status != 200 || !strings.Contains(body, "continue to <code>/settings</code>") {
+		t.Fatalf("login page without the destination: %d\n%s", status, body)
+	}
+	out, _, _ := inst.ssh(t, aliceKey, "", "web", "login", "--json")
+	var env struct {
+		Data struct {
+			URL string `json:"url"`
+		} `json:"data"`
+	}
+	json.Unmarshal([]byte(out), &env)
+	link := inst.base() + env.Data.URL[strings.Index(env.Data.URL, "/login"):]
+	if status, body := browserGet(t, anon, link); status != 200 || !strings.Contains(body, "Account settings") {
+		t.Fatalf("login did not return to /settings: %d\n%s", status, body)
+	}
+	// The destination is used once.
+	if _, body := browserGet(t, anon, inst.base()+"/login"); strings.Contains(body, "continue to") {
+		t.Fatal("next survived its use")
+	}
 }

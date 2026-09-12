@@ -1,6 +1,7 @@
 {{define "title"}}login · {{.Site}}{{end}}
 {{define "content"}}
 <h1>Log in</h1>
+{{if .Next}}<p class="meta">Log in to continue to <code>{{.Next}}</code>.</p>{{end}}
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 {{if .Sent}}
 <p>If that account exists, a login link is on its way. It works once and

@@ -3,6 +3,7 @@ package httpd
 import (
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // A form action that fails redirects back to the page it came from with
@@ -41,6 +42,51 @@ func (s *Server) takeFlash(w http.ResponseWriter, r *http.Request) string {
 		return ""
 	}
 	return msg
+}
+
+const nextCookie = "gitbay_next"
+
+// setNext remembers the local path an anonymous visitor asked for, so
+// the login that follows can return there. Only a GET path is stored:
+// a POST must not be replayed.
+func (s *Server) setNext(w http.ResponseWriter, path string) {
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || len(path) > 300 {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: nextCookie, Value: url.QueryEscape(path), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Secure: s.cfg.HTTP.TLS != "off", MaxAge: 600,
+	})
+}
+
+// takeNext returns the remembered path once and clears it. Anything
+// that is not a local path comes back empty.
+func (s *Server) takeNext(w http.ResponseWriter, r *http.Request) string {
+	c, err := r.Cookie(nextCookie)
+	if err != nil || c.Value == "" {
+		return ""
+	}
+	http.SetCookie(w, s.clearCookie(nextCookie, http.SameSiteLaxMode))
+	p, err := url.QueryUnescape(c.Value)
+	if err != nil || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
+		return ""
+	}
+	return p
+}
+
+// peekNext reads the remembered path without clearing it, for the
+// login page to say where the visitor is going.
+func (s *Server) peekNext(r *http.Request) string {
+	c, err := r.Cookie(nextCookie)
+	if err != nil {
+		return ""
+	}
+	p, err := url.QueryUnescape(c.Value)
+	if err != nil || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
+		return ""
+	}
+	return p
 }
 
 // clearCookie is the expiring twin of a Set-Cookie, carrying the same
