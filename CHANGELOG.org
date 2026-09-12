@@ -4,6 +4,22 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.20.0 — unreleased
+
+Snippets (#195): named text files a user owns outside any repository,
+shared by URL and edited in place.
+
+- Migration 0053: =snippets= and =snippet_files=.
+- =snippet create|show|list|edit|delete= and =snippet file
+  set|get|remove=. Files are UTF-8 under =limits.max_snippet_bytes=
+  (1MB), at most 64 per snippet; a snippet keeps at least one.
+  Visibility =public=, =unlisted= (default) or =private=; a private
+  snippet is not found to everyone but its owner and admins.
+- Web: =/<owner>/-/snippets= lists, each snippet page renders its
+  files with a raw route per file, and the owner creates, edits and
+  deletes from the page through the same commands. The owner page
+  links to the list.
+
 * v1.19.0 — 2026-09-11
 
 Labels and milestones an org defines once for every repository under

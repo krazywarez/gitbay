@@ -601,6 +601,32 @@ instance issues its own certificates). Claims are exclusive per
 instance; unverified claims serve nothing and expire after 7 days.
 =repo domain list= reports pending/verified/expired.
 
+* Snippets
+
+A snippet is one or more named text files you own outside any
+repository, for a log or a fragment shared by URL. Create one from a
+file on stdin; the reply is the id and the URL:
+
+#+begin_src sh
+gitbay snippet create build.log --description "failing build" < build.log
+gitbay snippet file set <id> notes.txt < notes.txt   # add or replace a file
+gitbay snippet file get <id> build.log > build.log
+gitbay snippet edit <id> --visibility public
+gitbay snippet list                                  # yours
+gitbay snippet list <owner>                          # their public ones
+gitbay snippet delete <id>
+#+end_src
+
+Visibility is =public= (listed on your page), =unlisted= (anyone with
+the URL, listed nowhere; the default) or =private= (you alone; not
+found to everyone else). Files are text, valid UTF-8, each under the
+instance's =max_snippet_bytes=, at most 64 per snippet. A snippet keeps
+at least one file. There is no history: setting a file replaces it.
+
+On the web, =/<you>/-/snippets= lists yours, each snippet page renders
+its files with a raw link per file, and the same page creates, edits
+and deletes through the commands above.
+
 * Browser sessions
 
 =gitbay web login= mints a one-time URL; the session it opens lasts
