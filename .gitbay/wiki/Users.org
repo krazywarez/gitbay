@@ -656,6 +656,34 @@ someone else.
 You are never mailed about your own actions, and only verified primary
 addresses receive anything. Delivery retries on relay failure.
 
+* Output rules
+
+=--json= is the contract; the plain output is for a person at a
+terminal, and follows these rules so every noun reads the same way.
+
+- A list command prints one row per item, tab-separated, no header.
+  Columns run identifier, state, then description; a trailing column
+  may carry a word (=due 2027-01-01=, =via team=). The =gitbay= CLI pads
+  the tabs into aligned columns when stdout is a terminal and leaves
+  them as tabs when piped, so =cut -f= sees the same bytes stock ssh
+  prints. Under =--json= nothing is touched.
+- An empty list prints nothing on stdout and one line on stderr saying
+  what was empty (=no open issues in krz/gitbay=).
+- A mutation prints one line: verb, object, identifier
+  (=created krz/gitbay#7=). A second line appears only for something
+  to copy: a URL, a token shown once.
+- A bad invocation prints =usage:= and the command's registered usage,
+  the same text =help <noun>= shows. Exit 2.
+- A refusal says who may and what to do instead: =only admins of acme
+  can manage teams; ask one to add you=. Exit 4. A thing that does not
+  exist, or that you may not know exists, is exit 3.
+- stdout is the result; stderr is everything else: progress, a note
+  that output was truncated, errors.
+- Verbs: =create= and =delete= for things with their own identity
+  (repository, issue, release, team), =add= and =remove= for attaching
+  something to them (a key, a member, a label on an issue), =set= for
+  a value, =revoke= for a credential, =show= and =list= for reads.
+
 * Scripting
 
 Every read command takes =--json= and emits one envelope:
