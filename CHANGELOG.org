@@ -4,6 +4,22 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.22.0 — unreleased
+
+The CLI output sweep (#183). The rules are on the wiki's Users page,
+under "Output rules".
+
+- A bad invocation prints the command's registered usage, the one
+  source of it; the hand-written copies are gone.
+- The =gitbay= CLI pads list rows into aligned columns at a terminal
+  and leaves the tabs alone when piped.
+- An empty list prints nothing on stdout and =nothing to list= on
+  stderr.
+- Every refusal (exit 4) says what to do instead.
+- =status list= and =repo topics= print rows.
+- =admin runners remove=; =forget= stays as an alias until the next
+  release.
+
 * v1.21.0 — 2026-09-12
 
 The web UI/UX sweep (#182).
