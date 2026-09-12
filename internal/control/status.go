@@ -118,13 +118,9 @@ func runStatusList(c *Ctx, args []string) int {
 		Statuses []out  `json:"statuses"`
 	}{full, combinedOf(statuses), ds}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%.10s: %s\n", d.SHA, orNone(d.Combined))
+		fmt.Fprintf(w, "combined\t%s\t%.10s\n", orNone(d.Combined), d.SHA)
 		for _, x := range ds {
-			extra := ""
-			if x.Description != "" {
-				extra = "\t" + x.Description
-			}
-			fmt.Fprintf(w, "  %s\t%s%s\n", x.Context, x.State, extra)
+			fmt.Fprintf(w, "%s\t%s\t%s\n", x.Context, x.State, x.Description)
 		}
 	})
 }

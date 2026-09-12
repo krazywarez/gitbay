@@ -141,7 +141,7 @@ func validQuery(q string) error {
 // stay available so an archived repo can be managed and unarchived.
 func refuseArchived(c *Ctx, repo store.Repo) int {
 	if repo.Settings.Archived {
-		return c.fail(protocol.ExitDenied, "%s is archived and read-only", repo.Path())
+		return c.fail(protocol.ExitDenied, "%s is archived and read-only; unarchive it first", repo.Path())
 	}
 	return -1
 }
@@ -165,7 +165,7 @@ func resolveRepo(c *Ctx, path string, check func(store.User, store.Repo, string)
 			// Invisible repos 404, per the enumeration rule.
 			return repo, c.fail(protocol.ExitNotFound, "repository %s not found", path)
 		}
-		return repo, c.fail(protocol.ExitDenied, "permission denied on %s", path)
+		return repo, c.fail(protocol.ExitDenied, "permission denied on %s; ask its owner for access", path)
 	}
 	return repo, -1
 }
@@ -846,7 +846,9 @@ func editTopics(c *Ctx, args []string, add bool) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(now, func(w io.Writer) {
-		fmt.Fprintf(w, "topics on %s: %s\n", repo.Path(), strings.Join(now, ", "))
+		for _, t := range now {
+			fmt.Fprintln(w, t)
+		}
 	})
 }
 
