@@ -1054,7 +1054,7 @@ func runMRMerge(c *Ctx, args []string) int {
 	case "ff":
 		if !ffPossible {
 			return c.fail(protocol.ExitUsage,
-				"fast-forward not possible: %s has diverged from the MR head; use --strategy merge or rebase and re-push", mr.TargetRef)
+				"fast-forward not possible: %s has diverged from the MR head; merge with the merge strategy, or rebase and push again", mr.TargetRef)
 		}
 		newSHA = headSHA
 
@@ -1129,7 +1129,7 @@ func runMRMerge(c *Ctx, args []string) int {
 			}
 			if len(parents) > 1 {
 				return c.fail(protocol.ExitUsage,
-					"the MR contains merge commit %.10s; a rebase merge needs linear history — use --strategy merge or squash", sha)
+					"the MR contains merge commit %.10s; a rebase merge needs linear history — choose the merge or squash strategy", sha)
 			}
 			base := onto // root commit: replay against the new tip itself
 			if len(parents) == 1 {
@@ -1175,7 +1175,7 @@ func runMRMerge(c *Ctx, args []string) int {
 			nums = append(nums, fmt.Sprintf("!%d", k.Number))
 		}
 		return c.fail(protocol.ExitUsage,
-			"%s is stacked on by %s; a %s merge rewrites the commits they build on. Merge with --strategy ff or merge, or merge the stack into %s first",
+			"%s is stacked on by %s; a %s merge rewrites the commits they build on. Merge with the fast-forward or merge strategy, or merge the stack into %s first",
 			fmt.Sprintf("!%d", mr.Number), strings.Join(nums, ", "), strategy, mr.SourceRef)
 	}
 
