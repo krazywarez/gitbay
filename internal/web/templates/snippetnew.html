@@ -1,0 +1,11 @@
+{{define "title"}}new snippet · {{.Owner}}{{end}}
+{{define "content"}}
+<h1>New snippet</h1>
+<form method="post" action="/{{.Owner}}/-/snippets/new" class="commentform">
+<p><input type="text" name="name" aria-label="File name" placeholder="filename" required></p>
+<p><input type="text" name="description" aria-label="Description" placeholder="description"></p>
+<p><select name="visibility" aria-label="Visibility"><option value="unlisted">unlisted</option><option value="public">public</option><option value="private">private</option></select></p>
+<p><textarea name="content" aria-label="Content" rows="16" required></textarea></p>
+<p><button type="submit">Create snippet</button></p>
+</form>
+{{end}}

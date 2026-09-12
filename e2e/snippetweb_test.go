@@ -93,6 +93,71 @@ func TestSnippetsWeb(t *testing.T) {
 		t.Fatalf("bob's page shows a snippets link with nothing to list: %d", status)
 	}
 
-	_ = url.Values{}
-	_ = bobKey
+	// The create form makes a snippet through snippet create.
+	status, body = browserPost(t, alice, inst.base()+"/alice/-/snippets/new", url.Values{
+		"name": {"notes.md"}, "description": {"from the browser"}, "visibility": {"public"}, "content": {"# notes\n"}})
+	if status != 200 || !strings.Contains(body, "from the browser") || !strings.Contains(body, "notes.md") {
+		t.Fatalf("create form: %d\n%s", status, body)
+	}
+	var listed struct {
+		Data []struct {
+			ID          string `json:"id"`
+			Description string `json:"description"`
+		} `json:"data"`
+	}
+	json.Unmarshal([]byte(must(aliceKey, "", "snippet", "list", "--json")), &listed)
+	created := ""
+	for _, sn := range listed.Data {
+		if sn.Description == "from the browser" {
+			created = sn.ID
+		}
+	}
+	if created == "" {
+		t.Fatalf("created from the web, not listed: %+v", listed.Data)
+	}
+	if status, _ := browserGet(t, alice, inst.base()+"/bob/-/snippets/new"); status != 404 {
+		t.Fatalf("new form under another owner: %d", status)
+	}
+
+	// The file form replaces a file and adds one; remove drops it.
+	page := inst.base() + "/alice/-/snippets/" + created
+	if status, _ := browserPost(t, alice, page+"/file", url.Values{"name": {"notes.md"}, "content": {"# changed\n"}}); status != 200 {
+		t.Fatal("file replace failed")
+	}
+	if got := must(aliceKey, "", "snippet", "file", "get", created, "notes.md"); got != "# changed\n" {
+		t.Fatalf("after web replace: %q", got)
+	}
+	if status, _ := browserPost(t, alice, page+"/file", url.Values{"name": {"b.txt"}, "content": {"b\n"}}); status != 200 {
+		t.Fatal("file add failed")
+	}
+	if status, _ := browserPost(t, alice, page+"/file/remove", url.Values{"name": {"b.txt"}}); status != 200 {
+		t.Fatal("file remove failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "file", "get", created, "b.txt"); code != 3 {
+		t.Fatalf("b.txt after web remove: exit %d", code)
+	}
+	// A refusal comes back on the page as a message, not a bare error.
+	_, body = browserPost(t, alice, page+"/file/remove", url.Values{"name": {"notes.md"}})
+	if !strings.Contains(body, `class="error"`) || !strings.Contains(body, "at least one file") {
+		t.Fatalf("last-file refusal on the page:\n%s", body)
+	}
+
+	// Edit changes visibility; delete removes.
+	if status, _ := browserPost(t, alice, page+"/edit", url.Values{"description": {"renamed"}, "visibility": {"private"}}); status != 200 {
+		t.Fatal("edit failed")
+	}
+	if status, _ := inst.get(t, "/alice/-/snippets/"+created); status != 404 {
+		t.Fatalf("private after web edit, anonymous: %d", status)
+	}
+	// bob cannot write alice's snippet from the browser either.
+	bob := inst.login(t, bobKey)
+	if status, _ := browserPost(t, bob, inst.base()+"/alice/-/snippets/"+public+"/edit", url.Values{"description": {"x"}, "visibility": {"public"}}); status != 403 {
+		t.Fatalf("bob editing alice's snippet: %d", status)
+	}
+	if status, _ := browserPost(t, alice, page+"/delete", nil); status != 200 {
+		t.Fatal("delete failed")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "show", created); code != 3 {
+		t.Fatalf("after web delete: exit %d", code)
+	}
 }

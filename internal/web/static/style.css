@@ -1499,6 +1499,7 @@ table.tree td.name.dir a { color: var(--accent); }
 p.clone { margin: 0 0 var(--sp-3); }
 p.filefacts { color: var(--muted); font-size: var(--fs-1); margin: 0 0 var(--sp-3); }
 .pathbar .actions { font-size: var(--fs-1); color: var(--muted); }
+.snippetfile { margin-bottom: 1.5rem }
 
 /* merge request: a two-column split, so state has somewhere to live that
    is not a run-on sentence under the title */

@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"html/template"
 	"net/http"
+	"strings"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/policy"
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -112,4 +115,85 @@ func (s *Server) snippetRaw(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(f.Content)
+}
+
+// snippetNewForm is the owner's own page only: the URL names the owner
+// and a snippet cannot be created for someone else.
+func (s *Server) snippetNewForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	if r.PathValue("owner") != u.Username {
+		s.notFound(w, r)
+		return
+	}
+	s.render(w, "snippetnew.html", struct {
+		basePage
+		Owner string
+	}{s.baseFor(u), u.Username})
+}
+
+func (s *Server) snippetNewSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	if r.PathValue("owner") != u.Username {
+		s.notFound(w, r)
+		return
+	}
+	argv := []string{"snippet", "create", strings.TrimSpace(r.FormValue("name")),
+		"--description", strings.TrimSpace(r.FormValue("description")),
+		"--visibility", r.FormValue("visibility")}
+	var out control.SnippetOut
+	code, msg := s.dispatchIntoStdin(u, argv, r.FormValue("content"), &out)
+	if code != protocol.ExitOK {
+		http.Error(w, msg, statusForExit(code))
+		return
+	}
+	http.Redirect(w, r, "/"+u.Username+"/-/snippets/"+out.ID, http.StatusSeeOther)
+}
+
+// snippetAction runs a write on the snippet in the URL and returns to
+// its page with the message, or to the list after a delete. A snippet
+// the viewer may not read is the 404 page, as on every read.
+func (s *Server) snippetAction(w http.ResponseWriter, r *http.Request, u store.User, argv []string, stdin string, dest string) {
+	sn, _, ok := s.snippetScope(w, r)
+	if !ok {
+		return
+	}
+	if dest == "" {
+		dest = "/" + sn.OwnerName + "/-/snippets/" + sn.PublicID
+	}
+	back := func(w http.ResponseWriter, r *http.Request, msg string) {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+	}
+	var msg string
+	var code int
+	if stdin == "" {
+		_, msg, code = s.runControlCode(u, argv)
+	} else {
+		msg, code = s.runControlStdinCode(u, argv, stdin)
+	}
+	if code == protocol.ExitDenied {
+		http.Error(w, msg, http.StatusForbidden)
+		return
+	}
+	s.done(w, r, code, msg, back)
+}
+
+func (s *Server) snippetEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.snippetAction(w, r, u, []string{"snippet", "edit", r.PathValue("id"),
+		"--description", strings.TrimSpace(r.FormValue("description")),
+		"--visibility", r.FormValue("visibility")}, "", "")
+}
+
+func (s *Server) snippetDeleteSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.snippetAction(w, r, u, []string{"snippet", "delete", r.PathValue("id")}, "",
+		"/"+r.PathValue("owner")+"/-/snippets")
+}
+
+// An empty textarea reaches the command as empty stdin, which it refuses;
+// the message lands on the page like any other.
+func (s *Server) snippetFileSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.snippetAction(w, r, u, []string{"snippet", "file", "set", r.PathValue("id"), strings.TrimSpace(r.FormValue("name"))},
+		r.FormValue("content"), "")
+}
+
+func (s *Server) snippetFileRemoveSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.snippetAction(w, r, u, []string{"snippet", "file", "remove", r.PathValue("id"), strings.TrimSpace(r.FormValue("name"))}, "", "")
 }

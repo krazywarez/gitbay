@@ -13,6 +13,39 @@
 </div>
 <p class="filefacts">{{.Lines}} lines · {{.Size}} bytes</p>
 <div class="code">{{.HTML}}</div>
+{{if $.CanWrite}}<details class="editbox"><summary>edit {{.Name}}</summary>
+<form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file" class="commentform">
+<input type="hidden" name="name" value="{{.Name}}">
+<p><textarea name="content" aria-label="Content of {{.Name}}" rows="12">{{.Content}}</textarea></p>
+<p><button type="submit">Save</button></p>
+</form>
+<form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file/remove">
+<input type="hidden" name="name" value="{{.Name}}">
+<p><button type="submit">Remove {{.Name}}</button></p>
+</form>
+</details>{{end}}
 </section>
+{{end}}
+{{if .CanWrite}}
+<details class="editbox"><summary>add a file</summary>
+<form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/file" class="commentform">
+<p><input type="text" name="name" aria-label="File name" placeholder="filename" required></p>
+<p><textarea name="content" aria-label="Content" rows="12" required></textarea></p>
+<p><button type="submit">Add file</button></p>
+</form></details>
+<details class="editbox"><summary>settings</summary>
+<form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/edit">
+<p><input type="text" name="description" aria-label="Description" value="{{.Snippet.Description}}" placeholder="description"></p>
+<p><select name="visibility" aria-label="Visibility">
+<option value="public"{{if eq .Snippet.Visibility "public"}} selected{{end}}>public</option>
+<option value="unlisted"{{if eq .Snippet.Visibility "unlisted"}} selected{{end}}>unlisted</option>
+<option value="private"{{if eq .Snippet.Visibility "private"}} selected{{end}}>private</option>
+</select></p>
+<p><button type="submit">Save</button></p>
+</form>
+<form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/delete">
+<p><button type="submit">Delete snippet</button></p>
+</form>
+</details>
 {{end}}
 {{end}}
