@@ -72,7 +72,7 @@ func TestSnippetsWeb(t *testing.T) {
 	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/plain") || resp.Header.Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("raw headers: %d %v", resp.StatusCode, resp.Header)
 	}
-	if status, _ := inst.get(t, "/alice/-/snippets/" + public + "/raw/other.go"); status != 404 {
+	if status, _ := inst.get(t, "/alice/-/snippets/"+public+"/raw/other.go"); status != 404 {
 		t.Fatalf("raw for a missing file: %d", status)
 	}
 
