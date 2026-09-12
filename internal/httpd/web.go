@@ -243,17 +243,20 @@ type repoPage struct {
 	Repo     store.Repo
 	Ref      string
 	CloneURL string
-	Dir      string
-	Tab      string // active tab in the repo header
-	Topics   []string
-	Pinned   bool   // by the viewer
-	Marked   bool   // bookmarked by the viewer
-	Watch    string // the viewer's watch state: watching, muted, or ""
-	HasWiki  bool
-	Host     string
-	Mirrors  []mirrorLine // repo admins only
-	CanAdmin bool         // gates the settings tab
-	Feed     string       // Atom feed for this page, if it has one
+	// SSHCloneURL is the same repository over the SSH transport, which is
+	// the one a push needs.
+	SSHCloneURL string
+	Dir         string
+	Tab         string // active tab in the repo header
+	Topics      []string
+	Pinned      bool   // by the viewer
+	Marked      bool   // bookmarked by the viewer
+	Watch       string // the viewer's watch state: watching, muted, or ""
+	HasWiki     bool
+	Host        string
+	Mirrors     []mirrorLine // repo admins only
+	CanAdmin    bool         // gates the settings tab
+	Feed        string       // Atom feed for this page, if it has one
 	// OpenIssues and OpenMRs are the counts on the header tabs.
 	OpenIssues int
 	OpenMRs    int
@@ -331,22 +334,23 @@ func (s *Server) repoFor(w http.ResponseWriter, r *http.Request, ref string) (re
 	}
 	openIssues, openMRs := s.st.OpenCounts(repo.ID)
 	return repoPage{
-		basePage:   s.baseFor(viewer),
-		CanAdmin:   canAdmin,
-		Mirrors:    mirrors,
-		Pinned:     pinned,
-		Marked:     marked,
-		Watch:      watch,
-		HasWiki:    s.hasWiki(repo),
-		Host:       s.cfg.SiteHost(),
-		Desc:       gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
-		Repo:       repo,
-		Ref:        ref,
-		CloneURL:   s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
-		Dir:        control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name),
-		Topics:     topics,
-		OpenIssues: openIssues,
-		OpenMRs:    openMRs,
+		basePage:    s.baseFor(viewer),
+		CanAdmin:    canAdmin,
+		Mirrors:     mirrors,
+		Pinned:      pinned,
+		Marked:      marked,
+		Watch:       watch,
+		HasWiki:     s.hasWiki(repo),
+		Host:        s.cfg.SiteHost(),
+		Desc:        gitutil.ReadDescription(control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)),
+		Repo:        repo,
+		Ref:         ref,
+		CloneURL:    s.cfg.Server.SiteURL + "/" + repo.Path() + ".git",
+		SSHCloneURL: s.sshCloneURL(repo),
+		Dir:         control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name),
+		Topics:      topics,
+		OpenIssues:  openIssues,
+		OpenMRs:     openMRs,
 	}, true
 }
 
@@ -1951,9 +1955,26 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		StackedOn       *store.MR
 		Stacked         []store.MR
 		Gates           *control.GatesOut
+		SourceGone      bool
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates})
+		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates,
+		sourceGone(p, m)})
+}
+
+// sourceGone reports whether an MR's source branch no longer exists: the
+// push hook marks a deleted branch on an open MR, and a merged or closed
+// one is checked here. A fork's branch lives in another repository and
+// is left to the recorded state.
+func sourceGone(p repoPage, m store.MR) bool {
+	if m.State == "source_gone" {
+		return true
+	}
+	if m.SourceRepoID != p.Repo.ID {
+		return false
+	}
+	_, err := gitutil.ResolveRef(p.Dir, "refs/heads/"+m.SourceRef)
+	return err != nil
 }
 
 func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
@@ -2006,4 +2027,14 @@ func policyCanRead(u store.User, repo store.Repo, grant string) bool {
 type reviewRow struct {
 	store.MRReview
 	Counts bool
+}
+
+// sshCloneURL is the SSH clone URL for a repository, with the port only
+// when it is not the default.
+func (s *Server) sshCloneURL(repo store.Repo) string {
+	host := s.cfg.SiteHost()
+	if s.cfg.SSH.Port != 22 {
+		host += ":" + strconv.Itoa(s.cfg.SSH.Port)
+	}
+	return "ssh://git@" + host + "/" + repo.Path() + ".git"
 }

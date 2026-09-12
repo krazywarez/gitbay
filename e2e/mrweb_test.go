@@ -155,6 +155,13 @@ func TestMRWebReviewLoop(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "feature.txt")); err != nil {
 		t.Fatal("merged content missing from main")
 	}
+	// A merged MR shows its merged head, and marks a source branch that
+	// no longer exists.
+	mustGit(t, bobDir, bobEnv, "push", "-q", "origin", "--delete", "feature")
+	_, body = browserGet(t, alice, mrURL)
+	if !strings.Contains(body, "merged at") || !strings.Contains(body, "branch deleted") {
+		t.Fatalf("merged MR sidebar after the branch was deleted:\n%s", body)
+	}
 
 	// Readers get no controls, and a forged POST is refused by the command.
 	_, anon := browserGet(t, newBrowser(t), mrURL)

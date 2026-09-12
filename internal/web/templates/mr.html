@@ -162,7 +162,7 @@
   <div class="grp">
     <h2>Source</h2>
     <p class="row"><code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code></p>
-    <p class="row none">into <code>{{.MR.TargetRef}}</code> at <code>{{short .MR.HeadSHA}}</code></p>
+    <p class="row none">into <code>{{.MR.TargetRef}}</code> · {{if eq .MR.State "merged"}}merged at{{else}}head{{end}} <code>{{short .MR.HeadSHA}}</code>{{if .SourceGone}} · <span class="chip chip-neutral">branch deleted</span>{{end}}</p>
   </div>
   {{if .MR.Milestone}}<div class="grp">
     <h2>Milestone</h2>

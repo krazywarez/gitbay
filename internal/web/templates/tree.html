@@ -10,7 +10,7 @@
   <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">History</a>
   <a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/archive/{{.Ref}}.tar.gz">Download</a>
 </div>
-{{if .Entries}}<p class="clone">Clone: <code>git clone {{.CloneURL}}</code></p>{{end}}
+{{if .Entries}}<p class="clone">Clone: <code>git clone {{.SSHCloneURL}}</code> · <code>git clone {{.CloneURL}}</code></p>{{end}}
 {{if .Facts.Commits}}{{$r := printf "/%s/%s" .Repo.OwnerName .Repo.Name}}<div class="facts">
   <p class="counts">
     <a href="{{$r}}/log/{{.Ref}}"><strong>{{.Facts.Commits}}</strong> commit{{if ne .Facts.Commits 1}}s{{end}}</a>

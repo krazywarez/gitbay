@@ -33,6 +33,7 @@ type mrPageData struct {
 	Notice          string
 	DetachedThreads []diffThread
 	Gates           *control.GatesOut
+	SourceGone      bool
 }
 
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
