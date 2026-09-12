@@ -639,6 +639,7 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 	}
 	var freeTags []string
 	if tags, err := gitutil.Refs(p.Dir, "tags"); err == nil {
+		gitutil.SortVersions(tags)
 		for _, tg := range tags {
 			if !released[tg.Name] {
 				freeTags = append(freeTags, tg.Name)
@@ -1963,6 +1964,7 @@ func (s *Server) refs(w http.ResponseWriter, r *http.Request) {
 	p.Tab = "refs"
 	branches, _ := gitutil.Refs(p.Dir, "heads")
 	tags, _ := gitutil.Refs(p.Dir, "tags")
+	gitutil.SortVersions(tags)
 	s.render(w, "refs.html", struct {
 		repoPage
 		Branches, Tags []gitutil.Ref
