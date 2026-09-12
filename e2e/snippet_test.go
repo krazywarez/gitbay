@@ -10,7 +10,7 @@ import (
 // Snippets over SSH: create from stdin, read back, list by visibility,
 // edit files and metadata, and the not-found rule for private ones.
 func TestSnippets(t *testing.T) {
-	inst := startInstance(t)
+	inst := startInstanceWith(t, "[limits]\nmax_snippets_per_user = 3\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
@@ -60,6 +60,11 @@ func TestSnippets(t *testing.T) {
 	}
 	public := idOf(must(aliceKey, "pub\n", "snippet", "create", "a.txt", "--visibility", "public", "--json"))
 	private := idOf(must(aliceKey, "sec\n", "snippet", "create", "b.txt", "--visibility", "private", "--json"))
+
+	// The per-account cap: three snippets exist, a fourth is refused.
+	if msg := fails(aliceKey, "x\n", 2, "snippet", "create", "c.txt"); !strings.Contains(msg, "snippet limit reached") {
+		t.Fatalf("cap refusal: %s", msg)
+	}
 
 	// Refusals on create: empty, not text, over the limit, bad name.
 	fails(aliceKey, "", 2, "snippet", "create", "x.txt")

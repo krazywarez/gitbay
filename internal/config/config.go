@@ -177,6 +177,9 @@ type Limits struct {
 	MaxBlobBytes    int64 `toml:"max_blob_bytes"`
 	MaxAssetBytes   int64 `toml:"max_asset_bytes"`   // per release asset
 	MaxSnippetBytes int64 `toml:"max_snippet_bytes"` // per snippet file
+	// MaxSnippetsPerUser caps snippets an account may own. 0 means
+	// unlimited, like MaxReposPerUser.
+	MaxSnippetsPerUser int `toml:"max_snippets_per_user"`
 	CloneTimeoutSec int   `toml:"clone_timeout"`
 	SSHAuthRate     int   `toml:"ssh_auth_rate"`
 	// APIRate is sustained JSON-API requests per minute per caller; writes

@@ -327,8 +327,8 @@ func runProfileShow(c *Ctx, args []string) int {
 	}
 
 	if kind == "user" {
-		all := id == c.User.ID || c.User.IsAdmin
-		if d.Snippets, err = c.Store.CountSnippets(id, all); err != nil {
+		seeAll := id == c.User.ID || c.User.IsAdmin
+		if d.Snippets, err = c.Store.CountSnippets(id, seeAll); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}

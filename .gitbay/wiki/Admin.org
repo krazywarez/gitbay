@@ -115,6 +115,7 @@ default, is right when gitbayd terminates TLS itself.
 - =max_blob_bytes= (100MB) — cap on raw file serving over the web.
 - =max_asset_bytes= (512MB) — cap per uploaded release asset.
 - =max_snippet_bytes= (1MB) — cap per snippet file.
+- =max_snippets_per_user= (0, unlimited) — snippets an account may own.
 - =max_repos_per_user= (0, unlimited) — repositories an account may own
   directly; =repo create=, =fork= and =import= refuse past it.
   Organizations are not capped.

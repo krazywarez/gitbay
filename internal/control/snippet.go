@@ -151,6 +151,15 @@ func runSnippetCreate(c *Ctx, args []string) int {
 	if !validSnippetVisibility(visibility) {
 		return c.fail(protocol.ExitUsage, "visibility is public, unlisted or private")
 	}
+	if limit := c.Cfg.Limits.MaxSnippetsPerUser; limit > 0 {
+		n, err := c.Store.CountSnippets(c.User.ID, true)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if n >= limit {
+			return c.fail(protocol.ExitUsage, "snippet limit reached (%d); delete one first", limit)
+		}
+	}
 	data, code := readSnippetBody(c)
 	if code >= 0 {
 		return code

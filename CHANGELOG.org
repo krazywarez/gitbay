@@ -13,8 +13,10 @@ shared by URL and edited in place.
 - =snippet create|show|list|edit|delete= and =snippet file
   set|get|remove=. Files are UTF-8 under =limits.max_snippet_bytes=
   (1MB), at most 64 per snippet; a snippet keeps at least one.
-  Visibility =public=, =unlisted= (default) or =private=; a private
-  snippet is not found to everyone but its owner and admins.
+  =limits.max_snippets_per_user= (0, unlimited) caps how many an
+  account may own, admins included. Visibility =public=, =unlisted=
+  (default) or =private=; a private snippet is not found to everyone
+  but its owner and admins.
 - Web: =/<owner>/-/snippets= lists, each snippet page renders its
   files with a raw route per file, and the owner creates, edits and
   deletes from the page through the same commands. The owner page

@@ -94,6 +94,9 @@ Limits:
   1 MiB. Enforced on create and `file set` with the same
   `io.LimitReader(n+1)` shape as `release asset add`.
 - 64 files per snippet, a constant in `internal/control/snippet.go`.
+- `limits.max_snippets_per_user`, default unlimited, like
+  `max_repos_per_user`. Enforced on `snippet create`; admins are not
+  exempt.
 - Snippet bytes do not count toward `max_bytes_per_user`; that quota
   measures repositories and LFS.
 

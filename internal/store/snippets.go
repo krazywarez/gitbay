@@ -154,7 +154,9 @@ func (s *Store) ListSnippets(ownerID int64, all bool, limit int, afterID int64) 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// One query per row for the names; pages are at most 200 rows.
+	// One query per row for the names. Command callers page at 200 rows
+	// or fewer; the web list page is uncapped, which the per-account
+	// snippet limit bounds.
 	for i := range out {
 		if out[i].Files, err = s.snippetFileNames(out[i].ID); err != nil {
 			return nil, err
