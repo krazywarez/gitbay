@@ -667,8 +667,8 @@ terminal, and follows these rules so every noun reads the same way.
   the tabs into aligned columns when stdout is a terminal and leaves
   them as tabs when piped, so =cut -f= sees the same bytes stock ssh
   prints. Under =--json= nothing is touched.
-- An empty list prints nothing on stdout and one line on stderr saying
-  what was empty (=no open issues in krz/gitbay=).
+- An empty list prints nothing on stdout and =nothing to list= on
+  stderr.
 - A mutation prints one line: verb, object, identifier
   (=created krz/gitbay#7=). A second line appears only for something
   to copy: a URL, a token shown once.

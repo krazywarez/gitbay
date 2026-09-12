@@ -109,23 +109,23 @@ func Dispatch(c *Ctx, argv []string) int {
 	// A runner-scoped key reaches the runner protocol and nothing else, so
 	// the key a CI host holds cannot administer the instance.
 	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {
-		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands", c.Scope)
+		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands; use a key added with --scope full", c.Scope)
 	}
 	if c.ViaAPI && cmd.SSHOnly {
 		return c.fail(protocol.ExitDenied, "%s is only available over SSH", joinPath(cmd.Path))
 	}
 	if c.ReadOnly && !cmd.ReadOnly {
-		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state", joinPath(cmd.Path))
+		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state — mint one with --scope full", joinPath(cmd.Path))
 	}
 	// The SSH listener refuses a disabled account before it gets here; the
 	// API and the web reach Dispatch directly, so the check lives here too.
 	if c.User.Disabled {
-		return c.fail(protocol.ExitDenied, "this account is disabled")
+		return c.fail(protocol.ExitDenied, "this account is disabled; ask an instance admin to enable it")
 	}
 	// The admin noun is gated here as well as in each handler, so a new
 	// admin command that forgets requireInstanceAdmin is still refused.
 	if cmd.Path[0] == "admin" && !c.User.IsAdmin {
-		return c.fail(protocol.ExitDenied, "admin commands are for instance admins")
+		return c.fail(protocol.ExitDenied, "admin commands are for instance admins; ask one")
 	}
 	if c.User.Pending && !pendingAllowed(cmd.Path) {
 		return c.fail(protocol.ExitDenied,
@@ -218,8 +218,15 @@ func (emptyReader) Read([]byte) (int, error) { return 0, io.EOF }
 // otherwise via the plain formatter.
 func (c *Ctx) emit(data any, plain func(w io.Writer)) int {
 	// A nil slice would serialize as null; consumers should see [].
-	if v := reflect.ValueOf(data); v.Kind() == reflect.Slice && v.IsNil() {
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Slice && v.IsNil() {
 		data = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	}
+	// An empty list prints nothing a script would read; the person at
+	// the terminal hears about it on stderr.
+	if !c.JSON && v.Kind() == reflect.Slice && v.Len() == 0 {
+		fmt.Fprintln(c.Stderr, "nothing to list")
+		return protocol.ExitOK
 	}
 	if c.JSON {
 		enc := json.NewEncoder(c.Stdout)
