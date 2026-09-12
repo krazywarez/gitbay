@@ -180,8 +180,8 @@ type Limits struct {
 	// MaxSnippetsPerUser caps snippets an account may own. 0 means
 	// unlimited, like MaxReposPerUser.
 	MaxSnippetsPerUser int `toml:"max_snippets_per_user"`
-	CloneTimeoutSec int   `toml:"clone_timeout"`
-	SSHAuthRate     int   `toml:"ssh_auth_rate"`
+	CloneTimeoutSec    int `toml:"clone_timeout"`
+	SSHAuthRate        int `toml:"ssh_auth_rate"`
 	// APIRate is sustained JSON-API requests per minute per caller; writes
 	// draw on a tenth of it. 0 uses the default.
 	APIRate int `toml:"api_rate"`
@@ -277,8 +277,8 @@ func (c Config) Validate() error {
 			errs = append(errs, fmt.Errorf("registration.pending_expiry %q must be a positive duration such as 168h", c.Registration.PendingExpiry))
 		}
 	}
-	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 {
-		errs = append(errs, errors.New("limits.max_repos_per_user and max_bytes_per_user must not be negative"))
+	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 {
+		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user and max_snippets_per_user must not be negative"))
 	}
 	if c.SSH.Port < 1 || c.SSH.Port > 65535 {
 		errs = append(errs, fmt.Errorf("ssh.port %d out of range", c.SSH.Port))

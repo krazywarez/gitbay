@@ -80,6 +80,16 @@ func TestContradictions(t *testing.T) {
 			"[server]\nroot = \"/var/lib/gitbay\"\n",
 			"site_url",
 		},
+		{
+			"negative repo limit",
+			minimal + "\n[limits]\nmax_repos_per_user = -1\n",
+			"must not be negative",
+		},
+		{
+			"negative snippet limit",
+			minimal + "\n[limits]\nmax_snippets_per_user = -1\n",
+			"max_snippets_per_user",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
