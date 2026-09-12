@@ -4,6 +4,14 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.20.1 — 2026-09-11
+
+One config check.
+
+- A negative =limits.max_snippets_per_user= is refused at config load,
+  as =max_repos_per_user= and =max_bytes_per_user= already were; it
+  used to pass validation and read as unlimited (#214).
+
 * v1.20.0 — 2026-09-11
 
 Snippets (#195): named text files a user owns outside any repository,
