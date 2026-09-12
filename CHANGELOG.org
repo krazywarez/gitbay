@@ -4,6 +4,31 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.21.0 — unreleased
+
+The web UI/UX sweep (#182).
+
+- Destructive controls ask for the object's name typed beside the
+  button: release delete, snippet delete and file remove, team delete,
+  label remove, and SSH key, email and PGP key removal. Reversible
+  controls keep a plain button.
+- Login returns to the page that asked for it, and says so.
+- One timestamp format everywhere, =2006-01-02 15:04 UTC=.
+- Tags on the refs page and in the release form are in version order,
+  newest first.
+- The file editor explains up front when signed commits or
+  merge-requests-only protection would refuse the commit, answers 404
+  for a branch that does not exist, and says when a path is new.
+- Merge refusals name the strategy rather than the flag; an issue
+  closed by a commit reads "closed by <who> in commit <sha>".
+- Repository settings: every Save names its field. Labels: the colour
+  column appears only when it means something. Sidebars use one shape
+  for empty. List rows show the state only under "all" and say "in
+  <milestone>". Global search counts its results. A merged MR shows
+  its merged head and a deleted source branch. The repository home
+  shows the SSH clone URL beside HTTPS. The settings page names
+  =auth token create=.
+
 * v1.20.1 — 2026-09-11
 
 One config check.
