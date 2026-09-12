@@ -9,13 +9,13 @@
   <input type="hidden" name="field" value="description">
   <label for="description">Description</label>
   <input type="text" id="description" name="description" value="{{.Desc}}" placeholder="one line, shown in listings">
-  <button type="submit">Save</button>
+  <button type="submit">Save description</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="website">
   <label for="website">Website</label>
   <input type="text" id="website" name="website" value="{{.Repo.Settings.Website}}" placeholder="https://example.org">
-  <button type="submit">Save</button>
+  <button type="submit">Save website</button>
 </form>
 {{if .Branches}}<form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="default-branch">
@@ -23,7 +23,7 @@
   <select id="default-branch" name="default-branch">
     {{$cur := .Repo.DefaultBranch}}{{range .Branches}}<option value="{{.Name}}"{{if eq .Name $cur}} selected{{end}}>{{.Name}}</option>{{end}}
   </select>
-  <button type="submit">Save</button>
+  <button type="submit">Save default branch</button>
 </form>
 {{end}}<form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="topics">
@@ -43,13 +43,13 @@
     <option value="public"{{if eq .Repo.Visibility "public"}} selected{{end}}>Public</option>
     <option value="private"{{if eq .Repo.Visibility "private"}} selected{{end}}>Private</option>
   </select>
-  <button type="submit">Save</button>
+  <button type="submit">Save visibility</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="git-daemon">
   <label for="git-daemon">Serve over git://</label>
   <input type="checkbox" id="git-daemon" name="git-daemon" value="on"{{if .Repo.Settings.GitDaemon}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save git://</button>
 </form>
 
 <h2>Merge gates</h2>
@@ -58,31 +58,31 @@
   <input type="hidden" name="field" value="require-checks">
   <label for="require-checks">Require green checks</label>
   <input type="checkbox" id="require-checks" name="require-checks" value="on"{{if .Repo.Settings.RequireChecks}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save checks</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-approvals">
   <label for="approvals">Required approvals</label>
   <input type="number" id="approvals" name="approvals" min="0" max="10" value="{{.Repo.Settings.RequireApprovals}}">
-  <button type="submit">Save</button>
+  <button type="submit">Save approvals</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-resolved">
   <label for="require-resolved">Require resolved threads</label>
   <input type="checkbox" id="require-resolved" name="require-resolved" value="on"{{if .Repo.Settings.RequireResolved}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save threads</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-codeowners">
   <label for="require-codeowners">Require CODEOWNERS approval</label>
   <input type="checkbox" id="require-codeowners" name="require-codeowners" value="on"{{if .Repo.Settings.RequireCodeowners}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save CODEOWNERS</button>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-signed">
   <label for="require-signed">Require signed commits</label>
   <input type="checkbox" id="require-signed" name="require-signed" value="on"{{if .Repo.Settings.RequireSignedCommits}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save signing</button>
 </form>
 
 <h2>Protected branches</h2>
@@ -109,7 +109,7 @@
   <input type="hidden" name="field" value="require-mr">
   <label for="require-mr">Merge requests only</label>
   <input type="checkbox" id="require-mr" name="require-mr" value="on"{{if .Repo.Settings.RequireMR}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save merge-only</button>
 </form>
 <p class="meta">With merge requests only, a protected branch refuses every direct push once it exists; the merge gates above are then what a change has to pass.</p>
 
@@ -137,7 +137,7 @@
   <input type="hidden" name="field" value="deps">
   <label for="deps">Check for updates</label>
   <input type="checkbox" id="deps" name="deps" value="on"{{if .DepsEnabled}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save dependency checks</button>
 </form>
 <p class="meta">Compares the manifests on <code>{{.Repo.DefaultBranch}}</code> against
 proxy.golang.org, npm, crates.io, and PyPI once a day, and tracks what is behind
@@ -182,7 +182,7 @@ depends on.</p>
   <input type="hidden" name="field" value="archive">
   <label for="archive">Archived (read-only)</label>
   <input type="checkbox" id="archive" name="archive" value="on"{{if .Repo.Settings.Archived}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit">Save archive</button>
 </form>
 <p class="meta">Deleting or transferring a repository is a CLI operation:
 <code>gitbay repo delete {{.Repo.OwnerName}}/{{.Repo.Name}} --yes</code></p>
