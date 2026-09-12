@@ -50,7 +50,7 @@
   <div class="grp">
     <h2>Labels</h2>
     {{if .Issue.Labels}}<p class="row">{{range .Issue.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues?label={{.}}">{{.}}</a> {{end}}</p>
-    {{else}}<p class="none">None yet</p>{{end}}
+    {{else}}<p class="none">none yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/label" class="actions">
       <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
@@ -62,7 +62,7 @@
   <div class="grp">
     <h2>Assignees</h2>
     {{if .Issue.Assignees}}<p class="row">{{range .Issue.Assignees}}<a href="/{{.}}">{{.}}</a> {{end}}</p>
-    {{else}}<p class="none">Nobody yet</p>{{end}}
+    {{else}}<p class="none">nobody yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/assign" class="actions">
       <input type="text" name="add" aria-label="Add assignees" placeholder="add, space-separated">
@@ -74,7 +74,7 @@
   <div class="grp">
     <h2>Milestone</h2>
     {{if .Issue.Milestone}}<p class="row"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.Issue.Milestone}}</a></p>
-    {{else}}<p class="none">None</p>{{end}}
+    {{else}}<p class="none">none yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/milestone" class="actions">
       <label class="none" for="milestone">Set milestone</label>
