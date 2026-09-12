@@ -20,6 +20,7 @@ type accountKey struct {
 	Algo        string
 	Scope       string
 	Label       string
+	Confirm     string // the 8 characters after SHA256: — a label can be empty
 }
 
 type accountPGP struct {
@@ -27,6 +28,7 @@ type accountPGP struct {
 	UIDs        []string
 	Expired     bool
 	Revoked     bool
+	Confirm     string // the fingerprint's first 8 characters
 }
 
 // accountForm renders the account's own settings: keys, addresses, and the
@@ -35,7 +37,11 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
-			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope, Label: k.Label})
+			confirm := strings.TrimPrefix(k.Fingerprint, "SHA256:")
+			if len(confirm) > 8 {
+				confirm = confirm[:8]
+			}
+			keys = append(keys, accountKey{Fingerprint: k.Fingerprint, Algo: k.Algo, Scope: k.Scope, Label: k.Label, Confirm: confirm})
 		}
 	}
 	var pgp []accountPGP
@@ -43,9 +49,13 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		for _, k := range list {
 			var uids []string
 			json.Unmarshal([]byte(k.UIDsJSON), &uids)
+			confirm := k.Fingerprint
+			if len(confirm) > 8 {
+				confirm = confirm[:8]
+			}
 			pgp = append(pgp, accountPGP{
 				Fingerprint: k.Fingerprint, UIDs: uids,
-				Expired: k.ExpiresAt != nil, Revoked: k.RevokedAt != nil,
+				Expired: k.ExpiresAt != nil, Revoked: k.RevokedAt != nil, Confirm: confirm,
 			})
 		}
 	}
@@ -153,6 +163,14 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "key registered")
 	case "key-remove":
+		want := strings.TrimPrefix(r.FormValue("fingerprint"), "SHA256:")
+		if len(want) > 8 {
+			want = want[:8]
+		}
+		if ok, msg := confirmed(r, want); !ok {
+			back(msg, "")
+			return
+		}
 		if _, msg, ok := s.runControl(u, []string{"keys", "remove", r.FormValue("fingerprint")}); !ok {
 			back(msg, "")
 			return
@@ -170,7 +188,16 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "PGP key registered")
 	case "pgp-remove":
-		if _, msg, ok := s.runControl(u, []string{"pgp", "remove", r.FormValue("fingerprint")}); !ok {
+		fp := r.FormValue("fingerprint")
+		want := fp
+		if len(want) > 8 {
+			want = want[:8]
+		}
+		if ok, msg := confirmed(r, want); !ok {
+			back(msg, "")
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"pgp", "remove", fp}); !ok {
 			back(msg, "")
 			return
 		}
@@ -188,7 +215,12 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "address verified")
 	case "email-remove":
-		if _, msg, ok := s.runControl(u, []string{"email", "remove", r.FormValue("address")}); !ok {
+		address := r.FormValue("address")
+		if ok, msg := confirmed(r, address); !ok {
+			back(msg, "")
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"email", "remove", address}); !ok {
 			back(msg, "")
 			return
 		}

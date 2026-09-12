@@ -213,7 +213,13 @@ func (s *Server) snippetEditSubmit(w http.ResponseWriter, r *http.Request, u sto
 }
 
 func (s *Server) snippetDeleteSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.snippetAction(w, r, u, []string{"snippet", "delete", r.PathValue("id")}, "",
+	id := r.PathValue("id")
+	if ok, msg := confirmed(r, id); !ok {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/"+r.PathValue("owner")+"/-/snippets/"+id, http.StatusSeeOther)
+		return
+	}
+	s.snippetAction(w, r, u, []string{"snippet", "delete", id}, "",
 		"/"+r.PathValue("owner")+"/-/snippets")
 }
 
@@ -225,5 +231,11 @@ func (s *Server) snippetFileSubmit(w http.ResponseWriter, r *http.Request, u sto
 }
 
 func (s *Server) snippetFileRemoveSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.snippetAction(w, r, u, []string{"snippet", "file", "remove", r.PathValue("id"), strings.TrimSpace(r.FormValue("name"))}, "", "")
+	name := strings.TrimSpace(r.FormValue("name"))
+	if ok, msg := confirmed(r, name); !ok {
+		s.setFlash(w, msg)
+		http.Redirect(w, r, "/"+r.PathValue("owner")+"/-/snippets/"+r.PathValue("id"), http.StatusSeeOther)
+		return
+	}
+	s.snippetAction(w, r, u, []string{"snippet", "file", "remove", r.PathValue("id"), name}, "", "")
 }

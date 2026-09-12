@@ -138,14 +138,16 @@ func TestSnippetsWeb(t *testing.T) {
 	if status, _ := browserPost(t, alice, page+"/file", url.Values{"name": {"b.txt"}, "content": {"b\n"}}); status != 200 {
 		t.Fatal("file add failed")
 	}
-	if status, _ := browserPost(t, alice, page+"/file/remove", url.Values{"name": {"b.txt"}}); status != 200 {
+	if status, _ := browserPost(t, alice, page+"/file/remove", url.Values{"name": {"b.txt"}, "confirm": {"b.txt"}}); status != 200 {
 		t.Fatal("file remove failed")
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "file", "get", created, "b.txt"); code != 3 {
 		t.Fatalf("b.txt after web remove: exit %d", code)
 	}
 	// A refusal comes back on the page as a message, not a bare error.
-	_, body = browserPost(t, alice, page+"/file/remove", url.Values{"name": {"notes.md"}})
+	// The confirmation matches, so the refusal under test is still the
+	// command's last-file rule.
+	_, body = browserPost(t, alice, page+"/file/remove", url.Values{"name": {"notes.md"}, "confirm": {"notes.md"}})
 	if !strings.Contains(body, `class="error"`) || !strings.Contains(body, "at least one file") {
 		t.Fatalf("last-file refusal on the page:\n%s", body)
 	}
@@ -170,7 +172,16 @@ func TestSnippetsWeb(t *testing.T) {
 	if status, _ := browserPost(t, bob, inst.base()+"/alice/-/snippets/"+public+"/edit", url.Values{"description": {"x"}, "visibility": {"public"}}); status != 403 {
 		t.Fatalf("bob editing alice's snippet: %d", status)
 	}
-	if status, _ := browserPost(t, alice, page+"/delete", nil); status != 200 {
+	// Deleting needs the public id typed to confirm; a bare post leaves
+	// the snippet in place.
+	_, body = browserPost(t, alice, page+"/delete", nil)
+	if !strings.Contains(body, "type "+created+" to confirm") {
+		t.Fatalf("unconfirmed delete was not refused:\n%s", body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "show", created); code != 0 {
+		t.Fatalf("snippet deleted without confirmation: exit %d", code)
+	}
+	if status, _ := browserPost(t, alice, page+"/delete", url.Values{"confirm": {created}}); status != 200 {
 		t.Fatal("delete failed")
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "snippet", "show", created); code != 3 {

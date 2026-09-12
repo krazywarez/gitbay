@@ -31,7 +31,7 @@ a CI checkout wants.</p>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{.Algo}}</td>
   <td>{{.Scope}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="linklike">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No SSH keys — which cannot be right, since you signed in.</p>{{end}}
@@ -61,7 +61,7 @@ account, and where notifications go.</p>
   {{if .Verified}}<span class="badge badge-verified">verified{{with .VerifiedBy}} · {{.}}{{end}}</span>
   {{else}}<span class="badge badge-unsigned">unverified</span>{{end}}
   {{if not .Primary}}{{if .Verified}}<form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-primary"><input type="hidden" name="address" value="{{.Address}}"><button type="submit" class="linklike">Make primary</button></form>{{end}}
-  <form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-remove"><input type="hidden" name="address" value="{{.Address}}"><button type="submit" class="linklike">Remove</button></form>{{end}}</li>
+  <form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-remove"><input type="hidden" name="address" value="{{.Address}}">{{template "confirmfield" .Address}} <button type="submit" class="linklike">Remove</button></form>{{end}}</li>
 {{end}}</ul>{{end}}
 <details class="editbox">
   <summary>Add an address</summary>
@@ -87,7 +87,7 @@ account, and where notifications go.</p>
 {{range .PGP}}<tr>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{range .UIDs}}{{.}}<br>{{end}}{{if .Revoked}}<span class="badge badge-bad_signature">revoked</span>{{else if .Expired}}<span class="badge badge-signed_key_expired">expired</span>{{end}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="pgp-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="pgp-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="linklike">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No OpenPGP keys.</p>{{end}}

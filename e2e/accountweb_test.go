@@ -72,10 +72,22 @@ func TestAccountSettingsWeb(t *testing.T) {
 		t.Error("git-scoped key ran a control command")
 	}
 
-	// Removing it through the form removes it for SSH too.
+	// Removing it through the form needs the fingerprint's prefix typed
+	// to confirm; a bare post leaves the key in place.
 	fp := gitScopedFingerprint(t, out)
-	if status, _ := browserPost(t, browser, inst.base()+"/settings", url.Values{
+	prefix := strings.TrimPrefix(fp, "SHA256:")[:8]
+	_, body = browserPost(t, browser, inst.base()+"/settings", url.Values{
 		"field": {"key-remove"}, "fingerprint": {fp},
+	})
+	if !strings.Contains(body, "to confirm") {
+		t.Fatalf("unconfirmed key remove was not refused:\n%s", body)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "keys", "list", "--json")
+	if !strings.Contains(out, fp) {
+		t.Fatalf("key removed without confirmation: %s", out)
+	}
+	if status, _ := browserPost(t, browser, inst.base()+"/settings", url.Values{
+		"field": {"key-remove"}, "fingerprint": {fp}, "confirm": {prefix},
 	}); status != 303 && status != 200 {
 		t.Fatalf("key remove: %d", status)
 	}

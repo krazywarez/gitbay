@@ -51,9 +51,18 @@ func TestLabelsWeb(t *testing.T) {
 		t.Errorf("bad colour accepted:\n%s", body)
 	}
 
-	// Removing takes the label off the issue too.
+	// Removing a label needs its name typed; a bare post is refused and
+	// the label stays.
+	_, body = browserPost(t, alice, base+"/labels", url.Values{
+		"action": {"remove"}, "name": {"bug"}})
+	if !strings.Contains(body, "type bug to confirm") {
+		t.Fatalf("unconfirmed remove was not refused:\n%s", body)
+	}
+	if out, _, _ := inst.ssh(t, aliceKey, "", "label", "list", "alice/app", "--json"); !strings.Contains(out, `"name":"bug"`) {
+		t.Fatalf("label removed without confirmation: %s", out)
+	}
 	if status, _ := browserPost(t, alice, base+"/labels", url.Values{
-		"action": {"remove"}, "name": {"bug"}}); status != 200 {
+		"action": {"remove"}, "name": {"bug"}, "confirm": {"bug"}}); status != 200 {
 		t.Fatal("label remove failed")
 	}
 	if out, _, _ := inst.ssh(t, aliceKey, "", "issue", "show", "alice/app", "1", "--json"); strings.Contains(out, `"bug"`) {

@@ -367,6 +367,7 @@ button.btn {
 button.btn:hover { border-color: var(--accent); color: var(--accent); }
 button.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 form.inline { display: inline; }
+input[name="confirm"] { width: auto; margin-right: var(--sp-2); }
 
 nav.tabs {
   display: flex;

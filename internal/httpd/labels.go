@@ -49,6 +49,10 @@ func (s *Server) labelSubmit(w http.ResponseWriter, r *http.Request, u store.Use
 	}
 	argv := []string{"label", "set", repo, name, "--color", strings.TrimSpace(r.FormValue("color"))}
 	if r.FormValue("action") == "remove" {
+		if ok, msg := confirmed(r, name); !ok {
+			s.backTo(w, r, "labels", msg)
+			return
+		}
 		argv = []string{"label", "remove", repo, name}
 	}
 	_, msg, code := s.runControlCode(u, argv)

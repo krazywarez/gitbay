@@ -85,6 +85,25 @@ func TestOrgManagementWeb(t *testing.T) {
 	browserPost(t, alice, inst.base()+"/acme", url.Values{
 		"field": {"team-revoke"}, "team": {"builders"}, "repo": {"acme/widget"},
 	})
+
+	// Deleting the team needs its name typed; a bare post is refused and
+	// the team stays.
+	_, body = browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"team-delete"}, "team": {"builders"},
+	})
+	if !strings.Contains(body, "type builders to confirm") {
+		t.Fatalf("unconfirmed team delete was not refused:\n%s", body)
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); code != 0 {
+		t.Fatal("team deleted without confirmation")
+	}
+	browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"team-delete"}, "team": {"builders"}, "confirm": {"builders"},
+	})
+	if _, _, code := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); code != 3 {
+		t.Fatalf("team not deleted: exit %d", code)
+	}
+
 	browserPost(t, alice, inst.base()+"/acme", url.Values{
 		"field": {"member-remove"}, "user": {"bob"},
 	})

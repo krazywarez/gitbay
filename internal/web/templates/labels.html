@@ -15,6 +15,7 @@
   <td class="act">{{if and $.CanWrite (not .Org)}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/labels" class="inline">
     <input type="hidden" name="action" value="remove">
     <input type="hidden" name="name" value="{{.Name}}">
+    {{template "confirmfield" .Name}}
     <button type="submit" class="linklike">Remove</button>
   </form>{{else if .Org}}<a href="/{{$.Repo.OwnerName}}/-/labels">org</a>{{end}}</td>
 </tr>

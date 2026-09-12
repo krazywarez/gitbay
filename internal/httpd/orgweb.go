@@ -80,6 +80,10 @@ func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 	case "team-create":
 		argv = []string{"org", "team", "create", owner, team}
 	case "team-delete":
+		if ok, msg := confirmed(r, team); !ok {
+			back(msg)
+			return
+		}
 		argv = []string{"org", "team", "delete", owner, team}
 	case "team-add":
 		argv = append([]string{"org", "team", "add", owner, team}, strings.Fields(user)...)

@@ -36,7 +36,7 @@
     <input type="hidden" name="action" value="delete">
     <input type="hidden" name="tag" value="{{$rel.Tag}}">
     <p class="meta">Deleting is permanent and takes the assets with it. The tag stays.</p>
-    <p><button type="submit" class="linklike">Delete release</button></p>
+    <p>{{template "confirmfield" $rel.Tag}} <button type="submit" class="linklike">Delete release</button></p>
   </form>{{end}}</details>{{end}}
   {{if $rel.Assets}}<table class="assets">
   <thead><tr><th scope="col">File</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead>

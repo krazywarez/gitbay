@@ -98,6 +98,7 @@ of a team get its role on every repository it is granted.</p>
     <form method="post" action="/{{$org}}" class="setform">
       <input type="hidden" name="field" value="team-delete">
       <input type="hidden" name="team" value="{{.Name}}">
+      {{template "confirmfield" .Name}}
       <button type="submit" class="linklike">Delete this team</button>
     </form>
   </div>

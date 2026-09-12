@@ -28,10 +28,13 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		return
 	}
 	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) }
-	// The CLI's --yes guards against a mistyped tag; here the tag comes from
-	// the page and the button sits behind a disclosure, so the click is the
-	// deliberate act.
+	// The CLI's --yes guards against a mistyped tag; here the tag comes
+	// from the page, so the browser's own confirm field stands in.
 	if r.FormValue("action") == "delete" {
+		if ok, msg := confirmed(r, tag); !ok {
+			back(w, r, msg)
+			return
+		}
 		_, msg, code := s.runControlCode(u, []string{"release", "delete", repo, tag, "--yes"})
 		s.done(w, r, code, msg, back)
 		return

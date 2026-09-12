@@ -21,7 +21,7 @@
 </form>
 <form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file/remove">
 <input type="hidden" name="name" value="{{.Name}}">
-<p><button type="submit">Remove {{.Name}}</button></p>
+<p>{{template "confirmfield" .Name}} <button type="submit">Remove {{.Name}}</button></p>
 </form>
 </details>{{end}}
 </section>
@@ -44,7 +44,7 @@
 <p><button type="submit">Save</button></p>
 </form>
 <form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/delete">
-<p><button type="submit">Delete snippet</button></p>
+<p>{{template "confirmfield" .Snippet.PublicID}} <button type="submit">Delete snippet</button></p>
 </form>
 </details>
 {{end}}

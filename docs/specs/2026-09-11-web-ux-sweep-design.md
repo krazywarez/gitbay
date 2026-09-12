@@ -12,8 +12,9 @@ in, and the rules chosen to fix them.
   No JavaScript: the instance CSP is `script-src 'none'`. Covered: release
   delete (the tag), snippet delete (the id), snippet file remove (the file
   name), team delete (the team name), label remove (the label), SSH key
-  remove (the key's label), email remove (the address), PGP key remove
-  (the first 8 characters of the fingerprint). Reversible state keeps a
+  remove (the 8 characters after `SHA256:` in the fingerprint; a label
+  can be empty), email remove (the address), PGP key remove (the first
+  8 characters of the fingerprint). Reversible state keeps a
   plain button: close/reopen, merge, protect/unprotect, attach/detach,
   resolve, cancel, make primary, org member remove.
 - **Refusal wording.** Control-command messages a web form can trigger

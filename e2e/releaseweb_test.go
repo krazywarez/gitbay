@@ -98,8 +98,17 @@ func TestReleaseAndBuildWeb(t *testing.T) {
 	if _, p := browserGet(t, alice, base+"/releases"); !strings.Contains(p, "Delete release") {
 		t.Fatalf("owner is not offered the delete control:\n%s", p)
 	}
+	_, body := browserPost(t, alice, base+"/releases", url.Values{
+		"action": {"delete"}, "tag": {"v1.0"}})
+	if !strings.Contains(body, "type v1.0 to confirm") {
+		t.Fatalf("unconfirmed delete was not refused:\n%s", body)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "release", "list", "alice/app", "--json")
+	if !strings.Contains(out, "v1.0") {
+		t.Fatalf("release removed without confirmation: %s", out)
+	}
 	if status, _ := browserPost(t, alice, base+"/releases", url.Values{
-		"action": {"delete"}, "tag": {"v1.0"}}); status != 200 {
+		"action": {"delete"}, "tag": {"v1.0"}, "confirm": {"v1.0"}}); status != 200 {
 		t.Fatal("release delete failed")
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "release", "list", "alice/app", "--json")

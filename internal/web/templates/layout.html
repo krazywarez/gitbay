@@ -137,6 +137,10 @@
   </select>
 </p>{{end}}
 
+{{/* confirmfield is the typed-name check beside a destructive control.
+     The argument is the text the person must type. */}}
+{{define "confirmfield"}}<input type="text" name="confirm" aria-label="Type {{.}} to confirm" placeholder="type {{.}} to confirm" size="{{len .}}" autocomplete="off">{{end}}
+
 {{/* difffiles renders a parsed diff: one foldable section per file, with
      line-number gutters and review threads inline. Base is the MR's
      endpoint and Viewer the signed-in account; the commit page passes
