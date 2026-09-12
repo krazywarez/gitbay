@@ -9,7 +9,7 @@
   <td><a href="/{{$.Owner}}/-/snippets/{{.PublicID}}">{{if .Description}}{{.Description}}{{else}}{{.PublicID}}{{end}}</a></td>
   <td><span class="mono">{{.Names}}</span></td>
   {{if $.All}}<td><span class="chip chip-neutral">{{.Visibility}}</span></td>{{end}}
-  <td>{{.UpdatedAt}}</td>
+  <td>{{when .UpdatedAt}}</td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No snippets yet.</p>{{end}}

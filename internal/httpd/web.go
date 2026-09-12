@@ -860,7 +860,7 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 		}
 		date := h.Date
 		if t, err := time.Parse(time.RFC3339, h.Date); err == nil {
-			date = t.Format("2006-01-02")
+			date = t.Format(time.RFC3339)
 		}
 		hv := hunkView{
 			BlameHunk: gitutil.BlameHunk{SHA: h.SHA, AuthorName: h.AuthorName,
@@ -1513,7 +1513,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request) {
 			rw.AuthorName = names.name(parsed.AuthorEmail, parsed.AuthorName)
 			rw.AuthorUser, _ = names.account(parsed.AuthorEmail)
 			rw.AuthorEmail = parsed.AuthorEmail
-			rw.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
+			rw.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339)
 		}
 		rows = append(rows, rw)
 	}
@@ -1887,7 +1887,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 				cr.Subject = parsed.Subject
 				cr.AuthorName = mrNames.name(parsed.AuthorEmail, parsed.AuthorName)
 				cr.AuthorUser, _ = mrNames.account(parsed.AuthorEmail)
-				cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
+				cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339)
 			}
 			commits = append(commits, cr)
 		}

@@ -13,7 +13,7 @@
 {{range .Hunks}}<div class="blamehunk">
   <div class="blameinfo">
     <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Summary}}</a></p>
-    <p class="meta"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code> <span title="{{.AuthorEmail}}">{{.AuthorName}}</span> · {{.Date}} {{template "sigbadge" .Sig}}</p>
+    <p class="meta"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code> <span title="{{.AuthorEmail}}">{{.AuthorName}}</span> · {{when .Date}} {{template "sigbadge" .Sig}}</p>
   </div>
   <pre class="blamecode">{{range .Numbered}}<span class="lineno">{{.N}}</span>{{.Text}}
 {{end}}</pre>

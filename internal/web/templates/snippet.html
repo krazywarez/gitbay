@@ -2,7 +2,7 @@
 {{define "content"}}
 <h1><a href="/{{.Owner}}">{{.Owner}}</a> / <a href="/{{.Owner}}/-/snippets">snippets</a> / {{.Snippet.PublicID}}</h1>
 {{if .Snippet.Description}}<p class="desc lede">{{.Snippet.Description}}</p>{{end}}
-<p class="meta"><span class="chip chip-neutral">{{.Snippet.Visibility}}</span> · updated {{.Snippet.UpdatedAt}} · <code>gitbay snippet show {{.Snippet.PublicID}}</code></p>
+<p class="meta"><span class="chip chip-neutral">{{.Snippet.Visibility}}</span> · updated {{when .Snippet.UpdatedAt}} · <code>gitbay snippet show {{.Snippet.PublicID}}</code></p>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{range .Files}}
 <section class="snippetfile" id="file-{{.Name}}">

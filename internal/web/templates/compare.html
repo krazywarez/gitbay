@@ -6,7 +6,7 @@
 {{range .Commits}}<li>
   <div class="commitmain">
     <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a></p>
-    <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" ""}} · {{.Date}}</p>
+    <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" ""}} · {{when .Date}}</p>
   </div>
   <span class="commitside">{{template "sigbadge" .Sig}} <code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code></span>
 </li>{{end}}

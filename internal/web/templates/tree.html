@@ -30,7 +30,7 @@
   <a class="subject" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a>
   <span class="spacer"></span>
   <a class="sha" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}"><code>{{short .SHA}}</code></a>
-  <span class="age">{{ago .When}}</span>
+  <span class="age"{{if not .When.IsZero}} title="{{whenT .When}}"{{end}}>{{ago .When}}</span>
 </div>{{end}}{{end}}
 <div class="tablewrap">
 <table class="tree">
@@ -39,7 +39,7 @@
   {{if eq .Type "tree"}}<td class="name dir"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/tree/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}/</a></td>
   {{else}}<td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{$.Prefix}}{{.Name}}">{{.Name}}</a></td>{{end}}
   <td class="lastcommit">{{with $c.Subject}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{$c.SHA}}" title="{{.}}">{{.}}</a>{{end}}</td>
-  <td class="age">{{ago $c.When}}</td>
+  <td class="age"{{if not $c.When.IsZero}} title="{{whenT $c.When}}"{{end}}>{{ago $c.When}}</td>
 </tr>
 {{else}}<tr><td class="name empty" colspan="3">this repository is empty — push something:<br><code>git remote add origin {{.CloneURL}}</code></td></tr>{{end}}
 </table>

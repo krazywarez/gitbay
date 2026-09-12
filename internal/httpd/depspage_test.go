@@ -27,7 +27,7 @@ func TestSettingsPageRendersDepsStatus(t *testing.T) {
 	}
 	page := sb.String()
 	for _, want := range []string{
-		"2026-09-03T08:20:25Z", "golang.org/x/crypto", "v0.31.0", "v0.42.0",
+		"2026-09-03 08:20 UTC", "golang.org/x/crypto", "v0.31.0", "v0.42.0",
 		`href="/krz/gitbay/issues/140"`,
 	} {
 		if !strings.Contains(page, want) {

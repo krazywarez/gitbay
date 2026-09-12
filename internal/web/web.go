@@ -224,7 +224,12 @@ var funcs = template.FuncMap{
 		if err != nil {
 			return s
 		}
-		return t.UTC().Format("2006-01-02 15:04")
+		return t.UTC().Format("2006-01-02 15:04 UTC")
+	},
+	// whenT is when for a value that is already a time.Time rather than
+	// a stored string.
+	"whenT": func(t time.Time) string {
+		return t.UTC().Format("2006-01-02 15:04 UTC")
 	},
 }
 

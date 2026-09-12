@@ -144,7 +144,7 @@ proxy.golang.org, npm, crates.io, and PyPI once a day, and tracks what is behind
 in an issue. Checking a private repository tells those registries what it
 depends on.</p>
 {{if .DepsEnabled}}
-<p class="meta">Last checked {{if .Deps.LastCheck}}{{.Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · tracked in <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
+<p class="meta">Last checked {{if .Deps.LastCheck}}{{when .Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · tracked in <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
 {{if .Deps.LastError}}<p class="error" role="alert">{{.Deps.LastError}}</p>{{end}}
 {{if .Deps.Behind}}<div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">dependency</th><th scope="col">pinned</th><th scope="col">latest</th></tr>
@@ -160,7 +160,7 @@ depends on.</p>
 <h2>Runners</h2>
 {{if .Runners}}
 <ul class="protlist">
-{{range .Runners}}<li><code>{{.Fingerprint}}</code> <span class="meta">{{.Username}}{{if .LastSeen}}, last poll {{.LastSeen}}{{else}}, never polled{{end}}{{if .BuildNumber}}, running {{.BuildRepo}} #{{.BuildNumber}} {{.BuildJob}}{{end}}</span>
+{{range .Runners}}<li><code>{{.Fingerprint}}</code> <span class="meta">{{.Username}}{{if .LastSeen}}, last poll {{when .LastSeen}}{{else}}, never polled{{end}}{{if .BuildNumber}}, running {{.BuildRepo}} #{{.BuildNumber}} {{.BuildJob}}{{end}}</span>
   <form method="post" action="{{$base}}" class="inline">
     <input type="hidden" name="field" value="runner-remove">
     <input type="hidden" name="fingerprint" value="{{.Fingerprint}}">

@@ -69,7 +69,7 @@ func (s *Server) compare(w http.ResponseWriter, r *http.Request) {
 			cr.Subject = parsed.Subject
 			cr.AuthorName = names.name(parsed.AuthorEmail, parsed.AuthorName)
 			cr.AuthorUser, _ = names.account(parsed.AuthorEmail)
-			cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format("2006-01-02")
+			cr.Date = time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339)
 		}
 		commits = append(commits, cr)
 	}

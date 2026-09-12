@@ -71,3 +71,15 @@ func TestHeaderRowsAreLeftAligned(t *testing.T) {
 		}
 	}
 }
+
+// when names the zone rather than leaving an absolute time ambiguous, and
+// passes an unparseable value through unchanged (#182).
+func TestWhenNamesTheZone(t *testing.T) {
+	got := funcs["when"].(func(string) string)("2026-09-12T02:18:07.123Z")
+	if got != "2026-09-12 02:18 UTC" {
+		t.Fatalf("when: %q", got)
+	}
+	if got := funcs["when"].(func(string) string)("not a time"); got != "not a time" {
+		t.Fatalf("passthrough: %q", got)
+	}
+}

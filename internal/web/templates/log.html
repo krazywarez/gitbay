@@ -12,7 +12,7 @@
 {{range .Commits}}{{$c := .}}<li>
   <div class="commitmain">
     <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Subject}}</a></p>
-    <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" .AuthorEmail}} · {{.Date}}</p>
+    <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" .AuthorEmail}} · {{when .Date}}</p>
   </div>
   <div class="commitside">
     {{with .Check}}<a class="badge badge-{{.}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{$c.SHA}}" title="checks: {{.}}">{{.}}</a>{{end}}
