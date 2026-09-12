@@ -254,3 +254,20 @@ func TestFailErrExitCodes(t *testing.T) {
 		}
 	}
 }
+
+// TestArgumentRefusalsNameTheUsage: a missing positional argument is a
+// usage error that prints the registered usage, the shared reference
+// helpers included (#215).
+func TestArgumentRefusalsNameTheUsage(t *testing.T) {
+	for _, argv := range [][]string{{"build", "show"}, {"release", "show"}, {"mr", "resolve"}, {"issue", "show"}} {
+		var out, errOut bytes.Buffer
+		c := &Ctx{Scope: "full", Stdout: &out, Stderr: &errOut}
+		if code := Dispatch(c, argv); code != protocol.ExitUsage {
+			t.Errorf("%v: exit %d, want %d (%s)", argv, code, protocol.ExitUsage, errOut.String())
+			continue
+		}
+		if !strings.Contains(errOut.String(), "usage: "+strings.Join(argv, " ")) {
+			t.Errorf("%v: no usage line: %q", argv, errOut.String())
+		}
+	}
+}

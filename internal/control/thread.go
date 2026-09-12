@@ -18,7 +18,7 @@ import (
 // refArgs resolves "<owner/name> <n>" to the repository and the number.
 func refArgs(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool, noun string) (store.Repo, int64, int) {
 	if len(args) < 2 {
-		return store.Repo{}, 0, c.fail(protocol.ExitUsage, "expected <owner/name> <number>")
+		return store.Repo{}, 0, c.usageWith("expected <owner/name> <number>")
 	}
 	repo, code := resolveRepo(c, args[0], perm)
 	if code >= 0 {

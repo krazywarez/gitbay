@@ -59,7 +59,7 @@ func assetDir(root string, repo store.Repo, releaseID int64) string {
 // releaseRef loads a release for "<owner/name> <tag>" with the permission.
 func releaseRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool) (store.Repo, store.Release, int) {
 	if len(args) < 2 {
-		return store.Repo{}, store.Release{}, c.fail(protocol.ExitUsage, "expected <owner/name> <tag>")
+		return store.Repo{}, store.Release{}, c.usageWith("expected <owner/name> <tag>")
 	}
 	repo, code := resolveRepo(c, args[0], perm)
 	if code >= 0 {

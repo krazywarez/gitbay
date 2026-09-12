@@ -47,6 +47,12 @@ func (c *Ctx) usage() int {
 	return c.fail(protocol.ExitUsage, "usage: %s", c.Cmd.Usage)
 }
 
+// usageWith reports a specific problem with the arguments, then the
+// registered usage, so a person always sees the shape that was expected.
+func (c *Ctx) usageWith(msg string) int {
+	return c.fail(protocol.ExitUsage, "%s\nusage: %s", msg, c.Cmd.Usage)
+}
+
 type Command struct {
 	Path []string // e.g. ["keys", "add"]
 	// Summary is one line of prose: what the command does, no argument

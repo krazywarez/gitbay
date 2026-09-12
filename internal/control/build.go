@@ -85,7 +85,7 @@ func buildToOut(b store.Build) BuildOut {
 
 func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
 	if len(args) != 2 {
-		return store.Repo{}, store.Build{}, c.fail(protocol.ExitUsage, "expected <owner/name> <number>")
+		return store.Repo{}, store.Build{}, c.usageWith("expected <owner/name> <number>")
 	}
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
