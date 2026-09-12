@@ -176,10 +176,13 @@ type ProfileOut struct {
 	// they own that you can see, and how active they have been. The web
 	// read these straight out of the store, which kept them off every
 	// other surface.
-	Orgs     []ProfileMember `json:"orgs,omitempty"`    // for a user
-	Members  []ProfileMember `json:"members,omitempty"` // for an org
-	Repos    []ProfileRepo   `json:"repos"`
-	Activity []ActivityDay   `json:"activity,omitempty"`
+	Orgs    []ProfileMember `json:"orgs,omitempty"`    // for a user
+	Members []ProfileMember `json:"members,omitempty"` // for an org
+	Repos   []ProfileRepo   `json:"repos"`
+	// Snippets counts the owner's snippets the caller may list: public
+	// ones, or all of them for the owner and admins. Orgs own none.
+	Snippets int           `json:"snippets"`
+	Activity []ActivityDay `json:"activity,omitempty"`
 	// ActivityTotal counts the same window the days cover.
 	ActivityTotal int `json:"activity_total"`
 }
@@ -321,6 +324,13 @@ func runProfileShow(c *Ctx, args []string) int {
 			Updated:       gitutil.LastCommitDate(dir, repo.DefaultBranch),
 			Archived:      repo.Settings.Archived,
 		})
+	}
+
+	if kind == "user" {
+		all := id == c.User.ID || c.User.IsAdmin
+		if d.Snippets, err = c.Store.CountSnippets(id, all); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 	}
 
 	var counts map[string]int

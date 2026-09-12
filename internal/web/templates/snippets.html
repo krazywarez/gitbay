@@ -1,0 +1,16 @@
+{{define "title"}}snippets · {{.Owner}}{{end}}
+{{define "content"}}
+<h1><a href="/{{.Owner}}">{{.Owner}}</a> snippets</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets/new">new snippet</a> · or <code>gitbay snippet create &lt;file&gt; &lt; file</code></p>{{end}}
+{{if .Snippets}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">snippet</th><th scope="col">files</th>{{if .All}}<th scope="col">visibility</th>{{end}}<th scope="col">updated</th></tr>
+{{range .Snippets}}<tr>
+  <td><a href="/{{$.Owner}}/-/snippets/{{.PublicID}}">{{if .Description}}{{.Description}}{{else}}{{.PublicID}}{{end}}</a></td>
+  <td><span class="mono">{{.Names}}</span></td>
+  {{if $.All}}<td><span class="chip chip-neutral">{{.Visibility}}</span></td>{{end}}
+  <td>{{.UpdatedAt}}</td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No snippets yet.</p>{{end}}
+{{end}}

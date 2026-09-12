@@ -1,0 +1,18 @@
+{{define "title"}}{{if .Snippet.Description}}{{.Snippet.Description}}{{else}}{{.Snippet.PublicID}}{{end}} · {{.Owner}}{{end}}
+{{define "content"}}
+<h1><a href="/{{.Owner}}">{{.Owner}}</a> / <a href="/{{.Owner}}/-/snippets">snippets</a> / {{.Snippet.PublicID}}</h1>
+{{if .Snippet.Description}}<p class="desc lede">{{.Snippet.Description}}</p>{{end}}
+<p class="meta"><span class="chip chip-neutral">{{.Snippet.Visibility}}</span> · updated {{.Snippet.UpdatedAt}} · <code>gitbay snippet show {{.Snippet.PublicID}}</code></p>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{range .Files}}
+<section class="snippetfile" id="file-{{.Name}}">
+<div class="pathbar">
+  <span class="crumbs"><strong>{{.Name}}</strong></span>
+  <span class="spacer"></span>
+  <span class="actions"><a href="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/raw/{{.Name}}">raw</a></span>
+</div>
+<p class="filefacts">{{.Lines}} lines · {{.Size}} bytes</p>
+<div class="code">{{.HTML}}</div>
+</section>
+{{end}}
+{{end}}

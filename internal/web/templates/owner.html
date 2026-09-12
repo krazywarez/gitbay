@@ -23,6 +23,7 @@
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">no visible repositories</li>{{end}}
 </ul>
+{{if or .Snippets .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets">snippets{{if .Snippets}} <span class="count">{{.Snippets}}</span>{{end}}</a></p>{{end}}
 
 {{if .Self}}
 <h2>organizations</h2>

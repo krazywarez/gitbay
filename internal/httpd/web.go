@@ -445,12 +445,14 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Teams         []teamView
 		CanAdmin      bool
 		Self          bool
+		Snippets      int
 		Notice        string
 		Feed          string
 	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
 		d.Repos, d.Members, d.Orgs,
 		weeks, activityTotal, teams, canAdmin,
 		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
+		d.Snippets,
 		s.takeFlash(w, r), "/" + name + "/activity.atom"})
 }
 
