@@ -1,8 +1,11 @@
 package main
 
 import (
+	"text/tabwriter"
+
 	"encoding/json"
 	"fmt"
+	"golang.org/x/term"
 	"io"
 	"os"
 	"os/exec"
@@ -120,7 +123,15 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	var tw *tabwriter.Writer
+	if alignColumns(serverArgv) {
+		tw = tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+		cmd.Stdout = tw
+	}
 	err := cmd.Run()
+	if tw != nil {
+		tw.Flush()
+	}
 	if err == nil {
 		return 0
 	}
@@ -192,4 +203,34 @@ func withRepo(t target, args []string) ([]string, error) {
 		return nil, fmt.Errorf("no repository given and none inferable: pass <owner/name> or run inside a clone of a gitbay repository")
 	}
 	return append([]string{t.repo}, args...), nil
+}
+
+// listVerbs are the server commands whose plain output is one row per
+// item with tab-separated columns.
+var listVerbs = map[string]bool{
+	"list": true, "runners": true, "deliveries": true, "refs": true,
+	"revisions": true, "threads": true, "bookmarks": true, "jobs": true,
+}
+
+// alignColumns reports whether a command's rows should be padded into
+// columns: a list command, printed for a person at a terminal. Piped
+// output keeps the server's tabs so cut and awk see the same bytes stock
+// ssh prints, and --json is never touched.
+func alignColumns(serverArgv []string) bool {
+	verb := ""
+	for _, a := range serverArgv {
+		if strings.HasPrefix(a, "-") {
+			break
+		}
+		if a == "--json" {
+			return false
+		}
+		verb = a
+	}
+	for _, a := range serverArgv {
+		if a == "--json" {
+			return false
+		}
+	}
+	return listVerbs[verb] && term.IsTerminal(int(os.Stdout.Fd()))
 }
