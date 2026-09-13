@@ -4,6 +4,19 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.22.1 — unreleased
+
+One merge gate fix.
+
+- =require-checks= no longer refuses a merge request head that carries
+  no statuses when nothing was going to report one: a repository with
+  no =.gitbay/ci.yml=, or one whose jobs all wait on a schedule or a
+  tag, had no mergeable merge request and no remedy but turning the
+  setting off. A head whose config carries a job a push runs, and a
+  head in a repository that has recorded a status before — which is
+  what reporting from outside through =status set= looks like — is
+  still refused (#216).
+
 * v1.22.0 — 2026-09-12
 
 The CLI output sweep (#183). The rules are on the wiki's Users page,
