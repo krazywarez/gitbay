@@ -4,7 +4,7 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* v1.22.1 — unreleased
+* v1.22.1 — 2026-09-13
 
 One merge gate fix.
 
