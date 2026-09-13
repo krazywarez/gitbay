@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -1243,6 +1244,30 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 	return -1
 }
 
+// headRunsJobs reports whether a push of this head would have queued or
+// skipped a job, and so left it a status. A repository with no CI
+// configuration, or one whose jobs all wait on a schedule or a tag, can
+// never satisfy require_checks, and refusing its merges leaves no remedy
+// but turning the setting off. A configuration that will not parse
+// counts as running jobs: the push recorded a ci/config failure for it,
+// so the head is not silent and this is not the branch that decides.
+func headRunsJobs(dir, headSHA string) bool {
+	raw, err := gitutil.ReadBlob(dir, headSHA, ci.ConfigPath, 1<<16)
+	if err != nil {
+		return false
+	}
+	jobs, err := ci.Parse(raw)
+	if err != nil {
+		return true
+	}
+	for _, j := range jobs {
+		if j.Tags == "" && j.Schedule == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // MergeGates computes where a merge request stands against its
 // repository's gates: draft, require_checks, require_approvals (fresh,
 // non-author, latest review per reviewer from someone who can write; a
@@ -1260,8 +1285,8 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 		g.Unmet = append(g.Unmet, fmt.Sprintf("!%d is a draft; `gitbay mr ready %s %d` first", mr.Number, repo.Path(), mr.Number))
 	}
 
-	// Checks: with require_checks, the head must carry statuses and every
-	// one of them must be green.
+	// Checks: with require_checks, every status the head carries must be
+	// green, and a head whose CI would report must carry some.
 	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
 	if err != nil {
 		return g, err
@@ -1271,7 +1296,9 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 		switch g.Checks {
 		case "success":
 		case "":
-			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", repo.Path(), headSHA))
+			if headRunsJobs(dir, headSHA) {
+				g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", repo.Path(), headSHA))
+			}
 		default:
 			var bad []string
 			for _, st := range statuses {

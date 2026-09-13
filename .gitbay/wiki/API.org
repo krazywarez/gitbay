@@ -109,8 +109,10 @@ One row per (commit, context): re-reporting updates in place. States:
 worst of them. Statuses appear on commit pages, MR pages, and
 =mr show=, each with =updated_at=; a =ci/<job>= status also carries
 =duration=, read from the build behind it, once that build has
-finished. With =repo settings require-checks <repo> on=, merging
-requires the MR head to carry statuses and all of them green. Each
+finished. With =repo settings require-checks <repo> on=, every status
+on the MR head must be green, and a head whose =.gitbay/ci.yml= has a
+job a push would run must carry some; a repository with no CI
+configuration, or only scheduled and tag jobs, merges. Each
 report also emits a =status= event to webhooks.
 
 * Webhooks
