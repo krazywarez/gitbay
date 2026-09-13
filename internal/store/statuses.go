@@ -53,6 +53,16 @@ func (s *Store) ListCommitStatuses(repoID int64, sha string) ([]CommitStatus, er
 	return out, rows.Err()
 }
 
+// RepoHasStatuses reports whether anything has ever reported a status in
+// this repository. It is how require_checks tells a repository whose
+// checks come from outside — `status set`, with no .gitbay/ci.yml — from
+// one that has no checks at all.
+func (s *Store) RepoHasStatuses(repoID int64) (bool, error) {
+	var n int
+	err := s.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM commit_statuses WHERE repo_id = ?)`, repoID).Scan(&n)
+	return n == 1, err
+}
+
 // CombinedStatus reduces per-context states to one: error/failure dominate,
 // then pending, then success; "" when no statuses exist.
 // CombinedStatusFor returns the combined state for each of several commits

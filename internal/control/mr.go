@@ -1244,13 +1244,25 @@ func (c *Ctx) reviewGates(repo store.Repo, mr store.MR, dir, targetSHA, headSHA 
 	return -1
 }
 
+// checksExpected reports whether anything was going to report a status
+// on this head. A repository with no CI configuration and no history of
+// statuses can never satisfy require_checks, and refusing its merges
+// leaves no remedy but turning the setting off. Two things say a report
+// was coming: a .gitbay/ci.yml at the head with a job a push runs, and a
+// status having ever been recorded in the repository, which is how a
+// repository reporting from outside through `status set` looks.
+func checksExpected(st *store.Store, repoID int64, dir, headSHA string) bool {
+	if seen, err := st.RepoHasStatuses(repoID); err != nil || seen {
+		return true
+	}
+	return headRunsJobs(dir, headSHA)
+}
+
 // headRunsJobs reports whether a push of this head would have queued or
-// skipped a job, and so left it a status. A repository with no CI
-// configuration, or one whose jobs all wait on a schedule or a tag, can
-// never satisfy require_checks, and refusing its merges leaves no remedy
-// but turning the setting off. A configuration that will not parse
-// counts as running jobs: the push recorded a ci/config failure for it,
-// so the head is not silent and this is not the branch that decides.
+// skipped a job, and so left it a status. A configuration that will not
+// parse counts as running jobs: the push recorded a ci/config failure
+// for it, so the head is not silent and this is not the branch that
+// decides.
 func headRunsJobs(dir, headSHA string) bool {
 	raw, err := gitutil.ReadBlob(dir, headSHA, ci.ConfigPath, 1<<16)
 	if err != nil {
@@ -1286,7 +1298,7 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 	}
 
 	// Checks: with require_checks, every status the head carries must be
-	// green, and a head whose CI would report must carry some.
+	// green, and a head something was going to report on must carry some.
 	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
 	if err != nil {
 		return g, err
@@ -1296,7 +1308,7 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 		switch g.Checks {
 		case "success":
 		case "":
-			if headRunsJobs(dir, headSHA) {
+			if checksExpected(st, repo.ID, dir, headSHA) {
 				g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", repo.Path(), headSHA))
 			}
 		default:

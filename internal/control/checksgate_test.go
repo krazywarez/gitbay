@@ -11,8 +11,13 @@ import (
 
 // gatesForHead builds a repository with require_checks on, a bare dir
 // holding the given .gitbay/ci.yml (empty string for none), and one MR
-// whose head carries no statuses at all.
+// whose head carries no statuses at all. seed records a status on the
+// base commit, standing for a repository that reports from outside.
 func gatesForHead(t *testing.T, ciYML string) GatesOut {
+	return gatesForHeadSeeded(t, ciYML, false)
+}
+
+func gatesForHeadSeeded(t *testing.T, ciYML string, seed bool) GatesOut {
 	t.Helper()
 	st, repo, uid := newQueueTestRepo(t)
 	if _, err := st.UpdateRepoSettings(repo.ID, func(set *store.RepoSettings) { set.RequireChecks = true }); err != nil {
@@ -52,6 +57,12 @@ func gatesForHead(t *testing.T, ciYML string) GatesOut {
 	mr, err := st.MRByNumber(repo.ID, 1)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if seed {
+		if err := st.SetCommitStatus(repo.ID, targetSHA, "lint", "success", "", "", uid); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	g, err := MergeGates(st, repo, mr, dir, targetSHA, headSHA)
@@ -95,5 +106,15 @@ func TestRequireChecksRefusesSilentPushJob(t *testing.T) {
 	cfg := "jobs:\n  unit:\n    steps:\n      - echo hi\n"
 	if g := gatesForHead(t, cfg); !checksUnmet(g) {
 		t.Fatalf("allowed a head whose push job reported nothing: %v", g.Unmet)
+	}
+}
+
+// A repository whose checks come from outside — `status set`, no
+// .gitbay/ci.yml — looks like one with no CI at all. Having reported
+// before is what says a report was coming, so a silent head there is
+// still refused.
+func TestRequireChecksRefusesSilentHeadInReportingRepo(t *testing.T) {
+	if g := gatesForHeadSeeded(t, "", true); !checksUnmet(g) {
+		t.Fatalf("allowed a silent head in a repository that reports statuses: %v", g.Unmet)
 	}
 }

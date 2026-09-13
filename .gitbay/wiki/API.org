@@ -110,9 +110,11 @@ worst of them. Statuses appear on commit pages, MR pages, and
 =mr show=, each with =updated_at=; a =ci/<job>= status also carries
 =duration=, read from the build behind it, once that build has
 finished. With =repo settings require-checks <repo> on=, every status
-on the MR head must be green, and a head whose =.gitbay/ci.yml= has a
-job a push would run must carry some; a repository with no CI
-configuration, or only scheduled and tag jobs, merges. Each
+on the MR head must be green, and a head something was going to report
+on must carry some: a =.gitbay/ci.yml= with a job a push runs, or a
+repository that has recorded a status before, which is what reporting
+from outside through =status set= looks like. A repository where
+nothing has ever reported merges. Each
 report also emits a =status= event to webhooks.
 
 * Webhooks
