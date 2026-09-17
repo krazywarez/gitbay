@@ -53,13 +53,13 @@ func TestSyntaxPaletteContrast(t *testing.T) {
 	}{
 		{lightStyle, map[string]chroma.Colour{
 			"page": chroma.NewColour(0xff, 0xff, 0xff),
-			"code": chroma.NewColour(0xf5, 0xf5, 0xf5),
+			"code": chroma.NewColour(0xff, 0xff, 0xff),
 			"add":  chroma.NewColour(0xe4, 0xf6, 0xea),
 			"del":  chroma.NewColour(0xfd, 0xea, 0xea),
 		}, map[chroma.TokenType]bool{chroma.NameAttribute: true}},
 		{darkStyle, map[string]chroma.Colour{
-			"page": chroma.NewColour(0x0a, 0x0a, 0x0a),
-			"code": chroma.NewColour(0x05, 0x05, 0x05),
+			"page": chroma.NewColour(0x10, 0x11, 0x14),
+			"code": chroma.NewColour(0x0b, 0x0c, 0x0e),
 			"add":  chroma.NewColour(0x0d, 0x2a, 0x18),
 			"del":  chroma.NewColour(0x2c, 0x11, 0x13),
 		}, map[chroma.TokenType]bool{
