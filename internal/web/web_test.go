@@ -83,3 +83,36 @@ func TestWhenNamesTheZone(t *testing.T) {
 		t.Fatalf("passthrough: %q", got)
 	}
 }
+
+// TestMainWidthClass renders every page against an empty struct and
+// checks main carries exactly one width class, and that the pages the
+// spec calls wide or bounded say so.
+func TestMainWidthClass(t *testing.T) {
+	wide := map[string]bool{"tree.html": true, "blob.html": true, "blame.html": true, "log.html": true, "commit.html": true, "compare.html": true, "builds.html": true, "build.html": true, "search.html": true, "globalsearch.html": true}
+	bounded := map[string]bool{"landing.html": true, "login.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "settings.html": true, "account.html": true, "admin.html": true, "edit.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
+	for _, name := range Pages() {
+		src, err := TemplateSource(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		has := strings.Contains(src, `{{define "width"}}`)
+		switch {
+		case wide[name] && !strings.Contains(src, `{{define "width"}}wide{{end}}`):
+			t.Errorf("%s: want width wide", name)
+		case bounded[name] && !strings.Contains(src, `{{define "width"}}bounded{{end}}`):
+			t.Errorf("%s: want width bounded", name)
+		case !wide[name] && !bounded[name] && has:
+			t.Errorf("%s: defines a width but the spec calls it reading", name)
+		}
+	}
+	layout, err := TemplateSource("layout.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(layout, `<main id="content" class="content {{template "width" .}}">`) {
+		t.Error("layout.html: main does not carry the width block")
+	}
+	if !strings.Contains(layout, `{{define "width"}}reading{{end}}`) {
+		t.Error("layout.html: no default width")
+	}
+}
