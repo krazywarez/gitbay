@@ -9,10 +9,9 @@ import (
 )
 
 // TestEveryTemplateClassHasARule fails on a class a template uses that
-// no selector in style.css mentions. Template actions are removed before
-// matching, so a class composed at render time (chip-{{.State}})
-// contributes only its literal part; the rules for the concrete values
-// cover the rest.
+// no selector in style.css mentions. Template actions are replaced by a
+// marker and any class token carrying one (chip-{{.State}}, l{{.Level}})
+// is skipped; the rules for the concrete values cover those.
 func TestEveryTemplateClassHasARule(t *testing.T) {
 	css := string(StyleCSS)
 	// Every ".name" that appears in a selector position: outside braces.
@@ -73,9 +72,12 @@ func TestEveryTemplateClassHasARule(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		clean := actionRe.ReplaceAllString(string(src), " ")
+		clean := actionRe.ReplaceAllString(string(src), "\x00")
 		for _, m := range attrRe.FindAllStringSubmatch(clean, -1) {
 			for _, c := range strings.Fields(m[1]) {
+				if strings.Contains(c, "\x00") {
+					continue // composed at render time; the concrete values have rules
+				}
 				if !styled[c] {
 					missing[c] = append(missing[c], e.Name())
 				}
