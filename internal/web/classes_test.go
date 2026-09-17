@@ -9,10 +9,10 @@ import (
 )
 
 // TestEveryTemplateClassHasARule fails on a class a template uses that
-// no selector in style.css mentions. Class tokens containing template
-// actions ({{...}}) are composed at render time and skipped; their
-// prefixes (chip-, badge-, check-, lang-) are covered by the rules for
-// the concrete values.
+// no selector in style.css mentions. Template actions are removed before
+// matching, so a class composed at render time (chip-{{.State}})
+// contributes only its literal part; the rules for the concrete values
+// cover the rest.
 func TestEveryTemplateClassHasARule(t *testing.T) {
 	css := string(StyleCSS)
 	// Every ".name" that appears in a selector position: outside braces.
@@ -62,6 +62,7 @@ func TestEveryTemplateClassHasARule(t *testing.T) {
 	}
 
 	attrRe := regexp.MustCompile(`class="([^"]*)"`)
+	actionRe := regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 	missing := map[string][]string{}
 	entries, err := fs.ReadDir(templateFS, "templates")
 	if err != nil {
@@ -72,11 +73,9 @@ func TestEveryTemplateClassHasARule(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, m := range attrRe.FindAllStringSubmatch(string(src), -1) {
+		clean := actionRe.ReplaceAllString(string(src), " ")
+		for _, m := range attrRe.FindAllStringSubmatch(clean, -1) {
 			for _, c := range strings.Fields(m[1]) {
-				if strings.Contains(c, "{{") || strings.Contains(c, "}}") {
-					continue
-				}
 				if !styled[c] {
 					missing[c] = append(missing[c], e.Name())
 				}
