@@ -3,7 +3,10 @@
 {{$base := printf "/%s/%s/mrs/%d" .Repo.OwnerName .Repo.Name .MR.Number}}
 <h1 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h1>
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{if eq .MR.State "source_gone"}}source gone{{else}}{{.MR.State}}{{end}}</span>{{if .MR.Draft}} <span class="chip chip-neutral">draft</span>{{end}}
-  {{if eq .MR.State "merged"}}merged by <a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a> on {{when .MR.MergedAt}}{{else if eq .MR.State "closed"}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a> on {{when .MR.ClosedAt}}{{else}}opened by <a href="/{{.MR.Author}}">{{.MR.Author}}</a> on {{when .MR.CreatedAt}}{{end}}
+  {{if and (eq .MR.State "merged") .MR.MergedBy}}merged by <a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a>{{with .MR.MergedAt}} on {{when .}}{{end}}
+  {{else if and (eq .MR.State "closed") .MR.ClosedBy}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a>{{with .MR.ClosedAt}} on {{when .}}{{end}}
+  {{else if or (eq .MR.State "merged") (eq .MR.State "closed")}}{{if eq .MR.State "merged"}}merged{{else}}closed without merging{{end}}
+  {{else}}opened by <a href="/{{.MR.Author}}">{{.MR.Author}}</a> on {{when .MR.CreatedAt}}{{end}}
   · <code>{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
 {{with field . "StackedOn"}}<p class="meta">Stacked on <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">!{{.Number}} {{.Title}}</a>: merges into its branch until that lands, then onto its target.</p>{{end}}
 {{with field . "Stacked"}}<p class="meta">Builds on this: {{range $i, $k := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$k.Number}}">!{{$k.Number}} {{$k.Title}}</a>{{end}}. Merging with squash or rebase is refused while they are open.</p>{{end}}

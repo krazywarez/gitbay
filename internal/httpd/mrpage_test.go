@@ -63,7 +63,8 @@ func testMR(state string) store.MR {
 }
 
 // The header states what happened to the MR: who opened, merged, or closed
-// it, and when.
+// it, and when. A merge or close with no stamp (imports, pre-0029 merges)
+// names the state without claiming a byline it cannot back up.
 func TestMRHeaderByState(t *testing.T) {
 	open := renderMR(t, testMR("open"), nil, nil)
 	if !strings.Contains(open, "opened by") {
@@ -90,10 +91,21 @@ func TestMRHeaderByState(t *testing.T) {
 	}
 
 	// Imports and pre-0029 merges carry no stamp; the wording drops the
-	// claim rather than inventing a time.
+	// byline claim rather than naming nobody or inventing a time.
 	out = renderMR(t, testMR("merged"), nil, nil)
-	if strings.Contains(out, "opened by") || strings.Contains(out, " on 20") {
+	if strings.Contains(out, "opened by") || strings.Contains(out, " on 20") || strings.Contains(out, "merged by") {
 		t.Errorf("unstamped merged header:\n%s", out)
+	}
+	if !strings.Contains(out, "merged") {
+		t.Errorf("unstamped merged header drops the state entirely:\n%s", out)
+	}
+
+	out = renderMR(t, testMR("closed"), nil, nil)
+	if strings.Contains(out, "opened by") || strings.Contains(out, " on 20") || strings.Contains(out, "closed without merging by") {
+		t.Errorf("unstamped closed header:\n%s", out)
+	}
+	if !strings.Contains(out, "without merging") {
+		t.Errorf("unstamped closed header drops the state entirely:\n%s", out)
 	}
 }
 
