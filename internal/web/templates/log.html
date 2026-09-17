@@ -4,7 +4,7 @@
 <form method="get" class="logfilter" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">
   <label for="path">Path</label>
   <input type="text" id="path" name="path" value="{{.FilePath}}" placeholder="filter to a file or directory">
-  <button type="submit" class="btn">Search</button>
+  <button type="submit" class="btn">Filter</button>
   {{if .FilePath}}<a class="act" href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}">Clear</a>{{end}}
 </form>
 {{if .FilePath}}<p class="meta">history of <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.FilePath}}"><code>{{.FilePath}}</code></a></p>{{end}}

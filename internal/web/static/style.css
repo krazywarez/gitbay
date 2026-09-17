@@ -859,10 +859,10 @@ ul.loglist li {
 ul.loglist li:last-child { border-bottom: 0; }
 ul.loglist li:hover { background: var(--hover); }
 ul.loglist p { margin: 0; }
-ul.loglist .commitmain { flex: 1; min-width: 0; }
+ul.loglist .commitmain { flex: 1 1 auto; min-width: 0; }
 ul.loglist .subject a { color: var(--fg); font-weight: 500; }
 ul.loglist .subject a:hover { color: var(--link); }
-ul.loglist .commitside { display: flex; align-items: baseline; gap: var(--sp-2); white-space: nowrap; }
+ul.loglist .commitside { flex: none; display: flex; gap: var(--sp-2); align-items: center; white-space: nowrap; }
 
 ul.repolist { list-style: none; margin: var(--sp-3) 0 var(--sp-5); padding: 0; }
 ul.repolist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
@@ -901,7 +901,7 @@ ul.issuelist li:last-child { border-bottom: 0; }
 ul.issuelist li:hover { background: var(--hover); }
 ul.issuelist li.empty { display: block; }
 ul.issuelist p { margin: 0; }
-ul.issuelist .issuemain { flex: 1; min-width: 0; }
+ul.issuelist .issuemain { flex: 1 1 auto; min-width: 0; }
 ul.issuelist .title a { color: var(--fg); font-weight: 500; }
 ul.issuelist .title a:hover { color: var(--link); }
 
@@ -1494,4 +1494,6 @@ svg.icon { vertical-align: -0.125em; }
   .blameinfo { width: auto; }
   .blamecode { border-left: 0; padding-left: var(--sp-3); width: 100%; }
   .factgrid { grid-template-columns: repeat(2, auto); }
+  ul.loglist li { flex-wrap: wrap; }
+  ul.loglist .commitside { width: 100%; justify-content: flex-start; }
 }
