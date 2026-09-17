@@ -348,6 +348,8 @@ func TestTreeSearchCodeAndClone(t *testing.T) {
 	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
 	dir := filepath.Join(work, "w")
 	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# app\n"), 0o644)
+	os.MkdirAll(filepath.Join(dir, "docs"), 0o755)
+	os.WriteFile(filepath.Join(dir, "docs", "README.md"), []byte("# docs\n"), 0o644)
 	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "init")
@@ -361,5 +363,9 @@ func TestTreeSearchCodeAndClone(t *testing.T) {
 	}
 	if !strings.Contains(body, `<label>SSH</label>`) || !strings.Contains(body, `<label>HTTPS</label>`) {
 		t.Error("clone blocks are not labelled")
+	}
+	// Clone and about belong to the repository root, not a subdirectory.
+	if _, sub := inst.get(t, "/alice/app/tree/main/docs"); strings.Contains(sub, `<div class="facts">`) {
+		t.Error("subdirectory listing still shows the clone/about facts block")
 	}
 }

@@ -29,7 +29,7 @@
 <div class="cardhead"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.Prefix}}{{.ReadmeName}}">{{.ReadmeName}}</a></div>
 <div class="rendered">{{.ReadmeHTML}}</div>
 </section>{{end}}
-{{if .Entries}}<div class="facts">
+{{if and .Entries (not .DirPath)}}<div class="facts">
   <div class="clone">
     <h2>Clone</h2>
     <label>SSH</label><pre><code>git clone {{.SSHCloneURL}}</code></pre>
