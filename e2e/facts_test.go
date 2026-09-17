@@ -46,9 +46,9 @@ func TestRepoFacts(t *testing.T) {
 		t.Fatalf("repo home: %d", status)
 	}
 	for _, want := range []string{
-		"<strong>2</strong> commit", // both commits counted
-		"<strong>1</strong> branch",
-		"<strong>1</strong> tag",
+		"<b>2</b> commit", // both commits counted
+		"<b>1</b> branch",
+		"<b>1</b> tag",
 		"0BSD",  // license detected and surfaced
 		"Go",    // language census
 		"Shell", // and it is not single-language

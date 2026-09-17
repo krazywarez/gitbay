@@ -335,3 +335,31 @@ func TestAuthorNamesResolve(t *testing.T) {
 		t.Fatalf("tipbar name is not a link:\n%s", tree)
 	}
 }
+
+// TestTreeSearchCodeAndClone: the overview links "Search code", not
+// "Find file", and shows two labelled clone blocks after the file table.
+func TestTreeSearchCodeAndClone(t *testing.T) {
+	inst := startInstance(t)
+	key := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")
+	inst.ssh(t, key, "", "repo", "create", "alice/app")
+	work := t.TempDir()
+	env := inst.gitEnv(key)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# app\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "init")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	_, body := inst.get(t, "/alice/app")
+	if strings.Contains(body, ">Find file<") || !strings.Contains(body, ">Search code<") {
+		t.Error("overview still says Find file")
+	}
+	if i, j := strings.Index(body, `<table class="tree">`), strings.Index(body, `<div class="clone">`); i < 0 || j < i {
+		t.Error("clone block does not follow the file table")
+	}
+	if !strings.Contains(body, `<label>SSH</label>`) || !strings.Contains(body, `<label>HTTPS</label>`) {
+		t.Error("clone blocks are not labelled")
+	}
+}

@@ -61,7 +61,7 @@ func TestBookmarks(t *testing.T) {
 	}
 
 	// The count is public and shows on the repository page.
-	if _, body := inst.get(t, "/alice/app"); !strings.Contains(body, "1</strong> bookmark") {
+	if _, body := inst.get(t, "/alice/app"); !strings.Contains(body, "1</b> bookmark") {
 		t.Errorf("count not on the repo page:\n%s", body)
 	}
 
