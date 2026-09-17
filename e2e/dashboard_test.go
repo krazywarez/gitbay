@@ -61,7 +61,7 @@ func TestDashboard(t *testing.T) {
 
 	// Anonymous homepage: landing with explore link, repos on /explore.
 	status, body := inst.get(t, "/")
-	if status != 200 || !strings.Contains(body, `href="/explore"`) || !strings.Contains(body, "CLI-first") {
+	if status != 200 || !strings.Contains(body, `href="/explore"`) || !strings.Contains(body, "A git forge you drive from the terminal") {
 		t.Fatalf("landing: %d", status)
 	}
 	if strings.Contains(body, "alice/app") {
