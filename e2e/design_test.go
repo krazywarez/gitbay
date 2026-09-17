@@ -139,14 +139,41 @@ func TestReadmeRelativeLinks(t *testing.T) {
 			t.Errorf("explore row missing %q", want)
 		}
 	}
-	// The repo header renders the same on every tab of the repo. It sits
-	// above the tab bar, so anything that appears on one tab and not
-	// another moves the navigation between clicks of that navigation.
-	for _, page := range []string{"", "/issues", "/mrs", "/releases"} {
-		_, body := inst.get(t, "/alice/site"+page)
-		if !strings.Contains(body, `href="/explore?q=web"`) {
-			t.Errorf("repo header topics missing on /alice/site%s", page)
+	// The description and topics belong to the code tab; task tabs render
+	// only the identity row and the tab bar.
+	for _, p := range []string{"/alice/site/issues", "/alice/site/mrs", "/alice/site/releases"} {
+		if _, body := inst.get(t, p); strings.Contains(body, `class="chip topic"`) {
+			t.Errorf("%s: header still carries topics on a task tab", p)
 		}
+	}
+	if _, body := inst.get(t, "/alice/site"); !strings.Contains(body, `class="chip topic"`) {
+		t.Error("repo home lost its topics")
+	}
+}
+
+// TestLandingRoutes checks the landing page's copy and the two routes.
+func TestLandingRoutes(t *testing.T) {
+	smtp := startFakeSMTP(t)
+	inst := startInstanceWith(t, fmt.Sprintf(
+		"[web]\nmode = \"accounts\"\n[registration]\nmode = \"open\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
+		smtp.addr))
+	_, body := inst.get(t, "/")
+	for _, want := range []string{
+		"A git forge you drive from the terminal.",
+		`class="button primary" href="/explore">Explore repositories</a>`,
+		`class="button btn" href="/register">Create an account</a>`,
+		"web login</code>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("landing lacks %q", want)
+		}
+	}
+	if strings.Contains(body, "is the whole onboarding") {
+		t.Error("landing still calls repo create the whole onboarding")
+	}
+	_, reg := inst.get(t, "/register")
+	if !strings.Contains(reg, "Paste the contents of your public key file") || !strings.Contains(reg, "/krz/gitbay/wiki/SSH-keys") {
+		t.Error("register page lacks the key hint or the wiki link")
 	}
 }
 

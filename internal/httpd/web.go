@@ -161,12 +161,19 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		s.cfg.Server.SiteURL, "https://"), "http://"), "/")
 	s.render(w, "landing.html", struct {
 		basePage
-		Host     string
-		Accounts bool
-		Signup   bool
+		Host       string
+		Accounts   bool
+		Signup     bool
+		Picture    bool
+		EmailLogin bool
 	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, host, s.cfg.Web.Mode == "accounts",
-		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed"})
+		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed",
+		landingPicture, s.emailLoginEnabled()})
 }
+
+// landingPicture says whether the landing page's screenshot images exist to
+// show. Task 15 replaces this with a check of the embedded images.
+var landingPicture = false
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {
 	pinned, _ := s.st.PinnedRepos(viewer.ID)

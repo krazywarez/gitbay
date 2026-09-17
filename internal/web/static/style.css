@@ -417,7 +417,6 @@ footer a:hover { color: var(--link); }
   font-size: var(--fs-2);
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
 }
-.repohead .topics { margin: var(--sp-2) 0 0; }
 .repometa { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-1); }
 .toggles { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-1); }
 
@@ -1369,6 +1368,7 @@ details.refmenu .refdrop a.allrefs {
    readable on the templates that do not set one yet */
 .landing { max-width: 48rem; padding: var(--sp-6) 0; }
 .landing h1 { font-size: var(--fs-6); display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.landing h1 .mark { width: 32px; height: 32px; }
 .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.5; max-width: 40rem; margin: 0 0 var(--sp-5); }
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
@@ -1377,7 +1377,6 @@ pre.quickstart { margin: 0 0 var(--sp-4); }
 .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
 .facets p { color: var(--muted); font-size: var(--fs-2); margin: 0; }
 .routes { display: flex; gap: var(--sp-3); align-items: center; margin: var(--sp-5) 0 var(--sp-3); }
-.explorelink { font-weight: 500; }
 
 /* ---- profile ---- */
 .profilehead { border-bottom: 1px solid var(--faint); padding-bottom: var(--sp-4); margin-bottom: var(--sp-4); }

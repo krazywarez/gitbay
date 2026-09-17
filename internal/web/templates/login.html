@@ -10,8 +10,8 @@ expires in fifteen minutes.</p>
 {{else}}
 {{if .EmailLogin}}
 <form method="post" action="/login">
-  <label for="identifier">Username or email address</label>
-  <input type="text" id="identifier" name="identifier" autocomplete="username" required>
+  <div class="field"><label for="identifier">Username or email address</label>
+  <input type="text" id="identifier" name="identifier" autocomplete="username" required></div>
   <button type="submit">Email me a link</button>
 </form>
 <p>Or, from a machine with your registered key:</p>

@@ -71,13 +71,13 @@
     <form method="post" action="/{{.OwnerName}}/{{.Name}}/fork" class="inline"><button type="submit" class="btn">Fork</button></form>{{end}}
   </div>
   {{$top := topTab (str $ "Tab")}}
-  {{/* The header is the same on every tab: it sits above the tab bar,
-       and anything shown on one tab and not another would move the
-       navigation between clicks of that navigation. */}}
-  {{with field $ "Desc"}}<p class="repodesc">{{.}}</p>{{end}}
-  {{with field $ "Topics"}}<p class="topics">{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
-  {{with $.Repo.Settings.Website}}<p class="repometa"><a href="{{.}}" rel="nofollow">{{.}}</a></p>{{end}}
-  {{range field $ "Mirrors"}}<p class="repometa">{{if eq .Direction "push"}}Mirrors to{{else}}Mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}} · <span class="bad">sync error: {{.Error}}</span>{{else if .Synced}} · synced {{.Synced}}{{end}}</p>
+  {{/* Description, topics and metadata belong to the code tab. On task
+       tabs only the identity row and the tab bar render, and the header
+       is identical on every page within a tab. */}}
+  {{if eq $top "code"}}
+  <p class="repodesc">{{with field $ "Desc"}}{{.}}{{end}} {{with field $ "Topics"}}{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}{{end}}</p>
+  {{if or $.Repo.Settings.Website (field $ "Mirrors")}}<p class="repometa">{{with $.Repo.Settings.Website}}<a href="{{.}}" rel="nofollow">{{.}}</a>{{end}}{{range field $ "Mirrors"}} · {{if eq .Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{.URL}}" rel="nofollow">{{.Target}}</a>{{if .Error}}, <span class="bad">sync error: {{.Error}}</span>{{else if .Synced}}, synced {{.Synced}}{{end}}{{end}}</p>{{end}}
+  {{if $.Viewer}}<p class="toggles">Pinned shows in your rail. Watching sends every issue, request and build to your inbox. Bookmarked lists it under Bookmarks.</p>{{end}}
   {{end}}
   <nav class="tabs" aria-label="Repository">
     <a {{if eq $top "code"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}">Code</a>
