@@ -162,6 +162,25 @@
     --shell-hover: #141414;
     --shell-mark: #ff6b3d;
 
+    /* the languages' own colours; the same in both schemes */
+    --lang-go: #00add8;
+    --lang-rust: #dea584;
+    --lang-c: #555555;
+    --lang-python: #3572a5;
+    --lang-javascript: #f1e05a;
+    --lang-typescript: #3178c6;
+    --lang-shell: #89e051;
+    --lang-ruby: #701516;
+    --lang-java: #b07219;
+    --lang-swift: #f05138;
+    --lang-html: #e34c26;
+    --lang-css: #563d7c;
+    --lang-org: #77aa99;
+    --lang-markdown: #083fa1;
+    --lang-emacs-lisp: #c065db;
+    --lang-nix: #7e7eff;
+    --lang-sql: #e38c00;
+
     --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a3a9b3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
@@ -304,7 +323,7 @@ ul.raillist.wide .owner { display: block; font-size: var(--fs-0); }
 }
 .count {
   font-size: var(--fs-0);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0;
   background: var(--shell-mark);
   color: var(--shell-bg);
@@ -1165,7 +1184,6 @@ table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underli
    ground and the face */
 .chroma { font-family: var(--mono); background: none; }
 
-.blame { border-radius: var(--r-card); }
 .blamehunk { display: flex; gap: var(--sp-3); border-top: 1px solid var(--line); align-items: flex-start; }
 .blamehunk:first-child { border-top: 0; }
 .blameinfo { flex: none; width: 17rem; min-width: 0; padding: var(--sp-2) var(--sp-3); }
@@ -1193,39 +1211,39 @@ table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underli
 
 /* ---- chips and badges ---- */
 .chip, .badge {
-  --c: var(--neutral);
+  --chip: var(--neutral);
   display: inline-block;
   padding: 1px 8px;
   border-radius: var(--r-ctl);
   font-size: var(--fs-0);
   font-weight: 500;
   line-height: 1.5;
-  color: var(--c);
-  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
-  background: color-mix(in srgb, var(--c) 10%, transparent);
+  color: var(--chip);
+  border: 1px solid color-mix(in srgb, var(--chip) 40%, transparent);
+  background: color-mix(in srgb, var(--chip) 10%, transparent);
   white-space: nowrap;
   vertical-align: middle;
 }
-.chip-open { --c: var(--ok); }
-.chip-closed { --c: var(--bad); }
-.chip-merged, .chip-done { --c: var(--done); }
-.chip-neutral, .chip-source_gone { --c: var(--neutral); }
-.chip-stale { --c: var(--warn); }
-.chip.topic { --c: var(--link); }
-.chip.topic:hover { text-decoration: none; background: color-mix(in srgb, var(--c) 18%, transparent); }
+.chip-open { --chip: var(--ok); }
+.chip-closed { --chip: var(--bad); }
+.chip-merged, .chip-done { --chip: var(--done); }
+.chip-neutral, .chip-source_gone { --chip: var(--neutral); }
+.chip-stale { --chip: var(--warn); }
+.chip.topic { --chip: var(--link); }
+.chip.topic:hover { text-decoration: none; background: color-mix(in srgb, var(--chip) 18%, transparent); }
 /* a label carries its own colour inline, from the label's hex */
 .chip.label { font-weight: 500; }
-.badge-verified { --c: var(--ok); }
-.badge-unsigned { --c: var(--neutral); }
-.badge-signed_unknown_key, .badge-signed_key_expired { --c: var(--warn); }
-.badge-signed_email_mismatch, .badge-signed_key_revoked, .badge-bad_signature { --c: var(--bad); }
-.badge.check-success, .chip.check-success { --c: var(--ok); }
+.badge-verified { --chip: var(--ok); }
+.badge-unsigned { --chip: var(--neutral); }
+.badge-signed_unknown_key, .badge-signed_key_expired { --chip: var(--warn); }
+.badge-signed_email_mismatch, .badge-signed_key_revoked, .badge-bad_signature { --chip: var(--bad); }
+.badge.check-success, .chip.check-success { --chip: var(--ok); }
 .badge.check-pending, .chip.check-pending,
-.badge.check-running, .chip.check-running { --c: var(--warn); }
+.badge.check-running, .chip.check-running { --chip: var(--warn); }
 .badge.check-failure, .chip.check-failure,
-.badge.check-error, .chip.check-error { --c: var(--bad); }
+.badge.check-error, .chip.check-error { --chip: var(--bad); }
 .badge.check-cancelled, .chip.check-cancelled,
-.badge.check-skipped, .chip.check-skipped { --c: var(--neutral); }
+.badge.check-skipped, .chip.check-skipped { --chip: var(--neutral); }
 span.check-success { color: var(--ok); }
 span.check-pending, span.check-running { color: var(--warn); }
 span.check-failure, span.check-error { color: var(--bad); }
@@ -1353,7 +1371,7 @@ details.refmenu .refdrop a.allrefs {
 .landing h1 { font-size: var(--fs-6); display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.5; max-width: 40rem; margin: 0 0 var(--sp-5); }
 pre.quickstart { margin: 0 0 var(--sp-4); }
-.shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; box-shadow: var(--shadow); }
+.shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
 .shot img { display: block; width: 100%; }
 .facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); margin: var(--sp-5) 0; }
 .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
