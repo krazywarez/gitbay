@@ -32,11 +32,6 @@
 
 <aside class="aside">
   <div class="grp">
-    <h2>Pinned</h2>
-    {{range .Pinned}}<p class="row"><a href="/{{.OwnerName}}/{{.Name}}"><span class="owner">{{.OwnerName}}/</span>{{.Name}}</a>{{if eq .Visibility "private"}} <span class="chip">Private</span>{{end}}</p>
-    {{else}}<p class="none">Pin a repository to keep it here</p>{{end}}
-  </div>
-  <div class="grp">
     <h2>Recent activity</h2>
     {{range .Feed}}<p class="row feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}">{{.Ref}}</a><br><span class="none">{{.Repo}} · {{when .When}}</span></p>
     {{else}}<p class="none">No activity yet</p>{{end}}
