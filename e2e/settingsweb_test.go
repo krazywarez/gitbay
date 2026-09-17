@@ -39,15 +39,27 @@ func TestRepoSettingsWeb(t *testing.T) {
 		return body
 	}
 
+	if body := post(url.Values{"field": {"description"}, "description": {"a thing"}}); !strings.Contains(body, `class="notice" role="status">Saved the description.`) {
+		t.Fatalf("no success flash after saving the description:\n%s", body)
+	}
+	if body := post(url.Values{"field": {"topics"}, "topics": {"cli, forge"}}); !strings.Contains(body, `value="cli, forge"`) {
+		t.Fatalf("topics field is not prefilled after save:\n%s", body)
+	}
+	if body := post(url.Values{"field": {"topics"}, "topics": {"forge"}}); strings.Contains(body, `>cli<`) || !strings.Contains(body, `value="forge"`) {
+		t.Fatalf("removing a topic through the field failed:\n%s", body)
+	}
+	if body := post(url.Values{"field": {"website"}, "website": {"javascript:alert(1)"}}); !strings.Contains(body, `class="error"`) || !strings.Contains(body, `value="javascript:alert(1)"`) {
+		t.Fatalf("error does not keep the submitted website:\n%s", body)
+	}
+
 	post(url.Values{"field": {"description"}, "description": {"a fine tool"}})
 	post(url.Values{"field": {"website"}, "website": {"https://tool.example"}})
-	post(url.Values{"field": {"topics"}, "add": {"cli forge"}})
 	post(url.Values{"field": {"require-checks"}, "require-checks": {"on"}})
 	post(url.Values{"field": {"require-approvals"}, "approvals": {"2"}})
 	post(url.Values{"field": {"protect"}, "branch": {"main"}})
 
 	out, _, _ := inst.ssh(t, aliceKey, "", "repo", "show", "alice/app", "--json")
-	for _, want := range []string{"a fine tool", "https://tool.example", `"cli"`, `"forge"`} {
+	for _, want := range []string{"a fine tool", "https://tool.example", `"forge"`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("repo show missing %q:\n%s", want, out)
 		}
@@ -83,12 +95,9 @@ func TestRepoSettingsWeb(t *testing.T) {
 		t.Fatalf("still archived:\n%s", out)
 	}
 
-	// Unprotecting works, and a refusal surfaces the command's message.
+	// Unprotecting works.
 	post(url.Values{"field": {"unprotect"}, "branch": {"main"}})
 	if out, _, _ := inst.ssh(t, aliceKey, "", "repo", "settings", "show", "alice/app", "--json"); strings.Contains(out, `"protected_branches"`) {
 		t.Fatalf("branch still protected:\n%s", out)
-	}
-	if body := post(url.Values{"field": {"website"}, "website": {"javascript:alert(1)"}}); !strings.Contains(body, `class="error"`) {
-		t.Fatalf("bad website accepted:\n%s", body)
 	}
 }

@@ -62,6 +62,7 @@ var fullVersion = sync.OnceValue(func() string {
 var funcs = template.FuncMap{
 	"gitbayVersion": func() string { return version() },
 	"gitbayCommit":  func() string { return fullVersion() },
+	"join":          strings.Join,
 	// paragraphs splits plain text on blank lines for safe rich display.
 	"paragraphs": func(s string) []string {
 		var out []string

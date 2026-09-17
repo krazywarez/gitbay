@@ -3,6 +3,8 @@ package httpd
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
@@ -23,9 +25,18 @@ type settingsPage struct {
 	Deps        control.DepsOut
 	Runners     []store.RepoRunner
 	Notice      string
+	Saved       bool
+	Submitted   map[string]string
 }
 
 func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.settingsFormWith(w, r, u, s.takeFlash(w, r), nil)
+}
+
+// settingsFormWith renders the page with the given notice. submitted is
+// nil on a plain GET; on a failed POST it carries the values the visitor
+// typed, so a rejected value is not silently dropped.
+func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u store.User, notice string, submitted url.Values) {
 	repo, ok := s.repoForUser(w, r, u, policyCanAdmin)
 	if !ok {
 		return
@@ -44,11 +55,21 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.Us
 	s.runControlInto(u, []string{"repo", "deps", "status", repo.Path()}, &deps)
 	var runners []store.RepoRunner
 	s.runControlInto(u, []string{"repo", "runner", "list", repo.Path()}, &runners)
+	var subm map[string]string
+	if submitted != nil {
+		subm = map[string]string{
+			"description": submitted.Get("description"),
+			"website":     submitted.Get("website"),
+			"topics":      submitted.Get("topics"),
+		}
+	}
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: deps.Enabled, Deps: deps,
-		Runners: runners,
-		Notice:  s.takeFlash(w, r),
+		Runners:   runners,
+		Notice:    notice,
+		Saved:     strings.HasPrefix(notice, "Saved "),
+		Submitted: subm,
 	})
 }
 
@@ -63,9 +84,10 @@ func (s *Server) settingsRedirect(w http.ResponseWriter, r *http.Request, msg st
 func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
 	v := func(k string) string { return strings.TrimSpace(r.FormValue(k)) }
+	field := r.FormValue("field")
 
 	var argv []string
-	switch r.FormValue("field") {
+	switch field {
 	case "description":
 		argv = []string{"repo", "settings", "description", repo, v("description")}
 	case "website":
@@ -109,12 +131,45 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		}
 		argv = []string{"repo", verb, repo}
 	case "topics":
-		if add := strings.Fields(v("add")); len(add) > 0 {
+		row, err := s.st.RepoByPath(repo)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		want := map[string]bool{}
+		var order []string
+		for _, t := range strings.Split(v("topics"), ",") {
+			if t = strings.ToLower(strings.TrimSpace(t)); t != "" && !want[t] {
+				want[t] = true
+				order = append(order, t)
+			}
+		}
+		have, err := s.st.ListTopics(row.ID)
+		if err != nil {
+			s.settingsRedirect(w, r, err.Error())
+			return
+		}
+		var add, remove []string
+		for _, t := range order {
+			if !slices.Contains(have, t) {
+				add = append(add, t)
+			}
+		}
+		for _, t := range have {
+			if !want[t] {
+				remove = append(remove, t)
+			}
+		}
+		if len(remove) > 0 {
+			if _, msg, ok := s.runControl(u, append([]string{"repo", "topics", "remove", repo}, remove...)); !ok {
+				s.settingsFormWith(w, r, u, msg, r.Form)
+				return
+			}
+		}
+		if len(add) > 0 {
 			argv = append([]string{"repo", "topics", "add", repo}, add...)
-		} else if rm := strings.Fields(v("remove")); len(rm) > 0 {
-			argv = append([]string{"repo", "topics", "remove", repo}, rm...)
 		} else {
-			s.settingsRedirect(w, r, "name at least one topic")
+			s.settingsRedirect(w, r, "Saved the topics.")
 			return
 		}
 	case "runner-add":
@@ -138,9 +193,54 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 
 	_, msg, ok := s.runControl(u, argv)
 	if ok {
-		msg = ""
+		s.settingsRedirect(w, r, "Saved the "+fieldLabel(field)+".")
+		return
 	}
-	s.settingsRedirect(w, r, msg)
+	s.settingsFormWith(w, r, u, msg, r.Form)
+}
+
+// fieldLabel names a settings field for the saved flash and, on
+// rejection, the error notice — lower case, matching the label beside
+// its control.
+func fieldLabel(field string) string {
+	switch field {
+	case "description":
+		return "description"
+	case "website":
+		return "website"
+	case "visibility":
+		return "visibility"
+	case "default-branch":
+		return "default branch"
+	case "git-daemon":
+		return "git:// serving"
+	case "require-checks":
+		return "required checks"
+	case "require-approvals":
+		return "approvals"
+	case "require-resolved":
+		return "review threads"
+	case "require-codeowners":
+		return "CODEOWNERS"
+	case "require-mr":
+		return "require-MR"
+	case "require-signed":
+		return "signed commits"
+	case "protect", "unprotect":
+		return "protected branch"
+	case "protect-tag", "unprotect-tag":
+		return "protected tag"
+	case "deps":
+		return "dependency scanning"
+	case "archive":
+		return "archive"
+	case "topics":
+		return "topics"
+	case "runner-add", "runner-remove":
+		return "runner"
+	default:
+		return field
+	}
 }
 
 // onOff normalises a checkbox to the on|off the commands take.
