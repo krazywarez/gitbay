@@ -1868,6 +1868,16 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			files, diffTruncated = parseDiff(patch), truncated
 		}
 	}
+	// The head is already reachable from the target, so the diff is empty
+	// by construction rather than because nothing changed.
+	headMerged := false
+	if len(files) == 0 && m.HeadSHA != "" {
+		if targetSHA, err := gitutil.ResolveRef(p.Dir, "refs/heads/"+m.TargetRef); err == nil {
+			if ok, err := gitutil.IsAncestor(p.Dir, m.HeadSHA, targetSHA); err == nil {
+				headMerged = ok
+			}
+		}
+	}
 	md := s.ugcFor(r, p.Repo)
 	canWrite := s.canWriteRepo(r, p.Repo)
 	var detachedThreads []diffThread
@@ -1963,10 +1973,12 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Stacked         []store.MR
 		Gates           *control.GatesOut
 		SourceGone      bool
+		HeadMerged      bool
+		Base            string
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates,
-		sourceGone(p, m)})
+		sourceGone(p, m), headMerged, base})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the

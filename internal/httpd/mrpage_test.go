@@ -34,6 +34,8 @@ type mrPageData struct {
 	DetachedThreads []diffThread
 	Gates           *control.GatesOut
 	SourceGone      bool
+	HeadMerged      bool
+	Base            string
 }
 
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
@@ -60,12 +62,12 @@ func testMR(state string) store.MR {
 		HeadSHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b"}
 }
 
-// The header states what happened to the MR. "wants to merge" is only true
-// while it is still open.
+// The header states what happened to the MR: who opened, merged, or closed
+// it, and when.
 func TestMRHeaderByState(t *testing.T) {
 	open := renderMR(t, testMR("open"), nil, nil)
-	if !strings.Contains(open, "wants to merge") {
-		t.Errorf("open MR does not say wants to merge:\n%s", open)
+	if !strings.Contains(open, "opened by") {
+		t.Errorf("open MR does not say who opened it:\n%s", open)
 	}
 
 	merged := testMR("merged")
@@ -76,21 +78,21 @@ func TestMRHeaderByState(t *testing.T) {
 			t.Errorf("merged header missing %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "wants to merge") {
-		t.Errorf("merged MR still wants to merge:\n%s", out)
+	if strings.Contains(out, "opened by") {
+		t.Errorf("merged MR still says it was opened:\n%s", out)
 	}
 
 	closed := testMR("closed")
 	closed.ClosedAt, closed.ClosedBy = "2026-08-27T14:03:11.000Z", "cmc"
 	out = renderMR(t, closed, nil, nil)
-	if !strings.Contains(out, "without merging") || strings.Contains(out, "wants to merge") {
+	if !strings.Contains(out, "without merging") || strings.Contains(out, "opened by") {
 		t.Errorf("closed header:\n%s", out)
 	}
 
 	// Imports and pre-0029 merges carry no stamp; the wording drops the
 	// claim rather than inventing a time.
 	out = renderMR(t, testMR("merged"), nil, nil)
-	if strings.Contains(out, "wants to merge") || strings.Contains(out, " on 20") {
+	if strings.Contains(out, "opened by") || strings.Contains(out, " on 20") {
 		t.Errorf("unstamped merged header:\n%s", out)
 	}
 }

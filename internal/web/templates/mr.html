@@ -1,20 +1,10 @@
-{{define "mrrange"}}<code>{{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}}</code> into <code>{{.TargetRef}}</code>{{end}}
 {{define "title"}}!{{.MR.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{$base := printf "/%s/%s/mrs/%d" .Repo.OwnerName .Repo.Name .MR.Number}}
 <h1 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h1>
-<p class="issuemeta">{{if .MR.Draft}}<span class="chip chip-neutral">draft</span> {{end}}<span class="chip chip-{{.MR.State}}">{{.MR.State}}</span>
-{{if and (eq .MR.State "merged") .MR.MergedAt}}
-  {{if .MR.MergedBy}}<a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a> merged{{else}}Merged{{end}}
-  {{template "mrrange" .MR}} on {{when .MR.MergedAt}}
-{{else if and (eq .MR.State "closed") .MR.ClosedAt}}
-  {{if .MR.ClosedBy}}<a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a> closed this{{else}}Closed{{end}}
-  without merging {{template "mrrange" .MR}} on {{when .MR.ClosedAt}}
-{{else if or (eq .MR.State "merged") (eq .MR.State "closed")}}
-  {{template "mrrange" .MR}}
-{{else}}
-  <a href="/{{.MR.Author}}">{{.MR.Author}}</a> wants to merge {{template "mrrange" .MR}}
-{{end}}</p>
+<p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{if eq .MR.State "source_gone"}}source gone{{else}}{{.MR.State}}{{end}}</span>{{if .MR.Draft}} <span class="chip chip-neutral">draft</span>{{end}}
+  {{if eq .MR.State "merged"}}merged by <a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a> on {{when .MR.MergedAt}}{{else if eq .MR.State "closed"}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a> on {{when .MR.ClosedAt}}{{else}}opened by <a href="/{{.MR.Author}}">{{.MR.Author}}</a> on {{when .MR.CreatedAt}}{{end}}
+  · <code>{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
 {{with field . "StackedOn"}}<p class="meta">Stacked on <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">!{{.Number}} {{.Title}}</a>: merges into its branch until that lands, then onto its target.</p>{{end}}
 {{with field . "Stacked"}}<p class="meta">Builds on this: {{range $i, $k := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$k.Number}}">!{{$k.Number}} {{$k.Title}}</a>{{end}}. Merging with squash or rebase is refused while they are open.</p>{{end}}
 
@@ -30,6 +20,7 @@
 </nav>
 
 {{if eq .View "conversation"}}
+<div class="prose">
 {{if .CanEdit}}<details class="editbox"><summary>Edit</summary>
 <form method="post" action="{{$base}}/edit" class="commentform">
 <p><input type="text" name="title" aria-label="Title" value="{{.MR.Title}}" required></p>
@@ -55,6 +46,7 @@
 <p><button type="submit" class="btn">Comment</button></p>
 </form>
 {{end}}
+</div>
 
 {{else if eq .View "commits"}}
 {{if gt .CommitsTotal (len .Commits)}}<p class="meta">first {{len .Commits}} of {{.CommitsTotal}} commits; the rest are in the branch</p>{{end}}
@@ -74,9 +66,10 @@
 </ul>
 
 {{else}}
-<p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span>{{if .DiffTruncated}} · shown up to 4 MiB; the counts and the last file are partial{{end}}</p>
+{{if .DiffFiles}}<p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span>{{if .DiffTruncated}} · shown up to 4 MiB; the counts and the last file are partial{{end}}</p>
 {{if .DiffTruncated}}<p class="error" role="alert">This diff is larger than 4 MiB and is cut off below. Fetch the branch to see all of it.</p>{{end}}
 {{template "difffiles" dict "Files" .DiffFiles "Base" $base "Viewer" .Viewer}}
+{{else}}<p class="empty-note">No changes between the source and target.{{if .HeadMerged}} The source branch was already merged or fast-forwarded into <code>{{.MR.TargetRef}}</code>.{{end}}</p>{{end}}
 {{end}}
 
 </div>
@@ -113,38 +106,6 @@
     </form>
   </div>
   {{end}}
-  {{if and .CanEdit (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
-  <div class="grp">
-    <h2>Target</h2>
-    <form method="post" action="{{$base}}/retarget" class="actions">
-      <label class="none" for="target">Branch</label>
-      <select id="target" name="target">
-        {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.MR.TargetRef}} selected{{end}}>{{.Name}}</option>{{end}}
-      </select>
-      <button type="submit" class="btn">Retarget</button>
-    </form>
-    <p class="row none">Retargeting stales existing reviews.</p>
-  </div>
-  {{end}}
-  <div class="grp">
-    <h2>Reviewers</h2>
-    {{if .MR.ReviewRequests}}<p class="row">{{range .MR.ReviewRequests}}<a href="/{{.}}">{{.}}</a> {{end}}</p>
-    {{else}}<p class="none">nobody yet</p>{{end}}
-    {{if and .CanWrite (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
-    <form method="post" action="{{$base}}/review-request" class="actions">
-      <input type="text" name="add" aria-label="Add reviewers" placeholder="add, space-separated">
-      <input type="text" name="remove" aria-label="Remove reviewers" placeholder="remove">
-      <button type="submit" class="btn">Apply</button>
-    </form>
-    {{end}}
-  </div>
-  <div class="grp">
-    <h2>Reviews</h2>
-    {{range .Reviews}}<p class="row"><span class="dot {{if eq .Verdict "approve"}}ok{{else}}pend{{end}}"></span><a href="/{{.Reviewer}}">{{.Reviewer}}</a> {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}{{if not .Counts}} <span class="chip chip-neutral" title="This reviewer has no write access, so the merge gates do not count it">advisory</span>{{end}}<span class="sub">{{when .CreatedAt}}</span></p>
-    {{else}}<p class="none">none yet</p>{{end}}
-    {{if gt (len .Revisions) 1}}<p class="row none">{{len .Revisions}} revisions pushed. What changed between the last two:
-      <code>gitbay mr range-diff {{.Repo.OwnerName}}/{{.Repo.Name}} {{.MR.Number}}</code></p>{{end}}
-  </div>
   {{with .Gates}}<div class="grp">
     <h2>Merge gates</h2>
     {{if .Unmet}}{{range .Unmet}}<p class="row"><span class="dot bad"></span>{{.}}</p>{{end}}
@@ -160,9 +121,38 @@
     {{else}}<p class="none">No checks reported</p>{{end}}
   </div>
   <div class="grp">
-    <h2>Source</h2>
-    <p class="row"><code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code></p>
-    <p class="row none">into <code>{{.MR.TargetRef}}</code> · {{if eq .MR.State "merged"}}merged at{{else}}head{{end}} <code>{{short .MR.HeadSHA}}</code>{{if .SourceGone}} · <span class="chip chip-neutral">branch deleted</span>{{end}}</p>
+    <h2>Reviews</h2>
+    {{range .Reviews}}<p class="row"><span class="dot {{if eq .Verdict "approve"}}ok{{else}}pend{{end}}"></span><a href="/{{.Reviewer}}">{{.Reviewer}}</a> {{.Verdict}}{{if .Stale}} <span class="chip chip-stale">stale</span>{{end}}{{if not .Counts}} <span class="chip chip-neutral" title="This reviewer has no write access, so the merge gates do not count it">advisory</span>{{end}}<span class="sub">{{when .CreatedAt}}</span></p>
+    {{else}}<p class="none">none yet</p>{{end}}
+    {{if gt (len .Revisions) 1}}<p class="row none">{{len .Revisions}} revisions pushed. What changed between the last two:
+      <code>gitbay mr range-diff {{.Repo.OwnerName}}/{{.Repo.Name}} {{.MR.Number}}</code></p>{{end}}
+  </div>
+  <div class="grp">
+    <h2>Reviewers</h2>
+    {{if .MR.ReviewRequests}}<p class="row">{{range .MR.ReviewRequests}}<a href="/{{.}}">{{.}}</a> {{end}}</p>
+    {{else}}<p class="none">nobody yet</p>{{end}}
+    {{if and .CanWrite (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
+    <form method="post" action="{{$base}}/review-request" class="actions">
+      <input type="text" name="add" aria-label="Add reviewers" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove reviewers" placeholder="remove">
+      <button type="submit" class="btn">Apply</button>
+    </form>
+    {{end}}
+  </div>
+  <div class="grp">
+    <h2>Source and target</h2>
+    <p class="row"><code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
+    <p class="row none">{{if eq .MR.State "merged"}}merged at{{else}}head{{end}} <code>{{short .MR.HeadSHA}}</code>{{if .Base}} · base <code>{{short .Base}}</code>{{end}}{{if .SourceGone}} · <span class="chip chip-neutral">branch deleted</span>{{end}}</p>
+    {{if and .CanEdit (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
+    <form method="post" action="{{$base}}/retarget" class="actions">
+      <label class="none" for="target">Branch</label>
+      <select id="target" name="target">
+        {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.MR.TargetRef}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+      <button type="submit" class="btn">Retarget</button>
+    </form>
+    <p class="row none">Retargeting stales existing reviews.</p>
+    {{end}}
   </div>
   {{if .MR.Milestone}}<div class="grp">
     <h2>Milestone</h2>

@@ -145,10 +145,10 @@ func TestMRWebReviewLoop(t *testing.T) {
 		t.Fatalf("review carries no timestamp: %+v", merged.Reviews[0])
 	}
 	_, body = browserGet(t, alice, mrURL)
-	if strings.Contains(body, "wants to merge") {
-		t.Fatalf("merged MR still wants to merge:\n%s", body)
+	if strings.Contains(body, "opened by") {
+		t.Fatalf("merged MR still says it was opened:\n%s", body)
 	}
-	if !strings.Contains(body, ">alice</a> merged") {
+	if !strings.Contains(body, "merged by <a href=\"/alice\">alice</a>") {
 		t.Fatalf("merged MR does not name the merger:\n%s", body)
 	}
 	mustGit(t, dir, env, "pull", "-q", "origin", "main")
@@ -352,4 +352,39 @@ func (i *instance) mrThreads(t *testing.T, key, repo, n string) []mrThread {
 		t.Fatalf("mr threads json: %v", err)
 	}
 	return env.Data
+}
+
+// TestMRDiffEmptyExplained: a merge request whose head was fast-forwarded
+// into the target outside the request shows why its diff is empty.
+func TestMRDiffEmptyExplained(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	key := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub", "--email", "alice@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, key, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(key)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "README"), []byte("base\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	mustGit(t, dir, env, "checkout", "-q", "-b", "feature")
+	os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "one")
+	mustGit(t, dir, env, "push", "-q", "origin", "feature")
+	if _, errOut, code := inst.ssh(t, key, "", "mr", "create", "alice/app", "--source", "feature", "--target", "main", "--title", "one"); code != 0 {
+		t.Fatal(errOut)
+	}
+	mustGit(t, dir, env, "push", "-q", "origin", "feature:main")
+	_, body := inst.get(t, "/alice/app/mrs/1?view=diff")
+	if !strings.Contains(body, "No changes between the source and target.") ||
+		!strings.Contains(body, "already merged or fast-forwarded into <code>main</code>") {
+		t.Fatalf("empty diff unexplained:\n%s", body)
+	}
 }
