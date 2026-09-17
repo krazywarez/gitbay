@@ -179,7 +179,7 @@
   <input type="hidden" name="field" value="archive">
   <div><label for="archive">Archived</label><p class="hint">Read-only for everyone. Issues and requests close to new activity. Reversible.</p></div>
   <div class="check"><input type="checkbox" id="archive" name="archive" value="on"{{if .Repo.Settings.Archived}} checked{{end}}></div>
-  <div>{{template "confirmfield" .Repo.Name}} <button type="submit" class="danger">Save</button></div>
+  <div><button type="submit" class="danger">Save</button></div>
 </form>
 <p class="meta">Deleting or transferring a repository is a CLI operation:
 <code>gitbay repo delete {{.Repo.OwnerName}}/{{.Repo.Name}} --yes</code></p>
