@@ -13,7 +13,7 @@
 <form method="get" action="/search" class="searchform">
   <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names and topics, issue and merge request text" autofocus>
   {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
-  <button type="submit">search</button>
+  <button type="submit" class="btn">Search</button>
 </form>
 {{if .QueryErr}}<p class="error" role="alert">{{.QueryErr}}</p>
 {{else if .Query}}

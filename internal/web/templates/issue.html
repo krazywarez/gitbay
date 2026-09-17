@@ -15,7 +15,7 @@
 <p><input type="text" name="title" aria-label="Title" value="{{.Issue.Title}}" required></p>
 <p><textarea name="body" aria-label="Description" rows="8">{{.Issue.Body}}</textarea></p>
 <p><input type="text" name="labels" aria-label="Labels" value="{{range $i, $l := .Issue.Labels}}{{if $i}} {{end}}{{$l}}{{end}}" placeholder="labels, space-separated (write access)"></p>
-<p><button type="submit">save</button></p>
+<p><button type="submit" class="btn">save</button></p>
 </form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.Issue.Author}}">{{.Issue.Author}}</a></strong> <span class="when">{{when .Issue.CreatedAt}}</span></header>
@@ -31,7 +31,7 @@
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit">comment</button></p>
+<p><button type="submit" class="btn">comment</button></p>
 </form>
 {{end}}
 </div>
@@ -55,7 +55,7 @@
     <form method="post" action="{{$base}}/label" class="actions">
       <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
       <input type="text" name="remove" aria-label="Remove labels" placeholder="remove">
-      <button type="submit">Apply</button>
+      <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
   </div>
@@ -67,7 +67,7 @@
     <form method="post" action="{{$base}}/assign" class="actions">
       <input type="text" name="add" aria-label="Add assignees" placeholder="add, space-separated">
       <input type="text" name="remove" aria-label="Remove assignees" placeholder="remove">
-      <button type="submit">Apply</button>
+      <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
   </div>
@@ -82,7 +82,7 @@
         <option value="none">No milestone</option>
         {{range .Milestones}}<option value="{{.Title}}"{{if eq .Title $.Issue.Milestone}} selected{{end}}>{{.Title}}</option>{{end}}
       </select>
-      <button type="submit">Apply</button>
+      <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
   </div>

@@ -17,11 +17,11 @@
 <form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file" class="commentform">
 <input type="hidden" name="name" value="{{.Name}}">
 <p><textarea name="content" aria-label="Content of {{.Name}}" rows="12">{{.Content}}</textarea></p>
-<p><button type="submit">Save</button></p>
+<p><button type="submit" class="btn">Save</button></p>
 </form>
 <form method="post" action="/{{$.Owner}}/-/snippets/{{$.Snippet.PublicID}}/file/remove">
 <input type="hidden" name="name" value="{{.Name}}">
-<p>{{template "confirmfield" .Name}} <button type="submit">Remove {{.Name}}</button></p>
+<p>{{template "confirmfield" .Name}} <button type="submit" class="danger">Remove {{.Name}}</button></p>
 </form>
 </details>{{end}}
 </section>
@@ -31,7 +31,7 @@
 <form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/file" class="commentform">
 <p><input type="text" name="name" aria-label="File name" placeholder="filename" required></p>
 <p><textarea name="content" aria-label="Content" rows="12" required></textarea></p>
-<p><button type="submit">Add file</button></p>
+<p><button type="submit" class="btn">Add file</button></p>
 </form></details>
 <details class="editbox"><summary>settings</summary>
 <form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/edit">
@@ -41,10 +41,10 @@
 <option value="unlisted"{{if eq .Snippet.Visibility "unlisted"}} selected{{end}}>unlisted</option>
 <option value="private"{{if eq .Snippet.Visibility "private"}} selected{{end}}>private</option>
 </select></p>
-<p><button type="submit">Save</button></p>
+<p><button type="submit" class="btn">Save</button></p>
 </form>
 <form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/delete">
-<p>{{template "confirmfield" .Snippet.PublicID}} <button type="submit">Delete snippet</button></p>
+<p>{{template "confirmfield" .Snippet.PublicID}} <button type="submit" class="danger">Delete snippet</button></p>
 </form>
 </details>
 {{end}}

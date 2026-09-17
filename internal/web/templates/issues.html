@@ -10,6 +10,7 @@
   {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
   <form method="get" class="searchform compact">
     <input type="search" name="q" aria-label="Search issues" value="{{.Query}}" placeholder="search title and body">
+    <button type="submit" class="btn">Search</button>
     <input type="hidden" name="state" value="{{.State}}">
   </form>
   <span class="spacer"></span>

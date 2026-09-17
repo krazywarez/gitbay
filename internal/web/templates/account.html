@@ -17,7 +17,7 @@
   <label for="p-about">About</label>
   <textarea id="p-about" name="about" rows="8" placeholder="longer, shown below your repositories">{{.Profile.About}}</textarea>
   {{template "formatpicker" .Profile.AboutFormat}}
-  <button type="submit">Save profile</button>
+  <button type="submit" class="btn">Save profile</button>
 </form>
 
 <h2>SSH keys</h2>
@@ -31,7 +31,7 @@ a CI checkout wants.</p>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{.Algo}}</td>
   <td>{{.Scope}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No SSH keys — which cannot be right, since you signed in.</p>{{end}}
@@ -48,7 +48,7 @@ a CI checkout wants.</p>
       <option value="full">full — commands and git</option>
       <option value="git">git — git transport only</option>
     </select>
-    <button type="submit">Add key</button>
+    <button type="submit" class="btn">Add key</button>
   </form>
 </details>
 
@@ -61,7 +61,7 @@ account, and where notifications go.</p>
   {{if .Verified}}<span class="badge badge-verified">verified{{with .VerifiedBy}} · {{.}}{{end}}</span>
   {{else}}<span class="badge badge-unsigned">unverified</span>{{end}}
   {{if not .Primary}}{{if .Verified}}<form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-primary"><input type="hidden" name="address" value="{{.Address}}"><button type="submit" class="linklike">Make primary</button></form>{{end}}
-  <form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-remove"><input type="hidden" name="address" value="{{.Address}}">{{template "confirmfield" .Address}} <button type="submit" class="linklike">Remove</button></form>{{end}}</li>
+  <form method="post" action="/settings" class="inline"><input type="hidden" name="field" value="email-remove"><input type="hidden" name="address" value="{{.Address}}">{{template "confirmfield" .Address}} <button type="submit" class="danger">Remove</button></form>{{end}}</li>
 {{end}}</ul>{{end}}
 <details class="editbox">
   <summary>Add an address</summary>
@@ -69,13 +69,13 @@ account, and where notifications go.</p>
     <input type="hidden" name="field" value="email-add">
     <label for="address">Address</label>
     <input type="email" id="address" name="address" required placeholder="you@example.org">
-    <button type="submit">Send code</button>
+    <button type="submit" class="btn">Send code</button>
   </form>
   <form method="post" action="/settings" class="setform">
     <input type="hidden" name="field" value="email-verify">
     <label for="code">Verification code</label>
     <input type="text" id="code" name="code" required placeholder="from the mail">
-    <button type="submit">Verify</button>
+    <button type="submit" class="btn">Verify</button>
   </form>
 </details>
 
@@ -87,7 +87,7 @@ account, and where notifications go.</p>
 {{range .PGP}}<tr>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{range .UIDs}}{{.}}<br>{{end}}{{if .Revoked}}<span class="badge badge-bad_signature">revoked</span>{{else if .Expired}}<span class="badge badge-signed_key_expired">expired</span>{{end}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="pgp-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="pgp-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No OpenPGP keys.</p>{{end}}
@@ -97,7 +97,7 @@ account, and where notifications go.</p>
     <input type="hidden" name="field" value="pgp-add">
     <label for="pgpkey">Armored public key</label>
     <textarea id="pgpkey" name="key" rows="6" required placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"></textarea>
-    <button type="submit">Add key</button>
+    <button type="submit" class="btn">Add key</button>
   </form>
 </details>
 
@@ -106,14 +106,14 @@ account, and where notifications go.</p>
   <input type="hidden" name="field" value="notify-mail">
   <label for="notify-mail">Activity by mail</label>
   <input type="checkbox" id="notify-mail" name="mail" value="on"{{if .MailOn}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">The inbox is filed either way; this is the mail half. Login links are not activity and still arrive.</p>
 <form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-watch">
   <label for="notify-watch">Watch repositories you can write to</label>
   <input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}>
-  <button type="submit">Save</button>
+  <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Every issue and merge request on those repositories, as if you had watched each. A watch or mute on a repository still wins.</p>
 

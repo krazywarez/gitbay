@@ -162,8 +162,8 @@
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
     <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
     <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
-    <p><button type="submit">Comment</button>
-       <button type="submit" name="pending" value="on">Add to review</button>
+    <p><button type="submit" class="btn">Comment</button>
+       <button type="submit" name="pending" value="on" class="btn">Add to review</button>
        <a href="{{$base}}?view=diff">Cancel</a></p>
   </form></td></tr>
   {{end}}{{end}}{{range .Threads}}<tr class="threadrow"><td colspan="3">{{template "thread" dict "T" . "Base" $base "Viewer" $viewer "Class" ""}}</td></tr>
@@ -186,7 +186,7 @@
 <form method="post" action="{{.Base}}/diff-comment">
   <input type="hidden" name="reply" value="{{$t.ID}}">
   <p><textarea name="body" aria-label="Reply to thread {{$t.ID}}" rows="2" placeholder="Reply as {{.Viewer}}"></textarea></p>
-  <p><button type="submit">Reply</button></p>
+  <p><button type="submit" class="btn">Reply</button></p>
 </form></details>{{end}}
 {{if $t.CanResolve}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{$t.ID}}"><button type="submit" name="action" value="{{if $t.Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if $t.Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}
 </div>{{end}}

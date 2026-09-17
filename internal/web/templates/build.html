@@ -6,7 +6,7 @@
 <span class="spacer"></span>
 {{if and .CanWrite (or (eq .Build.Status "pending") (eq .Build.Status "running"))}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds/{{.Build.Number}}/cancel" class="actions">
-  <button type="submit">{{if eq .Build.Status "running"}}Cancel (stops at the runner's next check){{else}}Cancel{{end}}</button>
+  <button type="submit" class="btn">{{if eq .Build.Status "running"}}Cancel (stops at the runner's next check){{else}}Cancel{{end}}</button>
 </form>
 {{end}}
 </div>

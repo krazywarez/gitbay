@@ -34,7 +34,7 @@
     <input type="hidden" name="field" value="org-create">
     <label for="orgname">Name</label>
     <input type="text" id="orgname" name="name" required>
-    <button type="submit">Create</button>
+    <button type="submit" class="btn">Create</button>
   </form>
 </details>
 {{end}}
@@ -52,7 +52,7 @@
 {{end}}</table></div>
 <details class="editbox">
   <summary>Add or change a member</summary>
-  <form method="post" action="/{{$org}}" class="setform">
+  <form method="post" action="/{{$org}}" class="setform stack">
     <input type="hidden" name="field" value="member-add">
     <label for="member">Username</label>
     <input type="text" id="member" name="user" required>
@@ -61,7 +61,7 @@
       <option value="member">member</option>
       <option value="admin">admin</option>
     </select>
-    <button type="submit">Apply</button>
+    <button type="submit" class="btn">Apply</button>
   </form>
 </details>
 
@@ -75,14 +75,14 @@ of a team get its role on every repository it is granted.</p>
   <div class="teambody">
     <p class="meta">members: {{range .Members}}<a class="memberchip" href="/{{.}}">{{.}}</a> {{else}}<span class="none">none yet</span>{{end}}</p>
     <p class="meta">repositories: {{range .Grants}}<span class="memberchip"><a href="/{{.RepoPath}}">{{.RepoPath}}</a> <span class="role">{{.Role}}</span></span> {{else}}<span class="none">none yet</span>{{end}}</p>
-    <form method="post" action="/{{$org}}" class="setform">
+    <form method="post" action="/{{$org}}" class="setform stack">
       <input type="hidden" name="team" value="{{.Name}}">
       <label class="none" for="tm-{{.Name}}">Members</label>
       <input type="text" id="tm-{{.Name}}" name="user" placeholder="usernames, space-separated">
-      <button type="submit" name="field" value="team-add">Add</button>
-      <button type="submit" name="field" value="team-remove">Remove</button>
+      <button type="submit" name="field" value="team-add" class="btn">Add</button>
+      <button type="submit" name="field" value="team-remove" class="btn">Remove</button>
     </form>
-    <form method="post" action="/{{$org}}" class="setform">
+    <form method="post" action="/{{$org}}" class="setform stack">
       <input type="hidden" name="team" value="{{.Name}}">
       <label class="none" for="tr-{{.Name}}">Repository</label>
       <input type="text" id="tr-{{.Name}}" name="repo" placeholder="owner/name">
@@ -92,14 +92,14 @@ of a team get its role on every repository it is granted.</p>
         <option value="write">write</option>
         <option value="admin">admin</option>
       </select>
-      <button type="submit" name="field" value="team-grant">Grant</button>
-      <button type="submit" name="field" value="team-revoke">Revoke</button>
+      <button type="submit" name="field" value="team-grant" class="btn">Grant</button>
+      <button type="submit" name="field" value="team-revoke" class="btn">Revoke</button>
     </form>
     <form method="post" action="/{{$org}}" class="setform">
       <input type="hidden" name="field" value="team-delete">
       <input type="hidden" name="team" value="{{.Name}}">
       {{template "confirmfield" .Name}}
-      <button type="submit" class="linklike">Delete this team</button>
+      <button type="submit" class="danger">Delete this team</button>
     </form>
   </div>
 </details>
@@ -110,7 +110,7 @@ of a team get its role on every repository it is granted.</p>
     <input type="hidden" name="field" value="team-create">
     <label for="newteam">Name</label>
     <input type="text" id="newteam" name="team" required>
-    <button type="submit">Create</button>
+    <button type="submit" class="btn">Create</button>
   </form>
 </details>
 
@@ -121,7 +121,7 @@ of a team get its role on every repository it is granted.</p>
     <input type="hidden" name="field" value="org-rename">
     <label for="orgrename">New name</label>
     <input type="text" id="orgrename" name="name" value="{{$org}}" required>
-    <button type="submit">Rename</button>
+    <button type="submit" class="btn">Rename</button>
   </form>
   <p class="meta">Every clone URL under this organization changes with the name.</p>
 </details>

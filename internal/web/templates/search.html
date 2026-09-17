@@ -3,7 +3,7 @@
 <h1>Search</h1>
 <form method="get" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/search" class="searchform">
   <input type="search" name="q" aria-label="Search file contents" value="{{.Query}}" placeholder="search file contents on {{.Ref}}" autofocus>
-  <button type="submit">search</button>
+  <button type="submit" class="btn">Search</button>
 </form>
 {{if .QueryErr}}<p class="error" role="alert">{{.QueryErr}}</p>
 {{else if .Query}}

@@ -10,6 +10,7 @@
   </nav>
   <form method="get" class="searchform compact">
     <input type="search" name="q" aria-label="Search merge requests" value="{{.Query}}" placeholder="search title and body">
+    <button type="submit" class="btn">Search</button>
     <input type="hidden" name="state" value="{{.State}}">
   </form>
   {{range .Filters}}<p class="meta">{{.Key}}: <b>{{.Value}}</b> <a href="{{.Clear}}">clear</a></p>{{end}}

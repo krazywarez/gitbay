@@ -34,7 +34,7 @@
 <form method="post" action="{{$base}}/edit" class="commentform">
 <p><input type="text" name="title" aria-label="Title" value="{{.MR.Title}}" required></p>
 <p><textarea name="body" aria-label="Description" rows="8">{{.MR.Body}}</textarea></p>
-<p><button type="submit">Save</button></p>
+<p><button type="submit" class="btn">Save</button></p>
 </form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.MR.Author}}">{{.MR.Author}}</a></strong></header>
@@ -52,7 +52,7 @@
 {{if .Viewer}}
 <form method="post" action="{{$base}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit">Comment</button></p>
+<p><button type="submit" class="btn">Comment</button></p>
 </form>
 {{end}}
 
@@ -86,8 +86,8 @@
   <div class="grp">
     <h2>Review</h2>
     <form method="post" action="{{$base}}/review" class="actions">
-      <button type="submit" name="verdict" value="approve">Approve</button>
-      <button type="submit" name="verdict" value="request-changes">Request changes</button>
+      <button type="submit" name="verdict" value="approve" class="btn">Approve</button>
+      <button type="submit" name="verdict" value="request-changes" class="btn">Request changes</button>
     </form>
   </div>
   <div class="grp">
@@ -105,11 +105,11 @@
       <button type="submit">Merge</button>
     </form>
     <form method="post" action="{{$base}}/close" class="actions">
-      <button type="submit">Close without merging</button>
+      <button type="submit" class="danger">Close without merging</button>
     </form>
     <form method="post" action="{{$base}}/draft" class="actions">
-      {{if .MR.Draft}}<button type="submit">Ready for review</button>
-      {{else}}<input type="hidden" name="draft" value="on"><button type="submit">Convert to draft</button>{{end}}
+      {{if .MR.Draft}}<button type="submit" class="btn">Ready for review</button>
+      {{else}}<input type="hidden" name="draft" value="on"><button type="submit" class="btn">Convert to draft</button>{{end}}
     </form>
   </div>
   {{end}}
@@ -121,7 +121,7 @@
       <select id="target" name="target">
         {{range .Branches}}<option value="{{.Name}}"{{if eq .Name $.MR.TargetRef}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
-      <button type="submit">Retarget</button>
+      <button type="submit" class="btn">Retarget</button>
     </form>
     <p class="row none">Retargeting stales existing reviews.</p>
   </div>
@@ -134,7 +134,7 @@
     <form method="post" action="{{$base}}/review-request" class="actions">
       <input type="text" name="add" aria-label="Add reviewers" placeholder="add, space-separated">
       <input type="text" name="remove" aria-label="Remove reviewers" placeholder="remove">
-      <button type="submit">Apply</button>
+      <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
   </div>
