@@ -271,6 +271,7 @@ a.brand svg.mark { display: block; flex: none; }
 a.brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .railbody { flex: 1; overflow-y: auto; padding: 0 var(--sp-3); }
+.railtop { display: block; }
 /* search is reachable from every page, so it sits above the rail's links
    rather than on one page of its own */
 form.railsearch { margin-bottom: var(--sp-3); }
@@ -1467,7 +1468,9 @@ svg.icon { vertical-align: -0.125em; }
     overflow-x: auto;
   }
   a.brand { padding: var(--sp-2) var(--sp-3); }
-  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; align-items: center; flex-wrap: wrap; }
+  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; flex-direction: column; }
+  .railtop { display: flex; align-items: center; gap: var(--sp-2); overflow-x: auto; }
+  .railtop > * { flex-shrink: 0; }
   form.railsearch { margin: 0 var(--sp-2); }
   form.railsearch input[type="search"] { min-width: 8rem; }
   /* the strip hides the review queue, reachable from the dashboard, and
@@ -1475,8 +1478,6 @@ svg.icon { vertical-align: -0.125em; }
   .railgroup { display: none; }
   .railgroup.pinned {
     display: block;
-    width: 100%;
-    order: 9;
     border-top: 1px solid var(--shell-line);
     padding: 0 var(--sp-2);
   }

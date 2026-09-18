@@ -16,6 +16,7 @@
 <nav class="rail" aria-label="Site">
   <a class="brand" href="/">{{template "mark"}}<span>{{.Site}}</span></a>
   <div class="railbody">
+    <div class="railtop">
     <form method="get" action="/search" class="railsearch" role="search">
       <input type="search" name="q" aria-label="Search {{.Site}}" placeholder="Search">
     </form>
@@ -26,6 +27,7 @@
       <li><a {{if eq (str . "Tab") "bookmarks"}}aria-current="page" {{end}}href="/bookmarks">Bookmarks</a></li>
       <li><a href="/new">New repository</a></li>{{end}}
     </ul>
+    </div>
     {{with .Rail.Pinned}}
     <div class="railgroup pinned">
     <p class="raillabel" id="rail-pinned">Pinned</p>
