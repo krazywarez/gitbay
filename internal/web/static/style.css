@@ -991,6 +991,10 @@ pre.message {
 .blobimage { text-align: center; }
 .blobimage img { max-width: 100%; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
 
+/* pinned repositories, on the dashboard now that the rail is icons only */
+.pinned { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.pinned .owner { color: var(--muted); }
+
 /* ---- two-column: conversation and aside ---- */
 .withaside { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
 .withaside .mainside { min-width: 0; }

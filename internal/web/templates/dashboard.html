@@ -17,6 +17,7 @@
 {{end}}
 {{define "content"}}
 <h1>Dashboard</h1>
+{{with .Rail.Pinned}}<p class="pinned" aria-label="Pinned repositories">{{range .}}<a class="chip" href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a> {{end}}</p>{{end}}
 
 <div class="withaside">
 <div class="mainside">

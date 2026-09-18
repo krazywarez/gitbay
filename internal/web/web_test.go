@@ -120,3 +120,63 @@ func TestMainWidthClass(t *testing.T) {
 		t.Error("layout.html: no default width")
 	}
 }
+
+// The rail carries no visible text, so every one of its controls has to
+// name itself twice over: an aria-label for the accessibility tree and a
+// visually hidden span for anything reading the DOM text, with the glyph
+// itself hidden from both so it is never announced as a graphic. This
+// parses layout.html, so an icon link that forgets one fails here rather
+// than on the page.
+func TestRailIconsAreLabelled(t *testing.T) {
+	src, err := TemplateSource("layout.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A control names its glyph either through the icon partial or with an
+	// svg of its own; the aria-hidden loop below covers both.
+	glyph := func(s string) bool {
+		return strings.Contains(s, `{{template "icon" `) || strings.Contains(s, "<svg")
+	}
+	tagRe := regexp.MustCompile(`(?s)<a class="railicon".*?</a>|<button [^>]*class="railicon".*?</button>`)
+	controls := tagRe.FindAllString(src, -1)
+	if len(controls) < 7 {
+		t.Fatalf("found %d railicon controls in layout.html, want the rail's full set", len(controls))
+	}
+	for _, c := range controls {
+		for _, want := range []string{`aria-label="`, `<span class="vh">`} {
+			if !strings.Contains(c, want) {
+				t.Errorf("railicon control missing %s: %.80s", want, c)
+			}
+		}
+		if !glyph(c) {
+			t.Errorf("railicon control draws no glyph: %.80s", c)
+		}
+	}
+
+	// Every button in the rail's foot is an icon button under the same
+	// rule: the Log out form's submit is the only one today.
+	foot := src[strings.Index(src, `<div class="railfoot">`):]
+	foot = foot[:strings.Index(foot, "</nav>")]
+	buttons := regexp.MustCompile(`(?s)<button.*?</button>`).FindAllString(foot, -1)
+	if len(buttons) == 0 {
+		t.Fatal("no button in the rail foot")
+	}
+	for _, b := range buttons {
+		for _, want := range []string{`aria-label="`, `<span class="vh">`} {
+			if !strings.Contains(b, want) {
+				t.Errorf("rail foot button missing %s: %.80s", want, b)
+			}
+		}
+		if !glyph(b) {
+			t.Errorf("rail foot button draws no glyph: %.80s", b)
+		}
+	}
+
+	// No decorative graphic anywhere in the layout is exposed, the brand
+	// mark included: the link around it carries the name.
+	for _, svg := range regexp.MustCompile(`<svg[^>]*>`).FindAllString(src, -1) {
+		if !strings.Contains(svg, `aria-hidden="true"`) {
+			t.Errorf("svg without aria-hidden: %s", svg)
+		}
+	}
+}

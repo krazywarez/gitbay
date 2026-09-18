@@ -93,7 +93,7 @@ func TestDashboard(t *testing.T) {
 		t.Fatalf("dashboard: %d", status)
 	}
 	for _, want := range []string{
-		`aria-labelledby="rail-pinned"`, `</span>app</a>`, // rail lists the pinned repo
+		`aria-label="Pinned repositories"`, `</span>app</a>`, // the dashboard lists the pinned repo
 		"Waiting on your review", "Assigned to you", "Recent activity",
 		"from bob", "alice/app!1", "todo one", "alice/app#1",
 		`href="/alice/app/mrs/1"`, `href="/alice/app/issues/1"`,
