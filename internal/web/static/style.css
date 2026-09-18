@@ -1225,7 +1225,7 @@ table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underli
   line-height: 1.5;
   color: var(--chip);
   border: 1px solid color-mix(in srgb, var(--chip) 40%, transparent);
-  background: color-mix(in srgb, var(--chip) 10%, transparent);
+  background: color-mix(in srgb, var(--chip) 10%, var(--canvas));
   white-space: nowrap;
   vertical-align: middle;
 }
@@ -1380,7 +1380,7 @@ details.refmenu .refdrop a.allrefs {
 .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.5; max-width: 40rem; margin: 0 0 var(--sp-5); }
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
-.shot img { display: block; width: 100%; }
+.shot img { display: block; width: 100%; height: auto; }
 .facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); margin: var(--sp-5) 0; }
 .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
 .facets p { color: var(--muted); font-size: var(--fs-2); margin: 0; }

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -45,11 +46,8 @@ func parseTokens(css []byte) (light, dark map[string]string) {
 	}
 	light = parse(lm[1])
 	dark = parse(dm[1])
-	for k, v := range light {
-		if _, ok := dark[k]; !ok && strings.HasPrefix(v, "#") {
-			dark[k] = v // a light-only colour is a bug; keep it visible below
-		}
-	}
+	// A token missing from the dark block is a bug, not a fallback to the
+	// light value: the missing-token loop in TestTokenContrast reports it.
 	return light, dark
 }
 
@@ -76,6 +74,18 @@ func contrastHex(a, b string) float64 {
 		la, lb = lb, la
 	}
 	return (la + 0.05) / (lb + 0.05)
+}
+
+// mixHex blends two hex colours per channel, t of a and 1-t of b, matching
+// CSS's color-mix(in srgb, a <t*100>%, b).
+func mixHex(a, b string, t float64) string {
+	a, b = strings.TrimPrefix(a, "#"), strings.TrimPrefix(b, "#")
+	channel := func(ca, cb string) string {
+		na, _ := strconv.ParseUint(ca, 16, 8)
+		nb, _ := strconv.ParseUint(cb, 16, 8)
+		return fmt.Sprintf("%02x", int(math.Round(t*float64(na)+(1-t)*float64(nb))))
+	}
+	return "#" + channel(a[0:2], b[0:2]) + channel(a[2:4], b[2:4]) + channel(a[4:6], b[4:6])
 }
 
 // TestTokenContrast is the contract for the colour tokens in style.css:
@@ -118,6 +128,14 @@ func TestTokenContrast(t *testing.T) {
 		for _, c := range checks {
 			if got := contrastHex(scheme[c.fg], scheme[c.bg]); got < c.floor {
 				t.Errorf("%s: --%s (%s) on --%s (%s) is %.2f:1, want >= %.1f", name, c.fg, scheme[c.fg], c.bg, scheme[c.bg], got, c.floor)
+			}
+		}
+		// The chip/badge ground is opaque (color-mix against canvas, not
+		// transparent), so its ratio does not depend on the row behind it.
+		for _, chip := range []string{"ok", "bad", "warn", "done", "neutral", "link"} {
+			ground := mixHex(scheme[chip], scheme["canvas"], 0.1)
+			if got := contrastHex(scheme[chip], ground); got < 4.5 {
+				t.Errorf("%s: chip --%s (%s) on its ground %s is %.2f:1, want >= 4.5", name, chip, scheme[chip], ground, got)
 			}
 		}
 		// The surface ladder must be visible: canvas, surface and inset
