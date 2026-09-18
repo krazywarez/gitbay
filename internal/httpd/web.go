@@ -481,7 +481,12 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "files"
-	s.renderTree(w, r, p, strings.Trim(r.PathValue("path"), "/"))
+	path := strings.Trim(r.PathValue("path"), "/")
+	// The root of the default branch is the same page as the bare repo
+	// URL, so its header must match: RepoHome is what picks the h1 over
+	// the p+link identity, not which route was typed.
+	p.RepoHome = path == "" && p.Ref == p.Repo.DefaultBranch
+	s.renderTree(w, r, p, path)
 }
 
 // treePage is shared by the populated and empty-repository renders: two

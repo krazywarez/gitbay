@@ -149,6 +149,30 @@ func TestReadmeRelativeLinks(t *testing.T) {
 	if _, body := inst.get(t, "/alice/site"); !strings.Contains(body, `class="chip topic"`) {
 		t.Error("repo home lost its topics")
 	}
+	// The repohead is the same markup on every tab within a repository —
+	// aria-current on the tab link and the watch/bookmark toggles are the
+	// only things that could vary, and they depend on who is signed in,
+	// not which tab is shown. inst.get is anonymous, so two tabs' headers
+	// must be byte-identical.
+	inst.ssh(t, aliceKey, "", "issue", "create", "alice/site", "--title", "one")
+	header := func(body string) string {
+		i := strings.Index(body, `<header class="repohead">`)
+		j := strings.Index(body, "</header>")
+		if i < 0 || j < 0 || j < i {
+			t.Fatalf("repohead not found:\n%.2000s", body)
+		}
+		return body[i:j]
+	}
+	_, issuesBody := inst.get(t, "/alice/site/issues")
+	_, issueBody := inst.get(t, "/alice/site/issues/1")
+	if a, b := header(issuesBody), header(issueBody); a != b {
+		t.Errorf("issues list and issue page headers differ:\n%s\nvs\n%s", a, b)
+	}
+	_, homeBody := inst.get(t, "/alice/site")
+	_, treeBody := inst.get(t, "/alice/site/tree/main/")
+	if a, b := header(homeBody), header(treeBody); a != b {
+		t.Errorf("repo home and tree headers differ:\n%s\nvs\n%s", a, b)
+	}
 }
 
 // TestLandingRoutes checks the landing page's copy and the two routes.
