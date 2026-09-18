@@ -1405,6 +1405,9 @@ h2 .count { background: none; color: var(--muted); font-weight: 400; font-size: 
 .actday.l2 { background: color-mix(in srgb, var(--link) 50%, var(--canvas)); }
 .actday.l3 { background: color-mix(in srgb, var(--link) 75%, var(--canvas)); }
 .actday.l4 { background: var(--link); }
+.actlegend { display: flex; align-items: center; gap: 3px; margin-top: var(--sp-2); font-size: var(--fs-0); color: var(--muted); }
+.actlegend span:first-child { margin-right: var(--sp-1); }
+.actlegend span:last-child { margin-left: var(--sp-1); }
 
 /* ---- wiki ---- */
 .wikilayout { display: flex; gap: var(--sp-5); align-items: flex-start; }
