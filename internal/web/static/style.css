@@ -1452,60 +1452,27 @@ svg.icon { vertical-align: -0.125em; }
 }
 
 @media (max-width: 52rem) {
-  /* the rail becomes a single strip, not a wall of links */
+  /* the rail becomes one row of the same glyphs: fixed squares, no
+     wrapping and no scrolling. The squares narrow a step further below
+     30rem, where eleven of them would not otherwise fit a phone. */
   .shell { display: block; }
   .rail {
     width: auto;
-    height: auto;
+    height: var(--rail-strip-h);
     position: static;
     flex-direction: row;
-    align-items: flex-start;
-    gap: var(--sp-2);
+    align-items: center;
+    gap: 0;
+    padding: 0 var(--sp-1);
     border-right: 0;
     border-bottom: 1px solid var(--shell-line);
-    overflow-x: auto;
+    overflow: visible;
   }
-  a.brand { padding: var(--sp-2) var(--sp-3); min-height: 39px; display: flex; align-items: center; }
-  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; flex-direction: column; }
-  .railtop { display: flex; align-items: center; gap: var(--sp-2); overflow-x: auto; }
-  .railtop > * { flex-shrink: 0; }
-  form.railsearch { margin: 0 var(--sp-2); }
-  form.railsearch input[type="search"] { min-width: 8rem; }
-  /* the strip hides the review queue, reachable from the dashboard, and
-     shows pinned repositories as a second, quieter row of the strip */
-  .railgroup { display: none; }
-  .railgroup.pinned {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    width: 100%;
-    border-top: 1px solid var(--shell-line);
-    padding: 0 var(--sp-2);
-    min-height: 32px;
-  }
-  .railgroup.pinned .raillabel {
-    display: block;
-    margin: 0;
-    font-size: var(--fs-0);
-    color: var(--shell-muted);
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    flex: none;
-  }
-  .railgroup.pinned ul.raillist {
-    display: flex;
-    overflow-x: auto;
-    margin: 0;
-    flex: 1;
-    min-width: 0;
-  }
-  .railgroup.pinned ul.raillist a { font-size: var(--fs-1); padding: var(--sp-1) var(--sp-2); }
-  .railgroup.pinned ul.raillist a .owner { display: none; }
-  ul.raillist { display: flex; margin: 0; }
-  ul.raillist a { border-radius: 0; border-bottom: 2px solid transparent; padding: var(--sp-2) var(--sp-3); }
-  ul.raillist a[aria-current] { box-shadow: none; border-bottom-color: var(--shell-mark); }
-  .railfoot { border-top: 0; padding: var(--sp-2); }
-  .railpinned { border-top: 0; padding: 0; }
+  a.brand { width: var(--rail-mark-box); height: var(--rail-strip-h); }
+  ul.raillist, .railfoot { flex-direction: row; gap: 0; }
+  .railicon, a.railuser { height: var(--rail-strip-h); border-radius: 0; }
+  /* the current item is marked along the bottom edge in a row */
+  .railicon[aria-current] { box-shadow: inset 0 -2px 0 var(--shell-mark); }
   main.content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   footer { padding: var(--sp-4); }
   .repohead { padding: var(--sp-3) var(--sp-4) 0; }
@@ -1536,4 +1503,10 @@ svg.icon { vertical-align: -0.125em; }
   .factgrid { grid-template-columns: repeat(2, auto); }
   ul.loglist li { flex-wrap: wrap; }
   ul.loglist .commitside { width: 100%; justify-content: flex-start; }
+}
+
+/* eleven squares at 40px overrun a phone; 32px keeps the row whole and
+   the 48px height keeps the target big enough to hit */
+@media (max-width: 30rem) {
+  :root { --rail-hit: 32px; }
 }
