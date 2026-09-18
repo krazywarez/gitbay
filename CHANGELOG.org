@@ -4,6 +4,30 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.23.0 — unreleased
+
+The web design foundation (#218). Tokens measured in both schemes, one
+control family, content widths per page, and the landing, repository
+overview, merge request and settings pages recomposed. Set =[web]
+title= to =gitbay= in lower case; the templates already are.
+
+- =style.css= rewritten on tokens defined on =:root= and again for dark;
+  =TestTokenContrast= enforces the floors and
+  =TestEveryTemplateClassHasARule= that every template class has a rule.
+- Buttons are primary, secondary, quiet or destructive; one focus ring on
+  everything; success and error flashes share one shape.
+- Every page picks a width: wide for code, reading for lists and threads,
+  bounded for forms.
+- The repository header shows description and topics on the code tab
+  only; the overview leads with the file table and puts clone commands
+  and facts after the README; "Find file" is "Search code".
+- A merge request states who merged or closed it under its title and
+  explains an empty diff.
+- Repository settings are bounded rows with a consequence beside each
+  control, a saved flash, a rejected value kept, and topics as one field.
+- Landing copy says what the product is and where to go; the register
+  form says to paste the contents of the key file and links [[SSH-keys]].
+
 * v1.22.1 — 2026-09-13
 
 One merge gate fix.

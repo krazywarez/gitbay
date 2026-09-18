@@ -1,0 +1,31 @@
+#+title: SSH keys
+
+Your key is your identity on gitbay: there are no passwords. Registering
+pastes the public half of a key pair; the private half never leaves your
+machine.
+
+* Make a key
+
+#+begin_src sh
+ssh-keygen -t ed25519 -C "you@host"
+#+end_src
+
+Accept the default path. Two files land in =~/.ssh/=: =id_ed25519= is
+private, keep it; =id_ed25519.pub= is public, paste it.
+
+* Get the public half
+
+#+begin_src sh
+cat ~/.ssh/id_ed25519.pub
+#+end_src
+
+One line, starting =ssh-ed25519 AAAA…= and ending with your comment. That
+whole line is what the registration form and =register= want.
+
+* Check it works
+
+#+begin_src sh
+ssh git@<host> whoami
+#+end_src
+
+More keys, labels and scopes: [[Users][the user guide]] under "SSH keys".

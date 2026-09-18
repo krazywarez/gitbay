@@ -87,6 +87,11 @@ default, is right when gitbayd terminates TLS itself.
   minted over SSH (=web login=), and users with write access can create
   repos, comment, and make simple file edits (which commit unsigned,
   honestly). =password_auth= is reserved and currently rejected.
+- =title= — the instance's display name in the rail and page titles;
+  empty falls back to the site host. Lower case is the convention for
+  gitbay itself.
+- =privacy_notice= — operator text shown on =/privacy= under the fixed
+  statement.
 
 ** [registration]
 - =mode= — =closed= (default) | =invite= | =open=. invite/open require

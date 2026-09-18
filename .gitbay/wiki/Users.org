@@ -52,6 +52,8 @@ the terminal alone:
 
 * SSH keys
 
+New to SSH keys? [[SSH-keys]] makes one in two commands.
+
 Your key is your identity; there are no passwords anywhere. The SSH
 username is always =git= — the key alone determines who you are.
 
@@ -655,6 +657,11 @@ have not muted it; watchers are not told about a mention addressed to
 someone else.
 You are never mailed about your own actions, and only verified primary
 addresses receive anything. Delivery retries on relay failure.
+
+* Web vocabulary
+
+Sign in / Log out, Search, sentence-case headings and buttons, product
+name lowercase.
 
 * Output rules
 
