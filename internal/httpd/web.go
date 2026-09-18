@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
-	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -177,20 +176,11 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		Host       string
 		Accounts   bool
 		Signup     bool
-		Picture    bool
 		EmailLogin bool
 	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, host, s.cfg.Web.Mode == "accounts",
 		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed",
-		landingPicture, s.emailLoginEnabled()})
+		s.emailLoginEnabled()})
 }
-
-// landingPicture says whether the landing page's screenshot images exist to
-// show, checked once against the embedded images.
-var landingPicture = func() bool {
-	_, e1 := fs.Stat(web.ImageFS, "static/img/mr-dark.png")
-	_, e2 := fs.Stat(web.ImageFS, "static/img/mr-light.png")
-	return e1 == nil && e2 == nil
-}()
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {
 	mrs, _ := s.st.DashboardMRs(viewer.ID)

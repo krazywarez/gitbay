@@ -6,10 +6,10 @@
 <p class="lede">A git forge you drive from the terminal. Repositories, issues, merge requests and CI over SSH, with a fast, readable web view of the same state.</p>
 <pre class="quickstart">ssh git@{{.Host}} help                        # every command, no client to install
 git clone ssh://git@{{.Host}}/owner/repo.git</pre>
-{{if .Picture}}<div class="shot"><picture>
+<div class="shot"><picture>
   <source srcset="/static/img/mr-dark.png" media="(prefers-color-scheme: dark)">
   <img src="/static/img/mr-light.png" width="1280" height="900" alt="A merge request page: the conversation on the left, checks and reviewers on the right.">
-</picture></div>{{end}}
+</picture></div>
 <div class="facets">
   <section><h2>Read</h2><p>Browse and clone any public repository over HTTPS or <code>git://</code>, no account. Every commit shows whether its signature verified.</p></section>
   <section><h2>Write</h2><p>Push over SSH with the key you already have. Create a repository, file an issue, open and merge a request, all as commands.</p></section>
