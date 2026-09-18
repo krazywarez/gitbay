@@ -780,6 +780,7 @@ table.tree, table.refs {
   overflow: hidden;
   margin-bottom: var(--sp-4);
 }
+table.tree { table-layout: fixed; }
 table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: 0; }
 table.tree tr:hover td, table.refs tr:hover td { background: var(--hover); }
 td.name a { color: var(--fg); }
@@ -787,12 +788,16 @@ td.name a:hover { color: var(--link); }
 table.tree td.name { width: 25%; white-space: nowrap; }
 table.tree td.name.dir a { color: var(--link); }
 table.tree th.lastcommit, table.tree td.lastcommit { width: 55%; }
+table.tree td.lastcommit {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 table.tree td.lastcommit a {
   color: var(--muted);
   display: block;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 table.tree td.lastcommit a:hover { color: var(--link); }
+table.tree th.age, table.tree td.age { width: 20%; }
 td.age, th.age { text-align: right; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
 td.size, td.mode { color: var(--muted); white-space: nowrap; }
 table.tree th.size, table.tree td.size { text-align: right; }
@@ -809,15 +814,17 @@ table.assets td.name { width: 100%; font-family: var(--mono); font-size: var(--f
 table.assets { margin-top: var(--sp-2); }
 
 /* the tip commit is the first row of the file table */
-.tipbar {
+tr.tipbar td {
+  background: var(--surface);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+.tipbar .tip {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-4);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: var(--r-card) var(--r-card) 0 0;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
   font-size: var(--fs-2);
 }
 .tipbar .who { font-weight: 600; }
@@ -825,8 +832,6 @@ table.assets { margin-top: var(--sp-2); }
 .tipbar .subject:hover { color: var(--link); }
 .tipbar .spacer { flex: 1; }
 .tipbar .age { color: var(--muted); white-space: nowrap; }
-.tipbar + table.tree,
-.tipbar + .tablewrap table.tree { border-radius: 0 0 var(--r-card) var(--r-card); }
 
 .readme { margin-top: var(--sp-5); }
 .readme .cardbody { max-width: 78ch; }
