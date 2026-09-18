@@ -780,7 +780,6 @@ table.tree, table.refs {
   overflow: hidden;
   margin-bottom: var(--sp-4);
 }
-table.tree { table-layout: fixed; }
 table.tree tr:last-child td, table.refs tr:last-child td { border-bottom: 0; }
 table.tree tr:hover td, table.refs tr:hover td { background: var(--hover); }
 td.name a { color: var(--fg); }
@@ -789,6 +788,7 @@ table.tree td.name { width: 25%; white-space: nowrap; }
 table.tree td.name.dir a { color: var(--link); }
 table.tree th.lastcommit, table.tree td.lastcommit { width: 55%; }
 table.tree td.lastcommit {
+  max-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 table.tree td.lastcommit a {
