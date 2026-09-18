@@ -4,6 +4,19 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.24.1 — 2026-09-18
+
+The dashboard feed and the phone-width rail strip (#222, #220).
+
+- Build events record their commit; the dashboard's activity feed folds
+  a commit's jobs into one line per run with the combined state and a
+  state dot. A status outside the known set is never shown as success.
+- Feed times are relative, with the exact UTC time in a title, as the
+  tree listings already do.
+- Under 52rem the rail strip keeps the brand on its first row, shows
+  pinned repositories as a compact labelled sub-row, and New repository
+  is a =+= button at every width.
+
 * v1.24.0 — 2026-09-18
 
 The web follow-ups to the design foundation (#219, #220, #221, #222,
