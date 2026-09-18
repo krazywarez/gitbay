@@ -581,6 +581,7 @@ input[type="radio"] { accent-color: var(--fill); }
 label { display: block; font-weight: 500; font-size: var(--fs-2); margin-bottom: 4px; }
 label:has(> input[type="radio"]), label:has(> input[type="checkbox"]),
 label:has(> select) { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.fieldname { display: block; font-size: var(--fs-2); font-weight: 500; }
 .hint { display: block; color: var(--muted); font-size: var(--fs-1); font-weight: 400; margin: 0 0 6px; }
 .field { margin-bottom: var(--sp-4); }
 .field input[type="text"], .field input[type="email"], .field select { width: 100%; }
@@ -1331,7 +1332,7 @@ details.refmenu .refdrop a.allrefs {
 }
 .clone { margin: 0 0 var(--sp-3); }
 .facts .about { min-width: 0; }
-.clone label { font-size: var(--fs-1); color: var(--muted); font-weight: 500; margin-bottom: 2px; }
+.clone .fieldname { font-size: var(--fs-1); color: var(--muted); font-weight: 500; margin-bottom: 2px; }
 .clone pre { margin-bottom: var(--sp-3); user-select: all; }
 .factgrid { display: grid; grid-template-columns: repeat(4, auto); gap: var(--sp-2) var(--sp-4); font-size: var(--fs-2); margin-bottom: var(--sp-3); }
 .factgrid b { font-weight: 600; }

@@ -32,8 +32,8 @@
 {{if and .Entries (not .DirPath)}}<div class="facts">
   <div class="clone">
     <h2>Clone</h2>
-    <label>SSH</label><pre><code>git clone {{.SSHCloneURL}}</code></pre>
-    <label>HTTPS</label><pre><code>git clone {{.CloneURL}}</code></pre>
+    <span class="fieldname">SSH</span><pre><code>git clone {{.SSHCloneURL}}</code></pre>
+    <span class="fieldname">HTTPS</span><pre><code>git clone {{.CloneURL}}</code></pre>
   </div>
   {{if .Facts.Commits}}{{$r := printf "/%s/%s" .Repo.OwnerName .Repo.Name}}<div class="about">
     <h2>About</h2>

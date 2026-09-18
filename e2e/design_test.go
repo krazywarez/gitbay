@@ -363,7 +363,7 @@ func TestTreeSearchCodeAndClone(t *testing.T) {
 	if i, j := strings.Index(body, `<table class="tree">`), strings.Index(body, `<div class="clone">`); i < 0 || j < i {
 		t.Error("clone block does not follow the file table")
 	}
-	if !strings.Contains(body, `<label>SSH</label>`) || !strings.Contains(body, `<label>HTTPS</label>`) {
+	if !strings.Contains(body, `<span class="fieldname">SSH</span>`) || !strings.Contains(body, `<span class="fieldname">HTTPS</span>`) {
 		t.Error("clone blocks are not labelled")
 	}
 	// Clone and about belong to the repository root, not a subdirectory.

@@ -36,7 +36,7 @@
 <section id="access"><h2>Access</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="visibility">
-  <div><label>Visibility</label><p class="hint">Private repositories answer not found to everyone without access, including in search and on your profile.</p></div>
+  <div><span class="fieldname">Visibility</span><p class="hint">Private repositories answer not found to everyone without access, including in search and on your profile.</p></div>
   <div class="check">
     <label><input type="radio" name="visibility" value="public"{{if eq .Repo.Visibility "public"}} checked{{end}}> Public</label>
     <label><input type="radio" name="visibility" value="private"{{if eq .Repo.Visibility "private"}} checked{{end}}> Private</label>
