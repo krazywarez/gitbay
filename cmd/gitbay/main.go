@@ -138,6 +138,9 @@ func newRoot() *cobra.Command {
 				pass("visibility", "set visibility: <owner/name> public|private", passOpts{server: []string{"admin", "repo", "visibility"}}),
 				pass("delete", "delete a repository: <owner/name> --yes", passOpts{server: []string{"admin", "repo", "delete"}}),
 			),
+			group("mr", "merge requests in any repository (audited)",
+				pass("prune", "drop merged or closed MRs' head refs and the objects only they kept: <owner/name> <n>... --yes", passOpts{server: []string{"admin", "mr", "prune"}}),
+			),
 		),
 		manCmd(root),
 	)

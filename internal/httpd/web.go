@@ -1863,6 +1863,10 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	diffComments, _ := s.st.ListDiffComments(m.ID, s.webViewer(r).ID)
 
 	headRef := fmt.Sprintf("refs/merge-requests/%d/head", m.Number)
+	// An admin can prune the head ref; the diff is then unavailable, not
+	// empty, and the page must not read as the latter.
+	_, headErr := gitutil.ResolveRef(p.Dir, headRef)
+	headPruned := headErr != nil
 	var files []diffFile
 	base := m.MergedBase
 	if base == "" {
@@ -1982,11 +1986,12 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Gates           *control.GatesOut
 		SourceGone      bool
 		HeadMerged      bool
+		HeadPruned      bool
 		Base            string
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates,
-		sourceGone(p, m), headMerged, base})
+		sourceGone(p, m), headMerged, headPruned, base})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the

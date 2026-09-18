@@ -4,6 +4,15 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.24.0 — unreleased
+
+- =admin mr prune <owner/name> <n>... --yes= drops the named merged or
+  closed MRs' =refs/merge-requests/N/head= and runs =git gc --prune=now=
+  on the repository, for commits a history rewrite left reachable only
+  through them. Open and source-gone MRs are refused. Nothing drops a
+  head ref on its own. =mr diff= and the MR page say when a head is gone
+  (#227).
+
 * v1.23.0 — 2026-09-17
 
 The web design foundation (#218). Tokens measured in both schemes, one

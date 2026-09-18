@@ -72,6 +72,7 @@
 {{if .DiffFiles}}<p class="diffstat">{{.Stat.Files}} file{{if ne .Stat.Files 1}}s{{end}} changed, <span class="add">+{{.Stat.Adds}}</span> <span class="del">−{{.Stat.Dels}}</span>{{if .DiffTruncated}} · shown up to 4 MiB; the counts and the last file are partial{{end}}</p>
 {{if .DiffTruncated}}<p class="error" role="alert">This diff is larger than 4 MiB and is cut off below. Fetch the branch to see all of it.</p>{{end}}
 {{template "difffiles" dict "Files" .DiffFiles "Base" $base "Viewer" .Viewer}}
+{{else if .HeadPruned}}<p class="empty-note">The head of this merge request is no longer in the repository; its diff is not available.</p>
 {{else}}<p class="empty-note">No changes between the source and target.{{if .HeadMerged}} The source branch was already merged or fast-forwarded into <code>{{.MR.TargetRef}}</code>.{{end}}</p>{{end}}
 {{end}}
 

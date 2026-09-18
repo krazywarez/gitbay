@@ -45,6 +45,27 @@ func DeleteRef(dir, ref string) error {
 	return nil
 }
 
+// RefExists reports whether ref is present, whatever it points at. Unlike
+// ResolveRef it does not need the object to exist, so a ref left dangling
+// by an interrupted prune still reads as present and gets deleted.
+func RefExists(dir, ref string) bool {
+	return exec.Command(toolpath.Look("git"), "-C", dir, "show-ref", "--verify", "--quiet", ref).Run() == nil
+}
+
+// PruneNow repacks the repository and drops every unreachable object at
+// once, instead of after git's two-week grace. For when a ref was deleted
+// so that what it pointed at stops being fetchable by sha. Without the
+// grace, a push whose objects have left quarantine but whose ref is not
+// yet written can lose them; the window is milliseconds, and the one
+// caller is an explicit admin command, not a timer.
+func PruneNow(dir string) error {
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "gc", "--quiet", "--prune=now")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("gc --prune=now: %v\n%s", err, out)
+	}
+	return nil
+}
+
 // RevListRange returns commits in old..new, newest first.
 func RevListRange(dir, old, new string) ([]string, error) {
 	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", "--end-of-options", new, "^"+old)

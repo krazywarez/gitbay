@@ -419,7 +419,9 @@ Semantics worth knowing:
 
 - the MR head lives in the *target* repository as
   =refs/merge-requests/N/head= (fetchable by any reader), so an MR
-  survives deletion of its source branch or fork.
+  survives deletion of its source branch or fork. It is never removed
+  on merge or close; after a history rewrite an instance admin can
+  drop it with =admin mr prune=.
 - force-pushing the source updates the MR and marks existing reviews
   stale — unless the diff is the one they reviewed. A rebase onto a
   target that moved on changes every sha and nothing about the change,

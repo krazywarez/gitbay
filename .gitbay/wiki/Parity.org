@@ -369,9 +369,9 @@ with the same cursors; iOS pages with them too.
 Build secrets, mirror configuration and tokens, custom domain claims,
 API token minting, web session listing and revocation, deploy keys,
 account and instance administration. Deleting, transferring or renaming
-a repository is also CLI-only, as is deleting an organization: each
-removes or moves what clone URLs point at, and wants a typed command,
-not a button.
+a repository is also CLI-only, as is deleting an organization and
+pruning merge request heads (=admin mr prune=): each removes or moves
+what clone URLs point at, and wants a typed command, not a button.
 
 These are the only rows where a =no= is intended. Everywhere else a
 =no= is work outstanding, and =n/a= means a surface cannot usefully

@@ -652,6 +652,9 @@ func runMRDiff(c *Ctx, args []string) int {
 	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	head := mrHeadRef(mr.Number)
+	if _, err := gitutil.ResolveRef(dir, head); err != nil {
+		return c.fail(protocol.ExitFailure, "the head of !%d is no longer in the repository; its diff is not available", mr.Number)
+	}
 	// After a merge (especially fast-forward) the live merge-base equals
 	// the head and the diff would vanish; use the recorded base instead.
 	base := mr.MergedBase

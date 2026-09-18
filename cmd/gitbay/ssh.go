@@ -210,6 +210,7 @@ func withRepo(t target, args []string) ([]string, error) {
 var listVerbs = map[string]bool{
 	"list": true, "runners": true, "deliveries": true, "refs": true,
 	"revisions": true, "threads": true, "bookmarks": true, "jobs": true,
+	"prune": true,
 }
 
 // alignColumns reports whether a command's rows should be padded into

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +65,10 @@ func init() {
 		Summary: "delete any repository (instance admins; audited)",
 		Usage:   "admin repo delete <owner/name> --yes",
 		SSHOnly: true, Run: runAdminRepoDelete})
+	register(Command{Path: []string{"admin", "mr", "prune"},
+		Summary: "drop merged or closed MRs' head refs and the objects only they kept, e.g. after a history rewrite (instance admins; audited)",
+		Usage:   "admin mr prune <owner/name> <n> [<n>...] --yes",
+		SSHOnly: true, Run: runAdminMRPrune})
 }
 
 // requireInstanceAdmin gates the admin noun. -1 means proceed.
@@ -521,6 +527,94 @@ func runAdminRunners(c *Ctx, args []string) int {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Username, r.Fingerprint, r.LastSeen, scope, held)
+		}
+	})
+}
+
+type mrPruneOut struct {
+	Number int64  `json:"number"`
+	Head   string `json:"head_sha"` // what the ref pointed at; empty if it was already gone
+}
+
+// runAdminMRPrune deletes refs/merge-requests/<n>/head for the named MRs
+// and prunes the repository at once, so commits a history rewrite left
+// reachable only through them stop being fetchable. Nothing drops a head
+// ref on its own: an open or source-gone MR is merged through it, and a
+// merged or closed one keeps its diff readable through it. Every check
+// runs before the first write.
+func runAdminMRPrune(c *Ctx, args []string) int {
+	var path string
+	var yes bool
+	var numbers []int64
+	for _, a := range args {
+		switch {
+		case a == "--yes":
+			yes = true
+		case path == "":
+			path = a
+		default:
+			n, err := strconv.ParseInt(a, 10, 64)
+			if err != nil || n <= 0 {
+				return c.usage()
+			}
+			if !slices.Contains(numbers, n) {
+				numbers = append(numbers, n)
+			}
+		}
+	}
+	if path == "" || len(numbers) == 0 {
+		return c.usage()
+	}
+	repo, code := adminRepo(c, path)
+	if code >= 0 {
+		return code
+	}
+	if !yes {
+		return c.fail(protocol.ExitUsage, "admin mr prune drops the commits for good; re-run with --yes")
+	}
+	mrs := make([]store.MR, 0, len(numbers))
+	for _, n := range numbers {
+		mr, err := c.Store.MRByNumber(repo.ID, n)
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "MR !%d not found in %s", n, repo.Path())
+		} else if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if mr.State != "merged" && mr.State != "closed" {
+			return c.fail(protocol.ExitFailure, "!%d is still mergeable and its head is what makes it so; merge or close it first", n)
+		}
+		mrs = append(mrs, mr)
+	}
+
+	// The record is written as each ref goes, not after the gc: a failure
+	// past this point leaves refs deleted, and the audit log and the MR
+	// thread must say so. Re-running the same command finishes the job.
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	rows := make([]mrPruneOut, 0, len(mrs))
+	for _, mr := range mrs {
+		ref := mrHeadRef(mr.Number)
+		row := mrPruneOut{Number: mr.Number}
+		if gitutil.RefExists(dir, ref) {
+			row.Head, _ = gitutil.ResolveRef(dir, ref)
+			if err := gitutil.DeleteRef(dir, ref); err != nil {
+				c.Store.Audit(c.User.ID, "admin mr.prune", map[string]any{"repo": repo.Path(), "numbers": numbers, "failed": err.Error()})
+				return c.fail(protocol.ExitFailure, "%v; the refs before !%d are deleted and not yet pruned; re-run the same command", err, mr.Number)
+			}
+		}
+		c.Store.AddMRSystemComment(mr.ID, c.User.ID, fmt.Sprintf("head ref pruned by %s; the diff is no longer available", c.User.Username))
+		rows = append(rows, row)
+	}
+	c.Store.Audit(c.User.ID, "admin mr.prune", map[string]any{"repo": repo.Path(), "numbers": numbers})
+	if err := gitutil.PruneNow(dir); err != nil {
+		return c.fail(protocol.ExitFailure, "%v; the head refs are deleted but the objects are not yet pruned; re-run the same command", err)
+	}
+	return c.emit(rows, func(w io.Writer) {
+		for _, r := range rows {
+			if r.Head == "" {
+				fmt.Fprintf(w, "!%d\talready gone\n", r.Number)
+				continue
+			}
+			fmt.Fprintf(w, "!%d\t%s\n", r.Number, r.Head)
 		}
 	})
 }

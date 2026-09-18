@@ -277,6 +277,26 @@ gitbayd admin gc --aggressive        # thorough repack; slow, rarely needed
 gitbayd admin gc --lfs               # also drop LFS objects no pointer names (older than a day)
 #+end_src
 
+A history rewrite leaves the commits it removed reachable through
+=refs/merge-requests/N/head= of the merge requests that landed them, so
+they stay fetchable by anyone who can read the repository. Nothing drops
+a head ref on its own — an open or source-gone MR is merged through it,
+and a merged or closed one keeps its diff readable through it — so the
+cleanup is a command an instance admin runs, naming the MRs:
+
+#+begin_src sh
+ssh git@<host> admin mr prune owner/name 1 2 3 --yes
+#+end_src
+
+It refuses an open or source-gone MR, deletes the named refs, runs
+=git gc --prune=now= on that one repository so the objects go at once
+rather than after git's two-week grace, leaves a system comment on each
+MR, and audits as =admin mr.prune=. The MR keeps its title, comments,
+reviews and head sha; =mr diff= and the MR page say the head is gone.
+Run it when nothing is pushing to that repository: without the grace, a
+push caught between leaving quarantine and writing its ref loses its
+objects. Objects also survive in offsite backups until those are pruned.
+
 =deploy/cloud-init.yaml= ships a =gitbay-gc.timer= that runs =admin gc=
 weekly (Sunday 07:00 UTC). Imported repositories keep whatever pack
 layout the source sent, so a first manual =admin gc= after a bulk
@@ -667,7 +687,8 @@ answers and which commit serves, 503 when it does not.
 - deleting a fork marks MRs sourced from it =source_gone=; their diffs
   remain viewable and mergeable because the target repo owns the
   objects.
-- =refs/merge-requests/*= is server-owned and unpushable by clients.
+- =refs/merge-requests/*= is server-owned and unpushable by clients;
+  only =admin mr prune= removes one (see Maintenance).
 - audit-relevant activity (issue/MR lifecycle, imports, pushes) lands in
   the =events= table, which also feeds webhooks.
 - the daemon idles under 10MB RSS; the smallest VPS tier is adequate.

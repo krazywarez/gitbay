@@ -35,7 +35,27 @@ type mrPageData struct {
 	Gates           *control.GatesOut
 	SourceGone      bool
 	HeadMerged      bool
+	HeadPruned      bool
 	Base            string
+}
+
+// A pruned head has no diff to show; the page must say the head is gone
+// rather than that nothing changed, which is what an empty file list
+// otherwise renders as.
+func TestMRDiffViewNamesAPrunedHead(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("merged"), View: "diff", HeadPruned: true,
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, "no longer in the repository") {
+		t.Error("diff view of a pruned head does not say the head is gone")
+	}
+	if strings.Contains(out, "No changes between") {
+		t.Error("diff view of a pruned head claims there were no changes")
+	}
 }
 
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
