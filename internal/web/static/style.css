@@ -1467,13 +1467,21 @@ svg.icon { vertical-align: -0.125em; }
     overflow-x: auto;
   }
   a.brand { padding: var(--sp-2) var(--sp-3); }
-  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; align-items: center; }
+  .railbody { flex: 1; overflow: visible; padding: 0; display: flex; align-items: center; flex-wrap: wrap; }
   form.railsearch { margin: 0 var(--sp-2); }
   form.railsearch input[type="search"] { min-width: 8rem; }
-  /* the strip hides the pinned group and the review queue: pinned repos
-     are reachable from the repository pages and the review queue from
-     the dashboard's review section, per the spec */
+  /* the strip hides the review queue, reachable from the dashboard, and
+     shows pinned repositories as a second row of the strip */
   .railgroup { display: none; }
+  .railgroup.pinned {
+    display: block;
+    width: 100%;
+    order: 9;
+    border-top: 1px solid var(--shell-line);
+    padding: 0 var(--sp-2);
+  }
+  .railgroup.pinned .raillabel { display: none; }
+  .railgroup.pinned ul.raillist { overflow-x: auto; }
   ul.raillist { display: flex; margin: 0; }
   ul.raillist a { border-radius: 0; border-bottom: 2px solid transparent; padding: var(--sp-2) var(--sp-3); }
   ul.raillist a[aria-current] { box-shadow: none; border-bottom-color: var(--shell-mark); }

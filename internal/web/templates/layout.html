@@ -27,7 +27,7 @@
       <li><a href="/new">New repository</a></li>{{end}}
     </ul>
     {{with .Rail.Pinned}}
-    <div class="railgroup">
+    <div class="railgroup pinned">
     <p class="raillabel" id="rail-pinned">Pinned</p>
     <ul class="raillist" aria-labelledby="rail-pinned">
       {{range .}}<li><a {{if eq $here (printf "%s/%s" .Owner .Name)}}aria-current="page" {{end}}href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a></li>
