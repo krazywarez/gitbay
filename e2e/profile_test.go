@@ -214,6 +214,9 @@ func TestOwnerProfiles(t *testing.T) {
 	if strings.Index(body, "<em>small tools</em>") > strings.Index(body, `class="activity"`) {
 		t.Error("about renders below the activity graph")
 	}
+	if strings.Index(body, `<ul class="repolist"`) > strings.Index(body, "<em>small tools</em>") {
+		t.Error("repositories render below the about section")
+	}
 
 	// Clearing works the same way as the other fields.
 	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--link", "''"); code != 0 {
