@@ -356,3 +356,56 @@ func TestDashboardQueues(t *testing.T) {
 		t.Fatalf("reviewed MR still waiting:\n%s", after)
 	}
 }
+
+// D04/D05: two jobs on one commit fold into a single feed line, marked
+// with the worse of the two outcomes, and shown with a relative time
+// carrying the exact UTC time in its title.
+func TestDashboardFeedFoldsBuildRun(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	inst.runner = buildRunner(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	runnerKey := inst.newKey(t, "ci")
+	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	work := t.TempDir()
+	env := inst.gitEnv(aliceKey)
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.MkdirAll(filepath.Join(dir, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  ok:\n    steps:\n      - echo fine\n  broken:\n    steps:\n      - \"false\"\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	sha := strings.TrimSpace(mustGit(t, dir, env, "rev-parse", "HEAD"))
+
+	// The runner processes both jobs ("broken" sorts first).
+	inst.runnerOnce(t, runnerKey)
+	inst.runnerOnce(t, runnerKey)
+
+	_, body := browserGet(t, inst.login(t, aliceKey), inst.base()+"/")
+	if !strings.Contains(body, "ran 2 jobs on") {
+		t.Fatalf("feed did not fold the two jobs into one run:\n%s", body)
+	}
+	if !strings.Contains(body, `class="dot bad"`) {
+		t.Fatalf("feed did not mark the run with the worse (failure) status:\n%s", body)
+	}
+	if !strings.Contains(body, sha[:10]) {
+		t.Fatalf("feed missing the short sha %q:\n%s", sha[:10], body)
+	}
+	// A build reported moments ago renders as "just now"; ago() only
+	// switches to "N ago" past a minute, so either form proves the
+	// relative-time rendering rather than the raw timestamp.
+	if !strings.Contains(body, ">just now<") && !strings.Contains(body, " ago<") {
+		t.Fatalf("feed missing a relative time:\n%s", body)
+	}
+	if !strings.Contains(body, "title=\"") || !strings.Contains(body, " UTC\"") {
+		t.Fatalf("feed missing the exact time in a title:\n%s", body)
+	}
+}

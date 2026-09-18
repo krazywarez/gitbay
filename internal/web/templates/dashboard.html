@@ -36,7 +36,7 @@
 <aside class="aside">
   <div class="grp">
     <h2>Recent activity</h2>
-    {{range .Feed}}<p class="row feedline">{{if eq .State "failure"}}<span class="dot bad"></span>{{else if eq .State "success"}}<span class="dot ok"></span>{{else if .State}}<span class="dot pend"></span>{{end}}<a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · {{when .When}}</span></p>
+    {{range .Feed}}<p class="row feedline">{{if eq .State "failure"}}<span class="dot bad"></span>{{else if eq .State "success"}}<span class="dot ok"></span>{{else if .State}}<span class="dot pend"></span>{{end}}<a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
     {{else}}<p class="none">No activity yet</p>{{end}}
   </div>
 </aside>

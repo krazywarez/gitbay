@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/store"
 )
@@ -15,10 +16,11 @@ type feedLine struct {
 	Ref   string // "#12", "!35", "v0.4.0", a short sha
 	Repo  string
 	URL   string
-	When  string   // the stored timestamp, for anything still reading it raw
-	State string   // a build run's combined status; empty for anything else
-	Jobs  []string // job names folded into a build run
-	sha   string   // the commit a build event fired on, for fold-matching
+	When  string    // the stored timestamp, for anything still reading it raw
+	WhenT time.Time // parsed from When, for ago/whenT rendering
+	State string    // a build run's combined status; empty for anything else
+	Jobs  []string  // job names folded into a build run
+	sha   string    // the commit a build event fired on, for fold-matching
 }
 
 // feedLines turns stored events into readable lines. An unknown kind
@@ -52,7 +54,7 @@ func feedLines(events []store.FeedEvent) []feedLine {
 			}
 		}
 
-		l := feedLine{Actor: e.Actor, Repo: e.RepoPath, When: e.CreatedAt}
+		l := feedLine{Actor: e.Actor, Repo: e.RepoPath, When: e.CreatedAt, WhenT: parseEventTime(e.CreatedAt)}
 		if l.Actor == "" {
 			l.Actor = "gitbay"
 		}
@@ -87,6 +89,17 @@ func feedLines(events []store.FeedEvent) []feedLine {
 		statuses = append(statuses, st)
 	}
 	return out
+}
+
+// parseEventTime parses a stored RFC3339 timestamp for ago/whenT
+// rendering; an unparseable value (or none) comes back zero rather than
+// guessing.
+func parseEventTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 func issueVerb(s string) string {

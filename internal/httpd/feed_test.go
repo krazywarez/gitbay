@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/store"
 )
@@ -127,5 +128,29 @@ func TestFeedLinesRunStatePrecedence(t *testing.T) {
 		if len(lines) != 1 || lines[0].State != tc.want {
 			t.Errorf("statuses %v: got %+v, want State %q", tc.statuses, lines, tc.want)
 		}
+	}
+}
+
+// D05: feedLines parses the stored RFC3339 timestamp into WhenT for the
+// template's relative-time rendering; an unparseable value leaves it zero
+// rather than panicking or guessing.
+func TestFeedLinesParsesWhenT(t *testing.T) {
+	events := []store.FeedEvent{
+		{RepoPath: "alice/app", Actor: "alice", Kind: "issue.created",
+			Data: `{"number":1}`, CreatedAt: "2026-09-10T12:00:00Z"},
+		{RepoPath: "alice/app", Actor: "alice", Kind: "issue.created",
+			Data: `{"number":2}`, CreatedAt: "not-a-time"},
+	}
+	lines := feedLines(events)
+	want, _ := time.Parse(time.RFC3339Nano, "2026-09-10T12:00:00Z")
+	if !lines[0].WhenT.Equal(want) {
+		t.Errorf("WhenT = %v, want %v", lines[0].WhenT, want)
+	}
+	if !lines[1].WhenT.IsZero() {
+		t.Errorf("WhenT for bad timestamp = %v, want zero", lines[1].WhenT)
+	}
+	// When is preserved for anything that still reads the raw string.
+	if lines[0].When != "2026-09-10T12:00:00Z" {
+		t.Errorf("When = %q", lines[0].When)
 	}
 }
