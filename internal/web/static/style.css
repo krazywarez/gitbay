@@ -119,6 +119,13 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
+  /* the rail: a column the width of one hit target, a row one tall */
+  --rail-w: 3.5rem;
+  --rail-hit: 40px;
+  --rail-strip-h: 48px;
+  --rail-mark: 24px;
+  --rail-mark-box: 32px;
+
   --r-ctl: 4px;   /* controls and chips */
   --r-card: 6px;  /* cards, lists, code blocks */
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -244,10 +251,14 @@ a.skip {
 }
 a.skip:focus { top: var(--sp-3); text-decoration: none; }
 
-/* ---- rail ---- */
+/* ---- rail: one glyph per destination, no labels ----
+   The column is the width of a hit target and nothing else. Every item is
+   a square link carrying an inline svg, its name in an aria-label and in a
+   visually hidden span, so the nav reads the same to a screen reader as
+   the old text list did. */
 .rail {
   flex: none;
-  width: 14rem;
+  width: var(--rail-w);
   background: var(--shell-bg);
   color: var(--shell-fg);
   border-right: 1px solid var(--shell-line);
@@ -256,83 +267,55 @@ a.skip:focus { top: var(--sp-3); text-decoration: none; }
   height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) 0;
 }
 a.brand {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  justify-content: center;
+  flex: none;
+  width: var(--rail-hit);
+  height: var(--rail-hit);
   color: var(--shell-fg);
-  font-weight: 600;
-  font-size: var(--fs-3);
 }
 a.brand:hover { text-decoration: none; }
-a.brand svg.mark { display: block; flex: none; }
-a.brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.brand svg.mark { display: block; flex: none; width: var(--rail-mark); height: var(--rail-mark); }
 
-.railbody { flex: 1; overflow-y: auto; padding: 0 var(--sp-3); }
-.railtop { display: block; }
-/* search is reachable from every page, so it sits above the rail's links
-   rather than on one page of its own */
-form.railsearch { margin-bottom: var(--sp-3); }
-form.railsearch input[type="search"] {
-  width: 100%;
-  background: var(--shell-hover);
-  border: 1px solid var(--shell-line);
-  color: var(--shell-fg);
-  border-radius: var(--r-ctl);
-  padding: 6px 10px;
-  height: 32px;
-  font: inherit;
-  font-size: var(--fs-2);
-}
-form.railsearch input[type="search"]::placeholder { color: var(--shell-muted); }
-ul.raillist { list-style: none; margin: 0 0 var(--sp-4); padding: 0; }
-ul.raillist a {
+ul.raillist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--sp-2);
-  padding: 5px var(--sp-2);
-  color: var(--shell-fg);
-  font-size: var(--fs-2);
-  border-radius: var(--r-ctl);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  gap: var(--sp-1);
+  min-width: 0;
 }
-ul.raillist a:hover { background: var(--shell-hover); text-decoration: none; }
-/* orange marks position — the rail's only accent */
-ul.raillist a[aria-current] {
-  background: var(--shell-hover);
-  box-shadow: inset 3px 0 0 var(--shell-mark);
-  font-weight: 600;
-}
-ul.raillist .owner { color: var(--shell-muted); }
-ul.raillist a.newrepo {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
+/* the spacer that holds settings, admin and the account cell at the far
+   end of the rail in either orientation */
+.railgap { flex: 1; }
+.railicon {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
+  flex: none;
+  width: var(--rail-hit);
+  height: var(--rail-hit);
   padding: 0;
-  border: 1px solid var(--shell-line);
+  border: 0;
+  background: none;
+  color: var(--shell-fg);
   border-radius: var(--r-ctl);
-  font-size: var(--fs-3);
-  font-weight: 600;
+  cursor: pointer;
 }
-ul.raillist.wide a { white-space: normal; display: block; }
-ul.raillist.wide b { display: block; font-weight: 500; font-size: var(--fs-1); }
-ul.raillist.wide .owner { display: block; font-size: var(--fs-0); }
-
-.railgroup { margin-bottom: var(--sp-4); }
-.raillabel {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin: 0 var(--sp-2) var(--sp-1);
-  font-size: var(--fs-0);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--shell-muted);
+.railicon:hover { background: var(--shell-hover); text-decoration: none; }
+/* orange marks position — the rail's only accent */
+.railicon[aria-current] {
+  background: var(--shell-hover);
+  box-shadow: inset 3px 0 0 var(--shell-mark);
 }
 .count {
   font-size: var(--fs-0);
@@ -344,32 +327,35 @@ ul.raillist.wide .owner { display: block; font-size: var(--fs-0); }
   border-radius: var(--r-ctl);
   margin-left: auto;
 }
-/* pinned above the account cell: always reachable, never scrolled away */
-.railpinned {
-  flex: none;
-  padding: var(--sp-2) var(--sp-3);
+/* the unread count is a badge on the bell's corner, not a trailing number */
+.railicon .count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   margin: 0;
-  border-top: 1px solid var(--shell-line);
+  padding: 0 3px;
+  line-height: 1.35;
 }
 .railfoot {
   flex: none;
-  border-top: 1px solid var(--shell-line);
-  padding: var(--sp-3) var(--sp-4);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  font-size: var(--fs-2);
+  gap: var(--sp-1);
+  min-width: 0;
 }
 .railfoot a { color: var(--shell-fg); }
-a.railuser { display: inline-flex; align-items: center; gap: var(--sp-2); }
-/* a descendant cannot cancel an ancestor's underline, so the link carries
-   none and the name draws its own */
+.railfoot form { margin: 0; }
+a.railuser {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--rail-hit);
+  height: var(--rail-hit);
+}
 a.railuser:hover { text-decoration: none; }
-a.railuser:hover .uname { text-decoration: underline; }
-.railfoot form { margin-left: auto; }
-.railfoot button.linklike { color: var(--shell-muted); text-decoration: underline; }
-.railfoot button.linklike:hover { color: var(--shell-fg); }
+a.railuser .avatar { width: var(--rail-mark); height: var(--rail-mark); }
 .avatar {
   display: inline-grid;
   place-items: center;

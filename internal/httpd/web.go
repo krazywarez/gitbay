@@ -190,12 +190,13 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	events, _ := s.st.RecentEvents(viewer.ID, 20, 0)
 	s.render(w, "dashboard.html", struct {
 		basePage
+		Tab      string
 		Reviews  []store.DashboardItem
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
 		Feed     []feedLine
-	}{s.baseFor(viewer), reviews, assigned, mrs, issues, feedLines(events)})
+	}{s.baseFor(viewer), "dashboard", reviews, assigned, mrs, issues, feedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
@@ -211,9 +212,10 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	s.render(w, "explore.html", struct {
 		basePage
+		Tab   string
 		Query string
 		Repos []describedRepo
-	}{s.baseFor(viewer), q, s.filterRepos(q, s.describeAll(repos))})
+	}{s.baseFor(viewer), "explore", q, s.filterRepos(q, s.describeAll(repos))})
 }
 
 // privacy renders the privacy page: what the gitbay software does with

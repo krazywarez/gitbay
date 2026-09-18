@@ -53,11 +53,12 @@ func (s *Server) globalSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "globalsearch.html", struct {
 		basePage
+		Tab      string
 		Query    string
 		Kind     string
 		QueryErr string
 		Results  []searchResult
-	}{s.baseFor(viewer), q, kind, queryErr, results})
+	}{s.baseFor(viewer), "sitesearch", q, kind, queryErr, results})
 }
 
 func searchHref(h control.SearchResult) string {
