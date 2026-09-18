@@ -53,6 +53,10 @@ func (s *Server) Routes() []Route {
 	for _, f := range fonts {
 		routes = append(routes, Route{Method: "GET", Pattern: "/static/fonts/" + f.Name(), Handler: s.font})
 	}
+	images, _ := fs.ReadDir(web.ImageFS, "static/img")
+	for _, f := range images {
+		routes = append(routes, Route{Method: "GET", Pattern: "/static/img/" + f.Name(), Handler: s.image})
+	}
 	routes = append(routes,
 		Route{Method: "GET", Pattern: "/favicon.svg", Handler: s.favicon},
 		Route{Method: "GET", Pattern: "/{owner}", Handler: s.ownerPage},

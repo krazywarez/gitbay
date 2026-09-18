@@ -29,6 +29,9 @@ var FaviconSVG []byte
 //go:embed static/fonts/*.woff2
 var FontFS embed.FS
 
+//go:embed static/img/*.png
+var ImageFS embed.FS
+
 // version returns the short VCS revision baked into the binary, or "" when
 // built outside a checkout. Used by the layout footer.
 var version = sync.OnceValue(func() string {

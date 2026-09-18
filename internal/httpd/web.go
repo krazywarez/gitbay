@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -105,6 +106,18 @@ func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// image serves the embedded landing pictures with the font cache policy.
+func (s *Server) image(w http.ResponseWriter, r *http.Request) {
+	data, err := web.ImageFS.ReadFile("static" + r.URL.Path[len("/static"):])
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
+	w.Write(data)
+}
+
 // notFound renders the designed 404 page with a 404 status. Falls back to
 // the stock plain-text response if the template fails.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +185,12 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 }
 
 // landingPicture says whether the landing page's screenshot images exist to
-// show. Task 15 replaces this with a check of the embedded images.
-var landingPicture = false
+// show, checked once against the embedded images.
+var landingPicture = func() bool {
+	_, e1 := fs.Stat(web.ImageFS, "static/img/mr-dark.png")
+	_, e2 := fs.Stat(web.ImageFS, "static/img/mr-light.png")
+	return e1 == nil && e2 == nil
+}()
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {
 	pinned, _ := s.st.PinnedRepos(viewer.ID)

@@ -1,9 +1,11 @@
 package httpd
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
@@ -40,6 +42,38 @@ func TestStylesheetFontsAreServed(t *testing.T) {
 		}
 		if ct := rec.Header().Get("Content-Type"); ct != "font/woff2" {
 			t.Errorf("%s: content-type %q", u, ct)
+		}
+	}
+}
+
+// TestLandingImagesAreServed: every file under static/img has a route
+// that answers 200 with an image type and the stylesheet's cache policy.
+func TestLandingImagesAreServed(t *testing.T) {
+	s := New(config.Default(), nil)
+	byPattern := map[string]http.HandlerFunc{}
+	for _, r := range s.Routes() {
+		if r.Method == "GET" {
+			byPattern[r.Pattern] = r.Handler
+		}
+	}
+	entries, err := fs.ReadDir(web.ImageFS, "static/img")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no images embedded")
+	}
+	for _, e := range entries {
+		u := "/static/img/" + e.Name()
+		h, ok := byPattern[u]
+		if !ok {
+			t.Errorf("%s: no route", u)
+			continue
+		}
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest("GET", u, nil))
+		if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/") {
+			t.Errorf("%s: %d %s", e.Name(), rec.Code, rec.Header().Get("Content-Type"))
 		}
 	}
 }

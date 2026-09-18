@@ -163,6 +163,8 @@ func TestLandingRoutes(t *testing.T) {
 		`class="button primary" href="/explore">Explore repositories</a>`,
 		`class="button btn" href="/register">Create an account</a>`,
 		"web login</code>",
+		"/static/img/mr-dark.png",
+		"<picture>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("landing lacks %q", want)
