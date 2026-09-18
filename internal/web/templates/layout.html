@@ -25,7 +25,7 @@
       <li><a {{if eq (str . "Tab") "explore"}}aria-current="page" {{end}}href="/explore">Explore</a></li>
       {{if .Viewer}}<li><a {{if eq (str . "Tab") "notifications"}}aria-current="page" {{end}}href="/notifications">Notifications{{with .Rail.Unread}} <b class="count">{{.}}</b>{{end}}</a></li>
       <li><a {{if eq (str . "Tab") "bookmarks"}}aria-current="page" {{end}}href="/bookmarks">Bookmarks</a></li>
-      <li><a href="/new">New repository</a></li>{{end}}
+      <li><a class="newrepo" href="/new" aria-label="New repository" title="New repository">+</a></li>{{end}}
     </ul>
     </div>
     {{with .Rail.Pinned}}

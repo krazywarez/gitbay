@@ -306,6 +306,18 @@ ul.raillist a[aria-current] {
   font-weight: 600;
 }
 ul.raillist .owner { color: var(--shell-muted); }
+ul.raillist a.newrepo {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--shell-line);
+  border-radius: var(--r-ctl);
+  font-size: var(--fs-3);
+  font-weight: 600;
+}
 ul.raillist.wide a { white-space: normal; display: block; }
 ul.raillist.wide b { display: block; font-weight: 500; font-size: var(--fs-1); }
 ul.raillist.wide .owner { display: block; font-size: var(--fs-0); }
@@ -1461,28 +1473,48 @@ svg.icon { vertical-align: -0.125em; }
     height: auto;
     position: static;
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sp-2);
     border-right: 0;
     border-bottom: 1px solid var(--shell-line);
     overflow-x: auto;
   }
-  a.brand { padding: var(--sp-2) var(--sp-3); }
+  a.brand { padding: var(--sp-2) var(--sp-3); min-height: 39px; display: flex; align-items: center; }
   .railbody { flex: 1; overflow: visible; padding: 0; display: flex; flex-direction: column; }
   .railtop { display: flex; align-items: center; gap: var(--sp-2); overflow-x: auto; }
   .railtop > * { flex-shrink: 0; }
   form.railsearch { margin: 0 var(--sp-2); }
   form.railsearch input[type="search"] { min-width: 8rem; }
   /* the strip hides the review queue, reachable from the dashboard, and
-     shows pinned repositories as a second row of the strip */
+     shows pinned repositories as a second, quieter row of the strip */
   .railgroup { display: none; }
   .railgroup.pinned {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
     border-top: 1px solid var(--shell-line);
     padding: 0 var(--sp-2);
+    min-height: 32px;
   }
-  .railgroup.pinned .raillabel { display: none; }
-  .railgroup.pinned ul.raillist { overflow-x: auto; }
+  .railgroup.pinned .raillabel {
+    display: block;
+    margin: 0;
+    font-size: var(--fs-0);
+    color: var(--shell-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    flex: none;
+  }
+  .railgroup.pinned ul.raillist {
+    display: flex;
+    overflow-x: auto;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .railgroup.pinned ul.raillist a { font-size: var(--fs-1); padding: var(--sp-1) var(--sp-2); }
+  .railgroup.pinned ul.raillist a .owner { display: none; }
   ul.raillist { display: flex; margin: 0; }
   ul.raillist a { border-radius: 0; border-bottom: 2px solid transparent; padding: var(--sp-2) var(--sp-3); }
   ul.raillist a[aria-current] { box-shadow: none; border-bottom-color: var(--shell-mark); }
