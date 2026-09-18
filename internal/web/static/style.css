@@ -486,9 +486,9 @@ form.searchform, form.logfilter, form.compareform {
   flex-wrap: wrap;
   margin: 0 0 var(--sp-4);
 }
-form.searchform input[type="search"], form.logfilter input { flex: 1; min-width: 12rem; max-width: 32rem; }
+form.searchform input[type="search"], form.searchform input[type="text"], form.logfilter input { flex: 1; min-width: 12rem; max-width: 32rem; }
 form.searchform.compact { margin: 0; }
-form.searchform.compact input[type="search"] { min-width: 18rem; }
+form.searchform.compact input[type="search"], form.searchform.compact input[type="text"] { min-width: 18rem; }
 form.compareform label { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; }
 
 /* ---- buttons: one family, 32px tall, so a row of them lines up ---- */
