@@ -55,6 +55,10 @@ func TestGroupRunsCombinedStatusPriority(t *testing.T) {
 		{[]string{"running", "cancelled"}, "cancelled"},
 		{[]string{"cancelled", "failure"}, "failure"},
 		{[]string{"success", "success", "failure"}, "failure"},
+		// A status outside runStatusPriority (a future state such as
+		// "skipped") is still not success: it must not fall through to
+		// the "success" default and read as green.
+		{[]string{"success", "skipped"}, "skipped"},
 	}
 	for _, tc := range cases {
 		var builds []control.BuildOut

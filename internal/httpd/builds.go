@@ -108,7 +108,9 @@ func combinedStatus(builds []control.BuildOut) string {
 
 // worstStatus is combinedStatus's ordering rule, factored out so the
 // dashboard feed can apply the same worst-first precedence to a folded
-// build run (D04).
+// build run (D04). A status outside runStatusPriority (a future state
+// such as "skipped") is still not "success": it is returned unchanged
+// rather than falling through and reading as green.
 func worstStatus(statuses []string) string {
 	has := map[string]bool{}
 	for _, s := range statuses {
@@ -116,6 +118,11 @@ func worstStatus(statuses []string) string {
 	}
 	for _, s := range runStatusPriority {
 		if has[s] {
+			return s
+		}
+	}
+	for _, s := range statuses {
+		if s != "success" {
 			return s
 		}
 	}
