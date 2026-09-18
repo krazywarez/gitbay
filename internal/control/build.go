@@ -593,7 +593,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+args[1],
-		fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+		fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))
 	// A red build mails the repo's notify targets with the log tail — a
 	// failed scheduled job must not wait to be noticed.
 	if args[1] == "failure" {
@@ -829,7 +829,7 @@ func cancelOrphanedBuild(c *Ctx, repo store.Repo, b store.Build) int {
 	c.Store.AppendBuildLog(b.ID, []byte(fmt.Sprintf(
 		"cancelled: %.10s is not reachable from any ref; the sha was likely orphaned by a force-push\n", b.SHA)))
 	resolveCancelledCommitStatus(c, repo, b)
-	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))
 	return -1
 }
 
@@ -858,7 +858,7 @@ func runBuildCancel(c *Ctx, args []string) int {
 	}
 	// The queued status replaced whatever the commit had for this job.
 	resolveCancelledCommitStatus(c, repo, b)
-	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q}`, b.Number, b.Job))
+	c.Store.RecordEvent(repo.ID, c.User.ID, "build.cancelled", fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))
 	return c.emit(map[string]any{"number": b.Number, "job": b.Job, "status": "cancelled", "was": b.Status}, func(w io.Writer) {
 		if b.Status == "running" {
 			fmt.Fprintf(w, "cancelled %s build %d (%s); the runner stops at its next check\n", repo.Path(), b.Number, b.Job)

@@ -99,9 +99,20 @@ var runStatusPriority = []string{"failure", "cancelled", "running", "pending"}
 // combinedStatus is the run's status: the worst of its builds' statuses,
 // success only when every one of them is.
 func combinedStatus(builds []control.BuildOut) string {
+	statuses := make([]string, len(builds))
+	for i, b := range builds {
+		statuses[i] = b.Status
+	}
+	return worstStatus(statuses)
+}
+
+// worstStatus is combinedStatus's ordering rule, factored out so the
+// dashboard feed can apply the same worst-first precedence to a folded
+// build run (D04).
+func worstStatus(statuses []string) string {
 	has := map[string]bool{}
-	for _, b := range builds {
-		has[b.Status] = true
+	for _, s := range statuses {
+		has[s] = true
 	}
 	for _, s := range runStatusPriority {
 		if has[s] {
