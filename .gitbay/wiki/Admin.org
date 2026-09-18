@@ -295,7 +295,8 @@ MR, and audits as =admin mr.prune=. The MR keeps its title, comments,
 reviews and head sha; =mr diff= and the MR page say the head is gone.
 Run it when nothing is pushing to that repository: without the grace, a
 push caught between leaving quarantine and writing its ref loses its
-objects. Objects also survive in offsite backups until those are pruned.
+objects. Objects also survive in offsite backups until those are
+rewritten; see "Removing a repository's history from every snapshot".
 
 =deploy/cloud-init.yaml= ships a =gitbay-gc.timer= that runs =admin gc=
 weekly (Sunday 07:00 UTC). Imported repositories keep whatever pack
@@ -346,6 +347,50 @@ produce a database referencing commits the repository backup does not
 have. Consistency between the two halves is worth more here than latency
 on one of them. Revisit if repository replication becomes continuous
 too.
+
+** Offsite copies
+
+bay1 also takes a nightly restic snapshot of =/var/lib/gitbay= and
+=/var/lib/gitbay-stage= (the staged database copy) to an S3 bucket at
+Scaleway, with a key that can only add snapshots. The key that can
+remove them lives on the operator's machine, in
+=~/.config/gitbay/offsite.env=, and never on bay1: a compromised host
+cannot destroy its own history. Forgetting, pruning and rewriting all
+run from there.
+
+*** Removing a repository's history from every snapshot
+
+A history rewrite plus =admin mr prune= takes commits off the server,
+but every snapshot taken before it still holds them, and the retention
+window is the only thing that ages them out. To remove them now,
+rewrite the snapshots without that repository rather than forgetting
+the snapshots: everything else in them stays restorable. The next
+nightly run adds the repository back in its current state.
+
+Repositories are stored under the name they had on disk when each
+snapshot was taken, so a renamed repository needs every name it has
+carried. Check what an older snapshot holds before choosing the paths:
+
+#+begin_src sh
+set -a; . ~/.config/gitbay/offsite.env; set +a
+restic $RESTIC_OPTS snapshots
+restic $RESTIC_OPTS ls <old-snapshot> /var/lib/gitbay/repos/<owner>
+#+end_src
+
+Then dry-run, apply, prune, and confirm nothing matches:
+
+#+begin_src sh
+EXCL="--exclude /var/lib/gitbay/repos/<owner>/<name>.git --exclude /var/lib/gitbay/repos/<owner>/<old-name>.git"
+restic $RESTIC_OPTS rewrite --dry-run $EXCL     # "would modify N snapshots"
+restic $RESTIC_OPTS rewrite --forget $EXCL      # new snapshots replace the originals
+restic $RESTIC_OPTS prune                       # drops the data nothing references
+restic $RESTIC_OPTS find <name>.git <old-name>.git   # expect no output
+#+end_src
+
+=--forget= is what makes the originals go; without it the rewritten
+snapshots sit beside them and the data stays referenced. Snapshot IDs
+change; their times do not. Done for krz/keycask (formerly rust-pass)
+on 2026-09-18, across 22 snapshots.
 
 * Upgrades
 
