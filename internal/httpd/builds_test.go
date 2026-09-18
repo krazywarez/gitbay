@@ -1,0 +1,147 @@
+package httpd
+
+import (
+	"reflect"
+	"testing"
+
+	"gitbay.org/gitbay/internal/control"
+)
+
+// groupRuns folds consecutive same-commit builds (the list is newest
+// first, so a commit's jobs are adjacent) into one run per commit, and
+// gives the run a combined status: worst first (failure beats everything,
+// then cancelled, running, pending), success only when every job is (#224).
+func TestGroupRunsCombinesByCommit(t *testing.T) {
+	builds := []control.BuildOut{
+		{Number: 3, Job: "lint", Status: "success", SHA: "bbb", Ref: "main", CreatedAt: "t2"},
+		{Number: 2, Job: "unit", Status: "failure", SHA: "aaa", Ref: "main", CreatedAt: "t1"},
+		{Number: 1, Job: "lint", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "t1"},
+	}
+	runs := groupRuns(builds)
+	if len(runs) != 2 {
+		t.Fatalf("groupRuns returned %d runs, want 2: %+v", len(runs), runs)
+	}
+	if runs[0].SHA != "bbb" || len(runs[0].Builds) != 1 || runs[0].Status != "success" {
+		t.Errorf("first run: %+v", runs[0])
+	}
+	if runs[1].SHA != "aaa" || len(runs[1].Builds) != 2 || runs[1].Status != "failure" {
+		t.Errorf("second run: %+v", runs[1])
+	}
+	// Order within a run is preserved from the input.
+	if runs[1].Builds[0].Job != "unit" || runs[1].Builds[1].Job != "lint" {
+		t.Errorf("run builds out of order: %+v", runs[1].Builds)
+	}
+}
+
+func TestGroupRunsEmpty(t *testing.T) {
+	if runs := groupRuns(nil); len(runs) != 0 {
+		t.Errorf("groupRuns(nil) = %+v, want empty", runs)
+	}
+}
+
+// Two builds on the same sha but on different refs (a fast-forward merge
+// can leave the commit reachable from more than one branch) are not
+// adjacent unless the list happens to put them there; groupRuns only folds
+// what is actually adjacent, so this documents that a same-sha, same-ref
+// pair from one push is what gets folded, not "any build of this sha ever".
+func TestGroupRunsCombinedStatusPriority(t *testing.T) {
+	cases := []struct {
+		statuses []string
+		want     string
+	}{
+		{[]string{"success"}, "success"},
+		{[]string{"success", "pending"}, "pending"},
+		{[]string{"pending", "running"}, "running"},
+		{[]string{"running", "cancelled"}, "cancelled"},
+		{[]string{"cancelled", "failure"}, "failure"},
+		{[]string{"success", "success", "failure"}, "failure"},
+	}
+	for _, tc := range cases {
+		var builds []control.BuildOut
+		for _, s := range tc.statuses {
+			builds = append(builds, control.BuildOut{SHA: "x", Status: s})
+		}
+		runs := groupRuns(builds)
+		if len(runs) != 1 || runs[0].Status != tc.want {
+			t.Errorf("statuses %v: combined %+v, want %q", tc.statuses, runs, tc.want)
+		}
+	}
+}
+
+// filterLinks builds the nav.filters row: one link that clears both status
+// and job, one per known status and one per known job, each preserving the
+// other two query parameters and marking itself active (#224).
+func TestFilterLinksPreservesOtherParamsAndMarksActive(t *testing.T) {
+	links := filterLinks(buildFilter{Ref: "main", Status: "success", Job: "lint"},
+		[]control.JobOut{{Name: "lint"}, {Name: "unit"}})
+
+	byLabel := map[string]buildFilterLink{}
+	for _, l := range links {
+		byLabel[l.Label] = l
+	}
+	all, ok := byLabel["all"]
+	if !ok {
+		t.Fatal("no \"all\" link")
+	}
+	if all.Active {
+		t.Error(`"all" is active while a status/job filter is set`)
+	}
+	if all.Href != "?ref=main" {
+		t.Errorf(`"all" href = %q, want "?ref=main" (clears status and job, keeps ref)`, all.Href)
+	}
+
+	success, ok := byLabel["success"]
+	if !ok || !success.Active {
+		t.Errorf("success link: %+v, want present and active", success)
+	}
+	if success.Href != "?job=lint&ref=main&status=success" {
+		t.Errorf("success href = %q", success.Href)
+	}
+
+	lint, ok := byLabel["lint"]
+	if !ok || !lint.Active {
+		t.Errorf("lint link: %+v, want present and active", lint)
+	}
+	if lint.Href != "?job=lint&ref=main&status=success" {
+		t.Errorf("lint href = %q", lint.Href)
+	}
+
+	unit, ok := byLabel["unit"]
+	if !ok || unit.Active {
+		t.Errorf("unit link: %+v, want present and inactive", unit)
+	}
+	if unit.Href != "?job=unit&ref=main&status=success" {
+		t.Errorf("unit href = %q", unit.Href)
+	}
+}
+
+// With no filter at all, "all" is the active link.
+func TestFilterLinksAllActiveWhenUnfiltered(t *testing.T) {
+	links := filterLinks(buildFilter{}, nil)
+	for _, l := range links {
+		if l.Label == "all" && !l.Active {
+			t.Error(`"all" is not active with no filter set`)
+		}
+	}
+}
+
+// distinctRefs lists each ref once, in the order builds carry them, and
+// always includes the current filter value even if it matched nothing —
+// it powers the branch field's suggestions, not a strict "what exists" list.
+func TestDistinctRefsDedupesAndIncludesCurrent(t *testing.T) {
+	builds := []control.BuildOut{{Ref: "main"}, {Ref: "feature"}, {Ref: "main"}}
+	got := distinctRefs(builds, "release")
+	want := []string{"main", "feature", "release"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("distinctRefs = %v, want %v", got, want)
+	}
+}
+
+func TestDistinctRefsNoDuplicateWhenCurrentAlreadyPresent(t *testing.T) {
+	builds := []control.BuildOut{{Ref: "main"}}
+	got := distinctRefs(builds, "main")
+	want := []string{"main"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("distinctRefs = %v, want %v", got, want)
+	}
+}
