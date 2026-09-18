@@ -818,6 +818,7 @@ tr.tipbar td {
   background: var(--surface);
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--line);
+  max-width: 0;
 }
 .tipbar .tip {
   display: flex;
