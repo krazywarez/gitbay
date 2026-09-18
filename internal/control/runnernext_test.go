@@ -165,7 +165,7 @@ func TestRunnerNextOrphanedQueuePastCapReportsNoPendingBuilds(t *testing.T) {
 		t.Fatalf("expected no pending builds, got:\n%s", out.String())
 	}
 
-	builds, err := st.ListBuilds(repo.ID, total+1)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, total+1)
 	if err != nil {
 		t.Fatal(err)
 	}

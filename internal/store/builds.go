@@ -274,8 +274,31 @@ func (s *Store) BuildByNumber(repoID, number int64) (Build, error) {
 	return b, err
 }
 
-func (s *Store) ListBuilds(repoID int64, limit int) ([]Build, error) {
-	rows, err := s.DB.Query(buildSelect+" WHERE repo_id = ? ORDER BY number DESC LIMIT ?", repoID, limit)
+// BuildFilter narrows ListBuilds to builds matching every non-empty field.
+type BuildFilter struct {
+	Ref    string
+	Status string
+	Job    string
+}
+
+func (s *Store) ListBuilds(repoID int64, f BuildFilter, limit int) ([]Build, error) {
+	q := buildSelect + " WHERE repo_id = ?"
+	args := []any{repoID}
+	if f.Ref != "" {
+		q += " AND ref = ?"
+		args = append(args, f.Ref)
+	}
+	if f.Status != "" {
+		q += " AND status = ?"
+		args = append(args, f.Status)
+	}
+	if f.Job != "" {
+		q += " AND job = ?"
+		args = append(args, f.Job)
+	}
+	q += " ORDER BY number DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

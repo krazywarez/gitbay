@@ -6,6 +6,7 @@ import (
 
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // repoFacts is the "what is this repository" summary on a repo home: the
@@ -86,7 +87,7 @@ func (s *Server) factsFor(p repoPage) repoFacts {
 	if rels, err := s.st.ListReleases(p.Repo.ID); err == nil && len(rels) > 0 {
 		f.Release = rels[0].Tag
 	}
-	if builds, err := s.st.ListBuilds(p.Repo.ID, 1); err == nil && len(builds) > 0 {
+	if builds, err := s.st.ListBuilds(p.Repo.ID, store.BuildFilter{}, 1); err == nil && len(builds) > 0 {
 		f.Build = builds[0].Status
 	}
 	f.Bookmarks = s.st.BookmarkCount(p.Repo.ID)

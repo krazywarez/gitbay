@@ -214,7 +214,7 @@ func (f *shapeFixture) schedules() map[string]bool {
 
 // mark snapshots the state the observed action starts from.
 func (f *shapeFixture) mark(sha string) {
-	builds, err := f.st.ListBuilds(f.repo.ID, 1000)
+	builds, err := f.st.ListBuilds(f.repo.ID, store.BuildFilter{}, 1000)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func (f *shapeFixture) mark(sha string) {
 // the ci/config status. The words are the table's vocabulary.
 func (f *shapeFixture) observe() map[string]string {
 	out := map[string]string{}
-	builds, err := f.st.ListBuilds(f.repo.ID, 1000)
+	builds, err := f.st.ListBuilds(f.repo.ID, store.BuildFilter{}, 1000)
 	if err != nil {
 		f.t.Fatal(err)
 	}

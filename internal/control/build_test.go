@@ -1,6 +1,7 @@
 package control
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -102,7 +104,7 @@ func TestQueueBranchBuildsFailsOpenOnDiffFailure(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", old, newSHA, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("builds after queue: %v %v", builds, err)
 	}
@@ -142,7 +144,7 @@ func TestQueueBranchBuildsNewBranchIgnoredPathSkips(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "feature", testZeroSHA, featureSHA, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +182,7 @@ func TestQueueBranchBuildsNewBranchMatchedPathQueues(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "feature", testZeroSHA, featureSHA, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("builds after queue: %v %v", builds, err)
 	}
@@ -225,7 +227,7 @@ func TestQueueBranchBuildsNewBranchFailsOpenWithoutMergeBase(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "feature", testZeroSHA, otherSHA, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("expected fail-open to queue the job: %v %v", builds, err)
 	}
@@ -257,7 +259,7 @@ func TestQueueBranchBuildsFreshDefaultBranchFailsOpen(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", testZeroSHA, sha, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("expected fail-open on the repository's first commit: %v %v", builds, err)
 	}
@@ -292,7 +294,7 @@ func TestQueueBranchBuildsOrdinaryPushStillFilters(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", oldSHA, newSHA, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +447,7 @@ func TestQueueBranchBuildsAlreadyBuiltJobRecordsNoSkippedStatus(t *testing.T) {
 	if len(statuses) != 0 {
 		t.Fatalf("already-built job recorded a status: %+v", statuses)
 	}
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("expected only the pre-existing build: %v %v", builds, err)
 	}
@@ -484,7 +486,7 @@ func TestQueueMRBuildsStillFailsOpen(t *testing.T) {
 
 	QueueMRBuilds(st, root, "https://x.test", repo, uid, 1, prSHA)
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("expected the MR head to fail open and queue a build: %v %v", builds, err)
 	}
@@ -541,7 +543,7 @@ func TestQueueBranchBuildsRebaseFiltersAgainstMergeBase(t *testing.T) {
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "feat", oldTip, newTip, time.Now())
 
-	builds, err := st.ListBuilds(repo.ID, 10)
+	builds, err := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +580,7 @@ func TestQueueBranchBuildsSameTreeReusesSuccess(t *testing.T) {
 	git(root, "clone", "-q", "--bare", src, dir)
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", "", first, time.Now())
-	builds, _ := st.ListBuilds(repo.ID, 10)
+	builds, _ := st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if len(builds) != 1 {
 		t.Fatalf("first commit queued %d builds, want 1", len(builds))
 	}
@@ -590,7 +592,7 @@ func TestQueueBranchBuildsSameTreeReusesSuccess(t *testing.T) {
 	}
 
 	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", first, second, time.Now())
-	builds, _ = st.ListBuilds(repo.ID, 10)
+	builds, _ = st.ListBuilds(repo.ID, store.BuildFilter{}, 10)
 	if len(builds) != 1 {
 		t.Fatalf("same tree queued a second build: %+v", builds)
 	}
@@ -603,5 +605,63 @@ func TestQueueBranchBuildsSameTreeReusesSuccess(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("second commit has no success status from the first: %+v", statuses)
+	}
+}
+
+// build list's --ref, --status and --job flags narrow the CLI listing the
+// same way the store filter does, and combine when more than one is given.
+// An invalid --status is refused rather than silently matching nothing (#224).
+func TestBuildListFlagsFilter(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	if _, err := st.CreateBuild(repo.ID, "unit", "aaa", "main", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateBuild(repo.ID, "lint", "bbb", "feature", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.ClaimBuild([]int64{repo.ID}, false); err != nil || !ok {
+		t.Fatalf("claim: %v ok=%v", err, ok)
+	}
+	if err := st.FinishBuild(1, "failure"); err != nil {
+		t.Fatal(err)
+	}
+	c, errOut := pruneCtx(st, t.TempDir(), store.User{ID: uid})
+
+	run := func(args ...string) string {
+		t.Helper()
+		out := c.Stdout.(*bytes.Buffer)
+		out.Reset()
+		errOut.Reset()
+		argv := append([]string{"build", "list", repo.Path()}, args...)
+		if code := Dispatch(c, argv); code != protocol.ExitOK {
+			t.Fatalf("build list %v: exit %d: %s", args, code, errOut.String())
+		}
+		return out.String()
+	}
+
+	if out := run(); !strings.Contains(out, "unit") || !strings.Contains(out, "lint") {
+		t.Fatalf("unfiltered listing missing a build:\n%s", out)
+	}
+	if out := run("--ref", "main"); !strings.Contains(out, "unit") || strings.Contains(out, "lint") {
+		t.Fatalf("--ref main:\n%s", out)
+	}
+	if out := run("--job", "lint"); strings.Contains(out, "unit") || !strings.Contains(out, "lint") {
+		t.Fatalf("--job lint:\n%s", out)
+	}
+	if out := run("--status", "failure"); !strings.Contains(out, "unit") || strings.Contains(out, "lint") {
+		t.Fatalf("--status failure:\n%s", out)
+	}
+	if out := run("--ref", "main", "--status", "pending"); strings.TrimSpace(out) != "" {
+		t.Fatalf("non-matching combination returned rows:\n%s", out)
+	}
+
+	out := c.Stdout.(*bytes.Buffer)
+	out.Reset()
+	errOut.Reset()
+	if code := Dispatch(c, []string{"build", "list", repo.Path(), "--status", "bogus"}); code != protocol.ExitUsage {
+		t.Fatalf("bad --status: exit %d, want %d (usage)", code, protocol.ExitUsage)
+	}
+	if !strings.Contains(errOut.String(), "pending") || !strings.Contains(errOut.String(), "cancelled") {
+		t.Fatalf("bad --status error does not name the valid states: %s", errOut.String())
 	}
 }

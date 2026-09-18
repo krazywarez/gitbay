@@ -332,6 +332,63 @@ func TestQueueStatsFractionalAverage(t *testing.T) {
 	}
 }
 
+// ListBuilds narrows on ref, status and job independently, and combines
+// when more than one is given (#224).
+func TestListBuildsFilters(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repoID, err := s.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateBuild(repoID, "unit", "aaa", "main", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateBuild(repoID, "lint", "bbb", "feature", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FinishBuild(mustClaim(t, s, repoID).ID, "failure"); err != nil {
+		t.Fatal(err)
+	}
+
+	all, err := s.ListBuilds(repoID, BuildFilter{}, 10)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("unfiltered: %+v %v", all, err)
+	}
+	if byRef, err := s.ListBuilds(repoID, BuildFilter{Ref: "main"}, 10); err != nil || len(byRef) != 1 || byRef[0].Ref != "main" {
+		t.Fatalf("by ref: %+v %v", byRef, err)
+	}
+	if byJob, err := s.ListBuilds(repoID, BuildFilter{Job: "lint"}, 10); err != nil || len(byJob) != 1 || byJob[0].Job != "lint" {
+		t.Fatalf("by job: %+v %v", byJob, err)
+	}
+	if byStatus, err := s.ListBuilds(repoID, BuildFilter{Status: "failure"}, 10); err != nil || len(byStatus) != 1 || byStatus[0].Status != "failure" {
+		t.Fatalf("by status: %+v %v", byStatus, err)
+	}
+	if combined, err := s.ListBuilds(repoID, BuildFilter{Ref: "main", Status: "failure"}, 10); err != nil || len(combined) != 1 {
+		t.Fatalf("combined filter: %+v %v", combined, err)
+	}
+	if none, err := s.ListBuilds(repoID, BuildFilter{Ref: "main", Status: "pending"}, 10); err != nil || len(none) != 0 {
+		t.Fatalf("non-matching combination: %+v %v", none, err)
+	}
+}
+
+// mustClaim claims the oldest pending build for repoID, failing the test
+// if none is available.
+func mustClaim(t *testing.T, s *Store, repoID int64) Build {
+	t.Helper()
+	b, ok, err := s.ClaimBuild([]int64{repoID}, false)
+	if err != nil || !ok {
+		t.Fatalf("claim: %v ok=%v", err, ok)
+	}
+	return b
+}
+
 // A merge request head from a fork is untrusted. A claim skips it unless
 // the runner asked for untrusted builds, so a runner on someone's laptop
 // never executes a stranger's branch by default.

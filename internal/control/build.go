@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ import (
 func init() {
 	register(Command{Path: []string{"build", "list"},
 		Summary: "list recent builds",
-		Usage:   "build list <owner/name>", ReadOnly: true, Run: runBuildList})
+		Usage:   "build list <owner/name> [--ref <branch>] [--status <state>] [--job <name>]", ReadOnly: true, Run: runBuildList})
 	register(Command{Path: []string{"build", "show"},
 		Summary: "show one build",
 		Usage:   "build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
@@ -102,15 +103,28 @@ func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
 	return repo, b, -1
 }
 
+// buildStatuses is the vocabulary --status accepts, and what a bad value
+// is told to pick from.
+var buildStatuses = []string{"pending", "running", "success", "failure", "cancelled"}
+
 func runBuildList(c *Ctx, args []string) int {
-	if len(args) != 1 {
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--status", "--job"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	path := f.pos(0)
+	if path == "" {
 		return c.usage()
 	}
-	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	status := f.Value("--status")
+	if f.Has("--status") && !slices.Contains(buildStatuses, status) {
+		return c.fail(protocol.ExitUsage, "--status must be one of %s", strings.Join(buildStatuses, ", "))
+	}
+	repo, code := resolveRepo(c, path, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
-	builds, err := c.Store.ListBuilds(repo.ID, 50)
+	builds, err := c.Store.ListBuilds(repo.ID, store.BuildFilter{Ref: f.Value("--ref"), Status: status, Job: f.Value("--job")}, 50)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

@@ -70,7 +70,7 @@ func TestSchedulerRunDue(t *testing.T) {
 		RepoDir: func(owner, name string) string { return bare }}
 	s.RunDue(now)
 
-	builds, err := st.ListBuilds(repoID, 10)
+	builds, err := st.ListBuilds(repoID, store.BuildFilter{}, 10)
 	if err != nil || len(builds) != 1 {
 		t.Fatalf("builds after run: %v %v", builds, err)
 	}
@@ -98,7 +98,7 @@ func TestSchedulerRunDue(t *testing.T) {
 
 	// A second pass fires nothing: next_run is in the future.
 	s.RunDue(now)
-	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
+	if builds, _ = st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 1 {
 		t.Fatalf("second pass queued extra builds: %+v", builds)
 	}
 
@@ -111,7 +111,7 @@ func TestSchedulerRunDue(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.RunDue(now)
-	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
+	if builds, _ = st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 1 {
 		t.Fatalf("tick with the last build pending queued another: %+v", builds)
 	}
 	b, ok, err := st.ClaimBuild(nil, false)
@@ -122,7 +122,7 @@ func TestSchedulerRunDue(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.RunDue(now)
-	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 1 {
+	if builds, _ = st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 1 {
 		t.Fatalf("tick with the last build running queued another: %+v", builds)
 	}
 	if err := st.FinishBuild(b.ID, "success"); err != nil {
@@ -132,7 +132,7 @@ func TestSchedulerRunDue(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.RunDue(now)
-	if builds, _ = st.ListBuilds(repoID, 10); len(builds) != 2 {
+	if builds, _ = st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 2 {
 		t.Fatalf("tick after the last build finished did not queue: %+v", builds)
 	}
 }
