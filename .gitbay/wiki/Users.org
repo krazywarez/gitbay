@@ -507,9 +507,13 @@ queues nothing, so look there when a push builds nothing.
 
 Each job becomes a build (=build list=, =build log=, the builds tab on
 the web) and a =ci/<job>= commit status, which =repo settings
-require-checks= can gate merges on. Steps run with =sh -c= on the
-instance's runner, stopping at the first failure; a broken config
-surfaces as a failed =ci/config= status. Environment: =GITBAY_REPO=,
+require-checks= can gate merges on. =build list= takes =--ref=,
+=--status= and =--job= to narrow the listing, combinable; the builds
+tab reads the same flags from its =?ref=, =?status= and =?job= query
+parameters and groups the result into one row per commit. Steps run
+with =sh -c= on the instance's runner, stopping at the first failure;
+a broken config surfaces as a failed =ci/config= status. Environment:
+=GITBAY_REPO=,
 =GITBAY_SHA=, =GITBAY_REF=, =GITBAY_JOB=, =CI=true=, and =GITBAY_SSH=,
 the instance's ssh destination as the build reaches it (=git@gitbay.org=
 from a runner elsewhere; inside a container on the server's own runner

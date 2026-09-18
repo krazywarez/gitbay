@@ -179,6 +179,7 @@ always markdown.
 | atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
 | build list                  | yes | yes | yes |
+| build list filters (ref, status, job) | yes | yes | no  |
 | build show (one build)      | yes | yes | yes |
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
