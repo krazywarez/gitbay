@@ -193,14 +193,6 @@ var landingPicture = func() bool {
 }()
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.User) {
-	pinned, _ := s.st.PinnedRepos(viewer.ID)
-	var visible []store.Repo
-	for _, rp := range pinned {
-		grant, _ := s.st.AccessRole(rp.ID, viewer.ID)
-		if policy.CanRead(viewer, rp, grant) {
-			visible = append(visible, rp)
-		}
-	}
 	mrs, _ := s.st.DashboardMRs(viewer.ID)
 	issues, _ := s.st.DashboardIssues(viewer.ID)
 	reviews, _ := s.st.ReviewQueue(viewer.ID)
@@ -208,13 +200,12 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	events, _ := s.st.RecentEvents(viewer.ID, 20, 0)
 	s.render(w, "dashboard.html", struct {
 		basePage
-		Pinned   []store.Repo
 		Reviews  []store.DashboardItem
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
 		Feed     []feedLine
-	}{s.baseFor(viewer), visible, reviews, assigned, mrs, issues, feedLines(events)})
+	}{s.baseFor(viewer), reviews, assigned, mrs, issues, feedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {

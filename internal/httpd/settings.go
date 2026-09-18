@@ -82,6 +82,10 @@ func (s *Server) settingsRedirect(w http.ResponseWriter, r *http.Request, msg st
 // settingsSubmit routes one form to its command. Keeping the mapping in
 // one place makes what the page can reach obvious.
 func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	row, ok := s.repoForUser(w, r, u, policyCanAdmin)
+	if !ok {
+		return
+	}
 	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
 	v := func(k string) string { return strings.TrimSpace(r.FormValue(k)) }
 	field := r.FormValue("field")
@@ -131,11 +135,6 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		}
 		argv = []string{"repo", verb, repo}
 	case "topics":
-		row, err := s.st.RepoByPath(repo)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
 		want := map[string]bool{}
 		var order []string
 		for _, t := range strings.Split(v("topics"), ",") {
@@ -160,16 +159,26 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 				remove = append(remove, t)
 			}
 		}
+		removed := false
 		if len(remove) > 0 {
 			if _, msg, ok := s.runControl(u, append([]string{"repo", "topics", "remove", repo}, remove...)); !ok {
 				s.settingsFormWith(w, r, u, msg, r.Form)
 				return
 			}
+			removed = true
 		}
 		if len(add) > 0 {
 			argv = append([]string{"repo", "topics", "add", repo}, add...)
 		} else {
 			s.settingsRedirect(w, r, "Saved the topics.")
+			return
+		}
+		if removed {
+			if _, msg, ok := s.runControl(u, argv); !ok {
+				s.settingsFormWith(w, r, u, "Removed "+strings.Join(remove, ", ")+"; "+msg, r.Form)
+				return
+			}
+			s.settingsRedirect(w, r, "Saved the "+fieldLabel(field)+".")
 			return
 		}
 	case "runner-add":
@@ -223,7 +232,7 @@ func fieldLabel(field string) string {
 	case "require-codeowners":
 		return "CODEOWNERS"
 	case "require-mr":
-		return "require-MR"
+		return "merge request requirement"
 	case "require-signed":
 		return "signed commits"
 	case "protect", "unprotect":
@@ -233,7 +242,7 @@ func fieldLabel(field string) string {
 	case "deps":
 		return "dependency scanning"
 	case "archive":
-		return "archive"
+		return "archived state"
 	case "topics":
 		return "topics"
 	case "runner-add", "runner-remove":
