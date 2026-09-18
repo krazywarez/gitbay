@@ -4,8 +4,27 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* v1.24.0 — unreleased
+* v1.24.0 — 2026-09-18
 
+The web follow-ups to the design foundation (#219, #220, #221, #222,
+#224, #225), and a repository maintenance command.
+
+- =build list= takes =--ref=, =--status= and =--job=, pushed down to the
+  store query; the builds page reads the same three as GET parameters
+  with shareable links, and groups a commit's jobs into one run showing
+  the combined state (#224).
+- The merge request page's "Files changed" view is wide; the
+  conversation and commits views stay at reading width (#219).
+- The profile page lists repositories above the biography; the
+  contribution grid carries month labels and a legend (#225).
+- The dashboard shows populated queues first, collapses empty ones to a
+  heading, and says what the two Open lists cover (#222, in part).
+- Under 52rem the rail strip keeps one scrolling row and shows pinned
+  repositories as a second row instead of hiding them (#220).
+- Polish from the v1.23.0 review: caption spans instead of dangling
+  labels, runner attach keeps a rejected key and reports success, the
+  tree root of the default branch is the repository home so the header
+  is identical within the code tab, the file editor is wide (#221).
 - =admin mr prune <owner/name> <n>... --yes= drops the named merged or
   closed MRs' =refs/merge-requests/N/head= and runs =git gc --prune=now=
   on the repository, for commits a history rewrite left reachable only
