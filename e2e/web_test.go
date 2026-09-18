@@ -86,7 +86,7 @@ func TestWebUI(t *testing.T) {
 		t.Fatalf("repo home: %d\n%s", status, body)
 	}
 	// Both clone URLs: SSH for anyone with a key, HTTPS for reading.
-	if !strings.Contains(body, "git clone ssh://git@gitbay.test:") || !strings.Contains(body, "/alice/site.git</code> · <code>git clone https://gitbay.test/alice/site.git</code>") {
+	if !strings.Contains(body, "git clone ssh://git@gitbay.test:") || !strings.Contains(body, "/alice/site.git</code></pre>") || !strings.Contains(body, "<code>git clone https://gitbay.test/alice/site.git</code>") {
 		t.Fatalf("clone URLs missing:\n%s", body)
 	}
 	if !strings.Contains(body, "<h2 id=\"hello-site\">hello site</h2>") || !strings.Contains(body, "<em>markdown</em>") {
