@@ -11,10 +11,18 @@ type activityDay struct {
 	Pad   bool // before the range start / after today
 }
 
-type activityWeek []activityDay // 7 days, Sunday first
+// activityWeek is one column of the graph: 7 days, Sunday first, plus the
+// month label to show above it (empty for most weeks).
+type activityWeek struct {
+	Days  []activityDay
+	Month string
+}
 
 // activityGrid lays a day->count map into 53 week columns ending today,
-// GitHub-style: columns are weeks, rows Sunday..Saturday.
+// GitHub-style: columns are weeks, rows Sunday..Saturday. Each week whose
+// first non-pad day falls within the first 7 days of a month, and whose
+// month differs from the last labelled week, carries that month's
+// three-letter name.
 func activityGrid(counts map[string]int) ([]activityWeek, int) {
 	today := time.Now().UTC()
 	// End the grid on the Saturday of the current week.
@@ -23,20 +31,34 @@ func activityGrid(counts map[string]int) ([]activityWeek, int) {
 
 	total := 0
 	var weeks []activityWeek
+	prevMonth := ""
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 7) {
-		var week activityWeek
+		var days []activityDay
+		var firstDay time.Time
+		haveFirst := false
 		for i := 0; i < 7; i++ {
 			day := d.AddDate(0, 0, i)
 			key := day.Format("2006-01-02")
 			if day.After(today) {
-				week = append(week, activityDay{Date: key, Pad: true})
+				days = append(days, activityDay{Date: key, Pad: true})
 				continue
+			}
+			if !haveFirst {
+				firstDay = day
+				haveFirst = true
 			}
 			n := counts[key]
 			total += n
-			week = append(week, activityDay{Date: key, Count: n, Level: activityLevel(n)})
+			days = append(days, activityDay{Date: key, Count: n, Level: activityLevel(n)})
 		}
-		weeks = append(weeks, week)
+		month := ""
+		if haveFirst && firstDay.Day() <= 7 {
+			if name := firstDay.Month().String()[:3]; name != prevMonth {
+				month = name
+				prevMonth = name
+			}
+		}
+		weeks = append(weeks, activityWeek{Days: days, Month: month})
 	}
 	return weeks, total
 }
