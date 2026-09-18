@@ -97,10 +97,24 @@ func TestDashboard(t *testing.T) {
 		"Waiting on your review", "Assigned to you", "Recent activity",
 		"from bob", "alice/app!1", "todo one", "alice/app#1",
 		`href="/alice/app/mrs/1"`, `href="/alice/app/issues/1"`,
+		"Yours anywhere, and every one in a repository you can write to.",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard missing %q", want)
 		}
+	}
+
+	// D01: alice has nothing assigned to her, so that section condenses to
+	// an empty heading, and populated sections (she has a review waiting)
+	// sort before it.
+	emptyHeading := `<h2 class="empty">Assigned to you <span class="count">0</span></h2>`
+	if !strings.Contains(body, emptyHeading) {
+		t.Fatalf("dashboard missing condensed empty heading %q:\n%s", emptyHeading, body)
+	}
+	reviewIdx := strings.Index(body, "Waiting on your review")
+	assignedIdx := strings.Index(body, emptyHeading)
+	if reviewIdx < 0 || assignedIdx < 0 || reviewIdx > assignedIdx {
+		t.Fatalf("populated heading should come before the empty one: review=%d assigned=%d", reviewIdx, assignedIdx)
 	}
 
 	// The diff has its own view rather than a fold at the foot of the
@@ -338,8 +352,7 @@ func TestDashboardQueues(t *testing.T) {
 		t.Fatalf("review: %s", errOut)
 	}
 	_, after := browserGet(t, inst.login(t, aliceKey), inst.base()+"/")
-	queue := after[strings.Index(after, "Waiting on your review"):strings.Index(after, "Assigned to you")]
-	if strings.Contains(queue, "needs a look") {
-		t.Fatalf("reviewed MR still waiting:\n%s", queue)
+	if !strings.Contains(after, `<h2 class="empty">Waiting on your review <span class="count">0</span></h2>`) {
+		t.Fatalf("reviewed MR still waiting:\n%s", after)
 	}
 }

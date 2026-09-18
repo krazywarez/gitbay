@@ -10,23 +10,26 @@
 {{else}}<li class="empty">{{$.Empty}}</li>{{end}}
 </ul>
 {{end}}
+{{define "queue"}}
+<h2>{{$.Title}} <span class="count">{{len $.Items}}</span></h2>
+{{if $.Hint}}<p class="hint">{{$.Hint}}</p>{{end}}
+{{template "itemlist" dict "Items" $.Items "Kind" $.Kind "Empty" $.Empty}}
+{{end}}
 {{define "content"}}
 <h1>Dashboard</h1>
 
 <div class="withaside">
 <div class="mainside">
 
-<h2>Waiting on your review <span class="count">{{len .Reviews}}</span></h2>
-{{template "itemlist" dict "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}
+{{if .Reviews}}{{template "queue" dict "Title" "Waiting on your review" "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}{{end}}
+{{if .Assigned}}{{template "queue" dict "Title" "Assigned to you" "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}{{end}}
+{{if .MRs}}{{template "queue" dict "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
+{{if .Issues}}{{template "queue" dict "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
 
-<h2>Assigned to you <span class="count">{{len .Assigned}}</span></h2>
-{{template "itemlist" dict "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}
-
-<h2>Open merge requests <span class="count">{{len .MRs}}</span></h2>
-{{template "itemlist" dict "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests"}}
-
-<h2>Open issues <span class="count">{{len .Issues}}</span></h2>
-{{template "itemlist" dict "Items" .Issues "Kind" "issues" "Empty" "No open issues"}}
+{{if not .Reviews}}<h2 class="empty">Waiting on your review <span class="count">0</span></h2>{{end}}
+{{if not .Assigned}}<h2 class="empty">Assigned to you <span class="count">0</span></h2>{{end}}
+{{if not .MRs}}<h2 class="empty">Open merge requests <span class="count">0</span></h2>{{end}}
+{{if not .Issues}}<h2 class="empty">Open issues <span class="count">0</span></h2>{{end}}
 
 </div>
 
