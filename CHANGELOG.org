@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.25.0 — 2026-09-18
+
+The site rail is an icon column (#220).
+
+- At desktop the rail is a 3.5rem column of inline glyphs: dashboard,
+  explore, search, notifications with the unread count as a badge,
+  bookmarks, new repository, then settings and admin, then the account
+  and sign-out. The search field leaves the rail; =/search= has its own.
+- Under 52rem the rail is one 48px row that neither wraps nor scrolls.
+- Every icon link carries an accessible name (=aria-label=, a title and
+  visually hidden text) and hides its SVG from assistive tech; a test
+  enforces it.
+- Pinned repositories are a chip row under the dashboard heading; the
+  review queue is the dashboard's section. Neither is in the rail.
+
 * v1.24.1 — 2026-09-18
 
 The dashboard feed and the phone-width rail strip (#222, #220).
