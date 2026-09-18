@@ -10,7 +10,7 @@
 {{if eq .Mode "invite"}}<div class="field"><label for="invite">Invite code</label><input type="text" id="invite" name="invite" required></div>
 {{else}}<div class="field"><label for="email">Email</label><input type="text" id="email" name="email" required></div>{{end}}
 <div class="field"><label for="key">SSH public key</label>
-<p class="hint">Paste the contents of your public key file, usually <code>~/.ssh/id_ed25519.pub</code>. It starts with <code>ssh-ed25519</code> or <code>ssh-rsa</code>. No key yet? <a href="/krz/gitbay/wiki/SSH-keys">Make one</a>.</p>
+<p class="hint">Paste the contents of your public key file, usually <code>~/.ssh/id_ed25519.pub</code>. It starts with <code>ssh-ed25519</code> or <code>ssh-rsa</code>. No key yet? <a href="https://gitbay.org/krz/gitbay/wiki/SSH-keys">Make one</a>.</p>
 <textarea id="key" name="key" rows="3" required placeholder="ssh-ed25519 AAAA... you@host"></textarea></div>
 <p><button type="submit">Create account</button></p>
 </form>

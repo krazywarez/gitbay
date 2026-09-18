@@ -75,7 +75,7 @@
        tabs only the identity row and the tab bar render, and the header
        is identical on every page within a tab. */}}
   {{if eq $top "code"}}
-  <p class="repodesc">{{with field $ "Desc"}}{{.}}{{end}} {{with field $ "Topics"}}{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}{{end}}</p>
+  {{if or (field $ "Desc") (field $ "Topics")}}<p class="repodesc">{{with field $ "Desc"}}{{.}}{{end}} {{with field $ "Topics"}}{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}{{end}}</p>{{end}}
   {{if or $.Repo.Settings.Website (field $ "Mirrors")}}<p class="repometa">{{with $.Repo.Settings.Website}}<a href="{{.}}" rel="nofollow">{{.}}</a>{{end}}{{range $i, $m := field $ "Mirrors"}}{{if or $i $.Repo.Settings.Website}} · {{end}}{{if eq $m.Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{$m.URL}}" rel="nofollow">{{$m.Target}}</a>{{if $m.Error}}, <span class="bad">sync error: {{$m.Error}}</span>{{else if $m.Synced}}, synced {{$m.Synced}}{{end}}{{end}}</p>{{end}}
   {{if $.Viewer}}<p class="toggles">Pinned shows in your rail. Watching sends every issue, request and build to your inbox. Bookmarked lists it under Bookmarks.</p>{{end}}
   {{end}}

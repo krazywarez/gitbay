@@ -26,7 +26,10 @@ title= to =gitbay= in lower case; the templates already are.
 - Repository settings are bounded rows with a consequence beside each
   control, a saved flash, a rejected value kept, and topics as one field.
 - Landing copy says what the product is and where to go; the register
-  form says to paste the contents of the key file and links [[SSH-keys]].
+  form says to paste the contents of the key file and links the SSH keys
+  wiki page.
+- The landing page shows the merge request page, light and dark,
+  captured from gitbay.org (two embedded PNGs under =/static/img/=).
 
 * v1.22.1 — 2026-09-13
 

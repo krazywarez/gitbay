@@ -7,7 +7,7 @@
   {{else if and (eq .MR.State "closed") .MR.ClosedBy}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a>{{with .MR.ClosedAt}} on {{when .}}{{end}}
   {{else if or (eq .MR.State "merged") (eq .MR.State "closed")}}{{if eq .MR.State "merged"}}merged{{else}}closed without merging{{end}}
   {{else}}opened by <a href="/{{.MR.Author}}">{{.MR.Author}}</a> on {{when .MR.CreatedAt}}{{end}}
-  · <code>{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
+  · <code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
 {{with field . "StackedOn"}}<p class="meta">Stacked on <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">!{{.Number}} {{.Title}}</a>: merges into its branch until that lands, then onto its target.</p>{{end}}
 {{with field . "Stacked"}}<p class="meta">Builds on this: {{range $i, $k := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$k.Number}}">!{{$k.Number}} {{$k.Title}}</a>{{end}}. Merging with squash or rebase is refused while they are open.</p>{{end}}
 
@@ -46,7 +46,7 @@
 {{if .Viewer}}
 <form method="post" action="{{$base}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit" class="btn">Comment</button></p>
+<p><button type="submit">Comment</button></p>
 </form>
 {{end}}
 </div>

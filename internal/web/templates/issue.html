@@ -31,7 +31,7 @@
 {{if .Viewer}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">
 <p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit" class="btn">Comment</button></p>
+<p><button type="submit">Comment</button></p>
 </form>
 {{end}}
 </div>
