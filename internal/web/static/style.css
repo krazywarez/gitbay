@@ -511,7 +511,6 @@ button, .button {
   background: var(--fill);
   color: var(--fill-fg);
 }
-button.primary, .button.primary { background: var(--fill); color: var(--fill-fg); border-color: transparent; }
 button:hover, .button.primary:hover { filter: brightness(1.12); text-decoration: none; }
 button.btn, .button.btn {
   background: var(--canvas);
