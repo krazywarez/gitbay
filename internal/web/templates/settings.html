@@ -169,7 +169,7 @@
   <input type="hidden" name="field" value="runner-add">
   <label for="runner-key">Attach a runner</label>
   <p class="hint">Install <code>gitbay-runner</code>, run <code>gitbay-runner init</code>, and paste the key it prints. The runner builds your commits with the repository's secrets; merge requests from forks wait unless it runs with <code>-untrusted</code>.</p>
-  <textarea id="runner-key" name="key" rows="3" placeholder="ssh-ed25519 AAAA… (from gitbay-runner init)"></textarea>
+  <textarea id="runner-key" name="key" rows="3" placeholder="ssh-ed25519 AAAA… (from gitbay-runner init)">{{index .Submitted "key"}}</textarea>
   <button type="submit" class="btn">Attach</button>
 </form>
 </section>

@@ -61,6 +61,7 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 			"description": submitted.Get("description"),
 			"website":     submitted.Get("website"),
 			"topics":      submitted.Get("topics"),
+			"key":         submitted.Get("key"),
 		}
 	}
 	s.render(w, "settings.html", settingsPage{
@@ -188,10 +189,11 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			return
 		}
 		msg, ok := s.runControlStdin(u, []string{"repo", "runner", "add", repo}, body+"\n")
-		if ok {
-			msg = ""
+		if !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
 		}
-		s.settingsRedirect(w, r, msg)
+		s.settingsRedirect(w, r, "Saved the runner.")
 		return
 	case "runner-remove":
 		argv = []string{"repo", "runner", "remove", repo, v("fingerprint")}
