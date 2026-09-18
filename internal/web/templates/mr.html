@@ -1,3 +1,4 @@
+{{define "width"}}{{if eq .View "diff"}}wide{{else}}reading{{end}}{{end}}
 {{define "title"}}!{{.MR.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{$base := printf "/%s/%s/mrs/%d" .Repo.OwnerName .Repo.Name .MR.Number}}
