@@ -12,27 +12,43 @@
 </ul>
 {{end}}
 {{define "queue"}}
-<h2>{{$.Title}} <span class="count">{{len $.Items}}</span></h2>
+<h2 id="{{$.ID}}">{{$.Title}} <span class="count">{{len $.Items}}</span></h2>
 {{if $.Hint}}<p class="hint">{{$.Hint}}</p>{{end}}
 {{template "itemlist" dict "Items" $.Items "Kind" $.Kind "Empty" $.Empty}}
 {{end}}
+{{define "tile"}}{{if $.N}}<a class="tile wants" href="#{{$.ID}}"><b>{{$.N}}</b><span>{{$.Label}}</span></a>{{else}}<div class="tile"><b>0</b><span>{{$.Label}}</span></div>{{end}}{{end}}
 {{define "content"}}
+<div class="dashgrid">
+
+<aside class="dashpins" aria-label="Pinned repositories">
+  <h2 class="colhead">Pinned</h2>
+  {{if .Pins}}<ul class="pins">
+  {{range .Pins}}<li><a href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a><span class="n" title="{{.Issues}} open issue{{if ne .Issues 1}}s{{end}}, {{.MRs}} open merge request{{if ne .MRs 1}}s{{end}}{{with .Build}}, last build {{.}}{{end}}">{{if .Issues}}<b class="wants">{{.Issues}}</b>{{else}}<b>0</b>{{end}} {{if .MRs}}<b class="wants">{{.MRs}}</b>{{else}}<b>0</b>{{end}} <span class="dot{{if eq .Build "success"}} ok{{else if eq .Build "failure"}} bad{{else if .Build}} pend{{end}}"></span></span></li>
+  {{end}}</ul>
+  <p class="meta">issues · merge requests · last build</p>
+  {{else}}<p class="none">Nothing pinned yet. Press Pin on a repository.</p>{{end}}
+</aside>
+
+<section class="dashmain">
 <h1>Dashboard</h1>
-{{with .Rail.Pinned}}<p class="pinned" aria-label="Pinned repositories">{{range .}}<a class="chip" href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a> {{end}}</p>{{end}}
+<div class="tiles">
+  {{template "tile" dict "N" (len .Issues) "ID" "issues" "Label" "open issues"}}
+  {{template "tile" dict "N" (len .Reviews) "ID" "reviews" "Label" "waiting on your review"}}
+  {{template "tile" dict "N" (len .Assigned) "ID" "assigned" "Label" "assigned to you"}}
+  {{template "tile" dict "N" (len .MRs) "ID" "mrs" "Label" "open merge requests"}}
+</div>
+{{if .Reviews}}{{template "queue" dict "ID" "reviews" "Title" "Waiting on your review" "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}{{end}}
+{{if .Assigned}}{{template "queue" dict "ID" "assigned" "Title" "Assigned to you" "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}{{end}}
+{{if .MRs}}{{template "queue" dict "ID" "mrs" "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
+{{if .Issues}}{{template "queue" dict "ID" "issues" "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
+{{if not (or .Reviews .Assigned .MRs .Issues)}}<p class="none">Nothing open anywhere you can write to.</p>{{end}}
+</section>
 
-{{if .Reviews}}{{template "queue" dict "Title" "Waiting on your review" "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}{{end}}
-{{if .Assigned}}{{template "queue" dict "Title" "Assigned to you" "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}{{end}}
-{{if .MRs}}{{template "queue" dict "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
-{{if .Issues}}{{template "queue" dict "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
-
-{{if not .Reviews}}<h2 class="empty">Waiting on your review <span class="count">0</span></h2>{{end}}
-{{if not .Assigned}}<h2 class="empty">Assigned to you <span class="count">0</span></h2>{{end}}
-{{if not .MRs}}<h2 class="empty">Open merge requests <span class="count">0</span></h2>{{end}}
-{{if not .Issues}}<h2 class="empty">Open issues <span class="count">0</span></h2>{{end}}
-
-<section class="feed">
-  <h2>Recent activity</h2>
+<aside class="feedcol" aria-label="Recent activity">
+  <h2 class="colhead">Recent activity</h2>
   {{range .Feed}}<p class="feedline">{{if eq .State "failure"}}<span class="dot bad"></span>{{else if eq .State "success"}}<span class="dot ok"></span>{{else if .State}}<span class="dot pend"></span>{{end}}<a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
   {{else}}<p class="none">No activity yet</p>{{end}}
-</section>
+</aside>
+
+</div>
 {{end}}

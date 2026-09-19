@@ -93,8 +93,8 @@ func TestDashboard(t *testing.T) {
 		t.Fatalf("dashboard: %d", status)
 	}
 	for _, want := range []string{
-		`aria-label="Pinned repositories"`, `</span>app</a>`, // the dashboard lists the pinned repo
-		"Waiting on your review", "Assigned to you", "Recent activity",
+		`aria-label="Pinned repositories"`, `class="pins"`, `</span>app</a>`, // the dashboard lists the pinned repo
+		"Waiting on your review", "assigned to you", "Recent activity",
 		"from bob", "alice/app!1", "todo one", "alice/app#1",
 		`href="/alice/app/mrs/1"`, `href="/alice/app/issues/1"`,
 		"Yours anywhere, and every one in a repository you can write to.",
@@ -104,17 +104,16 @@ func TestDashboard(t *testing.T) {
 		}
 	}
 
-	// D01: alice has nothing assigned to her, so that section condenses to
-	// an empty heading, and populated sections (she has a review waiting)
-	// sort before it.
-	emptyHeading := `<h2 class="empty">Assigned to you <span class="count">0</span></h2>`
-	if !strings.Contains(body, emptyHeading) {
-		t.Fatalf("dashboard missing condensed empty heading %q:\n%s", emptyHeading, body)
+	// The empty queue is a tile with a zero; a populated one is a tile
+	// that links to its rows, which render in the middle column.
+	if !strings.Contains(body, `<div class="tile"><b>0</b><span>assigned to you</span></div>`) {
+		t.Fatalf("dashboard missing the zero tile for assigned:\n%s", body)
 	}
-	reviewIdx := strings.Index(body, "Waiting on your review")
-	assignedIdx := strings.Index(body, emptyHeading)
-	if reviewIdx < 0 || assignedIdx < 0 || reviewIdx > assignedIdx {
-		t.Fatalf("populated heading should come before the empty one: review=%d assigned=%d", reviewIdx, assignedIdx)
+	if !strings.Contains(body, `<a class="tile wants" href="#reviews"><b>1</b><span>waiting on your review</span></a>`) {
+		t.Fatalf("dashboard missing the review tile:\n%s", body)
+	}
+	if !strings.Contains(body, `<h2 id="reviews">Waiting on your review`) || strings.Contains(body, `<h2 class="empty">`) {
+		t.Fatalf("queues do not render as tiles plus rows:\n%s", body)
 	}
 
 	// The diff has its own view rather than a fold at the foot of the
@@ -352,7 +351,7 @@ func TestDashboardQueues(t *testing.T) {
 		t.Fatalf("review: %s", errOut)
 	}
 	_, after := browserGet(t, inst.login(t, aliceKey), inst.base()+"/")
-	if !strings.Contains(after, `<h2 class="empty">Waiting on your review <span class="count">0</span></h2>`) {
+	if !strings.Contains(after, `<div class="tile"><b>0</b><span>waiting on your review</span></div>`) {
 		t.Fatalf("reviewed MR still waiting:\n%s", after)
 	}
 }

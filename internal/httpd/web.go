@@ -191,12 +191,13 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	s.render(w, "dashboard.html", struct {
 		basePage
 		Tab      string
+		Pins     []pinnedRow
 		Reviews  []store.DashboardItem
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
 		Feed     []feedLine
-	}{s.baseFor(viewer), "dashboard", reviews, assigned, mrs, issues, feedLines(events)})
+	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, feedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {

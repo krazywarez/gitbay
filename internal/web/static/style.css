@@ -1041,9 +1041,47 @@ pre.message {
 .blobimage { text-align: center; }
 .blobimage img { max-width: 100%; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); }
 
-/* pinned repositories, on the dashboard now that the rail is icons only */
-.pinned { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
-.pinned .owner { color: var(--muted); }
+/* ---- dashboard: pinned column, tiles and queues, feed ---- */
+.dashgrid { display: grid; grid-template-columns: 15rem minmax(0, 1fr) 20rem; gap: var(--sp-6); align-items: start; }
+.dashgrid h1 { margin-top: 0; }
+.dashgrid > aside { position: sticky; top: var(--sp-5); }
+.dashgrid .dashmain h2 { margin-top: var(--sp-5); }
+.dashgrid .dashmain .tiles + h2 { margin-top: 0; }
+.colhead {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-0);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pins { list-style: none; margin: 0; padding: 0; font-size: var(--fs-2); }
+.pins li { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 0; border-bottom: 1px solid var(--faint); }
+.pins li:last-child { border-bottom: 0; }
+.pins a { color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pins a:hover { color: var(--link); }
+.pins .owner { color: var(--muted); }
+.pins .n { margin-left: auto; flex: none; display: flex; gap: var(--sp-2); font-size: var(--fs-1); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pins .n b { font-weight: 600; color: var(--fg); }
+.pins .n b.wants { color: var(--warn); }
+.pins .dot { margin: 0; }
+/* count tiles: the queues' sizes in one strip; a non-zero count is orange,
+   what wants you */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-5); }
+.tile {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: var(--sp-3) var(--sp-4);
+  color: var(--fg);
+}
+a.tile:hover { background: var(--hover); text-decoration: none; }
+.tile b { display: block; font-size: var(--fs-5); font-weight: 600; line-height: 1.2; }
+.tile.wants b { color: var(--warn); }
+.tile span { font-size: var(--fs-1); color: var(--muted); }
+.feedcol .feedline { font-size: var(--fs-2); margin-bottom: var(--sp-2); }
+.feedcol .feedline .none { font-size: var(--fs-1); }
 
 /* ---- two-column: conversation and aside ---- */
 .withaside { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
@@ -1075,11 +1113,6 @@ form.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var
 form.actions button { flex: 1 1 auto; }
 form.actions select, form.actions textarea { width: 100%; }
 .feedline { margin-bottom: var(--sp-2); }
-/* the dashboard's activity feed is a section after the queues, one column */
-.feed { margin-top: var(--sp-6); max-width: 78ch; }
-.feed h2 { margin-bottom: var(--sp-3); }
-.feed .feedline { font-size: var(--fs-2); }
-.feed .none { color: var(--muted); font-size: var(--fs-1); }
 
 /* ---- comments and threads ---- */
 article.comment {
@@ -1524,6 +1557,11 @@ svg.icon { vertical-align: -0.125em; }
 .review { font-size: var(--fs-2); }
 
 /* ---- breakpoints ---- */
+@media (max-width: 80rem) {
+  .dashgrid { grid-template-columns: minmax(0, 1fr) 20rem; }
+  .dashgrid > .dashpins { grid-column: 1 / -1; position: static; }
+}
+
 @media (max-width: 62rem) {
   /* one column, the aside after the thread: a phone shows the
      description first, checks and reviewers after it (#232) */
@@ -1532,6 +1570,14 @@ svg.icon { vertical-align: -0.125em; }
   /* rows go back to two lines where one does not fit */
   ul.issuelist.rows .issuemain, ul.repolist.rows li, ul.loglist.rows .commitmain { display: block; }
   ul.issuelist.rows .title, ul.repolist.rows .desc { white-space: normal; }
+
+  .dashgrid { grid-template-columns: 1fr; }
+  .dashgrid > aside { position: static; }
+  /* the pinned column goes back to a chip row on a phone */
+  .pins { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .pins li { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
+  .pins .n, .dashpins .meta { display: none; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 52rem) {
