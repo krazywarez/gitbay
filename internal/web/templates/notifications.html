@@ -1,3 +1,4 @@
+{{define "width"}}wide{{end}}
 {{define "title"}}notifications · {{.Site}}{{end}}
 {{define "content"}}
 <div class="listhead">
@@ -9,7 +10,7 @@
   <span class="spacer"></span>
   {{if .Notices}}<form method="post" action="/notifications" class="inline"><button type="submit" class="btn">Mark all read</button></form>{{end}}
 </div>
-<ul class="issuelist">
+<ul class="issuelist rows">
 {{range .Notices}}<li>
   <div class="issuemain">
     <p class="title"><a href="{{.Href}}">{{.Actor}} {{.Summary}}</a></p>

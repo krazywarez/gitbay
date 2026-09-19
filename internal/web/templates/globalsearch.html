@@ -19,7 +19,7 @@
 {{if .QueryErr}}<p class="error" role="alert">{{.QueryErr}}</p>
 {{else if .Query}}
 {{if .Results}}
-<ul class="issuelist">
+<ul class="issuelist rows">
 {{range .Results}}<li>
   <div class="issuemain">
     <p class="title"><a href="{{.Href}}">{{if .Number}}{{.Title}}{{else}}{{.Repo}}{{end}}</a></p>

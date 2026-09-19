@@ -1,10 +1,11 @@
+{{define "width"}}wide{{end}}
 {{define "title"}}dashboard · {{.Site}}{{end}}
 {{define "itemlist"}}
-<ul class="issuelist">
+<ul class="issuelist rows">
 {{range .Items}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{.RepoPath}}/{{$.Kind}}/{{.Number}}">{{.Title}}</a></p>
-    <p class="meta">{{.RepoPath}}{{if eq $.Kind "mrs"}}!{{else}}#{{end}}{{.Number}} · <a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
+    <p class="meta"><span class="repo">{{.RepoPath}}{{if eq $.Kind "mrs"}}!{{else}}#{{end}}{{.Number}}</span> · <a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}{{if eq .State "source_gone"}} · <span class="chip chip-source_gone">source gone</span>{{end}}</p>
   </div>
 </li>
 {{else}}<li class="empty">{{$.Empty}}</li>{{end}}

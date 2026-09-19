@@ -1,3 +1,4 @@
+{{define "width"}}wide{{end}}
 {{define "title"}}explore · {{.Site}}{{end}}
 {{define "content"}}
 <div class="headrow">
@@ -8,7 +9,7 @@
 </form>
 <span class="spacer"></span>
 </div>
-<ul class="repolist">
+<ul class="repolist rows">
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">no public repositories yet</li>{{end}}
 </ul>

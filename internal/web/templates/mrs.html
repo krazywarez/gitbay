@@ -1,3 +1,4 @@
+{{define "width"}}wide{{end}}
 {{define "title"}}merge requests · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <div class="listhead">
@@ -16,7 +17,7 @@
   {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
 {{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
-<ul class="issuelist">
+<ul class="issuelist rows">
 {{range .MRs}}{{$n := .Number}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a>

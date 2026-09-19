@@ -1,3 +1,4 @@
+{{define "width"}}wide{{end}}
 {{define "title"}}issues · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <div class="listhead">
@@ -16,7 +17,7 @@
   <span class="spacer"></span>
   <p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">milestones</a> · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/labels">labels</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">new issue</a>{{end}}</p>
 </div>
-<ul class="issuelist">
+<ul class="issuelist rows">
 {{range .Issues}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/issues/{{.Number}}">{{.Title}}</a>

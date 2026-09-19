@@ -897,6 +897,10 @@ ul.loglist .subject a { color: var(--fg); font-weight: 500; }
 ul.loglist .subject a:hover { color: var(--link); }
 ul.loglist .commitside { flex: none; display: flex; gap: var(--sp-2); align-items: center; white-space: nowrap; }
 
+ul.loglist.rows li { align-items: center; padding: var(--sp-2) var(--sp-4); }
+ul.loglist.rows .commitmain { display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0; }
+ul.loglist.rows .meta { flex: none; color: var(--muted); font-size: var(--fs-1); white-space: nowrap; }
+
 ul.repolist { list-style: none; margin: var(--sp-3) 0 var(--sp-5); padding: 0; }
 ul.repolist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
 ul.repolist li:last-child { border-bottom: 0; }
@@ -908,6 +912,12 @@ ul.repolist .reponame a strong { color: var(--link); font-weight: 600; }
 ul.repolist .reponame .sep { color: var(--muted); margin: 0 2px; }
 ul.repolist .desc { margin-top: 2px; }
 ul.repolist .topics, ul.repolist .meta { margin-top: var(--sp-1); }
+
+ul.repolist.rows li { display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); }
+ul.repolist.rows .reponame { flex: none; font-size: var(--fs-2); }
+ul.repolist.rows .desc { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-2); margin: 0; }
+ul.repolist.rows .topics, ul.repolist.rows .meta { flex: none; margin: 0; white-space: nowrap; }
+ul.repolist.rows .meta { font-size: var(--fs-1); }
 
 /* pinned repos: a compact wrap of names, no description or meta */
 ul.pinlist { list-style: none; margin: var(--sp-3) 0 var(--sp-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
@@ -938,6 +948,15 @@ ul.issuelist .issuemain { flex: 1 1 auto; min-width: 0; }
 ul.issuelist .issueside { display: flex; gap: var(--sp-2); align-items: center; flex: none; }
 ul.issuelist .title a { color: var(--fg); font-weight: 500; }
 ul.issuelist .title a:hover { color: var(--link); }
+
+/* one-line rows: title, labels, then the meta pushed right. Above 64rem
+   a list is a table, not prose (desktop layout spec). */
+ul.issuelist.rows li { align-items: center; padding: var(--sp-2) var(--sp-4); }
+ul.issuelist.rows .issuemain { display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0; }
+ul.issuelist.rows .title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.issuelist.rows .title .chip { margin-left: var(--sp-1); }
+ul.issuelist.rows .meta { flex: none; color: var(--muted); font-size: var(--fs-1); white-space: nowrap; }
+ul.issuelist.rows .meta .repo { color: var(--fg); }
 
 ul.milestonelist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
 ul.milestonelist li { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--faint); }
@@ -1509,6 +1528,10 @@ svg.icon { vertical-align: -0.125em; }
   /* one column, the aside after the thread: a phone shows the
      description first, checks and reviewers after it (#232) */
   .withaside { grid-template-columns: 1fr; }
+
+  /* rows go back to two lines where one does not fit */
+  ul.issuelist.rows .issuemain, ul.repolist.rows li, ul.loglist.rows .commitmain { display: block; }
+  ul.issuelist.rows .title, ul.repolist.rows .desc { white-space: normal; }
 }
 
 @media (max-width: 52rem) {
