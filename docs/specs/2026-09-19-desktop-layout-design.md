@@ -108,8 +108,8 @@ management; the "milestones · labels" links leave the list head.
   20rem so the two sit balanced in the container.
 - **Log, commit, compare, refs, releases, build, code search**: the
   container width, no column.
-- **Notifications, bookmarks, snippets, profile, org**: centered
-  `reading`; notification rows one line.
+- **Notifications**: the container width, no column; rows one line.
+- **Bookmarks, snippets, profile, org**: centered `reading`.
 - **Landing, login, register, new repository, 404, privacy**: centered
   `bounded`.
 
