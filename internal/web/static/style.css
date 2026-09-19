@@ -863,6 +863,8 @@ tr.tipbar td {
 
 .readme { margin-top: var(--sp-5); }
 .readme .cardbody { max-width: 78ch; }
+/* the overview README caps as a card, so prose and code share an edge */
+.overview .readme { max-width: 88ch; }
 /* until every card wraps its body in .cardbody, the rendered block is
    the body */
 .readme > .rendered { padding: var(--sp-4) var(--sp-5); }
@@ -1083,7 +1085,7 @@ a.tile:hover { background: var(--hover); text-decoration: none; }
 .feedcol .feedline .none { font-size: var(--fs-1); }
 
 /* ---- two-column: conversation and aside ---- */
-.withaside { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
+.withaside { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--sp-6); align-items: start; }
 .withaside .mainside { min-width: 0; }
 aside.aside { font-size: var(--fs-2); }
 .aside .grp { border-top: 1px solid var(--line); padding: var(--sp-3) 0; }
@@ -1561,7 +1563,7 @@ h2.empty { color: var(--muted); font-weight: 500; font-size: var(--fs-3); margin
 /* ---- wiki ---- */
 .wikilayout { display: flex; gap: var(--sp-5); align-items: flex-start; }
 .wikipage { flex: 1; min-width: 0; }
-.wikinav { flex: none; width: 14rem; }
+.wikinav { flex: none; width: 15rem; }
 .wikinav ul { list-style: none; margin: var(--sp-1) 0 var(--sp-4); padding: 0; }
 .wikinav li a {
   display: block;

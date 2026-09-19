@@ -63,9 +63,9 @@ feed rows are the row format the lists should adopt.
    description with topics and website inline in muted text, the
    Pin/Watch/Bookmark/Fork buttons at the right. Row two: the tabs. The
    toggles hint moves to `title` text on the three buttons.
-7. **Below 64rem** a facet or section column folds into a `details`
-   element above the content, the file navigator disappears (the tree
-   page exists), and the dashboard's pinned column returns to the chip
+7. **Below 64rem** a facet or section column stacks after the content,
+   the way the issue aside does; the file navigator disappears (the
+   tree page exists); the dashboard's pinned column returns to the chip
    row. Nothing the phone layout fixed moves.
 
 ## Pages
@@ -76,7 +76,7 @@ feed rows are the row format the lists should adopt.
 |---|---|---|
 | Dashboard | Pinned repositories with open issue count, open MR count, last build state | `Rail.Pinned` plus per-repository counts (new store read) |
 | Blob, blame, edit | File navigator: the file's directory, parent link, current file marked with `aria-current` | `gitutil.ListTree` on the directory, the call the tree page makes |
-| Issues list, MR list | State; labels with counts; milestones with open counts; assignees (issues) | The `state`, `label`, `milestone`, `assignee` parameters `activeFilters` already handles; counts from the labels and milestones pages' reads |
+| Issues list, MR list | State; labels with counts; milestones with open counts | The `state`, `label`, `milestone`, `assignee` parameters `activeFilters` already handles; counts from the labels and milestones pages' reads |
 | Builds list | Status; job; branch | The `status`, `job`, `ref` parameters `buildFilter` already handles; branches from the refs read |
 | Explore | Topics with counts | `?q=<topic>`, the link the topic chips already use |
 | Site search | Kind: repositories, issues, merge requests | `?kind=repo\|issue\|mr` |
