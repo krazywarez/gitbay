@@ -25,10 +25,11 @@ func TestRepoHeaderTwoRows(t *testing.T) {
 		Runs        []buildRun
 		Filter      buildFilter
 		FilterLinks []buildFilterLink
+		Facets      []facetGroup
 		Refs        []string
 		CanWrite    bool
 		Notice      string
-	}{p, nil, nil, nil, buildFilter{}, nil, nil, true, ""})
+	}{p, nil, nil, nil, buildFilter{}, nil, nil, nil, true, ""})
 	if err != nil {
 		t.Fatal(err)
 	}

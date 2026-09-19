@@ -1,19 +1,24 @@
 {{define "width"}}wide{{end}}
 {{define "title"}}builds · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
-<div class="listhead">
-  <h1>Builds</h1>
-  <nav class="filters">
-  {{range .FilterLinks}}<a {{if .Active}}class="active" aria-current="page" {{end}}href="{{.Href}}">{{.Label}}</a>{{end}}
-  </nav>
+<div class="withcol">
+<nav class="sidecol" aria-label="Filters">
+  {{range .Facets}}{{if .Items}}<div class="grp">
+  <h2 class="colhead">{{.Title}}</h2>
+  <ul>{{range .Items}}<li><a{{if .Active}} aria-current="page"{{end}} href="{{.Href}}">{{.Label}}</a></li>{{end}}</ul>
+  </div>{{end}}{{end}}
   <form method="get" class="searchform compact">
-    <label for="ref">Branch</label>
+    <label for="ref" class="colhead">Branch</label>
     <input type="text" id="ref" name="ref" value="{{.Filter.Ref}}" list="buildrefs">
     <datalist id="buildrefs">{{range .Refs}}<option value="{{.}}">{{end}}</datalist>
     <input type="hidden" name="status" value="{{.Filter.Status}}">
     <input type="hidden" name="job" value="{{.Filter.Job}}">
     <button type="submit" class="btn">Filter</button>
   </form>
+</nav>
+<div class="colmain">
+<div class="listhead">
+  <h1>Builds</h1>
 </div>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if and .CanWrite .Jobs}}
@@ -31,7 +36,7 @@
 <p class="meta">Add <code>?job=name</code> for one job.</p>
 </details>
 <p class="meta">{{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}}{{if or .Filter.Ref .Filter.Status .Filter.Job}}, <a href="?">clear filters</a>{{end}}</p>
-<ul class="loglist">
+<ul class="loglist rows">
 {{range .Runs}}<li>
   <div class="commitmain">
     <p class="subject"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{printf "%.10s" .SHA}}</a></code></p>
@@ -44,4 +49,6 @@
 </li>
 {{else}}<li class="empty">no builds — push a commit with a <code>.gitbay/ci.yml</code></li>{{end}}
 </ul>
+</div>
+</div>
 {{end}}

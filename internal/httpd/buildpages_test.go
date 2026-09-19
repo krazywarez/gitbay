@@ -35,11 +35,12 @@ func TestBuildsPageRendersCommandOutput(t *testing.T) {
 		Runs        []buildRun
 		Filter      buildFilter
 		FilterLinks []buildFilterLink
+		Facets      []facetGroup
 		Refs        []string
 		CanWrite    bool
 		Notice      string
 	}{
-		testRepoPage(), builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs),
+		testRepoPage(), builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs), nil,
 		distinctRefs(builds, filter.Ref), true, "",
 	})
 	if err != nil {

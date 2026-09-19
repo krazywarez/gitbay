@@ -60,6 +60,33 @@ func filterLinks(f buildFilter, jobs []control.JobOut) []buildFilterLink {
 	return links
 }
 
+// buildFacets is the builds page's side column: filterLinks' rows split
+// into their groups, plus one link per branch seen, which keeps status
+// and job and clears itself when active.
+func buildFacets(f buildFilter, jobs []control.JobOut, refs []string) []facetGroup {
+	links := filterLinks(f, jobs)
+	n := 1 + len(buildStatuses)
+	status := facetGroup{Title: "Status"}
+	for _, l := range links[:n] {
+		status.Items = append(status.Items, facetItem{Label: l.Label, Href: l.Href, Active: l.Active})
+	}
+	job := facetGroup{Title: "Jobs"}
+	for _, l := range links[n:] {
+		job.Items = append(job.Items, facetItem{Label: l.Label, Href: l.Href, Active: l.Active})
+	}
+	branch := facetGroup{Title: "Branches"}
+	base := url.Values{"ref": {f.Ref}, "status": {f.Status}, "job": {f.Job}}
+	for _, ref := range refs {
+		active := ref == f.Ref
+		href := facetHref(base, "ref", ref)
+		if active {
+			href = facetHref(base, "ref", "")
+		}
+		branch.Items = append(branch.Items, facetItem{Label: ref, Href: href, Active: active})
+	}
+	return []facetGroup{status, job, branch}
+}
+
 // distinctRefs lists each ref among builds once, in order, plus the
 // current filter value if it is not already there. It backs the branch
 // field's <datalist> suggestions, not a claim about what branches exist:
@@ -176,6 +203,8 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 	var jobs []control.JobOut
 	s.runControlInto(viewer, []string{"build", "jobs", p.Repo.Path()}, &jobs)
 
+	refs := distinctRefs(builds, filter.Ref)
+
 	s.render(w, "builds.html", struct {
 		repoPage
 		Builds      []control.BuildOut
@@ -183,10 +212,12 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 		Runs        []buildRun
 		Filter      buildFilter
 		FilterLinks []buildFilterLink
+		Facets      []facetGroup
 		Refs        []string
 		CanWrite    bool
 		Notice      string
-	}{p, builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs), distinctRefs(builds, filter.Ref),
+	}{p, builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs),
+		buildFacets(filter, jobs, refs), refs,
 		s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 

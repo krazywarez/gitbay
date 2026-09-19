@@ -149,3 +149,28 @@ func TestDistinctRefsNoDuplicateWhenCurrentAlreadyPresent(t *testing.T) {
 		t.Errorf("distinctRefs = %v, want %v", got, want)
 	}
 }
+
+// The builds column groups the same links filterLinks makes: "all" and
+// the statuses, then the jobs, then the branches seen (desktop layout spec).
+func TestBuildFacetsGroups(t *testing.T) {
+	f := buildFilter{Ref: "main", Status: "success"}
+	groups := buildFacets(f, []control.JobOut{{Name: "lint"}}, []string{"main", "dev"})
+	if len(groups) != 3 || groups[0].Title != "Status" || groups[1].Title != "Jobs" || groups[2].Title != "Branches" {
+		t.Fatalf("groups: %+v", groups)
+	}
+	if groups[0].Items[0].Label != "all" || groups[0].Items[0].Href != "?ref=main" || groups[0].Items[0].Active {
+		t.Errorf("all: %+v", groups[0].Items[0])
+	}
+	if s := groups[0].Items[3]; s.Label != "success" || !s.Active {
+		t.Errorf("success: %+v", s)
+	}
+	if j := groups[1].Items[0]; j.Label != "lint" || j.Href != "?job=lint&ref=main&status=success" || j.Active {
+		t.Errorf("lint: %+v", j)
+	}
+	if b := groups[2].Items[0]; b.Label != "main" || !b.Active || b.Href != "?status=success" {
+		t.Errorf("active branch clears itself: %+v", b)
+	}
+	if b := groups[2].Items[1]; b.Label != "dev" || b.Active || b.Href != "?ref=dev&status=success" {
+		t.Errorf("dev: %+v", b)
+	}
+}
