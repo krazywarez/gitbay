@@ -4,6 +4,17 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.28.1 — 2026-09-19
+
+The newcomer route names its web path (#226).
+
+- After registering, the page and the verification mail say the code
+  can be pasted under Settings after signing in with an emailed link,
+  beside the terminal command.
+- The SSH keys wiki page names this instance instead of a placeholder;
+  the Quickstart leads with the browser route and Homebrew before
+  =go install=.
+
 * v1.28.0 — 2026-09-19
 
 Labels on merge requests (#231), and a one-column dashboard. Migration
