@@ -289,12 +289,15 @@ func setIssueState(c *Ctx, args []string, state string) int {
 }
 
 // editText parses --title/--body/--file -/--format and authorizes: author or
-// write. A nil format means the stored markup format stays as it is.
-func editText(c *Ctx, args []string, kind string) (rest []string, title, body, format *string, code int) {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--body", "--file", "--format"}, MaxPos: -1,
+// write. A nil format means the stored markup format stays as it is. extra
+// names further value flags a caller wants (mr edit's --superseded-by):
+// they are accepted and reported in the returned flags, and count toward
+// "at least one edit was given" alongside title/body/format.
+func editText(c *Ctx, args []string, kind string, extra ...string) (rest []string, title, body, format *string, f flags, code int) {
+	f, err := parseFlags(args, flagSpec{Values: append([]string{"--title", "--body", "--file", "--format"}, extra...), MaxPos: -1,
 		Usage: kind + " edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]"})
 	if err != nil {
-		return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "%v", err)
+		return nil, nil, nil, nil, flags{}, c.fail(protocol.ExitUsage, "%v", err)
 	}
 	rest = f.Pos
 	titleV, bodyV, file, formatV := f.Value("--title"), f.Value("--body"), f.Value("--file"), f.Value("--format")
@@ -302,20 +305,27 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body, f
 	if file != "" {
 		b, err := bodyFrom(c, "", file)
 		if err != nil {
-			return nil, nil, nil, nil, c.failInput(err)
+			return nil, nil, nil, nil, flags{}, c.failInput(err)
 		}
 		bodyV, haveBody = b, true
 	}
 	fmtName, err := markupFormat(formatV)
 	if err != nil {
-		return nil, nil, nil, nil, c.failInput(err)
+		return nil, nil, nil, nil, flags{}, c.failInput(err)
 	}
-	if !haveTitle && !haveBody && fmtName == "" {
-		return nil, nil, nil, nil, c.usage()
+	anyExtra := false
+	for _, e := range extra {
+		if f.Has(e) {
+			anyExtra = true
+			break
+		}
+	}
+	if !haveTitle && !haveBody && fmtName == "" && !anyExtra {
+		return nil, nil, nil, nil, flags{}, c.usage()
 	}
 	if haveTitle {
 		if strings.TrimSpace(titleV) == "" {
-			return nil, nil, nil, nil, c.fail(protocol.ExitUsage, "--title must not be empty")
+			return nil, nil, nil, nil, flags{}, c.fail(protocol.ExitUsage, "--title must not be empty")
 		}
 		title = &titleV
 	}
@@ -325,11 +335,11 @@ func editText(c *Ctx, args []string, kind string) (rest []string, title, body, f
 	if fmtName != "" {
 		format = &fmtName
 	}
-	return rest, title, body, format, -1
+	return rest, title, body, format, f, -1
 }
 
 func runIssueEdit(c *Ctx, args []string) int {
-	rest, title, body, format, code := editText(c, args, "issue")
+	rest, title, body, format, _, code := editText(c, args, "issue")
 	if code >= 0 {
 		return code
 	}

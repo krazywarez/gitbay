@@ -68,7 +68,7 @@ func init() {
 		Usage:   "mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
 	register(Command{Path: []string{"mr", "edit"},
 		Summary:    "edit title or body",
-		Usage:      "mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
+		Usage:      "mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org] [--superseded-by <m>|none]",
 		ReadsStdin: true, Run: runMREdit})
 	register(Command{Path: []string{"mr", "retarget"},
 		Summary: "retarget onto another branch",
@@ -88,7 +88,7 @@ func init() {
 		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
 	register(Command{Path: []string{"mr", "close"},
 		Summary: "close without merging",
-		Usage:   "mr close <owner/name> <n>", Run: runMRClose})
+		Usage:   "mr close <owner/name> <n> [--by <m>]", Run: runMRClose})
 }
 
 // ForkOut is what `repo fork` emits: where the fork landed, and what it
@@ -384,6 +384,9 @@ type mrOut struct {
 	MergedBy  string     `json:"merged_by,omitempty"`
 	ClosedAt  string     `json:"closed_at,omitempty"`
 	ClosedBy  string     `json:"closed_by,omitempty"`
+	// SupersededBy is the merge request, by number, this one was closed
+	// in favour of. 0 means none.
+	SupersededBy int64 `json:"superseded_by,omitempty"`
 }
 
 type stackRef struct {
@@ -429,7 +432,7 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
 		ReviewRequests: m.ReviewRequests,
 		CreatedAt:      m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
-		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy}
+		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy, SupersededBy: m.SupersededBy}
 	if withBody {
 		o.Body = m.Body
 		o.BodyFormat = m.BodyFormat
@@ -598,6 +601,9 @@ func runMRShow(c *Ctx, args []string) int {
 		if d.ClosedAt != "" {
 			fmt.Fprintf(w, "closed %s%s\n", d.ClosedAt, byWhom(d.ClosedBy))
 		}
+		if d.SupersededBy != 0 {
+			fmt.Fprintf(w, "superseded by: !%d\n", d.SupersededBy)
+		}
 		if d.Body != "" {
 			fmt.Fprintf(w, "\n%s\n", d.Body)
 		}
@@ -677,7 +683,7 @@ func runMRDiff(c *Ctx, args []string) int {
 }
 
 func runMREdit(c *Ctx, args []string) int {
-	rest, title, body, format, code := editText(c, args, "mr")
+	rest, title, body, format, fl, code := editText(c, args, "mr", "--superseded-by")
 	if code >= 0 {
 		return code
 	}
@@ -691,8 +697,32 @@ func runMREdit(c *Ctx, args []string) int {
 	if code := authorOrWrite(c, repo, mr.Author, "edit this merge request"); code >= 0 {
 		return code
 	}
+	var clearSuperseded bool
+	var supersededBy int64
+	if fl.Has("--superseded-by") {
+		if mr.State != "closed" {
+			return c.fail(protocol.ExitUsage, "only a closed merge request can be superseded")
+		}
+		if v := fl.Value("--superseded-by"); v == "none" {
+			clearSuperseded = true
+		} else {
+			supersededBy, code = resolveSupersededBy(c, repo, mr.Number, v)
+			if code >= 0 {
+				return code
+			}
+		}
+	}
 	if err := c.Store.UpdateMRText(mr.ID, title, body, format); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if clearSuperseded {
+		if err := c.Store.SetSupersededBy(mr.ID, 0); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	} else if supersededBy != 0 {
+		if err := c.Store.SetSupersededBy(mr.ID, supersededBy); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.edited", fmt.Sprintf(`{"number":%d}`, mr.Number))
 	return c.emit(map[string]any{"number": mr.Number}, func(w io.Writer) {
@@ -1499,14 +1529,19 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 }
 
 func runMRClose(c *Ctx, args []string) int {
-	repo, mr, code := mrRef(c, args, policy.CanRead)
+	f, err := parseFlags(args, flagSpec{Values: []string{"--by"}, MaxPos: 2,
+		Usage: "mr close <owner/name> <n> [--by <m>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	repo, mr, code := mrRef(c, f.Pos, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	if len(args) != 2 {
+	if len(f.Pos) != 2 {
 		return c.usage()
 	}
 	if code := authorOrWrite(c, repo, mr.Author, "close this merge request"); code >= 0 {
@@ -1515,10 +1550,24 @@ func runMRClose(c *Ctx, args []string) int {
 	if mr.State == "merged" || mr.State == "closed" {
 		return c.fail(protocol.ExitUsage, "MR !%d is already %s", mr.Number, mr.State)
 	}
+	var by int64
+	if f.Has("--by") {
+		by, code = resolveSupersededBy(c, repo, mr.Number, f.Value("--by"))
+		if code >= 0 {
+			return code
+		}
+	}
 	if err := c.Store.MarkClosed(mr.ID, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.closed", fmt.Sprintf(`{"number":%d}`, mr.Number))
+	eventData := fmt.Sprintf(`{"number":%d}`, mr.Number)
+	if by != 0 {
+		if err := c.Store.SetSupersededBy(mr.ID, by); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		eventData = fmt.Sprintf(`{"number":%d,"by":%d}`, mr.Number, by)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.closed", eventData)
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",
 			subject: mrSubject(repo, mr.Number, mr.Title),
@@ -1528,6 +1577,26 @@ func runMRClose(c *Ctx, args []string) int {
 	return c.emit(map[string]any{"number": mr.Number, "state": "closed"}, func(w io.Writer) {
 		fmt.Fprintf(w, "closed %s!%d\n", repo.Path(), mr.Number)
 	})
+}
+
+// resolveSupersededBy validates a --superseded-by/--by value against the
+// merge request it would be set on: it must parse, name another merge
+// request in the same repository (never itself), and that request must
+// exist. -1 as the returned code means the value is good to use.
+func resolveSupersededBy(c *Ctx, repo store.Repo, number int64, v string) (int64, int) {
+	m, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0, c.fail(protocol.ExitUsage, "bad MR number %q", v)
+	}
+	if m == number {
+		return 0, c.fail(protocol.ExitUsage, "a merge request cannot supersede itself")
+	}
+	if _, err := c.Store.MRByNumber(repo.ID, m); errors.Is(err, store.ErrNotFound) {
+		return 0, c.fail(protocol.ExitNotFound, "no merge request !%d on %s", m, repo.Path())
+	} else if err != nil {
+		return 0, c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return m, -1
 }
 
 // reviewAction is what a review notification says it was. A verdict with
