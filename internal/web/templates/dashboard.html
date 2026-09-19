@@ -23,7 +23,7 @@
 <aside class="dashpins" aria-label="Pinned repositories">
   <h2 class="colhead">Pinned</h2>
   {{if .Pins}}<ul class="pins">
-  {{range .Pins}}<li><a href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a><span class="n" title="{{.Issues}} open issue{{if ne .Issues 1}}s{{end}}, {{.MRs}} open merge request{{if ne .MRs 1}}s{{end}}{{with .Build}}, last build {{.}}{{end}}">{{if .Issues}}<b class="wants">{{.Issues}}</b>{{else}}<b>0</b>{{end}} {{if .MRs}}<b class="wants">{{.MRs}}</b>{{else}}<b>0</b>{{end}} <span class="dot{{if eq .Build "success"}} ok{{else if eq .Build "failure"}} bad{{else if .Build}} pend{{end}}"></span></span></li>
+  {{range .Pins}}<li><a href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a><span class="n" title="{{.Issues}} open issue{{if ne .Issues 1}}s{{end}}, {{.MRs}} open merge request{{if ne .MRs 1}}s{{end}}{{with .Build}}, last build {{.}}{{end}}"><b{{if .Issues}} class="wants"{{end}}>{{.Issues}} <span class="vh">open issues</span></b> <b{{if .MRs}} class="wants"{{end}}>{{.MRs}} <span class="vh">open merge requests</span></b> <span class="dot{{if eq .Build "success"}} ok{{else if or (eq .Build "failure") (eq .Build "error")}} bad{{else if or (eq .Build "pending") (eq .Build "running")}} pend{{end}}"><span class="vh">{{with .Build}}last build {{.}}{{else}}no builds{{end}}</span></span></span></li>
   {{end}}</ul>
   <p class="meta">issues · merge requests · last build</p>
   {{else}}<p class="none">Nothing pinned yet. Press Pin on a repository.</p>{{end}}
@@ -32,10 +32,10 @@
 <section class="dashmain">
 <h1>Dashboard</h1>
 <div class="tiles">
-  {{template "tile" dict "N" (len .Issues) "ID" "issues" "Label" "open issues"}}
   {{template "tile" dict "N" (len .Reviews) "ID" "reviews" "Label" "waiting on your review"}}
   {{template "tile" dict "N" (len .Assigned) "ID" "assigned" "Label" "assigned to you"}}
   {{template "tile" dict "N" (len .MRs) "ID" "mrs" "Label" "open merge requests"}}
+  {{template "tile" dict "N" (len .Issues) "ID" "issues" "Label" "open issues"}}
 </div>
 {{if .Reviews}}{{template "queue" dict "ID" "reviews" "Title" "Waiting on your review" "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}{{end}}
 {{if .Assigned}}{{template "queue" dict "ID" "assigned" "Title" "Assigned to you" "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}{{end}}
