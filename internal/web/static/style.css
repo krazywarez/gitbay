@@ -651,6 +651,28 @@ form.signupform label, form.editform label { margin-bottom: 4px; }
 .editform textarea { width: 100%; }
 .editform input[name="message"] { width: 100%; }
 
+/* A previewed draft, above the textarea it came from. The orange edge is
+   "where you are and what wants you": this is not saved yet. */
+.preview {
+  margin: var(--sp-4) 0;
+  max-width: 48rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--mark);
+  border-radius: var(--r-card);
+}
+.preview > .previewmark {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  color: var(--warn);
+  font-size: var(--fs-1);
+}
+.preview > .rendered { padding: var(--sp-3) var(--sp-4); }
+.preview > .rendered > :first-child { margin-top: 0; }
+.preview > .rendered > :last-child { margin-bottom: 0; }
+.preview > .rendered:empty::before { content: "nothing to preview"; color: var(--muted); }
+
 form.commentform { margin: var(--sp-4) 0; max-width: 48rem; }
 form.commentform p:last-child { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: 0; }
 

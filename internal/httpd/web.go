@@ -577,11 +577,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}
 	// Markdown and org render like a README, with the source one click
 	// away; ?view=source shows the text instead.
-	renderable := false
-	switch path.Ext(strings.ToLower(filePath)) {
-	case ".md", ".markdown", ".org":
-		renderable = !binary
-	}
+	renderable := markupFile(filePath) && !binary
 	var renderedHTML template.HTML
 	rendered := renderable && r.URL.Query().Get("view") != "source"
 	if rendered {
@@ -628,6 +624,13 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 
 // releases lists tag-anchored releases with notes and assets.
 func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
+	s.releasesPage(w, r, "")
+}
+
+// releasesPage lists releases. previewForm is "release" when the create
+// form asked to see its notes, or "release:<tag>" when that release's
+// edit form did (#235).
+func (s *Server) releasesPage(w http.ResponseWriter, r *http.Request, previewForm string) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
 		return
@@ -662,13 +665,28 @@ func (s *Server) releases(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// An edit keeps the release's stored format; a new release has no
+	// picker and is markdown, as release create stores with no --format.
+	var d *draft
+	if previewForm != "" {
+		format := "md"
+		if tag, ok := strings.CutPrefix(previewForm, "release:"); ok {
+			for _, v := range views {
+				if v.Tag == tag {
+					format = v.NotesFormat
+				}
+			}
+		}
+		d = s.draftFor(r, p.Repo, previewForm, "notes", format)
+	}
 	s.render(w, "releases.html", struct {
 		repoPage
 		Releases []relView
 		FreeTags []string
 		CanWrite bool
 		Notice   string
-	}{p, views, freeTags, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
+		Draft    *draft
+	}{p, views, freeTags, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r), d})
 }
 
 // releaseAsset streams one uploaded asset. Tags containing '/' are not
@@ -1734,6 +1752,14 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
+	s.issuePage(w, r, "")
+}
+
+// issuePage renders an issue. previewForm names the form that asked to
+// see its markup rather than save it — "edit" or "comment", "" for a
+// plain read — and the page renders that draft above the form it came
+// from, in the format the write would have stored (#235).
+func (s *Server) issuePage(w http.ResponseWriter, r *http.Request, previewForm string) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
 		return
@@ -1755,6 +1781,17 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := s.ugcFor(r, p.Repo)
+	// An edit keeps the issue's stored format; a comment has no picker
+	// and is markdown, which is what issue comment stores with no
+	// --format.
+	var d *draft
+	if previewForm != "" {
+		format := iss.BodyFormat
+		if previewForm == "comment" {
+			format = "md"
+		}
+		d = s.draftFor(r, p.Repo, previewForm, "body", format)
+	}
 	// nil readable: the picker lists titles, never the progress counts.
 	milestones, _ := s.st.ListMilestones(p.Repo, "open", nil)
 	s.render(w, "issue.html", struct {
@@ -1767,9 +1804,10 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
 		Milestones  []store.Milestone
 		Notice      string
 		LabelColors map[string]template.CSS
+		Draft       *draft
 	}{p, iss, md(iss.Body, iss.BodyFormat), renderComments(comments, md),
 		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
-		milestones, s.takeFlash(w, r), s.labelColors(p.Repo)})
+		milestones, s.takeFlash(w, r), s.labelColors(p.Repo), d})
 }
 
 // canEditItem: the author or anyone with write access may edit.
@@ -1876,6 +1914,13 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
+	s.mrPage(w, r, "")
+}
+
+// mrPage renders a merge request. previewForm names the form that asked
+// to see its markup rather than save it — "edit" or "comment", "" for a
+// plain read (#235).
+func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm string) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
 		return
@@ -2006,6 +2051,16 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 	// The merge requests this one superseded when it was closed, so the
 	// page it points to can also say what it supersedes.
 	supersedes, _ := s.st.MRsSuperseding(p.Repo.ID, m.Number)
+	// An edit keeps the merge request's stored format; a comment has no
+	// picker and is markdown, as mr comment stores with no --format.
+	var d *draft
+	if previewForm != "" {
+		format := m.BodyFormat
+		if previewForm == "comment" {
+			format = "md"
+		}
+		d = s.draftFor(r, p.Repo, previewForm, "body", format)
+	}
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -2036,10 +2091,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		HeadPruned      bool
 		Base            string
 		LabelColors     map[string]template.CSS
+		Draft           *draft
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, supersedes, gates,
-		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo)})
+		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo), d})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the

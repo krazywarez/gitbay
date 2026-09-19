@@ -12,6 +12,11 @@ The web findings from the forge comparison (#232).
   account becomes active: an invite redeemed, or an open-mode signup
   that verified its address. Off by default, requires =[mail]=, and
   queued like any other notice (#234).
+- Every web form that takes markup has a Preview button beside its own
+  submit: issue and merge request create, their edit and comment boxes,
+  release create and edit, the profile about text, and the file editor
+  on a path the forge renders. It renders the draft above the textarea
+  and writes nothing (#235).
 
 - Links inside running text are underlined: the meta lines on issues,
   merge requests and releases no longer tell a link apart by colour

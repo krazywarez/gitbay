@@ -10,12 +10,13 @@
 
 <div class="withaside">
 <div class="mainside">
-{{if .CanEdit}}<details class="editbox"><summary>edit</summary>
+{{if .CanEdit}}<details class="editbox"{{if .Draft.Is "edit"}} open{{end}}><summary>edit</summary>
+{{if .Draft.Is "edit"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/edit" class="commentform">
-<p><input type="text" name="title" aria-label="Title" value="{{.Issue.Title}}" required></p>
-<p><textarea name="body" aria-label="Description" rows="8">{{.Issue.Body}}</textarea></p>
-<p><input type="text" name="labels" aria-label="Labels" value="{{range $i, $l := .Issue.Labels}}{{if $i}} {{end}}{{$l}}{{end}}" placeholder="labels, space-separated (write access)"></p>
-<p><button type="submit" class="btn">Save</button></p>
+<p><input type="text" name="title" aria-label="Title" value="{{.Draft.Or "edit" "title" .Issue.Title}}" required></p>
+<p><textarea name="body" aria-label="Description" rows="8">{{.Draft.Or "edit" "body" .Issue.Body}}</textarea></p>
+<p><input type="text" name="labels" aria-label="Labels" value="{{$.Draft.Or "edit" "labels" (join .Issue.Labels " ")}}" placeholder="labels, space-separated (write access)"></p>
+<p><button type="submit" class="btn">Save</button> {{template "previewbtn"}}</p>
 </form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.Issue.Author}}">{{.Issue.Author}}</a></strong> <span class="when">{{when .Issue.CreatedAt}}</span></header>
@@ -29,9 +30,10 @@
 </article>{{end}}
 {{end}}
 {{if .Viewer}}
+{{if .Draft.Is "comment"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/comment" class="commentform">
-<p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit">Comment</button></p>
+<p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}">{{.Draft.Or "comment" "body" ""}}</textarea></p>
+<p><button type="submit">Comment</button> {{template "previewbtn"}}</p>
 </form>
 {{end}}
 </div>

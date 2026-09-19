@@ -3,17 +3,19 @@
 <h1>Releases</h1>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if and .CanWrite .FreeTags}}
-<details class="editbox"><summary>New release</summary>
+{{$want := .Draft.Or "release" "tag" ""}}
+<details class="editbox"{{if .Draft.Is "release"}} open{{end}}><summary>New release</summary>
+{{if .Draft.Is "release"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/releases" class="commentform">
   <p class="branchpick">
     <label for="tag">Tag</label>
     <select id="tag" name="tag" required>
-      {{range .FreeTags}}<option value="{{.}}">{{.}}</option>{{end}}
+      {{range .FreeTags}}<option value="{{.}}"{{if eq . $want}} selected{{end}}>{{.}}</option>{{end}}
     </select>
   </p>
-  <p><input type="text" name="title" aria-label="Title" placeholder="title (defaults to the tag)"></p>
-  <p><textarea name="notes" aria-label="Notes" rows="6" placeholder="what changed"></textarea></p>
-  <p><button type="submit" class="btn">Create release</button></p>
+  <p><input type="text" name="title" aria-label="Title" placeholder="title (defaults to the tag)" value="{{.Draft.Or "release" "title" ""}}"></p>
+  <p><textarea name="notes" aria-label="Notes" rows="6" placeholder="what changed">{{.Draft.Or "release" "notes" ""}}</textarea></p>
+  <p><button type="submit" class="btn">Create release</button> {{template "previewbtn"}}</p>
 </form>
 </details>
 {{else if .CanWrite}}<p class="meta">Push a tag to create a release from it.</p>{{end}}
@@ -24,13 +26,15 @@
     <p class="meta"><span class="refchip">{{$rel.Tag}}</span> {{if $rel.Author}}{{$rel.Author}} · {{end}}{{when $rel.CreatedAt}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/archive/{{$rel.Tag}}.tar.gz">source tar.gz</a></p>
   </header>
   {{if $rel.NotesHTML}}<div class="rendered">{{$rel.NotesHTML}}</div>{{end}}
-  {{if $.CanWrite}}<details class="editbox"><summary>Edit</summary>
+  {{$form := printf "release:%s" $rel.Tag}}
+  {{if $.CanWrite}}<details class="editbox"{{if $.Draft.Is $form}} open{{end}}><summary>Edit</summary>
+  {{if $.Draft.Is $form}}{{template "previewblock" $.Draft.HTML}}{{end}}
   <form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases" class="commentform">
     <input type="hidden" name="action" value="edit">
     <input type="hidden" name="tag" value="{{$rel.Tag}}">
-    <p><input type="text" name="title" aria-label="Title" value="{{$rel.Title}}"></p>
-    <p><textarea name="notes" aria-label="Notes" rows="6">{{$rel.Notes}}</textarea></p>
-    <p><button type="submit" class="btn">Save</button></p>
+    <p><input type="text" name="title" aria-label="Title" value="{{$.Draft.Or $form "title" $rel.Title}}"></p>
+    <p><textarea name="notes" aria-label="Notes" rows="6">{{$.Draft.Or $form "notes" $rel.Notes}}</textarea></p>
+    <p><button type="submit" class="btn">Save</button> {{template "previewbtn"}}</p>
   </form>
   {{if $.CanAdmin}}<form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases" class="commentform">
     <input type="hidden" name="action" value="delete">

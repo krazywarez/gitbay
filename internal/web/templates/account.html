@@ -7,18 +7,19 @@
 
 <h2>Profile</h2>
 <p class="meta">Shown on your profile page, <a href="/{{.Viewer}}">/{{.Viewer}}</a>.</p>
+{{if .Draft.Is "about"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="/settings" class="setform stack">
   <input type="hidden" name="field" value="profile">
   <label for="p-description">Description</label>
-  <input type="text" id="p-description" name="description" value="{{.Profile.Description}}" placeholder="one line, shown in listings">
+  <input type="text" id="p-description" name="description" value="{{.Draft.Or "about" "description" .Profile.Description}}" placeholder="one line, shown in listings">
   <label for="p-website">Website</label>
-  <input type="text" id="p-website" name="website" value="{{.Profile.Website}}" placeholder="https://example.org">
+  <input type="text" id="p-website" name="website" value="{{.Draft.Or "about" "website" .Profile.Website}}" placeholder="https://example.org">
   <label for="p-links">Links</label>
-  <textarea id="p-links" name="links" rows="3" placeholder="one per line: label|https://... or a bare https://... (at most 5)">{{.LinksText}}</textarea>
+  <textarea id="p-links" name="links" rows="3" placeholder="one per line: label|https://... or a bare https://... (at most 5)">{{.Draft.Or "about" "links" .LinksText}}</textarea>
   <label for="p-about">About</label>
-  <textarea id="p-about" name="about" rows="8" placeholder="longer, shown below your repositories">{{.Profile.About}}</textarea>
-  {{template "formatpicker" .Profile.AboutFormat}}
-  <button type="submit" class="btn">Save profile</button>
+  <textarea id="p-about" name="about" rows="8" placeholder="longer, shown below your repositories">{{.Draft.Or "about" "about" .Profile.About}}</textarea>
+  {{template "formatpicker" (.Draft.Or "about" "format" .Profile.AboutFormat)}}
+  <span class="btngroup"><button type="submit" class="btn">Save profile</button>{{template "previewbtn"}}</span>
 </form>
 
 <h2>SSH keys</h2>

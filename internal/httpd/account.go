@@ -34,6 +34,12 @@ type accountPGP struct {
 // accountForm renders the account's own settings: keys, addresses, and the
 // commands for everything that stays on SSH.
 func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.accountPage(w, r, u, nil)
+}
+
+// accountPage renders the settings page. d is non-nil when the profile
+// form asked to see its about text rather than save it (#235).
+func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.User, d *draft) {
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
@@ -75,8 +81,9 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 		MailOn       bool
 		WatchOn      bool
 		ThemeSetting string // system, light or dark: the form's selected option
+		Draft        *draft
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme})
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme, d})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -239,9 +246,10 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "notification preferences saved")
 	case "profile":
-		format := r.FormValue("format")
-		if format != "org" {
-			format = "md"
+		format := bodyFormat(r)
+		if wantsPreview(r) {
+			s.accountPage(w, r, u, s.draftWith(r, "about", format, r.FormValue("about"), ugcHTML))
+			return
 		}
 		argv := []string{"profile", "set",
 			"--description", r.FormValue("description"),

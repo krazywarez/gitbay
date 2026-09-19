@@ -37,6 +37,7 @@ type mrPageData struct {
 	HeadMerged      bool
 	HeadPruned      bool
 	Base            string
+	Draft           *draft
 }
 
 // A pruned head has no diff to show; the page must say the head is gone

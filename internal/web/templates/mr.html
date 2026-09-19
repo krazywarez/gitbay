@@ -26,11 +26,12 @@
 
 {{if eq .View "conversation"}}
 <div class="prose">
-{{if .CanEdit}}<details class="editbox"><summary>Edit</summary>
+{{if .CanEdit}}<details class="editbox"{{if .Draft.Is "edit"}} open{{end}}><summary>Edit</summary>
+{{if .Draft.Is "edit"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="{{$base}}/edit" class="commentform">
-<p><input type="text" name="title" aria-label="Title" value="{{.MR.Title}}" required></p>
-<p><textarea name="body" aria-label="Description" rows="8">{{.MR.Body}}</textarea></p>
-<p><button type="submit" class="btn">Save</button></p>
+<p><input type="text" name="title" aria-label="Title" value="{{.Draft.Or "edit" "title" .MR.Title}}" required></p>
+<p><textarea name="body" aria-label="Description" rows="8">{{.Draft.Or "edit" "body" .MR.Body}}</textarea></p>
+<p><button type="submit" class="btn">Save</button> {{template "previewbtn"}}</p>
 </form></details>{{end}}
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.MR.Author}}">{{.MR.Author}}</a></strong></header>
@@ -46,9 +47,10 @@
 {{if .DetachedThreads}}<h2>Threads on earlier revisions</h2>
 {{range .DetachedThreads}}{{template "thread" dict "T" . "Base" $base "Viewer" $.Viewer "Class" "stale"}}{{end}}{{end}}
 {{if .Viewer}}
+{{if .Draft.Is "comment"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="{{$base}}/comment" class="commentform">
-<p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}"></textarea></p>
-<p><button type="submit">Comment</button></p>
+<p><textarea name="body" aria-label="Comment" rows="4" placeholder="Comment as {{.Viewer}}">{{.Draft.Or "comment" "body" ""}}</textarea></p>
+<p><button type="submit">Comment</button> {{template "previewbtn"}}</p>
 </form>
 {{end}}
 </div>

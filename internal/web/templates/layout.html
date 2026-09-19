@@ -133,6 +133,18 @@
   </select>
 </p>{{end}}
 
+{{/* previewbtn is the Preview submit beside a markup form's own submit.
+     It posts the form to its usual action, which renders the body and
+     hands the page back instead of writing (#235). */}}
+{{define "previewbtn"}}<button type="submit" name="preview" value="1" class="btn">Preview</button>{{end}}
+
+{{/* previewblock shows a draft as it will read. The argument is the
+     rendered HTML; it sits above the textarea it came from. */}}
+{{define "previewblock"}}<div class="preview">
+  <p class="previewmark">Preview</p>
+  <div class="rendered">{{.}}</div>
+</div>{{end}}
+
 {{/* confirmfield is the typed-name check beside a destructive control.
      The argument is the text the person must type. */}}
 {{define "confirmfield"}}<input type="text" name="confirm" aria-label="Type {{.}} to confirm" placeholder="type {{.}} to confirm" size="{{len .}}" autocomplete="off">{{end}}

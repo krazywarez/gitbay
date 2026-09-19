@@ -52,6 +52,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | filter by label        | yes | yes | no  |
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
+| preview body markup    | n/a | yes | no  |
 | stacked merge requests | yes | yes | yes |
 | revisions              | yes | yes | yes |
 | range-diff             | yes | no  | yes |
@@ -114,6 +115,7 @@ reviews, since an approval was of the diff against the old branch.
 | milestone list      | yes | yes | yes |
 | labels: list, colour | yes | yes | yes |
 | choose body markup  | yes | yes | yes |
+| preview body markup | n/a | yes | no  |
 | issue templates     | yes | yes | yes |
 | milestone create, close, reopen | yes | no | yes |
 | org labels: set, list, remove | yes | list | yes |
@@ -144,6 +146,18 @@ body was stored in, since starting elsewhere would silently reinterpret
 it on the next save. Diff-line comments have no format column and are
 always markdown.
 
+Every web form that takes markup has a Preview button beside its own
+submit: issue and merge request create, their edit and comment boxes,
+release create and edit, the profile about text, and the file editor on
+a path the forge renders. It posts to the form's own action, which
+renders the draft and hands the page back without writing, so what you
+see is the rendering the thread will show, autolinks included. It is a
+round trip rather than a live preview because the instance serves no
+JavaScript, the same way the blob page's rendered/source toggle works.
+The row is =n/a= on the CLI: a terminal has no form to preview, and
+=issue show= already renders. Diff-line comments are left out — they
+sit inside the diff, where a page-level preview has nowhere to go.
+
 * Repositories
 
 | capability                  | cli | web | ios |
@@ -160,6 +174,7 @@ always markdown.
 | wiki (read)                 | yes | yes | yes |
 | download an archive         | yes | yes | n/a |
 | edit a file                 | yes | yes | yes |
+| preview an edited markup file | n/a | yes | no  |
 | create                      | yes | yes | yes |
 | fork                        | yes | yes | yes |
 | pin                         | yes | yes | yes |
@@ -183,6 +198,7 @@ always markdown.
 | release list, show          | yes | yes | yes |
 | atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
+| preview release notes       | n/a | yes | no  |
 | build list                  | yes | yes | yes |
 | build list filters (ref, status, job) | yes | yes | yes |
 | build show (one build)      | yes | yes | yes |
@@ -312,6 +328,7 @@ client has no use for one (krz/gitbay#57).
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
+| preview profile about       | n/a | yes | no  |
 | request a login link        | n/a | yes | n/a |
 | account import bundle       | yes | no  | n/a |
 

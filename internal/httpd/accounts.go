@@ -2,8 +2,10 @@ package httpd
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -341,13 +343,30 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 // issueCreateForm renders the new-issue form, prefilled from the repo's
-// default issue template when one exists.
+// default issue template when one exists. A Preview submit comes back
+// here with the draft in the form, so the page returns with everything
+// still typed and the rendering above the textarea (#235).
 func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store.User) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
 		return
 	}
 	p.Tab = "issues"
+	if wantsPreview(r) {
+		d := s.draftFor(r, p.Repo, "body", "body", bodyFormat(r))
+		s.render(w, "issuenew.html", struct {
+			repoPage
+			Body      string
+			Format    string
+			Title     string
+			Labels    string
+			Template  string
+			Templates []control.IssueTemplate
+			Draft     *draft
+		}{p, d.Body, d.Format, r.FormValue("title"), r.FormValue("labels"),
+			"", control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), d})
+		return
+	}
 	templates := control.IssueTemplates(p.Dir, p.Repo.DefaultBranch)
 	body, tplName := "", ""
 	if want := r.URL.Query().Get("template"); want != "" {
@@ -374,9 +393,12 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 		repoPage
 		Body      string
 		Format    string
+		Title     string
+		Labels    string
 		Template  string
 		Templates []control.IssueTemplate
-	}{p, body, format, tplName, templates})
+		Draft     *draft
+	}{p, body, format, "", "", tplName, templates, nil})
 }
 
 // Issue and merge request writes run the command the CLI runs, so the
@@ -386,9 +408,10 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	title := strings.TrimSpace(r.FormValue("title"))
-	format := r.FormValue("format")
-	if format != "org" {
-		format = "md"
+	format := bodyFormat(r)
+	if wantsPreview(r) {
+		s.issueCreateForm(w, r, u)
+		return
 	}
 	var created control.Created
 	argv := []string{"issue", "create", repoPath, "--title", title, "--format", format, "--file", "-"}
@@ -411,6 +434,10 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	n := r.PathValue("n")
+	if wantsPreview(r) {
+		s.issuePage(w, r, "edit")
+		return
+	}
 	title := strings.TrimSpace(r.FormValue("title"))
 	code, msg := s.dispatchJSON(u, []string{"issue", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
 	if code != protocol.ExitOK {
@@ -444,6 +471,10 @@ func (s *Server) issueEditSubmit(w http.ResponseWriter, r *http.Request, u store
 func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
 	n := r.PathValue("n")
+	if wantsPreview(r) {
+		s.mrPage(w, r, "edit")
+		return
+	}
 	title := strings.TrimSpace(r.FormValue("title"))
 	code, msg := s.dispatchJSON(u, []string{"mr", "edit", repoPath, n, "--title", title, "--file", "-"}, r.FormValue("body"))
 	if code != protocol.ExitOK {
@@ -454,10 +485,18 @@ func (s *Server) mrEditSubmit(w http.ResponseWriter, r *http.Request, u store.Us
 }
 
 func (s *Server) issueCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	if wantsPreview(r) {
+		s.issuePage(w, r, "comment")
+		return
+	}
 	s.commentSubmit(w, r, u, "issue", "issues")
 }
 
 func (s *Server) mrCommentSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	if wantsPreview(r) {
+		s.mrPage(w, r, "comment")
+		return
+	}
 	s.commentSubmit(w, r, u, "mr", "mrs")
 }
 
@@ -482,6 +521,10 @@ type editPage struct {
 	Blocked string
 	// Creating marks a path the branch does not have yet.
 	Creating bool
+	// Markup is set for a path the forge renders, which is where a
+	// Preview button makes sense; Draft holds one when asked for (#235).
+	Markup bool
+	Draft  *draft
 }
 
 func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -519,6 +562,7 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 	s.render(w, "edit.html", editPage{
 		basePage: s.baseFor(u), Repo: repo,
 		Ref: ref, Path: filePath, Content: string(content), Blocked: blocked, Creating: creating,
+		Markup: markupFile(filePath),
 	})
 }
 
@@ -529,6 +573,20 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request, u store.User
 	}
 	ref := r.PathValue("ref")
 	filePath := strings.Trim(r.PathValue("path"), "/")
+
+	// Preview: the file as the blob page will render it, above the
+	// editor, with nothing committed. Only for paths the forge renders.
+	if wantsPreview(r) && markupFile(filePath) {
+		content := r.FormValue("content")
+		d := s.draftWith(r, "content", "", content, func(raw, _ string) template.HTML {
+			return renderReadme(path.Base(filePath), []byte(raw))
+		})
+		s.render(w, "edit.html", editPage{
+			basePage: s.baseFor(u), Repo: repo,
+			Ref: ref, Path: filePath, Content: content, Markup: true, Draft: d,
+		})
+		return
+	}
 
 	// Editing is a control command; the web supplies the form and lets
 	// the registry enforce the rules — signed-commit policy, verified
@@ -541,6 +599,7 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request, u store.User
 		s.render(w, "edit.html", editPage{
 			basePage: s.baseFor(u), Repo: repo,
 			Ref: ref, Path: filePath, Content: r.FormValue("content"), Error: msg,
+			Markup: markupFile(filePath),
 		})
 		return
 	}

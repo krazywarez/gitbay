@@ -184,6 +184,7 @@ type mrNewPage struct {
 	Body     string
 	Format   string
 	Notice   string
+	Draft    *draft
 }
 
 // mrSources lists the branches a merge request may be opened from, in the
@@ -247,9 +248,18 @@ func (s *Server) mrCreateSubmit(w http.ResponseWriter, r *http.Request, u store.
 	target := strings.TrimSpace(r.FormValue("target"))
 	title := strings.TrimSpace(r.FormValue("title"))
 	body := strings.TrimSpace(r.FormValue("body"))
-	format := r.FormValue("format")
-	if format != "org" {
-		format = "md"
+	format := bodyFormat(r)
+
+	// Preview: the same page back with the draft intact, nothing opened.
+	if wantsPreview(r) {
+		p.Tab = "merge requests"
+		branches, _ := gitutil.Refs(p.Dir, "heads")
+		s.render(w, "mrnew.html", mrNewPage{
+			repoPage: p, Branches: branches, Sources: s.mrSources(u, p),
+			Source: source, Target: target, Title: title, Body: body, Format: format,
+			Draft: s.draftFor(r, p.Repo, "body", "body", format),
+		})
+		return
 	}
 
 	back := func(msg string) {

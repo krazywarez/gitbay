@@ -27,6 +27,17 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		s.backTo(w, r, "releases", "pick a tag")
 		return
 	}
+	// Preview: the page back with the notes rendered, nothing written.
+	// The form name carries the tag, because every release on the page
+	// has an edit box and only the one submitted shows its draft.
+	if wantsPreview(r) {
+		form := "release"
+		if r.FormValue("action") == "edit" {
+			form = "release:" + tag
+		}
+		s.releasesPage(w, r, form)
+		return
+	}
 	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) }
 	// The CLI's --yes guards against a mistyped tag; here the tag comes
 	// from the page, so the browser's own confirm field stands in.
