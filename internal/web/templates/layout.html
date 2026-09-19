@@ -38,26 +38,22 @@
 {{with field . "Repo"}}
 <header class="repohead">
 <div class="wrap">
+  {{$top := topTab (str $ "Tab")}}
   <div class="identity">
     {{if field $ "RepoHome"}}<h1 class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span>{{.Name}}</h1>
     {{else}}<p class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></p>{{end}}
     {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
     {{if .Settings.Archived}}<span class="chip">Archived</span>{{end}}
+    {{/* Description, topics and website belong to the code tab, inline
+         with the name so the header is two rows on every page. */}}
+    {{if eq $top "code"}}{{if or (field $ "Desc") (field $ "Topics") $.Repo.Settings.Website}}<p class="repodesc">{{with field $ "Desc"}}{{.}}{{end}} {{with field $ "Topics"}}{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}{{end}}{{with $.Repo.Settings.Website}}<a class="site" href="{{.}}" rel="nofollow">{{.}}</a>{{end}}</p>{{end}}{{end}}
     <span class="grow"></span>
-    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>
-    <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>
-    <form method="post" action="/{{.OwnerName}}/{{.Name}}/bookmark" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Marked"}}true{{else}}false{{end}}">{{if field $ "Marked"}}Bookmarked{{else}}Bookmark{{end}}</button></form>
+    {{if $.Viewer}}<form method="post" action="/{{.OwnerName}}/{{.Name}}/pin" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Pinned"}}true{{else}}false{{end}}" title="Pinned repositories show on your dashboard"><span aria-hidden="true">{{if field $ "Pinned"}}★{{else}}☆{{end}}</span> {{if field $ "Pinned"}}Pinned{{else}}Pin{{end}}</button></form>
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/watch" class="inline"><button type="submit" class="btn" aria-pressed="{{if eq (str $ "Watch") "watching"}}true{{else}}false{{end}}" title="Watching sends every issue, request and build to your inbox">{{if eq (str $ "Watch") "watching"}}Watching{{else}}Watch{{end}}</button></form>
+    <form method="post" action="/{{.OwnerName}}/{{.Name}}/bookmark" class="inline"><button type="submit" class="btn" aria-pressed="{{if field $ "Marked"}}true{{else}}false{{end}}" title="Bookmarked lists it under Bookmarks">{{if field $ "Marked"}}Bookmarked{{else}}Bookmark{{end}}</button></form>
     <form method="post" action="/{{.OwnerName}}/{{.Name}}/fork" class="inline"><button type="submit" class="btn">Fork</button></form>{{end}}
   </div>
-  {{$top := topTab (str $ "Tab")}}
-  {{/* Description, topics and metadata belong to the code tab. On task
-       tabs only the identity row and the tab bar render, and the header
-       is identical on every page within a tab. */}}
-  {{if eq $top "code"}}
-  {{if or (field $ "Desc") (field $ "Topics")}}<p class="repodesc">{{with field $ "Desc"}}{{.}}{{end}} {{with field $ "Topics"}}{{range .}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}{{end}}</p>{{end}}
-  {{if or $.Repo.Settings.Website (field $ "Mirrors")}}<p class="repometa">{{with $.Repo.Settings.Website}}<a href="{{.}}" rel="nofollow">{{.}}</a>{{end}}{{range $i, $m := field $ "Mirrors"}}{{if or $i $.Repo.Settings.Website}} · {{end}}{{if eq $m.Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{$m.URL}}" rel="nofollow">{{$m.Target}}</a>{{if $m.Error}}, <span class="bad">sync error: {{$m.Error}}</span>{{else if $m.Synced}}, synced {{$m.Synced}}{{end}}{{end}}</p>{{end}}
-  {{if $.Viewer}}<p class="toggles">Pinned shows on your dashboard. Watching sends every issue, request and build to your inbox. Bookmarked lists it under Bookmarks.</p>{{end}}
-  {{end}}
+  {{if eq $top "code"}}{{if field $ "Mirrors"}}<p class="repometa">{{range $i, $m := field $ "Mirrors"}}{{if $i}} · {{end}}{{if eq $m.Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{$m.URL}}" rel="nofollow">{{$m.Target}}</a>{{if $m.Error}}, <span class="bad">sync error: {{$m.Error}}</span>{{else if $m.Synced}}, synced {{$m.Synced}}{{end}}{{end}}</p>{{end}}{{end}}
   <nav class="tabs" aria-label="Repository">
     <a {{if eq $top "code"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}">Code</a>
     <a {{if eq $top "issues"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">Issues{{with field $ "OpenIssues"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>

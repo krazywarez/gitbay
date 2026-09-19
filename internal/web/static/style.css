@@ -412,13 +412,15 @@ footer a:hover { color: var(--link); }
 .repotitle a:hover { color: var(--link); text-decoration: none; }
 .repotitle .sep { color: var(--muted); margin: 0 2px; font-weight: 400; }
 .repodesc {
-  margin: var(--sp-2) 0 0;
-  color: var(--fg);
+  margin: 0 0 0 var(--sp-2);
+  color: var(--muted);
   font-size: var(--fs-2);
-  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  min-width: 0;
 }
+.repodesc a.site { color: var(--muted); }
+.repodesc a.site:hover { color: var(--link); }
 .repometa { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-1); }
-.toggles { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-1); }
 
 nav.tabs {
   display: flex;
@@ -1518,6 +1520,8 @@ svg.icon { vertical-align: -0.125em; }
      ones past the edge look absent. Two rows show all of them. */
   nav.tabs { flex-wrap: wrap; overflow: visible; }
   .facts { grid-template-columns: 1fr; }
+  /* a phone shows the description under the name, not beside it */
+  .repodesc { flex-basis: 100%; margin-left: 0; }
 }
 
 @media (max-width: 40rem) {
