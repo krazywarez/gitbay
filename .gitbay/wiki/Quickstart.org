@@ -1,6 +1,17 @@
 #+title: Quickstart
 
-1. Install the CLI: =go install gitbay.org/gitbay/cmd/gitbay@latest=
+* From the browser
+
+1. Create an account at https://gitbay.org/register with your SSH public key
+2. Verify the code from the mail under Settings
+3. + New repository
+4. Clone with the SSH command the repository shows
+5. Push
+
+* From the terminal
+
+1. Install the CLI: =brew install krz/tap/gitbay= on a Mac, or
+   =go install gitbay.org/gitbay/cmd/gitbay@latest=
 2. =ssh git@gitbay.org whoami= — your key is your identity
 3. =gitbay repo create you/hello= then push
 4. =gitbay issue create --title "first"= from inside the clone

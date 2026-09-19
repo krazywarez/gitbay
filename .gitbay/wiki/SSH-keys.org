@@ -25,7 +25,7 @@ whole line is what the registration form and =register= want.
 * Check it works
 
 #+begin_src sh
-ssh git@<host> whoami
+ssh git@gitbay.org whoami
 #+end_src
 
 More keys, labels and scopes: [[Users][the user guide]] under "SSH keys".
