@@ -4,9 +4,16 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* v1.30.0 — unreleased
+* v1.30.0 — 2026-09-19
 
-The web findings from the forge comparison (#232).
+Every command runs on every surface, markup previews before it is
+written, and the web findings from the forge comparison (#232, #233,
+#234, #235).
+
+*Upgrade note.* Dropping =SSHOnly= widens what a full-scope API token
+can do: it can now administer the instance and mint further tokens.
+Review the tokens you have issued and re-mint as =--scope read= any
+that only need to read.
 
 - *Every command now runs on every surface.* The registry's =SSHOnly=
   flag is gone, and with it the refusal that met build secrets, mirror
@@ -30,7 +37,6 @@ The web findings from the forge comparison (#232).
   release create and edit, the profile about text, and the file editor
   on a path the forge renders. It renders the draft above the textarea
   and writes nothing (#235).
-
 - Links inside running text are underlined: the meta lines on issues,
   merge requests and releases no longer tell a link apart by colour
   alone.
