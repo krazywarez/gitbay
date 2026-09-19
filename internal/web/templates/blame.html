@@ -19,7 +19,7 @@
     <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.Summary}}</a></p>
     <p class="meta"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{.ShortSHA}}</a></code> <span title="{{.AuthorEmail}}">{{.AuthorName}}</span> · {{when .Date}} {{template "sigbadge" .Sig}}</p>
   </div>
-  <pre class="blamecode">{{range .Numbered}}<span class="lineno">{{.N}}</span>{{.Text}}
+  <pre class="blamecode" tabindex="0">{{range .Numbered}}<span class="lineno">{{.N}}</span>{{.Text}}
 {{end}}</pre>
 </div>
 {{else}}<p class="empty-note">empty file</p>{{end}}

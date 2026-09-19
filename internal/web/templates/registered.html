@@ -3,13 +3,13 @@
 {{define "content"}}
 <div class="landing">
 <h1>Welcome, {{.Username}}</h1>
-<pre class="quickstart">{{.Message}}</pre>
+<pre class="quickstart" tabindex="0">{{.Message}}</pre>
 <h2>On the web</h2>
 <p>Check your mail for the code, <a href="/login">sign in</a> with an emailed
 link, and paste the code under <a href="/settings">Settings</a>. Then +
 creates your first repository.</p>
 <h2>From the terminal</h2>
-<pre class="quickstart">ssh git@{{.Host}} whoami
+<pre class="quickstart" tabindex="0">ssh git@{{.Host}} whoami
 ssh git@{{.Host}} repo create {{.Username}}/hello
 gitbay web login        # mints a browser session from your terminal</pre>
 </div>

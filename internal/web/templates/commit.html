@@ -9,7 +9,7 @@
   <p class="meta">{{template "authorname" dict "Name" .AuthorName "User" .AuthorUser "Email" .AuthorEmail}} &lt;{{.AuthorEmail}}&gt; · {{when .Date}}
   {{if .CommitterEmail}}<br>committer: &lt;{{.CommitterEmail}}&gt;{{end}}</p>
 </div>
-<pre class="message">{{.Message}}</pre>
+<pre class="message" tabindex="0">{{.Message}}</pre>
 {{if .DiffTruncated}}<p class="error" role="alert">This patch is larger than 4 MiB and is cut off below. Clone the repository to see all of it.</p>{{end}}
 {{template "difffiles" dict "Files" .DiffFiles "Base" "" "Viewer" ""}}
 {{end}}

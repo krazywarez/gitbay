@@ -13,7 +13,7 @@
 <ul class="matchlist">
 {{range .Matches}}<li>
   <a class="matchpath" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Ref}}/{{.Path}}#L{{.Line}}">{{.Path}}:{{.Line}}</a>
-  <pre class="matchline">{{.TextHTML}}</pre>
+  <pre class="matchline" tabindex="0">{{.TextHTML}}</pre>
 </li>
 {{end}}
 </ul>
