@@ -1452,7 +1452,10 @@ svg.icon { vertical-align: -0.125em; }
 /* ---- breakpoints ---- */
 @media (max-width: 62rem) {
   .withaside { grid-template-columns: 1fr; }
+  /* checks and reviewers before a long thread; the dashboard's aside is
+     the activity feed, which reads after the queues */
   .withaside .aside { order: -1; }
+  .withaside.feedlast .aside { order: 0; }
 }
 
 @media (max-width: 52rem) {
