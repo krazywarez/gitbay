@@ -125,6 +125,9 @@
   --rail-mark: 24px;
   --rail-mark-box: 32px;
 
+  /* the one page container: header content, main and footer align on it */
+  --container: 100rem;
+
   --r-ctl: 4px;   /* controls and chips */
   --r-card: 6px;  /* cards, lists, code blocks */
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -372,9 +375,10 @@ main.content {
   width: 100%;
   padding: var(--sp-5) var(--sp-6) var(--sp-7);
 }
-main.wide { max-width: none; }
-main.reading { max-width: calc(72rem + 2 * var(--sp-6)); }
-main.bounded { max-width: calc(48rem + 2 * var(--sp-6)); }
+main.content, footer { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; }
+main.wide { max-width: calc(var(--container) + 2 * var(--sp-6)); }
+main.reading { max-width: calc(72rem + 2 * var(--sp-6)); margin: 0 auto; }
+main.bounded { max-width: calc(48rem + 2 * var(--sp-6)); margin: 0 auto; }
 footer {
   width: 100%;
   padding: var(--sp-4) var(--sp-6);
@@ -388,9 +392,11 @@ footer a:hover { color: var(--link); }
 
 /* ---- repository header ---- */
 .repohead {
-  padding: var(--sp-4) var(--sp-6) 0;
+  padding: var(--sp-4) 0 0;
   border-bottom: 1px solid var(--line);
 }
+.repohead .wrap { max-width: var(--container); margin: 0 auto; }
+.repohead .wrap { padding: 0 var(--sp-6); }
 .identity { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .grow { flex: 1; }
 /* h1 on the repo home, p elsewhere so each page keeps its own h1 — but
@@ -1507,7 +1513,8 @@ svg.icon { vertical-align: -0.125em; }
 @media (max-width: 52rem) {
   main.content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   footer { padding: var(--sp-4); }
-  .repohead { padding: var(--sp-3) var(--sp-4) 0; }
+  .repohead { padding: var(--sp-3) 0 0; }
+  .repohead .wrap { padding: 0 var(--sp-4); }
   /* seven tabs do not fit a phone in one row; a hidden scrollbar made the
      ones past the edge look absent. Two rows show all of them. */
   nav.tabs { flex-wrap: wrap; overflow: visible; }

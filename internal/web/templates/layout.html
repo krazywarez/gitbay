@@ -37,6 +37,7 @@
 <div class="pane">
 {{with field . "Repo"}}
 <header class="repohead">
+<div class="wrap">
   <div class="identity">
     {{if field $ "RepoHome"}}<h1 class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span>{{.Name}}</h1>
     {{else}}<p class="repotitle"><a class="owner" href="/{{.OwnerName}}">{{.OwnerName}}</a><span class="sep">/</span><a href="/{{.OwnerName}}/{{.Name}}">{{.Name}}</a></p>{{end}}
@@ -66,6 +67,7 @@
     {{if field $ "HasWiki"}}<a {{if eq $top "wiki"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/wiki">Wiki</a>{{end}}
     {{if field $ "CanAdmin"}}<a {{if eq $top "settings"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/settings">Settings</a>{{end}}
   </nav>
+</div>
 </header>
 {{end}}
 
