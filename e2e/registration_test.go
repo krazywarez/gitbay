@@ -143,6 +143,9 @@ func TestOpenRegistration(t *testing.T) {
 	if !strings.Contains(msg, "To: dana@example.test") || !strings.Contains(msg, "From: noreply@gitbay.test") {
 		t.Fatalf("mail headers:\n%s", msg)
 	}
+	if !strings.Contains(msg, "/login") {
+		t.Fatalf("mail missing web sign-in path:\n%s", msg)
+	}
 
 	// Pending: the key authenticates, whoami works, but everything else is
 	// gated — control commands and git alike.

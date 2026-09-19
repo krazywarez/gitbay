@@ -54,7 +54,8 @@ func TestWebSignup(t *testing.T) {
 	// The real thing: account is active immediately (invite proves the mailbox).
 	status, body = browserPost(t, browser, inst.base()+"/register", url.Values{
 		"username": {"erin"}, "invite": {inviteCode}, "key": {string(pub)}})
-	if status != 200 || !strings.Contains(body, "welcome, erin") {
+	if status != 200 || !strings.Contains(body, "welcome, erin") ||
+		!strings.Contains(body, `href="/settings"`) || !strings.Contains(body, "paste the code") {
 		t.Fatalf("signup: %d\n%s", status, body)
 	}
 	out, errOut, code := inst.ssh(t, key, "", "whoami")

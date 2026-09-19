@@ -127,8 +127,9 @@ func sendVerification(cfg config.Config, st *store.Store, userID int64, address 
 	body := fmt.Sprintf(
 		"Someone (hopefully you) added this address to an account on %s.\n\n"+
 			"To verify it, run:\n\n    ssh git@%s email verify %s\n\n"+
+			"Or sign in at https://%s/login with this address and paste the code under Settings.\n\n"+
 			"The code expires in 24 hours. If this wasn't you, ignore this mail.\n",
-		siteHost(cfg), siteHost(cfg), code)
+		siteHost(cfg), siteHost(cfg), code, siteHost(cfg))
 	return mail.Send(cfg, address, "verify your email on "+siteHost(cfg), body)
 }
 
