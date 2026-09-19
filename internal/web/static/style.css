@@ -1370,6 +1370,26 @@ a.memberchip .role { color: var(--muted); }
 .crumbs { color: var(--muted); }
 .crumbs a { color: var(--link); }
 .crumbs strong { color: var(--fg); }
+
+/* ---- file navigator: the directory beside a file ---- */
+.blobgrid { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+.blobmain { min-width: 0; }
+.filenav { position: sticky; top: var(--sp-4); font-size: var(--fs-2); }
+.filenav ul { list-style: none; margin: 0; padding: 0; }
+.filenav li a {
+  display: block;
+  padding: 3px var(--sp-2);
+  border-radius: var(--r-ctl);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filenav li a:hover { background: var(--hover); text-decoration: none; }
+.filenav li a[aria-current] { background: var(--surface); box-shadow: inset 2px 0 0 var(--mark); font-weight: 600; }
+.filenav li a.dir { color: var(--link); }
+.filenav li a.up { color: var(--muted); }
+
 .refchip {
   display: inline-flex;
   align-items: center;
@@ -1578,6 +1598,10 @@ svg.icon { vertical-align: -0.125em; }
   .pins li { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
   .pins .n, .dashpins .meta { display: none; }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* the tree page is the navigator on a phone */
+  .blobgrid { grid-template-columns: 1fr; }
+  .filenav { display: none; }
 }
 
 @media (max-width: 52rem) {

@@ -525,6 +525,7 @@ type editPage struct {
 	// Preview button makes sense; Draft holds one when asked for (#235).
 	Markup bool
 	Draft  *draft
+	Nav    fileNav
 }
 
 func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -559,10 +560,13 @@ func (s *Server) editForm(w http.ResponseWriter, r *http.Request, u store.User) 
 		http.Error(w, "binary files cannot be edited in the browser", http.StatusBadRequest)
 		return
 	}
+	navEntries, _ := gitutil.ListTree(dir, "refs/heads/"+ref, navDir(filePath))
+	nav := fileNavFor(repo.Path(), ref, filePath, navEntries)
 	s.render(w, "edit.html", editPage{
 		basePage: s.baseFor(u), Repo: repo,
 		Ref: ref, Path: filePath, Content: string(content), Blocked: blocked, Creating: creating,
 		Markup: markupFile(filePath),
+		Nav:    nav,
 	})
 }
 

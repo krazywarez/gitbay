@@ -2,6 +2,9 @@
 {{define "title"}}blame: {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1 class="vh">Blame: {{.Path}}</h1>
+<div class="blobgrid">
+{{template "filenav" .Nav}}
+<div class="blobmain">
 <div class="pathbar">
   <span class="refchip">{{template "branchicon"}} {{.Ref}}</span>
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}<strong>{{.Base}}</strong></span>
@@ -23,4 +26,6 @@
 </div>
 {{if gt .Pages 1}}<p class="pager">page {{.Page}} of {{.Pages}}{{if gt .Page 1}} · <a href="?page={{sub .Page 1}}">← earlier lines</a>{{end}}{{if lt .Page .Pages}} · <a href="?page={{add .Page 1}}">later lines →</a>{{end}}</p>{{end}}
 {{end}}
+</div>
+</div>
 {{end}}

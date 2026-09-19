@@ -2,6 +2,9 @@
 {{define "title"}}edit {{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>edit {{.Repo.OwnerName}}/{{.Repo.Name}} : {{.Path}} @ {{.Ref}}</h1>
+<div class="blobgrid">
+{{template "filenav" .Nav}}
+<div class="blobmain">
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 {{if .Blocked}}<p class="empty-note">{{.Blocked}}</p>{{else}}
 {{if .Creating}}<p class="meta"><code>{{.Path}}</code> does not exist on {{.Ref}}; committing creates it.</p>{{end}}
@@ -13,4 +16,6 @@
 <p class="crumbs">this commit will be unsigned and authored as {{.Viewer}}</p>
 </form>
 {{end}}
+</div>
+</div>
 {{end}}

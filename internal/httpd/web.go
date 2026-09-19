@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"path"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -521,12 +520,7 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 		s.notFound(w, r)
 		return
 	}
-	// Directories first. git's tree order interleaves them with files, but
-	// a listing is scanned by shape before name. Stable, so each group
-	// keeps the ordering git gave it.
-	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].Type == "tree" && entries[j].Type != "tree"
-	})
+	sortDirsFirst(entries)
 	prefix := ""
 	if dirPath != "" {
 		prefix = dirPath + "/"
@@ -591,6 +585,8 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		cs = cs[:len(cs)-1]
 	}
 	branches, _ := gitutil.Refs(p.Dir, "heads")
+	navEntries, _ := gitutil.ListTree(p.Dir, p.Ref, navDir(filePath))
+	nav := fileNavFor(p.Repo.Path(), p.Ref, filePath, navEntries)
 	lines := 0
 	if !binary && !image && len(data) > 0 {
 		lines = bytes.Count(data, []byte("\n"))
@@ -619,8 +615,9 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		Renderable   bool // markdown or org: the toggle is offered
 		Rendered     bool // this response shows the rendering
 		RenderedHTML template.HTML
+		Nav          fileNav
 	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), lines,
-		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML, renderable, rendered, renderedHTML})
+		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML, renderable, rendered, renderedHTML, nav})
 }
 
 // releases lists tag-anchored releases with notes and assets.
@@ -924,6 +921,8 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 		base = cs[len(cs)-1].Name
 		cs = cs[:len(cs)-1]
 	}
+	navEntries, _ := gitutil.ListTree(p.Dir, p.Ref, navDir(filePath))
+	nav := fileNavFor(p.Repo.Path(), p.Ref, filePath, navEntries)
 	s.render(w, "blame.html", struct {
 		repoPage
 		Crumbs      []crumb
@@ -932,7 +931,8 @@ func (s *Server) blame(w http.ResponseWriter, r *http.Request) {
 		Binary      bool
 		Hunks       []hunkView
 		Page, Pages int
-	}{p, cs, base, filePath, binary, hunks, page, pages})
+		Nav         fileNav
+	}{p, cs, base, filePath, binary, hunks, page, pages, nav})
 }
 
 type numberedLine struct {

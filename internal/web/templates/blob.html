@@ -2,6 +2,9 @@
 {{define "title"}}{{.Path}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1 class="vh">{{.Path}}</h1>
+<div class="blobgrid">
+{{template "filenav" .Nav}}
+<div class="blobmain">
 <div class="pathbar">
   {{template "refmenu" .}}
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}<strong>{{.Base}}</strong></span>
@@ -13,4 +16,6 @@
 {{else if .Binary}}<p class="empty-note">binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
 {{else if .Rendered}}<section class="readme"><div class="rendered">{{.RenderedHTML}}</div></section>
 {{else}}<div class="code">{{.CodeHTML}}</div>{{end}}
+</div>
+</div>
 {{end}}
