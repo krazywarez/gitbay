@@ -202,6 +202,8 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.mrReviewSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/review-request", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrReviewRequestSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/label", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.mrLabelSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/merge", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrMergeSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/close", Mutating: true,

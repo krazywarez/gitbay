@@ -13,13 +13,14 @@
     <button type="submit" class="btn">Search</button>
     <input type="hidden" name="state" value="{{.State}}">
   </form>
-  {{range .Filters}}<p class="meta">{{.Key}}: <b>{{.Value}}</b> <a href="{{.Clear}}">clear</a></p>{{end}}
+  {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
 {{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
 <ul class="issuelist">
 {{range .MRs}}{{$n := .Number}}<li>
   <div class="issuemain">
-    <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></p>
+    <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a>
+    {{range .Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="?label={{.}}">{{.}}</a> {{end}}</p>
     <p class="meta">!{{.Number}} by <a href="/{{.Author}}">{{.Author}}</a> · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
   </div>
   <div class="issueside">

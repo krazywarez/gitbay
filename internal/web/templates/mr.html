@@ -166,6 +166,18 @@
     <h2>Milestone</h2>
     <p class="row"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/milestones">{{.MR.Milestone}}</a></p>
   </div>{{end}}
+  <div class="grp">
+    <h2>Labels</h2>
+    {{if .MR.Labels}}<p class="row">{{range .MR.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs?label={{.}}">{{.}}</a> {{end}}</p>
+    {{else}}<p class="none">none yet</p>{{end}}
+    {{if .CanWrite}}
+    <form method="post" action="{{$base}}/label" class="actions">
+      <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove labels" placeholder="remove">
+      <button type="submit" class="btn">Apply</button>
+    </form>
+    {{end}}
+  </div>
 </aside>
 </div>
 {{end}}

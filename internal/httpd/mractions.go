@@ -66,6 +66,16 @@ func (s *Server) mrReviewRequestSubmit(w http.ResponseWriter, r *http.Request, u
 	s.done(w, r, code, msg, s.mrRedirect)
 }
 
+func (s *Server) mrLabelSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	args := append(fieldArgs("--add", r.FormValue("add")), fieldArgs("--remove", r.FormValue("remove"))...)
+	if len(args) == 0 {
+		s.mrRedirect(w, r, "name at least one label")
+		return
+	}
+	_, msg, code := s.runControlCode(u, mrArgs(r, "label", args...))
+	s.done(w, r, code, msg, s.mrRedirect)
+}
+
 func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	args := []string{}
 	if st := strings.TrimSpace(r.FormValue("strategy")); st != "" && st != "auto" {

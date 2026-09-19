@@ -1814,8 +1814,8 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		state = "open"
 	}
 	qv := r.URL.Query()
-	mf := store.MRFilter{State: state, Author: qv.Get("author"), Milestone: qv.Get("milestone"),
-		Search: strings.TrimSpace(qv.Get("q")), Limit: listPage + 1}
+	mf := store.MRFilter{State: state, Label: qv.Get("label"), Author: qv.Get("author"),
+		Milestone: qv.Get("milestone"), Search: strings.TrimSpace(qv.Get("q")), Limit: listPage + 1}
 	mf.Before, _ = strconv.ParseInt(qv.Get("before"), 10, 64)
 	mrs, err := s.st.QueryMRs(p.Repo.ID, mf)
 	if err != nil {
@@ -1841,19 +1841,26 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		comments = map[int64]int{}
 	}
+	labels, err := s.st.ListMRLabels(p.Repo)
+	if err != nil {
+		labels = map[int64][]string{}
+	}
 	rows := make([]mrRow, len(mrs))
 	for i, m := range mrs {
+		m.Labels = labels[m.ID]
 		rows[i] = mrRow{MR: m, Check: checks[m.HeadSHA], Comments: comments[m.ID]}
 	}
 	s.render(w, "mrs.html", struct {
 		repoPage
-		State   string
-		Query   string
-		Filters []listFilter
-		MRs     []mrRow
-		Older   string
+		State       string
+		Query       string
+		Filters     []listFilter
+		MRs         []mrRow
+		LabelColors map[string]template.CSS
+		Older       string
 	}{p, state, mf.Search,
-		activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), rows, older})
+		activeFilters(state, [][2]string{{"label", mf.Label}, {"author", mf.Author}, {"milestone", mf.Milestone}}),
+		rows, s.labelColors(p.Repo), older})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
@@ -2016,10 +2023,11 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		HeadMerged      bool
 		HeadPruned      bool
 		Base            string
+		LabelColors     map[string]template.CSS
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, supersedes, gates,
-		sourceGone(p, m), headMerged, headPruned, base})
+		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo)})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the
