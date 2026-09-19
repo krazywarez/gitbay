@@ -985,6 +985,7 @@ pre.message {
   overflow-wrap: normal; /* scroll the table, don't shatter words */
 }
 .rendered th { background: var(--surface); font-weight: 600; }
+.rendered tr:last-child td { border-bottom: 1px solid var(--line); }
 /* GFM task lists: the box sits in the line, sized to the prose */
 .rendered li input[type="checkbox"] { width: 0.9em; height: 0.9em; margin: 0 0.35em 0 0; vertical-align: -0.05em; background-size: 0.7em; }
 .rendered li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }
