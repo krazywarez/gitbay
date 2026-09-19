@@ -97,6 +97,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"pgp list":                    {},
 		"token list":                  {},
 		"web sessions list":           {},
+		"web theme show":              {},
 		"account export":              {},
 		"org list":                    {},
 		"repo list":                   {},
