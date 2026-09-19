@@ -51,6 +51,11 @@ func TestContradictions(t *testing.T) {
 			"requires [mail] smtp_host",
 		},
 		{
+			"notify_admin without smtp",
+			minimal + "\n[registration]\nnotify_admin = true\n",
+			"notify_admin = true requires [mail] smtp_host",
+		},
+		{
 			"system ssh with open registration",
 			minimal + "\n[ssh]\nmode = \"system\"\n[registration]\nmode = \"open\"\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"gitbay@example\"\n",
 			"requires registration.mode = \"closed\"",

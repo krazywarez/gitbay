@@ -86,6 +86,31 @@ func (s *Store) AdminUserByName(name string) (AdminUser, error) {
 	return u, err
 }
 
+// AdminMailAddresses returns where to reach the instance's admins: the
+// verified primary address of every active admin who has activity mail
+// on. An admin with no verified primary, or with mail off, is skipped
+// rather than reported, the same rule ActivityMailAddress applies to
+// anyone else (#234).
+func (s *Store) AdminMailAddresses() ([]string, error) {
+	rows, err := s.DB.Query(`SELECT e.address FROM users u
+		JOIN emails e ON e.user_id = u.id AND e.is_primary = 1 AND e.verified_at IS NOT NULL
+		WHERE u.is_admin = 1 AND u.pending = 0 AND u.disabled = 0 AND u.notify_mail != 0
+		ORDER BY e.address`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // OwnedRepoCount counts repositories the user owns directly, not through
 // an org.
 func (s *Store) OwnedRepoCount(userID int64) (int64, error) {
