@@ -59,6 +59,48 @@ func TestResolutionStamps(t *testing.T) {
 	}
 }
 
+// A merge request closed without merging can record the request that
+// carried its change forward; MRsSuperseding is the reverse lookup, and
+// 0 clears the field (#223).
+func TestSupersededBy(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	if _, err := s.CreateMR(repoID, uid, repoID, "feature2", "main", "t2", "", "def456", "md", false); err != nil {
+		t.Fatal(err)
+	}
+	mr1, _ := s.MRByNumber(repoID, 1)
+	if err := s.MarkClosed(mr1.ID, uid, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSupersededBy(mr1.ID, 2); err != nil {
+		t.Fatal(err)
+	}
+	mr1, _ = s.MRByNumber(repoID, 1)
+	if mr1.SupersededBy != 2 {
+		t.Fatalf("SupersededBy = %d, want 2", mr1.SupersededBy)
+	}
+	superseding, err := s.MRsSuperseding(repoID, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(superseding) != 1 || superseding[0].Number != 1 {
+		t.Fatalf("MRsSuperseding(repoID, 2) = %+v", superseding)
+	}
+	if err := s.SetSupersededBy(mr1.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	mr1, _ = s.MRByNumber(repoID, 1)
+	if mr1.SupersededBy != 0 {
+		t.Fatalf("SupersededBy after clear = %d, want 0", mr1.SupersededBy)
+	}
+	superseding, err = s.MRsSuperseding(repoID, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(superseding) != 0 {
+		t.Fatalf("MRsSuperseding(repoID, 2) after clear = %+v", superseding)
+	}
+}
+
 // An import carries the upstream time but no local account for the actor.
 func TestResolutionStampImported(t *testing.T) {
 	s, repoID, _ := mrFixture(t)

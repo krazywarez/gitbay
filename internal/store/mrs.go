@@ -29,8 +29,11 @@ type MR struct {
 	MergedBy   string // "" when unknown (imports) or the account is gone
 	ClosedAt   string // "" unless closed without merging
 	ClosedBy   string
-	CreatedAt  string
-	UpdatedAt  string
+	// SupersededBy is the number, within this repository, of the merge
+	// request this one was closed in favour of. 0 means none.
+	SupersededBy int64
+	CreatedAt    string
+	UpdatedAt    string
 	// ReviewRequests is who has been asked, directly, for a review — the
 	// mr review request counterpart of Issue.Assignees.
 	ReviewRequests []string
@@ -92,7 +95,7 @@ const mrSelect = `
 	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state, m.draft,
 	       COALESCE(ms.title, ''), m.head_sha,
 	       m.merged_base, m.merged_at, COALESCE(mu.username, ''),
-	       m.closed_at, COALESCE(cu.username, ''), m.created_at, m.updated_at
+	       m.closed_at, COALESCE(cu.username, ''), COALESCE(m.superseded_by, 0), m.created_at, m.updated_at
 	FROM merge_requests m
 	JOIN users u ON u.id = m.author_id
 	LEFT JOIN users mu ON mu.id = m.merged_by
@@ -106,7 +109,7 @@ func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
 		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Draft, &m.Milestone, &m.HeadSHA, &m.MergedBase,
-		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.CreatedAt, &m.UpdatedAt)
+		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.SupersededBy, &m.CreatedAt, &m.UpdatedAt)
 	return m, err
 }
 
@@ -263,6 +266,37 @@ func (s *Store) MarkClosed(mrID, actorID int64, at string) error {
 			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
 		at, actorID, mrID)
 	return err
+}
+
+// SetSupersededBy records which merge request, by number within the same
+// repository, this one was closed in favour of. n of 0 clears it.
+func (s *Store) SetSupersededBy(mrID, n int64) error {
+	var v any
+	if n != 0 {
+		v = n
+	}
+	_, err := s.DB.Exec("UPDATE merge_requests SET superseded_by = ? WHERE id = ?", v, mrID)
+	return err
+}
+
+// MRsSuperseding returns the merge requests in a repository whose
+// superseded_by names number, oldest first — the reverse of
+// MR.SupersededBy.
+func (s *Store) MRsSuperseding(repoID, number int64) ([]MR, error) {
+	rows, err := s.DB.Query(mrSelect+" WHERE m.repo_id = ? AND m.superseded_by = ? ORDER BY m.number ASC", repoID, number)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MR
+	for rows.Next() {
+		m, err := scanMR(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 // SetMRState moves an MR between states that carry no resolution stamp.
