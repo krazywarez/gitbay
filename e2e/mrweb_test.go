@@ -575,6 +575,16 @@ func TestMRWebLabels(t *testing.T) {
 		t.Fatalf("removed label still lists the merge request:\n%s", body)
 	}
 
+	// The list's column lists the label with its merge request count and a
+	// link that keeps the state (desktop layout spec).
+	_, body = browserGet(t, alice, inst.base()+"/alice/app/mrs")
+	if !strings.Contains(body, `<nav class="sidecol" aria-label="Filters">`) {
+		t.Fatalf("merge request list lacks the side column:\n%s", body)
+	}
+	if !strings.Contains(body, `href="?label=bug&amp;state=open">bug <i>1</i></a>`) {
+		t.Fatalf("merge request column lacks the bug facet:\n%s", body)
+	}
+
 	// A reader gets the chips and no form.
 	_, body = browserGet(t, inst.login(t, bobKey), mrURL)
 	if !strings.Contains(body, `class="chip label"`) {
