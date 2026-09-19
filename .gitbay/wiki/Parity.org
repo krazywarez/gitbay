@@ -41,7 +41,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | comment on a diff line | yes | yes | yes |
 | merge (all strategies) | yes | yes | yes |
 | close                  | yes | yes | yes |
-| close in favour of another | yes | yes | no |
+| close in favour of another | yes | yes | yes |
 | create                 | yes | yes | yes |
 | draft, ready           | yes | yes | yes |
 | search title and body  | yes | yes | yes |
@@ -180,7 +180,7 @@ always markdown.
 | atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
 | build list                  | yes | yes | yes |
-| build list filters (ref, status, job) | yes | yes | no  |
+| build list filters (ref, status, job) | yes | yes | yes |
 | build show (one build)      | yes | yes | yes |
 | build log                   | yes | yes | yes |
 | build jobs                  | yes | yes | yes |
