@@ -3,6 +3,8 @@
 {{define "content"}}
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if .DirPath}}<h1 class="vh">{{.DirPath}}</h1>{{end}}
+<div class="overview{{if and .Entries (not .DirPath)}} withfacts{{end}}">
+<div class="overviewmain">
 <div class="pathbar">
   {{template "refmenu" .}}
   <span class="crumbs"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}">{{.Repo.Name}}</a>/{{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a>/{{end}}</span>
@@ -29,12 +31,8 @@
 <div class="cardhead"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blob/{{.Ref}}/{{.Prefix}}{{.ReadmeName}}">{{.ReadmeName}}</a></div>
 <div class="rendered">{{.ReadmeHTML}}</div>
 </section>{{end}}
+</div>
 {{if and .Entries (not .DirPath)}}<div class="facts">
-  <div class="clone">
-    <h2>Clone</h2>
-    <span class="fieldname">SSH</span><pre><code>git clone {{.SSHCloneURL}}</code></pre>
-    <span class="fieldname">HTTPS</span><pre><code>git clone {{.CloneURL}}</code></pre>
-  </div>
   {{if .Facts.Commits}}{{$r := printf "/%s/%s" .Repo.OwnerName .Repo.Name}}<div class="about">
     <h2>About</h2>
     <div class="factgrid">
@@ -50,5 +48,11 @@
     <p class="langs">{{range .}}<span class="lang-name"><span class="dot lang-{{slug .Name}}"></span>{{.Name}} <span class="muted">{{pct .Percent}}%</span></span>{{end}}</p>{{end}}
     {{with .Facts.Contributors}}<p class="contribs"><span class="label">{{len .}} contributor{{if ne (len .) 1}}s{{end}}</span>{{range .}}{{template "authorname" dict "Name" .Name "User" .User "Email" .Title}}{{end}}</p>{{end}}
   </div>{{end}}
+  <div class="clone">
+    <h2>Clone</h2>
+    <span class="fieldname">SSH</span><pre><code>git clone {{.SSHCloneURL}}</code></pre>
+    <span class="fieldname">HTTPS</span><pre><code>git clone {{.CloneURL}}</code></pre>
+  </div>
 </div>{{end}}
+</div>
 {{end}}

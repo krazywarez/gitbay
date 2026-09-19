@@ -1323,6 +1323,12 @@ details.refmenu .refdrop a.allrefs {
   margin-top: var(--sp-1);
 }
 
+/* ---- repository overview layout ---- */
+.overview { display: block; }
+.overview.withfacts { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
+.overviewmain { min-width: 0; }
+.overview.withfacts .facts { display: block; margin-top: 0; max-width: none; }
+
 /* ---- repository facts ---- */
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); margin: var(--sp-5) 0 var(--sp-4); max-width: 72rem; }
 .facts h2 {
@@ -1335,9 +1341,11 @@ details.refmenu .refdrop a.allrefs {
 }
 .clone { margin: 0 0 var(--sp-3); }
 .facts .about { min-width: 0; }
+.facts .about { margin-bottom: var(--sp-5); }
 .clone .fieldname { font-size: var(--fs-1); color: var(--muted); font-weight: 500; margin-bottom: 2px; }
 .clone pre { margin-bottom: var(--sp-3); user-select: all; }
 .factgrid { display: grid; grid-template-columns: repeat(4, auto); gap: var(--sp-2) var(--sp-4); font-size: var(--fs-2); margin-bottom: var(--sp-3); }
+.overview.withfacts .facts .factgrid { grid-template-columns: repeat(2, auto); }
 .factgrid b { font-weight: 600; }
 .factgrid a { color: var(--fg); }
 .factgrid a:hover { color: var(--link); }
@@ -1457,6 +1465,8 @@ svg.icon { vertical-align: -0.125em; }
      the activity feed, which reads after the queues */
   .withaside .aside { order: -1; }
   .withaside.feedlast .aside { order: 0; }
+  .overview.withfacts { grid-template-columns: 1fr; }
+  .overview.withfacts .facts { display: grid; grid-template-columns: 1fr 1fr; margin-top: var(--sp-5); }
 }
 
 @media (max-width: 52rem) {

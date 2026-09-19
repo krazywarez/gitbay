@@ -390,8 +390,15 @@ func TestTreeSearchCodeAndClone(t *testing.T) {
 	if !strings.Contains(body, `<span class="fieldname">SSH</span>`) || !strings.Contains(body, `<span class="fieldname">HTTPS</span>`) {
 		t.Error("clone blocks are not labelled")
 	}
+	if !strings.Contains(body, `class="overview withfacts"`) {
+		t.Error("root overview is not the two-column withfacts layout")
+	}
 	// Clone and about belong to the repository root, not a subdirectory.
-	if _, sub := inst.get(t, "/alice/app/tree/main/docs"); strings.Contains(sub, `<div class="facts">`) {
+	_, sub := inst.get(t, "/alice/app/tree/main/docs")
+	if strings.Contains(sub, `<div class="facts">`) {
 		t.Error("subdirectory listing still shows the clone/about facts block")
+	}
+	if !strings.Contains(sub, `class="overview"`) || strings.Contains(sub, `class="overview withfacts"`) {
+		t.Error("subdirectory listing should have a plain overview, not withfacts")
 	}
 }
