@@ -1,10 +1,24 @@
-{{define "width"}}bounded{{end}}
+{{define "width"}}wide{{end}}
 {{define "title"}}settings · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 {{$base := printf "/%s/%s/settings" .Repo.OwnerName .Repo.Name}}
 <h1>Settings</h1>
 {{if .Notice}}{{if .Saved}}<p class="notice" role="status">{{.Notice}}</p>{{else}}<p class="error" role="alert">{{.Notice}}</p>{{end}}{{end}}
-<nav class="sections" aria-label="Sections"><a href="#identity">Identity</a><a href="#access">Access</a><a href="#gates">Merge gates</a><a href="#branches">Protected branches</a><a href="#tags">Protected tags</a><a href="#deps">Dependencies</a><a href="#runners">Runners</a><a href="#lifecycle">Lifecycle</a></nav>
+<div class="withcol narrow">
+<nav class="sidecol" aria-label="Sections">
+  <div class="grp"><h2 class="colhead">Sections</h2>
+  <ul>
+    <li><a href="#identity">Identity</a></li>
+    <li><a href="#access">Access</a></li>
+    <li><a href="#gates">Merge gates</a></li>
+    <li><a href="#branches">Protected branches</a></li>
+    <li><a href="#tags">Protected tags</a></li>
+    <li><a href="#deps">Dependencies</a></li>
+    <li><a href="#runners">Runners</a></li>
+    <li><a href="#lifecycle">Lifecycle</a></li>
+  </ul></div>
+</nav>
+<div class="colmain">
 
 <section id="identity"><h2>Identity</h2>
 <form method="post" action="{{$base}}" class="setform">
@@ -184,4 +198,6 @@
 <p class="meta">Deleting or transferring a repository is a CLI operation:
 <code>gitbay repo delete {{.Repo.OwnerName}}/{{.Repo.Name}} --yes</code></p>
 </section>
+</div>
+</div>
 {{end}}

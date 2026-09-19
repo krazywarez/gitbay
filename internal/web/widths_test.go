@@ -1,6 +1,7 @@
 package web
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -32,5 +33,19 @@ func TestListPagesAreWide(t *testing.T) {
 	}
 	if src, _ := templateFS.ReadFile("templates/explore.html"); !strings.Contains(string(src), `<ul class="repolist rows">`) {
 		t.Error("explore.html does not use one-line rows")
+	}
+	// Settings pages carry a section column: every section id has a link
+	// in the column, and the page is wide with the narrow grid.
+	for _, name := range []string{"settings.html", "account.html", "admin.html"} {
+		src, _ := templateFS.ReadFile("templates/" + name)
+		s := string(src)
+		if !strings.HasPrefix(s, `{{define "width"}}wide{{end}}`) || !strings.Contains(s, `<div class="withcol narrow">`) {
+			t.Errorf("%s lacks the narrow column layout", name)
+		}
+		for _, m := range regexp.MustCompile(`<section id="([a-z]+)"`).FindAllStringSubmatch(s, -1) {
+			if !strings.Contains(s, `href="#`+m[1]+`"`) {
+				t.Errorf("%s: section %q has no link in the column", name, m[1])
+			}
+		}
 	}
 }

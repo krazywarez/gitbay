@@ -720,7 +720,6 @@ form.setform input[type="text"], form.setform input[type="number"], form.setform
 form.setform > button, form.setform > .btngroup { justify-self: start; }
 form.setform.stack { grid-template-columns: 1fr; }
 form.setform.stack textarea, form.setform.stack select { width: 100%; max-width: 48rem; }
-nav.sections { display: flex; gap: var(--sp-4); flex-wrap: wrap; font-size: var(--fs-2); margin-bottom: var(--sp-5); }
 ul.protlist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
 ul.protlist li {
   display: flex;
