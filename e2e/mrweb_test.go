@@ -238,6 +238,55 @@ func TestMRWebCreate(t *testing.T) {
 	}
 }
 
+// TestMRListRows checks that the merge request list shows each row's
+// combined check state and comment count (#230).
+func TestMRListRows(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/lib"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/lib"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "topic")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "topic work")
+	mustGit(t, dir, env, "push", "-q", "origin", "topic")
+	sha := strings.TrimSpace(mustGit(t, dir, env, "rev-parse", "topic"))
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/lib",
+		"--source", "topic", "--target", "main", "--title", "feature"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "status", "set", "alice/lib", sha,
+		"--context", "ci/test", "--state", "success"); code != 0 {
+		t.Fatalf("status set: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "comment", "alice/lib", "1",
+		"--message", "hi"); code != 0 {
+		t.Fatalf("mr comment: %s", errOut)
+	}
+
+	alice := inst.login(t, aliceKey)
+	_, body := browserGet(t, alice, inst.base()+"/alice/lib/mrs")
+	if !strings.Contains(body, `class="chip check-success"`) {
+		t.Errorf("no check chip on the list:\n%s", body)
+	}
+	if !strings.Contains(body, `>1 <span class="vh">comments</span>`) {
+		t.Errorf("no comment count on the list:\n%s", body)
+	}
+}
+
 // TestMRWebDiffThreads opens a review thread on a diff line and replies to
 // it from the browser. The CLI's view of the threads afterwards is what
 // proves the page dispatched mr diff-comment rather than writing its own

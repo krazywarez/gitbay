@@ -420,6 +420,10 @@ its change forward: =mr close 4 --by 7= records it and both pages show
 it, and =mr edit 4 --superseded-by 7|none= sets or clears it
 afterwards, refused on anything but a closed merge request.
 
+The web list shows each request's combined check state and comment
+count alongside its title, so open work needing attention stands out
+without opening it.
+
 Semantics worth knowing:
 
 - the MR head lives in the *target* repository as
