@@ -30,17 +30,16 @@ func TestBuildsPageRendersCommandOutput(t *testing.T) {
 	filter := buildFilter{}
 	err := web.Render(&sb, "builds.html", struct {
 		repoPage
-		Builds      []control.BuildOut
-		Jobs        []control.JobOut
-		Runs        []buildRun
-		Filter      buildFilter
-		FilterLinks []buildFilterLink
-		Facets      []facetGroup
-		Refs        []string
-		CanWrite    bool
-		Notice      string
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		CanWrite bool
+		Notice   string
 	}{
-		testRepoPage(), builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs), nil,
+		testRepoPage(), builds, jobs, groupRuns(builds), filter, nil,
 		distinctRefs(builds, filter.Ref), true, "",
 	})
 	if err != nil {

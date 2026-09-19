@@ -16,9 +16,9 @@ type buildFilter struct {
 	Job    string
 }
 
-// buildFilterLink is one entry in the nav.filters row above the build
-// list: a status or a job, with the other two parameters carried along so
-// clicking one never drops another.
+// buildFilterLink is one of the links buildFacets splits into the side
+// column's Status and Jobs groups: a status or a job, with the other two
+// parameters carried along so clicking one never drops another.
 type buildFilterLink struct {
 	Label  string
 	Href   string
@@ -26,12 +26,13 @@ type buildFilterLink struct {
 }
 
 // buildStatuses is the fixed vocabulary a build's status takes, in the
-// order the nav.filters row offers them.
+// order the Status group offers them. Its length is also where buildFacets
+// cuts filterLinks' rows apart.
 var buildStatuses = []string{"pending", "running", "success", "failure", "cancelled"}
 
-// filterLinks builds the nav.filters row: "all" (clears status and job),
-// one link per status, and one per job the repository's CI config names.
-// Each link keeps the filter's other two parameters and net/url encodes
+// filterLinks builds the status and job rows: "all" (clears status and
+// job), one link per status, and one per job the repository's CI config
+// names. Each link keeps the filter's other two parameters and net/url encodes
 // them, so a branch name or job name with an odd character does not break
 // the query string it lands in.
 func filterLinks(f buildFilter, jobs []control.JobOut) []buildFilterLink {
@@ -207,17 +208,15 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 
 	s.render(w, "builds.html", struct {
 		repoPage
-		Builds      []control.BuildOut
-		Jobs        []control.JobOut
-		Runs        []buildRun
-		Filter      buildFilter
-		FilterLinks []buildFilterLink
-		Facets      []facetGroup
-		Refs        []string
-		CanWrite    bool
-		Notice      string
-	}{p, builds, jobs, groupRuns(builds), filter, filterLinks(filter, jobs),
-		buildFacets(filter, jobs, refs), refs,
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		CanWrite bool
+		Notice   string
+	}{p, builds, jobs, groupRuns(builds), filter, buildFacets(filter, jobs, refs), refs,
 		s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 

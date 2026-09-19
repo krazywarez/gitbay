@@ -20,16 +20,15 @@ func TestRepoHeaderTwoRows(t *testing.T) {
 	p.Tab = "files"
 	err := web.Render(&sb, "builds.html", struct {
 		repoPage
-		Builds      []control.BuildOut
-		Jobs        []control.JobOut
-		Runs        []buildRun
-		Filter      buildFilter
-		FilterLinks []buildFilterLink
-		Facets      []facetGroup
-		Refs        []string
-		CanWrite    bool
-		Notice      string
-	}{p, nil, nil, nil, buildFilter{}, nil, nil, nil, true, ""})
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		CanWrite bool
+		Notice   string
+	}{p, nil, nil, nil, buildFilter{}, nil, nil, true, ""})
 	if err != nil {
 		t.Fatal(err)
 	}
