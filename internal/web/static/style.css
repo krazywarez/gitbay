@@ -138,6 +138,10 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
+    /* the scheme in force, not just the tokens: light-dark() reads it,
+       and themedCSS repeats this block for a page stamped dark */
+    color-scheme: dark;
+
     --canvas: #101114;
     --surface: #212429;
     --inset: #0b0c0e;
@@ -195,6 +199,10 @@
   }
 }
 
+/* a page stamped light keeps the light scheme under a dark OS: the token
+   block above is guarded for it, and this is the other half of that */
+:root[data-theme="light"] { color-scheme: light; }
+
 /* ---- base ---- */
 * { box-sizing: border-box; }
 html { font-size: 16px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -218,6 +226,10 @@ a:hover { text-decoration: underline; }
 p a, .syscomment a { text-decoration: underline; }
 /* a title or a path is the whole line: position is the cue */
 p a.button, p a.btn, p a.chip, .repotitle a, p.title a, .pathbar a, .pager a { text-decoration: none; }
+/* where a link shares its line with other text the underline is the cue
+   again, path bar or not: a crumb beside the file name, a heading that
+   names an owner, an empty-state note (#226) */
+.crumbs a, h1 a, li.empty a { text-decoration: underline; }
 a.xref { color: var(--link); text-decoration: none; }
 
 code, pre, .mono, .code, td.mode, td.size {
@@ -1334,8 +1346,15 @@ table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underli
 .chip-stale { --chip: var(--warn); }
 .chip.topic { --chip: var(--link); }
 .chip.topic:hover { text-decoration: none; background: color-mix(in srgb, var(--chip) 18%, transparent); }
-/* a label carries its own colour inline, from the label's hex */
-.chip.label { font-weight: 500; }
+/* A label carries its own colour inline, from the label's hex, as one
+   tone per scheme: chip text is 12px, so it needs 4.5:1 against its own
+   ground, and no single colour clears that on both canvases (#226). An
+   old browser without light-dark() drops the declaration and the chip
+   falls back to the neutral above. */
+.chip.label {
+  --chip: light-dark(var(--chip-l, var(--neutral)), var(--chip-d, var(--neutral)));
+  font-weight: 500;
+}
 .badge-verified { --chip: var(--ok); }
 .badge-unsigned { --chip: var(--neutral); }
 .badge-signed_unknown_key, .badge-signed_key_expired { --chip: var(--warn); }

@@ -1627,12 +1627,90 @@ var labelPalette = []string{
 
 var hexColorPat = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
-// clampChip keeps a user-set label colour legible as text on both
-// grounds. Contrast is defined on relative luminance, so that is what is
-// held: between 0.12 and 0.28, where the chip clears 3:1 against white
-// and against the dark ground alike, and where the palette's own colours
-// sit. The hue is kept; the channels are scaled in linear light (#120).
-func clampChip(hex string) string {
+// The canvases a chip is drawn on, --canvas in each scheme, and the ratio
+// its text owes them. Chip text is 12px, which WCAG reads as small text at
+// 4.5:1. TestChipCanvasMatchesStylesheet keeps these in step with the
+// tokens.
+const (
+	chipCanvasLight = "#ffffff"
+	chipCanvasDark  = "#101114"
+	chipRatio       = 4.5
+)
+
+// chipTones returns a user-set label colour as it is drawn in each scheme.
+// The chip's ground is mixed from the colour itself, and the luminance
+// band that clears 4.5:1 on white ends below the band that clears it on
+// the dark canvas, so one colour cannot serve both and each label carries
+// two (#226, replacing the single clamp of #120). The hue is kept — the
+// channels are scaled in linear light — and only a colour too dark to
+// brighten any further, a saturated blue, is blended on toward white.
+func chipTones(hex string) (light, dark string) {
+	return chipTone(hex, chipCanvasLight, false), chipTone(hex, chipCanvasDark, true)
+}
+
+// chipTone walks the colour along its ramp until it clears the ratio,
+// stopping at the first tone that does: contrast rises with the distance
+// travelled, so the bisection finds the tone nearest the one asked for.
+func chipTone(hex, canvas string, up bool) string {
+	if chipContrast(strings.ToLower(hex), canvas) >= chipRatio {
+		return strings.ToLower(hex)
+	}
+	lo, hi := 0.0, 1.0
+	for i := 0; i < 24; i++ {
+		mid := (lo + hi) / 2
+		if chipContrast(chipStep(hex, mid, up), canvas) >= chipRatio {
+			hi = mid
+		} else {
+			lo = mid
+		}
+	}
+	return chipStep(hex, hi, up)
+}
+
+// chipStep is the colour s of the way along its ramp: down to black on a
+// light canvas, and on a dark one up through the brightest tone that
+// keeps the hue and from there on to white.
+func chipStep(hex string, s float64, up bool) string {
+	r, g, b := chipLinear(hex)
+	switch m := math.Max(r, math.Max(g, b)); {
+	case !up:
+		k := 1 - s
+		r, g, b = r*k, g*k, b*k
+	case m == 0: // black has no hue to keep
+		r, g, b = s, s, s
+	case s <= 0.5:
+		k := 1 + (s/0.5)*(1/m-1)
+		r, g, b = r*k, g*k, b*k
+	default:
+		k, t := 1/m, (s-0.5)/0.5
+		r, g, b = r*k, g*k, b*k
+		r, g, b = r+t*(1-r), g+t*(1-g), b+t*(1-b)
+	}
+	return chipHex(r, g, b)
+}
+
+// chipContrast is the WCAG ratio between a chip colour and its own
+// ground, color-mix(in srgb, chip 10%, canvas).
+func chipContrast(hex, canvas string) float64 {
+	y, g := chipLuminance(hex), chipLuminance(chipGround(hex, canvas))
+	if y < g {
+		y, g = g, y
+	}
+	return (y + 0.05) / (g + 0.05)
+}
+
+// chipGround mixes a tenth of the chip colour into the canvas, the blend
+// color-mix(in srgb, ...) makes: gamma-encoded channels, not linear ones.
+func chipGround(hex, canvas string) string {
+	mix := func(a, b string) string {
+		return fmt.Sprintf("%02x", int(math.Round(0.1*float64(hexByte(a))+0.9*float64(hexByte(b)))))
+	}
+	return "#" + mix(hex[1:3], canvas[1:3]) + mix(hex[3:5], canvas[3:5]) + mix(hex[5:7], canvas[5:7])
+}
+
+// chipLinear is a #rrggbb colour in linear light, chipHex the way back,
+// and chipLuminance the WCAG relative luminance of one.
+func chipLinear(hex string) (r, g, b float64) {
 	lin := func(c int64) float64 {
 		v := float64(c) / 255
 		if v <= 0.04045 {
@@ -1640,23 +1718,12 @@ func clampChip(hex string) string {
 		}
 		return math.Pow((v+0.055)/1.055, 2.4)
 	}
-	r, g, b := lin(hexByte(hex[1:3])), lin(hexByte(hex[3:5])), lin(hexByte(hex[5:7]))
-	y := 0.2126*r + 0.7152*g + 0.0722*b
-	const lo, hi = 0.12, 0.28
-	if y >= lo && y <= hi {
-		return strings.ToLower(hex)
-	}
-	target := hi
-	if y < lo {
-		target = lo
-	}
-	if y == 0 {
-		r, g, b = target, target, target
-	} else {
-		k := target / y
-		r, g, b = math.Min(1, r*k), math.Min(1, g*k), math.Min(1, b*k)
-	}
+	return lin(hexByte(hex[1:3])), lin(hexByte(hex[3:5])), lin(hexByte(hex[5:7]))
+}
+
+func chipHex(r, g, b float64) string {
 	enc := func(v float64) int {
+		v = math.Min(1, math.Max(0, v))
 		if v <= 0.0031308 {
 			v *= 12.92
 		} else {
@@ -1665,6 +1732,11 @@ func clampChip(hex string) string {
 		return int(math.Round(v * 255))
 	}
 	return fmt.Sprintf("#%02x%02x%02x", enc(r), enc(g), enc(b))
+}
+
+func chipLuminance(hex string) float64 {
+	r, g, b := chipLinear(hex)
+	return 0.2126*r + 0.7152*g + 0.0722*b
 }
 
 func hexByte(s string) int64 {
@@ -1682,7 +1754,7 @@ func (s *Server) labelColors(repo store.Repo) map[string]template.CSS {
 
 // colorStyles turns a label-name -> stored color map into chip styles: the
 // stored color when it is a valid hex color, otherwise a stable default
-// picked from the palette by name hash.
+// picked from the palette by name hash, as a tone per scheme.
 func colorStyles(stored map[string]string) map[string]template.CSS {
 	out := make(map[string]template.CSS, len(stored))
 	for name, color := range stored {
@@ -1691,7 +1763,8 @@ func colorStyles(stored map[string]string) map[string]template.CSS {
 			h.Write([]byte(name))
 			color = labelPalette[h.Sum32()%uint32(len(labelPalette))]
 		}
-		out[name] = template.CSS("--chip:" + clampChip(color))
+		light, dark := chipTones(color)
+		out[name] = template.CSS("--chip-l:" + light + ";--chip-d:" + dark)
 	}
 	return out
 }

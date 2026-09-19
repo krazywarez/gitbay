@@ -43,8 +43,9 @@ func TestLabelColors(t *testing.T) {
 		!strings.Contains(out, `{"name":"docs","issues":0,"mrs":0}`) {
 		t.Fatalf("list json:\n%s", out)
 	}
-	// The web paints the chip with the stored colour.
-	if _, body := inst.get(t, "/alice/app/issues"); !strings.Contains(body, "--chip:#cf222e") {
+	// The web paints the chip with the stored colour, as the tone each
+	// scheme needs to clear 4.5:1 on the chip's own ground (#226).
+	if _, body := inst.get(t, "/alice/app/issues"); !strings.Contains(body, "--chip-l:#") || !strings.Contains(body, ";--chip-d:#") {
 		t.Fatalf("issue list does not carry the colour:\n%s", body)
 	}
 	// Clearing the colour keeps the label; removing it unlinks the issue.

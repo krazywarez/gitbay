@@ -180,3 +180,46 @@ func TestRailIconsAreLabelled(t *testing.T) {
 		}
 	}
 }
+
+// Every pre in the stylesheet scrolls sideways, which makes it a
+// scrollable region: a keyboard reaches its content only if the element
+// can take focus, so every authored pre carries tabindex="0" — the same
+// attribute focusableBlocks puts on the pre blocks of rendered markup
+// (#226).
+func TestPreBlocksAreFocusable(t *testing.T) {
+	if !regexp.MustCompile(`(?s)\npre \{[^}]*overflow-x: auto`).Match(StyleCSS) {
+		t.Fatal("style.css no longer scrolls every pre; this test's premise is gone")
+	}
+	preRe := regexp.MustCompile(`<pre[^>]*>`)
+	n := 0
+	for _, name := range append(Pages(), "layout.html") {
+		src, err := TemplateSource(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tag := range preRe.FindAllString(src, -1) {
+			n++
+			if !strings.Contains(tag, `tabindex="0"`) {
+				t.Errorf("%s: %s is a scrollable region with no way to focus it", name, tag)
+			}
+		}
+	}
+	if n < 10 {
+		t.Fatalf("found %d pre blocks in the templates, want the site's set", n)
+	}
+}
+
+// A link mixed into other text is told apart by its underline. The rule
+// covers running text; these are the other places a link sits in a line
+// of text it has to be picked out of — a path, a heading, an empty-state
+// note. Link and muted text are 1.07:1 apart in dark, so colour alone is
+// no cue (#226).
+func TestMixedTextLinksAreUnderlined(t *testing.T) {
+	css := string(StyleCSS)
+	for _, sel := range []string{".crumbs a", "h1 a", "li.empty a"} {
+		re := regexp.MustCompile(`(?m)^[^{}\n]*` + regexp.QuoteMeta(sel) + `[^{}\n]*\{[^}]*text-decoration: underline`)
+		if !re.MatchString(css) {
+			t.Errorf("%s is not underlined", sel)
+		}
+	}
+}
