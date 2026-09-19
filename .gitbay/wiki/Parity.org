@@ -15,11 +15,11 @@ stranded a capability where only it can reach.
 
 A capability lands over SSH first. If it belongs to the
 triage/review/respond loop, it lands on the web in the same merge
-request. Anything whose input is a credential — secrets, mirror
-tokens, API tokens — stays SSH-only by design: the web dispatcher
-refuses =SSHOnly= commands outright. Session minting is not one of
-them: what a browser submits to ask for a login link is a username or
-an address, and the credential it gets back travels by mail.
+request. Nothing is held back from a surface any more (#234): the
+registry has no flag for it, and what a caller may do is the account's
+rights narrowed by the scope of the key or token it arrived with,
+decided in one place. A =no= in the web or ios column is a page nobody
+has built yet, not a refusal.
 
 Rows are one page or one action each. Grouped rows hide gaps, twice
 now: "browse, log, blame, search" read as covered while blame had no
@@ -360,12 +360,34 @@ The account export bundle is =n/a= on iOS on the archive-download
 argument above — a JSON bundle has nowhere useful to land on a phone,
 and the web route stays the way to get one.
 
-=profile set= carries description, website, about and links. It is not
-=SSHOnly= — nothing about a bio is a credential, and the JSON API runs
-it. The account settings page has the form, and so does the iOS client:
+=profile set= carries description, website, about and links; the JSON
+API runs it like any other write. The account settings page has the form, and so does the iOS client:
 =--link= replaces the whole set rather than appending, so a client sends
 every link it keeps on every save, and =--link ''= is how they are
 cleared.
+
+* Administration
+
+| capability                      | cli | web | ios |
+|---------------------------------+-----+-----+-----|
+| account list, filter by state   | yes | yes | no  |
+| account show                    | yes | no  | no  |
+| promote, demote                 | yes | yes | no  |
+| disable, enable                 | yes | yes | no  |
+| account create, delete          | yes | no  | no  |
+| invite                          | yes | no  | no  |
+| worker queues                   | yes | yes | no  |
+| runners                         | yes | no  | no  |
+| repository list, archive, visibility | yes | no | no |
+| audit log                       | yes | no  | no  |
+| instance statistics             | yes | no  | no  |
+
+=/admin/users= carries the account list with the command's state
+filter and cursor, and promote, demote, disable and enable per row;
+demote and disable ask for the username to be typed. The rest is a
+page nobody has built yet rather than a refusal — see below. Account
+creation and deletion stay on the command line on purpose: one takes a
+key, the other cannot be undone.
 
 * Organizations
 
@@ -388,15 +410,20 @@ one. Without the flags a list stays complete, so existing scripts are
 unchanged. The web pages the issue and merge request lists at fifty
 with the same cursors; iOS pages with them too.
 
-* SSH only, by design
+* CLI only, for now
 
 Build secrets, mirror configuration and tokens, custom domain claims,
 API token minting, web session listing and revocation, deploy keys,
-account and instance administration. Deleting, transferring or renaming
-a repository is also CLI-only, as is deleting an organization and
-pruning merge request heads (=admin mr prune=): each removes or moves
-what clone URLs point at, and wants a typed command, not a button.
+and instance administration have no page yet. Until #234 these were
+refused outright on the other surfaces; the refusal is gone, so each is
+now a page waiting to be built rather than a rule. A credential still
+travels on stdin wherever it is set, since argv is world-readable in
+/proc and the audit log keeps flag values.
 
-These are the only rows where a =no= is intended. Everywhere else a
-=no= is work outstanding, and =n/a= means a surface cannot usefully
-carry the capability at all — see the archive note above.
+Deleting, transferring or renaming a repository stays CLI-only on
+purpose, as does deleting an organization and pruning merge request
+heads (=admin mr prune=): each removes or moves what clone URLs point
+at, and wants a typed command rather than a button.
+
+=n/a= means a surface cannot usefully carry the capability at all —
+see the archive note above.

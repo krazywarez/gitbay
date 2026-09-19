@@ -15,7 +15,7 @@ func init() {
 	register(Command{Path: []string{"audit"},
 		Summary:  "instance audit log (admins)",
 		Usage:    "audit [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]",
-		ReadOnly: true, SSHOnly: true, Run: runAudit})
+		ReadOnly: true, Run: runAudit})
 }
 
 func runAudit(c *Ctx, args []string) int {

@@ -17,8 +17,10 @@ import (
 // never reimplement command logic — merge gates, review rules, and audit
 // entries stay in one place — so the surfaces cannot drift apart.
 //
-// ViaAPI is set, which refuses SSHOnly commands: anything whose input is a
-// credential (secrets, mirror tokens, session minting) stays on SSH.
+// ViaAPI is set, which marks the request as one that arrived over HTTP.
+// Nothing is held back from that door any more (#234): what a caller may
+// do is the account's rights and its credential's scope, decided in one
+// place for every surface.
 func (s *Server) runControl(u store.User, argv []string) (out string, msg string, ok bool) {
 	out, msg, code := s.runControlCode(u, argv)
 	return out, msg, code == protocol.ExitOK
@@ -67,10 +69,9 @@ func (s *Server) done(w http.ResponseWriter, r *http.Request, code int, msg stri
 }
 
 // runControlStdin is runControl for the handful of commands whose input
-// arrives on stdin: public keys, and review comment bodies. Neither is
-// secret, and both are prose or paste rather than a flag value. Secrets,
-// tokens and mirror credentials remain SSHOnly and are refused by the
-// dispatcher.
+// arrives on stdin: public keys, and review comment bodies. Stdin is
+// also where a secret goes when one is set through this path, since
+// argv is world-readable in /proc and the audit log keeps flag values.
 func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg string, ok bool) {
 	msg, code := s.runControlStdinCode(u, argv, stdin)
 	return msg, code == protocol.ExitOK

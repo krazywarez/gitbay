@@ -59,7 +59,7 @@ Properties that follow from the design:
   with SMTP email verification
 - signed outbound webhooks with retries, dead-lettering, and SSRF
   guarding; a JSON API (=POST /api/v1/cmd=) fronting the same command
-  registry, with bearer tokens mintable only over SSH
+  registry, with scoped, revocable bearer tokens
 - built-in ACME (Let's Encrypt) TLS; =admin backup= produces one
   restore-tested archive (database snapshot first, then repositories)
 

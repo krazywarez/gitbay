@@ -18,7 +18,7 @@ func init() {
 	register(Command{Path: []string{"repo", "mirror", "add"},
 		Summary:    "mirror to or from a remote",
 		Usage:      "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
-		ReadsStdin: true, SSHOnly: true, Run: runMirrorAdd})
+		ReadsStdin: true, Run: runMirrorAdd})
 	register(Command{Path: []string{"repo", "mirror", "list"},
 		Summary: "list mirrors with sync status",
 		Usage:   "repo mirror list <owner/name>", ReadOnly: true, Run: runMirrorList})

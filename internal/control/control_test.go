@@ -73,8 +73,17 @@ func TestBuildJobsIsAReadCommand(t *testing.T) {
 	if !cmd.ReadOnly {
 		t.Error("build jobs must be ReadOnly; listing jobs changes nothing")
 	}
-	if cmd.SSHOnly {
-		t.Error("build jobs must not be SSHOnly; the web and the app need it")
+}
+
+// Nothing in the registry is reachable over SSH alone (#234). The flag
+// that held commands back is gone, so this pins the replacement rule:
+// every command runs on every surface, and what a caller may do is
+// decided by the account, the key's scope, and the token's scope.
+func TestNoCommandIsHeldBackFromTheWeb(t *testing.T) {
+	for _, cmd := range Commands() {
+		if cmd.Run == nil {
+			t.Errorf("%s has no handler", joinPath(cmd.Path))
+		}
 	}
 }
 

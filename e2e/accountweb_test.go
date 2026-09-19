@@ -105,7 +105,9 @@ func TestAccountSettingsWeb(t *testing.T) {
 		t.Error("invalid key accepted without an error")
 	}
 
-	// Token minting is SSHOnly and has no web form to reach it.
+	// The settings page has no token form. Nothing refuses one now
+	// (#234); there is simply no page for it yet, and a minted token is
+	// shown once, which wants a page designed for it.
 	if strings.Contains(body, `value="token-mint"`) {
 		t.Error("token minting exposed on the web")
 	}

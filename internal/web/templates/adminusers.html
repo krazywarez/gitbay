@@ -1,0 +1,67 @@
+{{define "width"}}bounded{{end}}
+{{define "title"}}accounts · admin · {{.Site}}{{end}}
+{{define "content"}}
+<h1>Accounts</h1>
+<p class="meta"><a href="/admin">Admin</a> · the same read as <code>gitbay admin user list</code>.</p>
+{{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
+
+<nav class="filters">
+  <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
+  <a {{if eq .State "active"}}class="active" aria-current="page" {{end}}href="?state=active">active</a>
+  <a {{if eq .State "pending"}}class="active" aria-current="page" {{end}}href="?state=pending">pending</a>
+  <a {{if eq .State "disabled"}}class="active" aria-current="page" {{end}}href="?state=disabled">disabled</a>
+  <a {{if eq .State "admin"}}class="active" aria-current="page" {{end}}href="?state=admin">admins</a>
+</nav>
+
+{{if .Users}}<div class="tablewrap"><table class="keys accounts">
+<thead><tr class="cols"><th>Account</th><th>State</th><th>Created</th><th>Last seen</th><th>Actions</th></tr></thead>
+<tbody>
+{{range .Users}}<tr>
+  <td><a href="/{{.Username}}">{{.Username}}</a>{{if .Admin}} <span class="chip">admin</span>{{end}}</td>
+  <td><span class="chip {{if eq .State "active"}}chip-open{{else if eq .State "disabled"}}chip-closed{{else}}chip-neutral{{end}}">{{.State}}</span></td>
+  <td>{{when .CreatedAt}}</td>
+  <td>{{if .LastSeen}}{{when .LastSeen}}{{else}}never{{end}}</td>
+  <td>
+    {{if .Admin}}
+    <form method="post" action="/admin/users" class="actions">
+      <input type="hidden" name="field" value="demote">
+      <input type="hidden" name="user" value="{{.Username}}">
+      <input type="hidden" name="state" value="{{$.State}}">
+      {{template "confirmfield" .Username}} <button type="submit" class="btn">Demote</button>
+    </form>
+    {{else if eq .State "active"}}
+    <form method="post" action="/admin/users" class="actions">
+      <input type="hidden" name="field" value="promote">
+      <input type="hidden" name="user" value="{{.Username}}">
+      <input type="hidden" name="state" value="{{$.State}}">
+      <button type="submit" class="btn">Promote</button>
+    </form>
+    {{end}}
+    {{if eq .State "disabled"}}
+    <form method="post" action="/admin/users" class="actions">
+      <input type="hidden" name="field" value="enable">
+      <input type="hidden" name="user" value="{{.Username}}">
+      <input type="hidden" name="state" value="{{$.State}}">
+      <button type="submit" class="btn">Enable</button>
+    </form>
+    {{else}}
+    <form method="post" action="/admin/users" class="actions">
+      <input type="hidden" name="field" value="disable">
+      <input type="hidden" name="user" value="{{.Username}}">
+      <input type="hidden" name="state" value="{{$.State}}">
+      {{template "confirmfield" .Username}} <button type="submit" class="btn">Disable</button>
+    </form>
+    {{end}}
+  </td>
+</tr>
+{{end}}
+</tbody></table></div>{{else}}<p class="none">No account matches</p>{{end}}
+{{if .Next}}<p class="pager"><a href="{{.Next}}">more →</a></p>{{end}}
+
+<p class="meta">Creating and deleting an account, issuing an invite and
+asserting an address stay on the command line: each takes a key, mints
+a credential, or cannot be undone.</p>
+<pre tabindex="0"><code>gitbay admin user create &lt;name&gt; --key - &lt; key.pub
+gitbay admin user delete &lt;name&gt; --yes
+gitbay admin invite --email &lt;address&gt;</code></pre>
+{{end}}

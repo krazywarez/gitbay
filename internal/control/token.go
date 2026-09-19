@@ -16,14 +16,14 @@ func init() {
 	register(Command{Path: []string{"token", "create"},
 		Summary: "mint an API token (shown once)",
 		Usage:   "token create --name <n> [--scope full|read] [--ttl 30d|720h]",
-		SSHOnly: true, Run: runTokenCreate})
+		Run:     runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
 		Summary: "list API tokens",
-		Usage:   "token list", ReadOnly: true, SSHOnly: true, Run: runTokenList})
+		Usage:   "token list", ReadOnly: true, Run: runTokenList})
 	register(Command{Path: []string{"token", "revoke"},
 		Summary: "revoke an API token by name",
 		Usage:   "token revoke <name>",
-		SSHOnly: true, Run: runTokenRevoke})
+		Run:     runTokenRevoke})
 }
 
 // parseTTL accepts Go durations plus a day suffix ("30d").

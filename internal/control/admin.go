@@ -18,57 +18,57 @@ func init() {
 	register(Command{Path: []string{"admin", "user", "list"},
 		Summary:  "list accounts (instance admins)",
 		Usage:    "admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]",
-		ReadOnly: true, SSHOnly: true, Run: runAdminUserList})
+		ReadOnly: true, Run: runAdminUserList})
 	register(Command{Path: []string{"admin", "user", "show"},
 		Summary:  "show an account: keys, emails, orgs, tokens, sessions (instance admins)",
 		Usage:    "admin user show <username>",
-		ReadOnly: true, SSHOnly: true, Run: runAdminUserShow})
+		ReadOnly: true, Run: runAdminUserShow})
 	register(Command{Path: []string{"admin", "user", "promote"},
 		Summary: "make an account an instance admin",
 		Usage:   "admin user promote <username>",
-		SSHOnly: true, Run: runAdminUserPromote})
+		Run:     runAdminUserPromote})
 	register(Command{Path: []string{"admin", "user", "demote"},
 		Summary: "remove instance admin from an account (never the last one)",
 		Usage:   "admin user demote <username>",
-		SSHOnly: true, Run: runAdminUserDemote})
+		Run:     runAdminUserDemote})
 	register(Command{Path: []string{"admin", "runners"},
 		Summary:  "the build queue and runner accounts: last poll, scope, the build each holds (instance admins)",
 		Usage:    "admin runners",
-		ReadOnly: true, SSHOnly: true, Run: runAdminRunners})
+		ReadOnly: true, Run: runAdminRunners})
 	register(Command{Path: []string{"admin", "runners", "remove"},
 		Summary: "drop a key's runner heartbeat row, e.g. one that polled once by mistake (instance admins)",
 		Usage:   "admin runners remove <fingerprint>",
-		SSHOnly: true, Run: runAdminRunnersForget})
+		Run:     runAdminRunnersForget})
 	// forget is the name this shipped under in v1.18; remove is the verb
 	// every other noun uses. Both stay for one release.
 	register(Command{Path: []string{"admin", "runners", "forget"},
 		Summary: "alias of admin runners remove",
 		Usage:   "admin runners forget <fingerprint>",
-		SSHOnly: true, Run: runAdminRunnersForget})
+		Run:     runAdminRunnersForget})
 	register(Command{Path: []string{"admin", "repo", "list"},
 		Summary:  "list every repository with size and last push (instance admins)",
 		Usage:    "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
-		ReadOnly: true, SSHOnly: true, Run: runAdminRepoList})
+		ReadOnly: true, Run: runAdminRepoList})
 	register(Command{Path: []string{"admin", "repo", "archive"},
 		Summary: "archive any repository (instance admins; audited)",
 		Usage:   "admin repo archive <owner/name>",
-		SSHOnly: true, Run: runAdminRepoArchive})
+		Run:     runAdminRepoArchive})
 	register(Command{Path: []string{"admin", "repo", "unarchive"},
 		Summary: "unarchive any repository (instance admins; audited)",
 		Usage:   "admin repo unarchive <owner/name>",
-		SSHOnly: true, Run: runAdminRepoUnarchive})
+		Run:     runAdminRepoUnarchive})
 	register(Command{Path: []string{"admin", "repo", "visibility"},
 		Summary: "set any repository's visibility (instance admins; audited)",
 		Usage:   "admin repo visibility <owner/name> public|private",
-		SSHOnly: true, Run: runAdminRepoVisibility})
+		Run:     runAdminRepoVisibility})
 	register(Command{Path: []string{"admin", "repo", "delete"},
 		Summary: "delete any repository (instance admins; audited)",
 		Usage:   "admin repo delete <owner/name> --yes",
-		SSHOnly: true, Run: runAdminRepoDelete})
+		Run:     runAdminRepoDelete})
 	register(Command{Path: []string{"admin", "mr", "prune"},
 		Summary: "drop merged or closed MRs' head refs and the objects only they kept, e.g. after a history rewrite (instance admins; audited)",
 		Usage:   "admin mr prune <owner/name> <n> [<n>...] --yes",
-		SSHOnly: true, Run: runAdminMRPrune})
+		Run:     runAdminMRPrune})
 }
 
 // requireInstanceAdmin gates the admin noun. -1 means proceed.

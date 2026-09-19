@@ -46,7 +46,7 @@ func init() {
 	register(Command{Path: []string{"repo", "secret", "set"},
 		Summary:    "set a build secret",
 		Usage:      "repo secret set <owner/name> <NAME> (value on stdin)",
-		ReadsStdin: true, SSHOnly: true, Run: runSecretSet})
+		ReadsStdin: true, Run: runSecretSet})
 	register(Command{Path: []string{"repo", "secret", "remove"},
 		Summary: "remove a build secret",
 		Usage:   "repo secret remove <owner/name> <NAME>", Run: runSecretRemove})
@@ -61,13 +61,13 @@ func init() {
 	// an admin key, which a runner host should not hold (#92).
 	register(Command{Path: []string{"runner", "next"},
 		Summary: "claim the oldest pending build this key may run (runner protocol)",
-		Usage:   "runner next [--untrusted] [<owner/name>...]", SSHOnly: true, Run: runRunnerNext})
+		Usage:   "runner next [--untrusted] [<owner/name>...]", Run: runRunnerNext})
 	register(Command{Path: []string{"runner", "log"},
 		Summary: "append a build's log from stdin",
-		Usage:   "runner log <build-id>", SSHOnly: true, ReadsStdin: true, Run: runRunnerLog})
+		Usage:   "runner log <build-id>", ReadsStdin: true, Run: runRunnerLog})
 	register(Command{Path: []string{"runner", "done"},
 		Summary: "finish a build",
-		Usage:   "runner done <build-id> success|failure", SSHOnly: true, Run: runRunnerDone})
+		Usage:   "runner done <build-id> success|failure", Run: runRunnerDone})
 }
 
 type BuildOut struct {
@@ -323,8 +323,9 @@ func runSecretList(c *Ctx, args []string) int {
 	})
 }
 
-// runnerSession resolves the key behind a runner-protocol session. The
-// runner commands are SSHOnly, so Source is the key's fingerprint. An
+// runnerSession resolves the key behind a runner-protocol session:
+// Source is the key's fingerprint. A build is claimed by a key, so a
+// session without one is told so plainly rather than half-running. An
 // admin key is accepted so an operator can rotate at their own pace; a
 // runner host should hold a key added with --scope runner.
 func runnerSession(c *Ctx) (store.SSHKey, int) {

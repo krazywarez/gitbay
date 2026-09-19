@@ -3,6 +3,7 @@
 {{define "content"}}
 <h1>Admin</h1>
 <p class="meta">Server build {{.Commit}}. Every background worker's backlog, the same read as <code>gitbay dashboard --json</code> for an admin.</p>
+<p class="meta"><a href="/admin/users">Accounts</a> — every account, with promote, demote, disable and enable.</p>
 
 {{with .Queues.Webhooks}}
 <h2>Webhook deliveries <span class="count">{{.Pending}}</span></h2>

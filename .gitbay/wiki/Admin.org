@@ -186,7 +186,7 @@ never in argv.
 
 #+begin_src sh
 gitbayd admin audit [--actor u|-] [--action prefix] [--since 24h|7d|date] [--limit n] [--json]
-ssh git@<host> audit ...             # the same, from an admin session (SSH only)
+ssh git@<host> audit ...             # the same, from an admin session
 ssh git@<host> admin user list [--state active|pending|disabled|admin]
 ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions
 ssh git@<host> admin user limits <name> [--repos n|default] [--bytes n|default]   # per-account caps
@@ -212,12 +212,22 @@ each account's state and =last_seen=, the newest use of any of its SSH
 keys or API tokens. =admin user show= adds the keys with their last use,
 each address with how it was verified, PGP keys, org roles, the owned
 repository count, API token names, and live browser sessions. Both are
-SSH-only and refused to non-admins, like =audit=.
+Both are refused to non-admins, like =audit=, on every surface.
+
+=/admin/users= is the same list in a browser, linked from the admin
+page: the state filter the command takes, keyset paging on its cursor,
+and a row per account with promote, demote, disable and enable, each
+dispatching the command. Demote and disable ask for the username to be
+typed, since both take someone's access away. Creating and deleting an
+account, issuing an invite and asserting an address stay on the command
+line: each takes a key, mints a credential, or cannot be undone. A
+non-admin gets the 404 a missing page would, so the URL confirms
+nothing.
 
 Promotion needs an active account: a pending or disabled one is refused.
-Demotion is refused when it would leave no admin, over SSH and on the
-host alike, so the host-local =promote= is the way back in when the only
-admin key is lost.
+Demotion is refused when it would leave no admin, over SSH, in the
+browser and on the host alike, so the host-local =promote= is the way
+back in when the only admin key is lost.
 
 Instance admin carries no right on anyone's repository: policy does not
 consult it, and a private repository still answers not-found to an

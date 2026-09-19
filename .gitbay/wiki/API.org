@@ -13,8 +13,12 @@ enabled = true
 
 ** Tokens
 
-Tokens are minted over SSH and only over SSH — an API token can never
-create further credentials.
+Tokens are minted wherever the registry is reached: over SSH, on the
+API, anywhere. A full-scope token can mint another, which is what full
+scope means; a read-scoped one cannot, because minting is a write. The
+controls here are scope, TTL and revocation, not which door a request
+arrived through (#234). Give a token the narrowest scope and shortest
+TTL that does its job, and revoke it when the job is over.
 
 #+begin_src sh
 gitbay auth token create --name ci [--scope full|read] [--ttl 30d]

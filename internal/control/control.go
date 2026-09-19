@@ -27,9 +27,10 @@ type Ctx struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	JSON   bool
-	// ViaAPI marks requests arriving over the HTTP token API. Some
-	// commands (token management) are SSH-only: an API token must never
-	// mint further credentials.
+	// ViaAPI marks requests arriving over HTTP, from the token API or
+	// the web. Every command runs there; nothing is held back for SSH
+	// any more (#234). The flag stays because the rate limiter and the
+	// audit log want to know which door a request came through.
 	ViaAPI bool
 	// ReadOnly is set for read-scoped API tokens.
 	ReadOnly bool
@@ -62,7 +63,6 @@ type Command struct {
 	Usage      string
 	ReadsStdin bool
 	ReadOnly   bool // safe for read-scoped API tokens
-	SSHOnly    bool // refused over the HTTP API (credential minting)
 	Run        func(c *Ctx, args []string) int
 }
 
@@ -116,9 +116,6 @@ func Dispatch(c *Ctx, argv []string) int {
 	// the key a CI host holds cannot administer the instance.
 	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {
 		return c.fail(protocol.ExitDenied, "this key's scope (%s) does not allow control commands; use a key added with --scope full", c.Scope)
-	}
-	if c.ViaAPI && cmd.SSHOnly {
-		return c.fail(protocol.ExitDenied, "%s is only available over SSH", joinPath(cmd.Path))
 	}
 	if c.ReadOnly && !cmd.ReadOnly {
 		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state — mint one with --scope full", joinPath(cmd.Path))

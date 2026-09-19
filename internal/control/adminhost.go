@@ -24,31 +24,31 @@ func init() {
 	register(Command{Path: []string{"admin", "user", "create"},
 		Summary:    "create an account, optionally with a key and a verified address (instance admins)",
 		Usage:      "admin user create <username> [--admin] [--email <address> [--verified]] [--key -] < key.pub",
-		ReadsStdin: true, SSHOnly: true, Run: runAdminUserCreate})
+		ReadsStdin: true, Run: runAdminUserCreate})
 	register(Command{Path: []string{"admin", "user", "disable"},
 		Summary: "suspend an account: SSH, web sessions and API tokens refused until re-enabled",
 		Usage:   "admin user disable <username>",
-		SSHOnly: true, Run: runAdminUserDisable})
+		Run:     runAdminUserDisable})
 	register(Command{Path: []string{"admin", "user", "enable"},
 		Summary: "restore a suspended account",
 		Usage:   "admin user enable <username>",
-		SSHOnly: true, Run: runAdminUserEnable})
+		Run:     runAdminUserEnable})
 	register(Command{Path: []string{"admin", "user", "delete"},
 		Summary: "delete an account that anchors nothing (keys, emails and sessions go with it)",
 		Usage:   "admin user delete <username> --yes",
-		SSHOnly: true, Run: runAdminUserDelete})
+		Run:     runAdminUserDelete})
 	register(Command{Path: []string{"admin", "email", "verify"},
 		Summary: "mark an address verified by admin assertion",
 		Usage:   "admin email verify <username> <address>",
-		SSHOnly: true, Run: runAdminEmailVerify})
+		Run:     runAdminEmailVerify})
 	register(Command{Path: []string{"admin", "invite"},
 		Summary: "issue a registration invite and mail its code",
 		Usage:   "admin invite --email <address>",
-		SSHOnly: true, Run: runAdminInvite})
+		Run:     runAdminInvite})
 	register(Command{Path: []string{"admin", "stats"},
 		Summary:  "instance statistics: counts and per-repository disk usage",
 		Usage:    "admin stats",
-		ReadOnly: true, SSHOnly: true, Run: runAdminStats})
+		ReadOnly: true, Run: runAdminStats})
 }
 
 func runAdminUserCreate(c *Ctx, args []string) int {

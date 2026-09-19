@@ -8,6 +8,19 @@ anything beyond "replace the binary and restart" is needed.
 
 The web findings from the forge comparison (#232).
 
+- *Every command now runs on every surface.* The registry's =SSHOnly=
+  flag is gone, and with it the refusal that met build secrets, mirror
+  credentials, API token minting, web sessions, deploy keys, the audit
+  log and instance administration when they arrived over HTTP. What a
+  caller may do is the account's rights narrowed by the scope of the
+  key or token the request came with, decided in one place. A
+  full-scope API token can now do anything its owner can, minting
+  another token included; a read-scoped one still cannot write.
+  Operators should review the tokens they have issued and re-mint as
+  =--scope read= any that only need to read (#234).
+- =/admin/users= lists every account with the state filter and cursor
+  =admin user list= takes, and runs promote, demote, disable and enable
+  per row. Demote and disable ask for the username to be typed (#234).
 - =[registration] notify_admin= mails the instance's admins when an
   account becomes active: an invite redeemed, or an open-mode signup
   that verified its address. Off by default, requires =[mail]=, and

@@ -85,7 +85,7 @@ func init() {
 	register(Command{Path: []string{"admin", "user", "limits"},
 		Summary: "show or set an account's repository and storage caps (instance admins)",
 		Usage:   "admin user limits <username> [--repos <n>|default] [--bytes <n>|default]",
-		SSHOnly: true, Run: runAdminUserLimits})
+		Run:     runAdminUserLimits})
 }
 
 func runAdminUserLimits(c *Ctx, args []string) int {

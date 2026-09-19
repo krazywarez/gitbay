@@ -18,10 +18,10 @@ func init() {
 		Usage:   "web login", Run: runWebLogin})
 	register(Command{Path: []string{"web", "sessions", "list"},
 		Summary: "list your browser sessions",
-		Usage:   "web sessions list", ReadOnly: true, SSHOnly: true, Run: runWebSessionsList})
+		Usage:   "web sessions list", ReadOnly: true, Run: runWebSessionsList})
 	register(Command{Path: []string{"web", "sessions", "revoke"},
 		Summary: "end a browser session, or all of them",
-		Usage:   "web sessions revoke <id>|--all", SSHOnly: true, Run: runWebSessionsRevoke})
+		Usage:   "web sessions revoke <id>|--all", Run: runWebSessionsRevoke})
 }
 
 func runWebSessionsList(c *Ctx, args []string) int {

@@ -169,8 +169,8 @@ gitbay org profile krz            # no flags shows it
 #+end_src
 
 The web renders profiles but has no form for editing one, so the CLI is
-the only interface today. =profile set= is not =SSHOnly=, so the JSON API
-runs it like any other write command.
+the only interface today. The JSON API runs =profile set= like any
+other write command.
 
 * Repositories
 

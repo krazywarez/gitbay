@@ -139,9 +139,11 @@ func TestJSONAPI(t *testing.T) {
 		t.Fatalf("git over API: %d", status)
 	}
 
-	// Token management never works over the API: no credential minting.
-	status, body = inst.apiCall(t, token, []string{"token", "create", "--name", "sneaky"}, "")
-	if status != 403 || !strings.Contains(body["error"].(string), "only available over SSH") {
+	// Token management works over the API like everything else: no
+	// command is held back from a surface any more (#234). A full-scope
+	// token mints another, which is what a full-scope credential means.
+	status, body = inst.apiCall(t, token, []string{"token", "create", "--name", "minted"}, "")
+	if status != 200 {
 		t.Fatalf("token create via API: %d %v", status, body)
 	}
 

@@ -38,9 +38,12 @@ log and hardening notes in [[Admin]].
 - *Per-instance trust.* Email verification and key registration are local
   to an instance and never transfer. Account migration re-registers keys
   and re-verifies emails on the target by design.
-- *The control plane is one authenticated channel* (SSH), fully usable
-  from stock OpenSSH. The JSON API fronts the same command registry with
-  bearer tokens minted only over SSH; git transport never runs over it.
+- *The control plane is one command registry*, fully usable from stock
+  OpenSSH and fronted unchanged by the JSON API and the web. No command
+  belongs to one surface (#234): what a caller may do is the account's
+  rights narrowed by its credential's scope, decided in one place, so a
+  bearer token is worth exactly its scope and no more. Git transport
+  never runs over the API.
 - *Anonymous surfaces* — HTTPS clone of public repos, =git://= where
   enabled, the read-only web UI — carry no credentials and expose only
   public data. HTTP push is refused via a pkt-line =ERR=, never a 401.
