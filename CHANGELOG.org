@@ -4,6 +4,16 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.29.0 — 2026-09-19
+
+The icon nav is a top bar at every width.
+
+- The 48px row of glyphs that narrow screens already used is now the
+  only shell layout; the left column is gone. The row keeps the same
+  order, labels and current-page mark, with settings, admin and the
+  account cell at the far right.
+- The landing picture is recaptured under the new shell.
+
 * v1.28.1 — 2026-09-19
 
 The newcomer route names its web path (#226).
