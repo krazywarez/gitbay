@@ -395,8 +395,7 @@ footer a:hover { color: var(--link); }
   padding: var(--sp-4) 0 0;
   border-bottom: 1px solid var(--line);
 }
-.repohead .wrap { max-width: var(--container); margin: 0 auto; }
-.repohead .wrap { padding: 0 var(--sp-6); }
+.repohead .wrap { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; padding: 0 var(--sp-6); }
 .identity { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .grow { flex: 1; }
 /* h1 on the repo home, p elsewhere so each page keeps its own h1 — but

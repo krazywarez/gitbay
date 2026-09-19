@@ -20,7 +20,7 @@ func TestSharedCenteredContainer(t *testing.T) {
 	for _, want := range []string{
 		"--container: 100rem;",
 		"main.content, footer { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; }",
-		".repohead .wrap { max-width: var(--container); margin: 0 auto; }",
+		".repohead .wrap { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; padding: 0 var(--sp-6); }",
 		"main.reading { max-width: calc(72rem + 2 * var(--sp-6)); margin: 0 auto; }",
 		"main.bounded { max-width: calc(48rem + 2 * var(--sp-6)); margin: 0 auto; }",
 	} {
