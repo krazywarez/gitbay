@@ -4,6 +4,31 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.31.0 — unreleased
+
+The desktop layout (#226): the web UI uses a wide screen.
+
+- One centered container at 100rem; the repository header, main and
+  footer align on it. Text keeps its measure.
+- The repository header is two rows: name, description and buttons,
+  then the tabs.
+- Issue, merge request, build, explore, search and notification rows
+  are one line above 64rem, and those pages render at the container
+  width.
+- The dashboard is three columns: pinned repositories with open issue,
+  merge request and last-build counts; a tile per queue with the queue
+  rows below; the activity feed.
+- A file navigator beside blob, blame and edit pages lists the file's
+  directory and marks the file.
+- Side columns: state, labels and open milestones on the issue and
+  merge request lists; status, jobs and branches on builds; topics on
+  explore; kinds on search; sections on repository settings, account
+  settings and admin.
+- Below 64rem the facet and section columns stack after their content,
+  the dashboard's pinned repositories return to a chip row above the
+  queues, and the navigator hides, since the tree page is the navigator
+  on a phone.
+
 * v1.30.0 — 2026-09-19
 
 Every command runs on every surface, markup previews before it is
