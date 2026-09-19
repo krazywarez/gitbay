@@ -1328,6 +1328,7 @@ details.refmenu .refdrop a.allrefs {
 .overview.withfacts { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
 .overviewmain { min-width: 0; }
 .overview.withfacts .facts { display: block; margin-top: 0; max-width: none; }
+.overview.withfacts .clone pre { white-space: pre-wrap; word-break: break-all; }
 
 /* ---- repository facts ---- */
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); margin: var(--sp-5) 0 var(--sp-4); max-width: 72rem; }
