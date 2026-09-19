@@ -1384,11 +1384,11 @@ details.refmenu .refdrop a.allrefs {
 .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.5; max-width: 40rem; margin: 0 0 var(--sp-5); }
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
-.shot img { display: block; width: 100%; height: auto; }
+.shot img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; object-position: top; }
 .facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); margin: var(--sp-5) 0; }
 .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
 .facets p { color: var(--muted); font-size: var(--fs-2); margin: 0; }
-.routes { display: flex; gap: var(--sp-3); align-items: center; margin: var(--sp-5) 0 var(--sp-3); }
+.routes { display: flex; gap: var(--sp-3); align-items: center; margin: var(--sp-4) 0 0; }
 
 /* ---- profile ---- */
 .profilehead { border-bottom: 1px solid var(--faint); padding-bottom: var(--sp-4); margin-bottom: var(--sp-4); }
