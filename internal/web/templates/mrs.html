@@ -17,12 +17,14 @@
 </div>
 {{if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>{{end}}
 <ul class="issuelist">
-{{range .MRs}}<li>
+{{range .MRs}}{{$n := .Number}}<li>
   <div class="issuemain">
     <p class="title"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">{{.Title}}</a></p>
     <p class="meta">!{{.Number}} by <a href="/{{.Author}}">{{.Author}}</a> · {{if .SourcePath}}{{.SourcePath}}:{{end}}{{.SourceRef}} → {{.TargetRef}}</p>
   </div>
-  {{if .Draft}}<span class="chip chip-neutral">draft</span> {{end}}{{if eq $.State "all"}}<span class="chip chip-{{.State}}">{{.State}}</span>{{end}}
+  <div class="issueside">
+    {{if .Draft}}<span class="chip chip-neutral">draft</span> {{end}}{{if eq $.State "all"}}<span class="chip chip-{{.State}}">{{.State}}</span> {{end}}{{with .Check}}<a class="chip check-{{.}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$n}}?view=diff" title="checks: {{.}}">{{.}}</a> {{end}}{{if .Comments}}<span class="chip chip-neutral" title="{{.Comments}} comment{{if ne .Comments 1}}s{{end}}">{{.Comments}} <span class="vh">comments</span></span>{{end}}
+  </div>
 </li>
 {{else}}{{if .Query}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests matching “{{.Query}}”</li>
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}{{end}}

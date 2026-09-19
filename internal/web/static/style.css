@@ -906,6 +906,7 @@ ul.issuelist li:hover { background: var(--hover); }
 ul.issuelist li.empty { display: block; }
 ul.issuelist p { margin: 0; }
 ul.issuelist .issuemain { flex: 1 1 auto; min-width: 0; }
+ul.issuelist .issueside { display: flex; gap: var(--sp-2); align-items: center; flex: none; }
 ul.issuelist .title a { color: var(--fg); font-weight: 500; }
 ul.issuelist .title a:hover { color: var(--link); }
 

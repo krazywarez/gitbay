@@ -1790,6 +1790,15 @@ func (s *Server) canEditItem(r *http.Request, repo store.Repo, author string) bo
 	return policy.CanWrite(u, repo, grant)
 }
 
+// mrRow is one row of the merge request list: the MR plus its head's
+// combined check state and its comment count. Errors gathering either
+// fall back to zero values (#230) — the list must still render.
+type mrRow struct {
+	store.MR
+	Check    string
+	Comments int
+}
+
 func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
@@ -1818,15 +1827,33 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		mrs = mrs[:listPage]
 		older = olderLink(r, mrs[len(mrs)-1].Number)
 	}
+	shas := make([]string, len(mrs))
+	ids := make([]int64, len(mrs))
+	for i, m := range mrs {
+		shas[i] = m.HeadSHA
+		ids[i] = m.ID
+	}
+	checks, err := s.st.CombinedStatusFor(p.Repo.ID, shas)
+	if err != nil {
+		checks = map[string]string{}
+	}
+	comments, err := s.st.MRCommentCounts(p.Repo.ID, ids)
+	if err != nil {
+		comments = map[int64]int{}
+	}
+	rows := make([]mrRow, len(mrs))
+	for i, m := range mrs {
+		rows[i] = mrRow{MR: m, Check: checks[m.HeadSHA], Comments: comments[m.ID]}
+	}
 	s.render(w, "mrs.html", struct {
 		repoPage
 		State   string
 		Query   string
 		Filters []listFilter
-		MRs     []store.MR
+		MRs     []mrRow
 		Older   string
 	}{p, state, mf.Search,
-		activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), mrs, older})
+		activeFilters(state, [][2]string{{"author", mf.Author}, {"milestone", mf.Milestone}}), rows, older})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
