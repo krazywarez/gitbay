@@ -1738,18 +1738,24 @@ func (s *Server) issues(w http.ResponseWriter, r *http.Request) {
 			issues[i].Labels = labels[issues[i].ID]
 		}
 	}
+	base := url.Values{"state": {state}, "label": {f.Label}, "assignee": {f.Assignee}, "author": {f.Author}, "milestone": {f.Milestone}, "q": {f.Search}}
+	readable, _ := control.ReadableScope(s.st, s.viewer(r), p.Repo)
+	allLabels, _ := s.st.ListLabels(p.Repo, readable)
+	openMS, _ := s.st.ListMilestones(p.Repo, "open", readable)
+	facets := listFacets(base, []string{"open", "closed", "all"}, state, allLabels, openMS, false)
 	s.render(w, "issues.html", struct {
 		repoPage
 		State       string
 		Label       string
 		Query       string
 		Filters     []listFilter
+		Facets      []facetGroup
 		Issues      []store.Issue
 		LabelColors map[string]template.CSS
 		Older       string
 	}{p, state, f.Label, f.Search,
 		activeFilters(state, [][2]string{{"label", f.Label}, {"assignee", f.Assignee}, {"author", f.Author}, {"milestone", f.Milestone}}),
-		issues, s.labelColors(p.Repo), older})
+		facets, issues, s.labelColors(p.Repo), older})
 }
 
 func (s *Server) issue(w http.ResponseWriter, r *http.Request) {
@@ -1901,17 +1907,23 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		m.Labels = labels[m.ID]
 		rows[i] = mrRow{MR: m, Check: checks[m.HeadSHA], Comments: comments[m.ID]}
 	}
+	base := url.Values{"state": {state}, "label": {mf.Label}, "author": {mf.Author}, "milestone": {mf.Milestone}, "q": {mf.Search}}
+	readable, _ := control.ReadableScope(s.st, s.viewer(r), p.Repo)
+	allLabels, _ := s.st.ListLabels(p.Repo, readable)
+	openMS, _ := s.st.ListMilestones(p.Repo, "open", readable)
+	facets := listFacets(base, []string{"open", "merged", "closed", "all"}, state, allLabels, openMS, true)
 	s.render(w, "mrs.html", struct {
 		repoPage
 		State       string
 		Query       string
 		Filters     []listFilter
+		Facets      []facetGroup
 		MRs         []mrRow
 		LabelColors map[string]template.CSS
 		Older       string
 	}{p, state, mf.Search,
 		activeFilters(state, [][2]string{{"label", mf.Label}, {"author", mf.Author}, {"milestone", mf.Milestone}}),
-		rows, s.labelColors(p.Repo), older})
+		facets, rows, s.labelColors(p.Repo), older})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {

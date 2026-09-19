@@ -51,6 +51,20 @@ func TestLabelsWeb(t *testing.T) {
 		t.Errorf("bad colour accepted:\n%s", body)
 	}
 
+	// The issue list's column lists the label with its count and a link
+	// that keeps the state (desktop layout spec).
+	status, page = browserGet(t, alice, base+"/issues?state=open")
+	if status != 200 || !strings.Contains(page, `<nav class="sidecol" aria-label="Filters">`) {
+		t.Fatalf("issues page lacks the side column: %d", status)
+	}
+	if !strings.Contains(page, `href="?label=bug&amp;state=open">bug <i>1</i></a>`) {
+		t.Fatalf("issues column lacks the bug facet:\n%s", page)
+	}
+	status, page = browserGet(t, alice, base+"/issues?state=open&label=bug")
+	if status != 200 || !strings.Contains(page, `aria-current="page" href="?state=open">bug <i>1</i></a>`) {
+		t.Fatalf("active facet does not clear itself:\n%s", page)
+	}
+
 	// Removing a label needs its name typed; a bare post is refused and
 	// the label stays.
 	_, body = browserPost(t, alice, base+"/labels", url.Values{

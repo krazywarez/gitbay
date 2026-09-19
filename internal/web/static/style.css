@@ -1390,6 +1390,25 @@ a.memberchip .role { color: var(--muted); }
 .filenav li a.dir { color: var(--link); }
 .filenav li a.up { color: var(--muted); }
 
+/* ---- side column: facets or sections beside a list or a form ---- */
+.withcol { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+.withcol.narrow { grid-template-columns: 15rem minmax(0, 56rem); }
+.colmain { min-width: 0; }
+.sidecol { position: sticky; top: var(--sp-4); font-size: var(--fs-2); }
+.sidecol .grp { margin-bottom: var(--sp-4); }
+.sidecol ul { list-style: none; margin: 0; padding: 0; }
+.sidecol li a {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  padding: 4px var(--sp-2);
+  border-radius: var(--r-ctl);
+  color: var(--fg);
+}
+.sidecol li a:hover { background: var(--hover); text-decoration: none; }
+.sidecol li a[aria-current] { background: var(--surface); box-shadow: inset 2px 0 0 var(--mark); font-weight: 500; }
+.sidecol li a i { margin-left: auto; font-style: normal; color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.sidecol form.searchform { margin-top: var(--sp-2); }
+.sidecol form.searchform input[type="text"] { min-width: 0; width: 100%; }
+
 .refchip {
   display: inline-flex;
   align-items: center;
@@ -1602,6 +1621,11 @@ svg.icon { vertical-align: -0.125em; }
   /* the tree page is the navigator on a phone */
   .blobgrid { grid-template-columns: 1fr; }
   .filenav { display: none; }
+
+  /* the column follows the content on a phone, the way the aside does */
+  .withcol, .withcol.narrow { grid-template-columns: 1fr; }
+  .sidecol { position: static; order: 2; }
+  .sidecol .grp { display: inline-block; vertical-align: top; margin-right: var(--sp-5); }
 }
 
 @media (max-width: 52rem) {

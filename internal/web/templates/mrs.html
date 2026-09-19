@@ -1,14 +1,11 @@
 {{define "width"}}wide{{end}}
 {{define "title"}}merge requests · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
+<div class="withcol">
+{{template "sidecol" .Facets}}
+<div class="colmain">
 <div class="listhead">
   <h1>Merge requests</h1>
-  <nav class="filters">
-    <a {{if eq .State "open"}}class="active" aria-current="page" {{end}}href="?state=open">open</a>
-    <a {{if eq .State "merged"}}class="active" aria-current="page" {{end}}href="?state=merged">merged</a>
-    <a {{if eq .State "closed"}}class="active" aria-current="page" {{end}}href="?state=closed">closed</a>
-    <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
-  </nav>
   <form method="get" class="searchform compact">
     <input type="search" name="q" aria-label="Search merge requests" value="{{.Query}}" placeholder="search title and body">
     <button type="submit" class="btn">Search</button>
@@ -32,4 +29,6 @@
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}merge requests — open one with <code>gitbay mr create {{.Repo.OwnerName}}/{{.Repo.Name}} --source ... --target {{.Repo.DefaultBranch}}</code></li>{{end}}{{end}}
 </ul>
 {{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
+</div>
+</div>
 {{end}}

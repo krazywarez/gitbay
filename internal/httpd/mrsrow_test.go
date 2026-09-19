@@ -13,6 +13,7 @@ type mrsPageData struct {
 	State   string
 	Query   string
 	Filters []listFilter
+	Facets  []facetGroup
 	MRs     []mrRow
 	Older   string
 }
