@@ -10,7 +10,7 @@ import (
 // A file page lists its directory beside the file, marks the file, and
 // links up (desktop layout spec).
 func TestFileNavigator(t *testing.T) {
-	inst := startInstance(t)
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")
 	if _, errOut, code := inst.ssh(t, key, "", "repo", "create", "alice/nav"); code != 0 {
@@ -48,5 +48,11 @@ func TestFileNavigator(t *testing.T) {
 	_, body = inst.get(t, "/alice/nav/blame/main/README.md")
 	if !strings.Contains(body, `<h2 class="colhead">nav</h2>`) || !strings.Contains(body, `<a aria-current="page" href="/alice/nav/blob/main/README.md">README.md</a>`) {
 		t.Errorf("blame page lacks the root navigator:\n%s", body)
+	}
+
+	alice := inst.login(t, key)
+	status, body = browserGet(t, alice, inst.base()+"/alice/nav/edit/main/cmd/main.go")
+	if status != 200 || !strings.Contains(body, `<h2 class="colhead">cmd</h2>`) || !strings.Contains(body, `<a aria-current="page" href="/alice/nav/blob/main/cmd/main.go">main.go</a>`) {
+		t.Errorf("edit page lacks the navigator: %d\n%s", status, body)
 	}
 }
