@@ -120,7 +120,6 @@
   --sp-7: 48px;
 
   /* the rail: a column the width of one hit target, a row one tall */
-  --rail-w: 3.5rem;
   --rail-hit: 40px;
   --rail-strip-h: 48px;
   --rail-mark: 24px;
@@ -251,33 +250,28 @@ a.skip {
 }
 a.skip:focus { top: var(--sp-3); text-decoration: none; }
 
-/* ---- rail: one glyph per destination, no labels ----
-   The column is the width of a hit target and nothing else. Every item is
-   a square link carrying an inline svg, its name in an aria-label and in a
-   visually hidden span, so the nav reads the same to a screen reader as
-   the old text list did. */
+/* ---- rail: one row of glyphs across the top, no labels ----
+   One strip the height of a hit target, at every width: fixed squares,
+   no wrapping and no scrolling. Every item is a square link carrying an
+   inline svg, its name in an aria-label and in a visually hidden span, so
+   the nav reads the same to a screen reader as the old text list did. */
 .rail {
-  flex: none;
-  width: var(--rail-w);
+  height: var(--rail-strip-h);
   background: var(--shell-bg);
   color: var(--shell-fg);
-  border-right: 1px solid var(--shell-line);
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  border-bottom: 1px solid var(--shell-line);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-3) 0;
+  padding: 0 var(--sp-1);
 }
 a.brand {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: var(--rail-hit);
-  height: var(--rail-hit);
+  width: var(--rail-mark-box);
+  height: var(--rail-strip-h);
   color: var(--shell-fg);
 }
 a.brand:hover { text-decoration: none; }
@@ -288,13 +282,11 @@ ul.raillist {
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--sp-1);
   min-width: 0;
 }
 /* the spacer that holds settings, admin and the account cell at the far
-   end of the rail in either orientation */
+   end of the row */
 .railgap { flex: 1; }
 .railicon {
   position: relative;
@@ -303,19 +295,18 @@ ul.raillist {
   justify-content: center;
   flex: none;
   width: var(--rail-hit);
-  height: var(--rail-hit);
+  height: var(--rail-strip-h);
   padding: 0;
   border: 0;
   background: none;
   color: var(--shell-fg);
-  border-radius: var(--r-ctl);
   cursor: pointer;
 }
 .railicon:hover { background: var(--shell-hover); text-decoration: none; }
-/* orange marks position — the rail's only accent */
+/* orange marks position along the bottom edge — the rail's only accent */
 .railicon[aria-current] {
   background: var(--shell-hover);
-  box-shadow: inset 3px 0 0 var(--shell-mark);
+  box-shadow: inset 0 -2px 0 var(--shell-mark);
 }
 .count {
   font-size: var(--fs-0);
@@ -339,9 +330,7 @@ ul.raillist {
 .railfoot {
   flex: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--sp-1);
   min-width: 0;
 }
 .railfoot a { color: var(--shell-fg); }
@@ -352,7 +341,7 @@ a.railuser {
   justify-content: center;
   flex: none;
   width: var(--rail-hit);
-  height: var(--rail-hit);
+  height: var(--rail-strip-h);
 }
 a.railuser:hover { text-decoration: none; }
 a.railuser .avatar { width: var(--rail-mark); height: var(--rail-mark); }
@@ -368,8 +357,9 @@ a.railuser .avatar { width: var(--rail-mark); height: var(--rail-mark); }
   font-weight: 600;
 }
 
-/* ---- shell ---- */
-.shell { display: flex; align-items: stretch; min-height: 100vh; }
+/* ---- shell: the rail above, then the pane, which fills the rest of the
+   viewport so the footer sits at the bottom of a short page ---- */
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
 .pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 main.content {
   flex: 1;
@@ -1476,27 +1466,6 @@ svg.icon { vertical-align: -0.125em; }
 }
 
 @media (max-width: 52rem) {
-  /* the rail becomes one row of the same glyphs: fixed squares, no
-     wrapping and no scrolling. The squares narrow a step further below
-     30rem, where eleven of them would not otherwise fit a phone. */
-  .shell { display: block; }
-  .rail {
-    width: auto;
-    height: var(--rail-strip-h);
-    position: static;
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
-    padding: 0 var(--sp-1);
-    border-right: 0;
-    border-bottom: 1px solid var(--shell-line);
-    overflow: visible;
-  }
-  a.brand { width: var(--rail-mark-box); height: var(--rail-strip-h); }
-  ul.raillist, .railfoot { flex-direction: row; gap: 0; }
-  .railicon, a.railuser { height: var(--rail-strip-h); border-radius: 0; }
-  /* the current item is marked along the bottom edge in a row */
-  .railicon[aria-current] { box-shadow: inset 0 -2px 0 var(--shell-mark); }
   main.content { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
   footer { padding: var(--sp-4); }
   .repohead { padding: var(--sp-3) var(--sp-4) 0; }
