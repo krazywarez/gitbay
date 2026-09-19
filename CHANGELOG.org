@@ -28,6 +28,9 @@ The web findings from the forge comparison (#232).
 - =web theme set system|light|dark= and an Appearance section on the
   account page fix the colour scheme per account. Migration 0057 adds
   =users.theme=.
+- A path that only misses because of a trailing slash redirects to the
+  path without it: =/cmc/= reaches =/cmc=, =/cmc/-/snippets/= reaches
+  =/cmc/-/snippets= (#233).
 
 * v1.29.0 — 2026-09-19
 

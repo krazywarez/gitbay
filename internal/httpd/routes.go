@@ -231,8 +231,9 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc(r.Method+" "+r.Pattern, r.Handler)
 	}
 	// A path no pattern matches gets the 404 page, not net/http's
-	// plain-text body (#232).
-	mux.HandleFunc("/", s.notFound)
+	// plain-text body (#232), unless dropping a trailing slash makes it
+	// match (#233).
+	mux.HandleFunc("/", s.unmatched(mux))
 	var h http.Handler = mux
 	if len(s.cfg.GoImport) > 0 {
 		h = s.goImportHandler(mux)
@@ -240,6 +241,30 @@ func (s *Server) Handler() http.Handler {
 	// Always wrapped: custom pages domains work with or without the
 	// built-in [pages] domain.
 	return compressed(s.pagesRouter(s.securityHeaders(h)))
+}
+
+// unmatched answers a path no pattern matched. A GET whose path ends in
+// a slash and resolves without it redirects there, so /cmc/ reaches /cmc
+// and /cmc/-/snippets/ reaches /cmc/-/snippets (#233). Everything else is
+// the 404 page. Patterns ending in a {path...} wildcard already accept
+// the slash and never arrive here.
+func (s *Server) unmatched(mux *http.ServeMux) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if len(p) > 1 && strings.HasSuffix(p, "/") && (r.Method == "GET" || r.Method == "HEAD") {
+			trimmed := r.Clone(r.Context())
+			u := *r.URL
+			u.Path = strings.TrimRight(p, "/")
+			trimmed.URL = &u
+			// The fallback itself is registered at "/", so a miss
+			// reports that pattern; a real route reports its own.
+			if _, pattern := mux.Handler(trimmed); pattern != "" && pattern != "/" {
+				http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
+				return
+			}
+		}
+		s.notFound(w, r)
+	}
 }
 
 // securityHeaders sets defensive response headers on every reply. The CSP
