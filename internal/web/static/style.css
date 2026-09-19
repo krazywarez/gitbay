@@ -1027,6 +1027,11 @@ form.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var
 form.actions button { flex: 1 1 auto; }
 form.actions select, form.actions textarea { width: 100%; }
 .feedline { margin-bottom: var(--sp-2); }
+/* the dashboard's activity feed is a section after the queues, one column */
+.feed { margin-top: var(--sp-6); max-width: 78ch; }
+.feed h2 { margin-bottom: var(--sp-3); }
+.feed .feedline { font-size: var(--fs-2); }
+.feed .none { color: var(--muted); font-size: var(--fs-1); }
 
 /* ---- comments and threads ---- */
 article.comment {
@@ -1466,10 +1471,8 @@ svg.icon { vertical-align: -0.125em; }
 /* ---- breakpoints ---- */
 @media (max-width: 62rem) {
   .withaside { grid-template-columns: 1fr; }
-  /* checks and reviewers before a long thread; the dashboard's aside is
-     the activity feed, which reads after the queues */
+  /* checks and reviewers before a long thread */
   .withaside .aside { order: -1; }
-  .withaside.feedlast .aside { order: 0; }
 }
 
 @media (max-width: 52rem) {
