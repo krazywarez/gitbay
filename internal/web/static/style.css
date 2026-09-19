@@ -1463,7 +1463,7 @@ details.refmenu .refdrop a.allrefs {
 /* the side column exists only above 62rem; below it .facts keeps its
    own two-up layout and the 40rem factgrid rule applies untouched */
 @media (min-width: 62.01rem) {
-  .overview.withfacts { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--sp-6); align-items: start; }
+  .overview.withfacts { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--sp-6); align-items: start; }
   .overview.withfacts .facts { display: block; margin-top: 0; max-width: none; }
   .overview.withfacts .facts .factgrid { grid-template-columns: repeat(2, auto); }
   .overview.withfacts .clone pre { white-space: pre-wrap; word-break: break-all; }
