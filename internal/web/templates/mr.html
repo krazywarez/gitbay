@@ -5,12 +5,13 @@
 <h1 class="issuetitle">{{.MR.Title}} <span class="issuenumber">!{{.MR.Number}}</span></h1>
 <p class="issuemeta"><span class="chip chip-{{.MR.State}}">{{if eq .MR.State "source_gone"}}source gone{{else}}{{.MR.State}}{{end}}</span>{{if .MR.Draft}} <span class="chip chip-neutral">draft</span>{{end}}
   {{if and (eq .MR.State "merged") .MR.MergedBy}}merged by <a href="/{{.MR.MergedBy}}">{{.MR.MergedBy}}</a>{{with .MR.MergedAt}} on {{when .}}{{end}}
-  {{else if and (eq .MR.State "closed") .MR.ClosedBy}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a>{{with .MR.ClosedAt}} on {{when .}}{{end}}
+  {{else if and (eq .MR.State "closed") .MR.ClosedBy}}closed without merging by <a href="/{{.MR.ClosedBy}}">{{.MR.ClosedBy}}</a>{{with .MR.ClosedAt}} on {{when .}}{{end}}{{if .MR.SupersededBy}}, in favour of <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.SupersededBy}}">!{{.MR.SupersededBy}}</a>{{end}}
   {{else if or (eq .MR.State "merged") (eq .MR.State "closed")}}{{if eq .MR.State "merged"}}merged{{else}}closed without merging{{end}}
   {{else}}opened by <a href="/{{.MR.Author}}">{{.MR.Author}}</a> on {{when .MR.CreatedAt}}{{end}}
   · <code>{{if .MR.SourcePath}}{{.MR.SourcePath}}:{{end}}{{.MR.SourceRef}}</code> into <code>{{.MR.TargetRef}}</code></p>
 {{with field . "StackedOn"}}<p class="meta">Stacked on <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{.Number}}">!{{.Number}} {{.Title}}</a>: merges into its branch until that lands, then onto its target.</p>{{end}}
 {{with field . "Stacked"}}<p class="meta">Builds on this: {{range $i, $k := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$k.Number}}">!{{$k.Number}} {{$k.Title}}</a>{{end}}. Merging with squash or rebase is refused while they are open.</p>{{end}}
+{{with field . "Supersedes"}}<p class="meta">supersedes {{range $i, $m := .}}{{if $i}}, {{end}}<a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs/{{$m.Number}}">!{{$m.Number}}</a>{{end}}</p>{{end}}
 
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 
@@ -103,6 +104,8 @@
       <button type="submit">Merge</button>
     </form>
     <form method="post" action="{{$base}}/close" class="actions">
+      <label class="vh" for="by">Closed in favour of</label>
+      <input type="text" id="by" name="by" inputmode="numeric" size="4" placeholder="!N">
       <button type="submit" class="danger">Close without merging</button>
     </form>
     <form method="post" action="{{$base}}/draft" class="actions">

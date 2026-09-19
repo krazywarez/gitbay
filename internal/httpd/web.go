@@ -1957,6 +1957,9 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 			stacked, _ = s.st.OpenMRsByTarget(p.Repo.ID, m.SourceRef)
 		}
 	}
+	// The merge requests this one superseded when it was closed, so the
+	// page it points to can also say what it supersedes.
+	supersedes, _ := s.st.MRsSuperseding(p.Repo.ID, m.Number)
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -1980,6 +1983,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		DetachedThreads []diffThread
 		StackedOn       *store.MR
 		Stacked         []store.MR
+		Supersedes      []store.MR
 		Gates           *control.GatesOut
 		SourceGone      bool
 		HeadMerged      bool
@@ -1987,7 +1991,7 @@ func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
 		Base            string
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
-		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, gates,
+		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, supersedes, gates,
 		sourceGone(p, m), headMerged, headPruned, base})
 }
 

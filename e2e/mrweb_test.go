@@ -388,3 +388,68 @@ func TestMRDiffEmptyExplained(t *testing.T) {
 		t.Fatalf("empty diff unexplained:\n%s", body)
 	}
 }
+
+// TestMRSupersedes closes one merge request in favour of another from the
+// web form, and checks both pages say so; clearing it over ssh removes
+// both lines again (#223).
+func TestMRSupersedes(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "README"), []byte("base\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+
+	for _, branch := range []string{"one", "two"} {
+		mustGit(t, dir, env, "checkout", "-q", "main")
+		mustGit(t, dir, env, "checkout", "-q", "-b", branch)
+		os.WriteFile(filepath.Join(dir, branch+".txt"), []byte(branch+"\n"), 0o644)
+		mustGit(t, dir, env, "add", ".")
+		mustGit(t, dir, env, "commit", "-q", "-m", branch)
+		mustGit(t, dir, env, "push", "-q", "origin", branch)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/app",
+		"--source", "one", "--target", "main", "--title", "one"); code != 0 {
+		t.Fatalf("mr create one: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/app",
+		"--source", "two", "--target", "main", "--title", "two"); code != 0 {
+		t.Fatalf("mr create two: %s", errOut)
+	}
+
+	alice := inst.login(t, aliceKey)
+	if status, body := browserPost(t, alice, inst.base()+"/alice/app/mrs/1/close", url.Values{"by": {"2"}}); status != 200 {
+		t.Fatalf("close post: %d\n%s", status, body)
+	}
+
+	_, body1 := browserGet(t, alice, inst.base()+"/alice/app/mrs/1")
+	if !strings.Contains(body1, `in favour of <a href="/alice/app/mrs/2">!2</a>`) {
+		t.Fatalf("!1 does not say it was superseded:\n%s", body1)
+	}
+	_, body2 := browserGet(t, alice, inst.base()+"/alice/app/mrs/2")
+	if !strings.Contains(body2, `supersedes <a href="/alice/app/mrs/1">!1</a>`) {
+		t.Fatalf("!2 does not say what it supersedes:\n%s", body2)
+	}
+
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "edit", "alice/app", "1", "--superseded-by", "none"); code != 0 {
+		t.Fatalf("mr edit --superseded-by none: %s", errOut)
+	}
+	_, body1 = browserGet(t, alice, inst.base()+"/alice/app/mrs/1")
+	if strings.Contains(body1, "in favour of") {
+		t.Fatalf("!1 still says it was superseded after clearing:\n%s", body1)
+	}
+	_, body2 = browserGet(t, alice, inst.base()+"/alice/app/mrs/2")
+	if strings.Contains(body2, "supersedes") {
+		t.Fatalf("!2 still says it supersedes after clearing:\n%s", body2)
+	}
+}

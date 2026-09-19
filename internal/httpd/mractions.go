@@ -76,7 +76,15 @@ func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.U
 }
 
 func (s *Server) mrCloseSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	_, msg, code := s.runControlCode(u, mrArgs(r, "close"))
+	args := []string{}
+	if by := strings.TrimSpace(r.FormValue("by")); by != "" {
+		if _, err := strconv.ParseInt(by, 10, 64); err != nil {
+			s.mrRedirect(w, r, "the superseding request is a number")
+			return
+		}
+		args = append(args, "--by", by)
+	}
+	_, msg, code := s.runControlCode(u, mrArgs(r, "close", args...))
 	s.done(w, r, code, msg, s.mrRedirect)
 }
 
