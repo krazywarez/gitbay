@@ -580,7 +580,7 @@ func mrCmd() *cobra.Command {
 	return group("mr", "merge requests",
 		pass("create", "open a merge request: --source <branch> --target <branch> --title <t>",
 			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
-		pass("list", "list merge requests [--state ...] [--author u] [--milestone m|none] [--limit n] [--cursor c]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
+		pass("list", "list merge requests [--state ...] [--label l] [--author u] [--milestone m|none] [--limit n] [--cursor c]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
 		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
 		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
 		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),
@@ -598,6 +598,7 @@ func mrCmd() *cobra.Command {
 		pass("draft", "mark as work in progress", passOpts{server: []string{"mr", "draft"}, needsRepo: true}),
 		pass("ready", "take the draft mark off, so it can merge", passOpts{server: []string{"mr", "ready"}, needsRepo: true}),
 		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),
+		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"mr", "label"}, needsRepo: true}),
 		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
 		pass("retarget", "retarget onto another branch: <n> <branch>", passOpts{server: []string{"mr", "retarget"}, needsRepo: true}),
 	)

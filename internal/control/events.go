@@ -33,6 +33,7 @@ var EventKinds = []string{
 	"mr.created",
 	"mr.draft",
 	"mr.edited",
+	"mr.labeled",
 	"mr.merged",
 	"mr.milestoned",
 	"mr.retargeted",

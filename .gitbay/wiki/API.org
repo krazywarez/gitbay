@@ -146,8 +146,8 @@ silently never fire.
   =issue.assigned= (assignees), =issue.milestoned= (milestone)
 - merge requests: =mr.created=, =mr.edited=, =mr.commented=,
   =mr.reviewed= (verdict), =mr.draft= (draft), =mr.retargeted= (from,
-  to), =mr.milestoned= (milestone), =mr.merged= (number, sha),
-  =mr.closed=
+  to), =mr.labeled= (labels), =mr.milestoned= (milestone), =mr.merged=
+  (number, sha), =mr.closed=
 - releases: =release.created= (tag), =release.deleted= (tag)
 - CI: =status=, =build.success=, =build.failure=, =build.cancelled=
 

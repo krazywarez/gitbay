@@ -59,7 +59,7 @@ func init() {
 		Usage:   "mr ready <owner/name> <n>", Run: runMRReady})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
-		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--label <l>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
 		Summary: "show a merge request",
 		Usage:   "mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
@@ -83,6 +83,9 @@ func init() {
 	register(Command{Path: []string{"mr", "review", "request"},
 		Summary: "ask specific people for a review",
 		Usage:   "mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runMRReviewRequest})
+	register(Command{Path: []string{"mr", "label"},
+		Summary: "labels",
+		Usage:   "mr label <owner/name> <n> [--add <l>]... [--remove <l>]...", Run: runMRLabel})
 	register(Command{Path: []string{"mr", "merge"},
 		Summary: "merge",
 		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
@@ -365,14 +368,15 @@ type mrOut struct {
 	Title  string `json:"title"`
 	State  string `json:"state"`
 	// Draft is an open merge request not asking to be merged yet.
-	Draft      bool   `json:"draft,omitempty"`
-	Author     string `json:"author"`
-	Source     string `json:"source"` // owner/name:branch, or branch, "" if gone
-	TargetRef  string `json:"target_ref"`
-	HeadSHA    string `json:"head_sha"`
-	Body       string `json:"body,omitempty"`
-	BodyFormat string `json:"body_format,omitempty"`
-	Milestone  string `json:"milestone,omitempty"`
+	Draft      bool     `json:"draft,omitempty"`
+	Author     string   `json:"author"`
+	Source     string   `json:"source"` // owner/name:branch, or branch, "" if gone
+	TargetRef  string   `json:"target_ref"`
+	HeadSHA    string   `json:"head_sha"`
+	Body       string   `json:"body,omitempty"`
+	BodyFormat string   `json:"body_format,omitempty"`
+	Milestone  string   `json:"milestone,omitempty"`
+	Labels     []string `json:"labels,omitempty"`
 	// ReviewRequests is who has been asked, directly, for a review.
 	ReviewRequests []string `json:"review_requests,omitempty"`
 	// StackedOn is the open merge request whose source branch this one
@@ -430,8 +434,8 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 	}
 	o := mrOut{Number: m.Number, Title: m.Title, State: m.State, Draft: m.Draft, Author: m.Author,
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
-		ReviewRequests: m.ReviewRequests,
-		CreatedAt:      m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
+		Labels: m.Labels, ReviewRequests: m.ReviewRequests,
+		CreatedAt: m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
 		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy, SupersededBy: m.SupersededBy}
 	if withBody {
 		o.Body = m.Body
@@ -446,7 +450,7 @@ func runMRList(c *Ctx, args []string) int {
 		return code
 	}
 	f := store.MRFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -454,7 +458,7 @@ func runMRList(c *Ctx, args []string) int {
 	if fl.Has("--state") {
 		f.State = fl.Value("--state")
 	}
-	f.Author, f.Milestone = fl.Value("--author"), fl.Value("--milestone")
+	f.Label, f.Author, f.Milestone = fl.Value("--label"), fl.Value("--author"), fl.Value("--milestone")
 	f.Search = fl.Value("--search")
 	if fl.Has("--search") {
 		if err := validQuery(f.Search); err != nil {
@@ -586,6 +590,9 @@ func runMRShow(c *Ctx, args []string) int {
 			state = "draft"
 		}
 		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, state, d.Author, d.Source, d.TargetRef, d.HeadSHA)
+		if len(d.Labels) > 0 {
+			fmt.Fprintf(w, "labels: %s\n", strings.Join(d.Labels, ", "))
+		}
 		if len(d.ReviewRequests) > 0 {
 			fmt.Fprintf(w, "reviewers: %s\n", strings.Join(d.ReviewRequests, ", "))
 		}
@@ -874,6 +881,45 @@ func runMRReview(c *Ctx, args []string) int {
 // runMRReviewRequest is issue assign's counterpart for merge requests: it
 // pushes a merge request into a specific person's review queue and inbox
 // directly, rather than waiting for them to be otherwise involved (#145).
+func runMRLabel(c *Ctx, args []string) int {
+	rest, adds, removes, err := addRemoveFlags(args)
+	if err != nil {
+		return c.failInput(err)
+	}
+	if len(adds)+len(removes) == 0 {
+		return c.usage()
+	}
+	repo, mr, code := mrRef(c, rest, policy.CanWrite)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	for _, l := range adds {
+		if err := c.Store.SetMRLabel(repo, mr.ID, l, true); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	for _, l := range removes {
+		if err := c.Store.SetMRLabel(repo, mr.ID, l, false); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return c.fail(protocol.ExitNotFound, "%v", err)
+			}
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	updated, err := c.Store.MRByNumber(repo.ID, mr.Number)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.labeled",
+		fmt.Sprintf(`{"number":%d,"labels":%s}`, mr.Number, jsonStrings(updated.Labels)))
+	return c.emit(map[string]any{"number": mr.Number, "labels": updated.Labels}, func(w io.Writer) {
+		fmt.Fprintf(w, "labels on %s!%d: %s\n", repo.Path(), mr.Number, strings.Join(updated.Labels, ", "))
+	})
+}
+
 func runMRReviewRequest(c *Ctx, args []string) int {
 	rest, adds, removes, err := addRemoveFlags(args)
 	if err != nil {

@@ -174,3 +174,54 @@ func TestDuplicateMilestoneTitleFails(t *testing.T) {
 		t.Fatalf("duplicate org create: exit %d %s", code, out.String())
 	}
 }
+
+// mr label mirrors issue label: a name the org holds resolves to the org's
+// row, one neither scope has is created in the repository, removing what
+// is not there is not found, and someone with read only is denied (#231).
+func TestMRLabelCommandMirrorsIssueLabel(t *testing.T) {
+	f := newOrgFixture(t)
+	if _, err := f.st.SetOrgLabel(f.org, "bug", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.st.CreateMR(f.core.ID, f.alice, f.core.ID, "topic", "main", "c1", "", "deadbeef", "md", false); err != nil {
+		t.Fatal(err)
+	}
+	c, out := f.ctx(f.alice)
+	if code := runMRLabel(c, []string{"acme/core", "1", "--add", "bug", "--add", "docs"}); code != protocol.ExitOK ||
+		!strings.Contains(out.String(), `"labels":["bug","docs"]`) {
+		t.Fatalf("mr label --add: exit %d %s", code, out.String())
+	}
+	// bug is the org's one row; docs was created in the repository.
+	var n int
+	f.st.DB.QueryRow("SELECT COUNT(*) FROM labels WHERE name = 'bug'").Scan(&n)
+	if n != 1 {
+		t.Fatalf("labels named bug: %d, want 1", n)
+	}
+	if l, err := f.st.LabelByName(f.core, "docs"); err != nil || l.Org {
+		t.Fatalf("docs = %+v, %v", l, err)
+	}
+	out.Reset()
+	if code := runMRList(c, []string{"acme/core", "--label", "bug"}); code != protocol.ExitOK ||
+		!strings.Contains(out.String(), `"number":1`) {
+		t.Fatalf("mr list --label bug: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runMRList(c, []string{"acme/core", "--label", "nope"}); code != protocol.ExitOK ||
+		strings.Contains(out.String(), `"number":1`) {
+		t.Fatalf("mr list --label nope: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runMRLabel(c, []string{"acme/core", "1", "--remove", "docs"}); code != protocol.ExitOK ||
+		!strings.Contains(out.String(), `"labels":["bug"]`) {
+		t.Fatalf("mr label --remove: exit %d %s", code, out.String())
+	}
+	out.Reset()
+	if code := runMRLabel(c, []string{"acme/core", "1", "--remove", "docs"}); code != protocol.ExitNotFound {
+		t.Fatalf("mr label --remove of an absent label: exit %d %s", code, out.String())
+	}
+	// carol reads acme/core and writes nothing.
+	rc, rout := f.ctx(f.carol)
+	if code := runMRLabel(rc, []string{"acme/core", "1", "--add", "bug"}); code != protocol.ExitDenied {
+		t.Fatalf("reader: exit %d %s", code, rout.String())
+	}
+}
