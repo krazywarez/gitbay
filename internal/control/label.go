@@ -14,13 +14,13 @@ import (
 
 func init() {
 	register(Command{Path: []string{"label", "list"},
-		Summary: "list a repository's issue labels with colour and use",
+		Summary: "list a repository's labels with colour and use",
 		Usage:   "label list <owner/name>", ReadOnly: true, Run: runLabelList})
 	register(Command{Path: []string{"label", "set"},
 		Summary: "create a label or set its colour",
 		Usage:   "label set <owner/name> <label> [--color rrggbb|'']", Run: runLabelSet})
 	register(Command{Path: []string{"label", "remove"},
-		Summary: "remove a label from the repository and from every issue",
+		Summary: "remove a label from the repository and from every issue and merge request",
 		Usage:   "label remove <owner/name> <label>", Run: runLabelRemove})
 }
 
@@ -47,7 +47,7 @@ func runLabelList(c *Ctx, args []string) int {
 	}
 	return c.emit(labels, func(w io.Writer) {
 		for _, l := range labels {
-			fmt.Fprintf(w, "%s\t%s\t%d%s\n", l.Name, l.Color, l.Issues, map[bool]string{true: "\torg"}[l.Org])
+			fmt.Fprintf(w, "%s\t%s\t%d\t%d%s\n", l.Name, l.Color, l.Issues, l.MRs, map[bool]string{true: "\torg"}[l.Org])
 		}
 	})
 }

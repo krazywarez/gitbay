@@ -129,7 +129,7 @@ func runOrgLabelList(c *Ctx, args []string) int {
 	}
 	return c.emit(labels, func(w io.Writer) {
 		for _, l := range labels {
-			fmt.Fprintf(w, "%s\t%s\t%d\n", l.Name, l.Color, l.Issues)
+			fmt.Fprintf(w, "%s\t%s\t%d\t%d\n", l.Name, l.Color, l.Issues, l.MRs)
 		}
 	})
 }

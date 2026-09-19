@@ -881,45 +881,6 @@ func runMRReview(c *Ctx, args []string) int {
 // runMRReviewRequest is issue assign's counterpart for merge requests: it
 // pushes a merge request into a specific person's review queue and inbox
 // directly, rather than waiting for them to be otherwise involved (#145).
-func runMRLabel(c *Ctx, args []string) int {
-	rest, adds, removes, err := addRemoveFlags(args)
-	if err != nil {
-		return c.failInput(err)
-	}
-	if len(adds)+len(removes) == 0 {
-		return c.usage()
-	}
-	repo, mr, code := mrRef(c, rest, policy.CanWrite)
-	if code >= 0 {
-		return code
-	}
-	if code := refuseArchived(c, repo); code >= 0 {
-		return code
-	}
-	for _, l := range adds {
-		if err := c.Store.SetMRLabel(repo, mr.ID, l, true); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-	}
-	for _, l := range removes {
-		if err := c.Store.SetMRLabel(repo, mr.ID, l, false); err != nil {
-			if errors.Is(err, store.ErrNotFound) {
-				return c.fail(protocol.ExitNotFound, "%v", err)
-			}
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-	}
-	updated, err := c.Store.MRByNumber(repo.ID, mr.Number)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.labeled",
-		fmt.Sprintf(`{"number":%d,"labels":%s}`, mr.Number, jsonStrings(updated.Labels)))
-	return c.emit(map[string]any{"number": mr.Number, "labels": updated.Labels}, func(w io.Writer) {
-		fmt.Fprintf(w, "labels on %s!%d: %s\n", repo.Path(), mr.Number, strings.Join(updated.Labels, ", "))
-	})
-}
-
 func runMRReviewRequest(c *Ctx, args []string) int {
 	rest, adds, removes, err := addRemoveFlags(args)
 	if err != nil {
@@ -1001,6 +962,47 @@ func runMRReviewRequest(c *Ctx, args []string) int {
 		fmt.Sprintf(`{"number":%d,"reviewers":%s}`, mr.Number, jsonStrings(updated.ReviewRequests)))
 	return c.emit(map[string]any{"number": mr.Number, "reviewers": updated.ReviewRequests}, func(w io.Writer) {
 		fmt.Fprintf(w, "requested reviewers on %s!%d: %s\n", repo.Path(), mr.Number, strings.Join(updated.ReviewRequests, ", "))
+	})
+}
+
+// runMRLabel is issue label's counterpart for merge requests: the label
+// set is the repository's (or its org's), shared with the issues (#231).
+func runMRLabel(c *Ctx, args []string) int {
+	rest, adds, removes, err := addRemoveFlags(args)
+	if err != nil {
+		return c.failInput(err)
+	}
+	if len(adds)+len(removes) == 0 {
+		return c.usage()
+	}
+	repo, mr, code := mrRef(c, rest, policy.CanWrite)
+	if code >= 0 {
+		return code
+	}
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	for _, l := range adds {
+		if err := c.Store.SetMRLabel(repo, mr.ID, l, true); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	for _, l := range removes {
+		if err := c.Store.SetMRLabel(repo, mr.ID, l, false); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return c.fail(protocol.ExitNotFound, "%v", err)
+			}
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	updated, err := c.Store.MRByNumber(repo.ID, mr.Number)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.labeled",
+		fmt.Sprintf(`{"number":%d,"labels":%s}`, mr.Number, jsonStrings(updated.Labels)))
+	return c.emit(map[string]any{"number": mr.Number, "labels": updated.Labels}, func(w io.Writer) {
+		fmt.Fprintf(w, "labels on %s!%d: %s\n", repo.Path(), mr.Number, strings.Join(updated.Labels, ", "))
 	})
 }
 

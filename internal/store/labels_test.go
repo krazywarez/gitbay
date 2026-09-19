@@ -260,6 +260,16 @@ func TestSetOrgLabelFoldsMRLabels(t *testing.T) {
 	if len(rows) != 1 || rows[0].MRs != 2 {
 		t.Fatalf("org label rows = %+v", rows)
 	}
+	// Deleting the label takes it off every merge request: mr_labels
+	// cascades from labels, nothing unlinks them by hand.
+	if err := f.s.DeleteOrgLabel(f.org, "bug"); err != nil {
+		t.Fatal(err)
+	}
+	for _, repo := range []Repo{f.core, f.site} {
+		if got, err := f.s.ListMRLabels(repo); err != nil || len(got) != 0 {
+			t.Fatalf("%s MR labels after delete = %v, %v", repo.Name, got, err)
+		}
+	}
 }
 
 func TestRepoLabelRefusedWhenOrgHoldsName(t *testing.T) {

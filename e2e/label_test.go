@@ -23,7 +23,7 @@ func TestLabelColors(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "label", "alice/app", "1", "--add", "bug"); code != 0 {
 		t.Fatal("issue label failed")
 	}
-	if out, _, _ := inst.ssh(t, aliceKey, "", "label", "list", "alice/app"); !strings.Contains(out, "bug\t\t1") {
+	if out, _, _ := inst.ssh(t, aliceKey, "", "label", "list", "alice/app"); !strings.Contains(out, "bug\t\t1\t0") {
 		t.Fatalf("list after issue label:\n%s", out)
 	}
 	if _, _, code := inst.ssh(t, bobKey, "", "label", "set", "alice/app", "bug", "--color", "cf222e"); code != 4 {
@@ -39,7 +39,8 @@ func TestLabelColors(t *testing.T) {
 		t.Fatal("create without colour failed")
 	}
 	out, _, _ := inst.ssh(t, aliceKey, "", "label", "list", "alice/app", "--json")
-	if !strings.Contains(out, `{"name":"bug","color":"#cf222e","issues":1}`) || !strings.Contains(out, `{"name":"docs","issues":0}`) {
+	if !strings.Contains(out, `{"name":"bug","color":"#cf222e","issues":1,"mrs":0}`) ||
+		!strings.Contains(out, `{"name":"docs","issues":0,"mrs":0}`) {
 		t.Fatalf("list json:\n%s", out)
 	}
 	// The web paints the chip with the stored colour.
