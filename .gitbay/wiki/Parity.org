@@ -48,6 +48,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | create from a fork     | yes | yes | yes |
 | retarget               | yes | yes | yes |
 | milestone              | yes | yes | yes |
+| labels                 | yes | yes | no  |
+| filter by label        | yes | yes | no  |
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
 | stacked merge requests | yes | yes | yes |
@@ -118,12 +120,13 @@ reviews, since an approval was of the diff against the old branch.
 | org milestones: create, list, close, reopen | yes | list | yes |
 | closes across repositories | yes | yes | yes |
 
-Labels are created on the fly by =issue label --add= and managed by
-=label list=, =label set <label> --color rrggbb= and =label remove=,
-which takes the label off every issue. The web paints the stored colour
-on every chip and derives one from the name when none is set. The set
-itself is at =/<owner>/<repo>/labels=, linked from the issue list:
-create, recolour and remove, dispatching the same commands.
+Labels are created on the fly by =issue label --add= and =mr label
+--add=, and managed by =label list=, =label set <label> --color rrggbb=
+and =label remove=, which takes the label off every issue and merge
+request. One set serves both. The web paints the stored colour on every
+chip and derives one from the name when none is set. The set itself is
+at =/<owner>/<repo>/labels=, linked from the issue list: create,
+recolour and remove, dispatching the same commands.
 
 Org labels and milestones are managed on the CLI, the API and the iOS
 client's org screen; =/<org>/-/labels= and =/<org>/-/milestones= show

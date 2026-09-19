@@ -502,3 +502,85 @@ func TestMRSupersedes(t *testing.T) {
 		t.Fatalf("!2 still says it supersedes after clearing:\n%s", body2)
 	}
 }
+
+// TestMRWebLabels labels a merge request from the browser and filters the
+// list by it (#231). The CLI is the check that the page dispatched
+// mr label rather than writing its own rows.
+func TestMRWebLabels(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	bobKey := inst.newKey(t, "bob")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	inst.admin(t, "admin", "user", "create", "bob",
+		"--key", bobKey+".pub", "--email", "bob@example.test", "--verified")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	env := inst.gitEnv(aliceKey)
+	work := t.TempDir()
+	mustGit(t, work, env, "clone", inst.sshURL("alice/app"), "w")
+	dir := filepath.Join(work, "w")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644)
+	mustGit(t, dir, env, "checkout", "-q", "-b", "main")
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "base")
+	mustGit(t, dir, env, "push", "-q", "origin", "main")
+	mustGit(t, dir, env, "checkout", "-q", "-b", "topic")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "topic work")
+	mustGit(t, dir, env, "push", "-q", "origin", "topic")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/app",
+		"--source", "topic", "--target", "main", "--title", "feature"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+
+	alice := inst.login(t, aliceKey)
+	mrURL := inst.base() + "/alice/app/mrs/1"
+
+	// The form is on the page, and applying it lands in the CLI's view.
+	if _, body := browserGet(t, alice, mrURL); !strings.Contains(body, `/mrs/1/label`) {
+		t.Fatalf("MR page has no label form:\n%s", body)
+	}
+	if status, _ := browserPost(t, alice, mrURL+"/label", url.Values{"add": {"bug ui"}}); status != 200 {
+		t.Fatalf("label post: %d", status)
+	}
+	out, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/app", "1", "--json")
+	for _, want := range []string{`"bug"`, `"ui"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("label %s did not land:\n%s", want, out)
+		}
+	}
+	_, body := browserGet(t, alice, mrURL)
+	if n := strings.Count(body, `class="chip label"`); n != 2 {
+		t.Fatalf("MR page shows %d label chips, want 2:\n%s", n, body)
+	}
+
+	// Removing works the same way.
+	if status, _ := browserPost(t, alice, mrURL+"/label", url.Values{"remove": {"ui"}}); status != 200 {
+		t.Fatalf("label remove: %d", status)
+	}
+	if out, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/app", "1", "--json"); strings.Contains(out, `"ui"`) {
+		t.Fatalf("label not removed:\n%s", out)
+	}
+
+	// The list narrows by label, and says which one it is narrowed by.
+	_, body = browserGet(t, alice, inst.base()+"/alice/app/mrs?label=bug")
+	if !strings.Contains(body, ">feature<") || !strings.Contains(body, `label: <span class="chip label"`) {
+		t.Fatalf("web label filter:\n%s", body)
+	}
+	_, body = browserGet(t, alice, inst.base()+"/alice/app/mrs?label=ui")
+	if strings.Contains(body, ">feature<") {
+		t.Fatalf("removed label still lists the merge request:\n%s", body)
+	}
+
+	// A reader gets the chips and no form.
+	_, body = browserGet(t, inst.login(t, bobKey), mrURL)
+	if !strings.Contains(body, `class="chip label"`) {
+		t.Fatalf("reader sees no labels:\n%s", body)
+	}
+	if strings.Contains(body, `/mrs/1/label`) {
+		t.Fatalf("reader sees the label form:\n%s", body)
+	}
+}

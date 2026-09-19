@@ -39,8 +39,8 @@ func TestLabelsWeb(t *testing.T) {
 		t.Fatal("label recolour failed")
 	}
 	out, _, _ := inst.ssh(t, aliceKey, "", "label", "list", "alice/app", "--json")
-	if !strings.Contains(out, `{"name":"bug","color":"#cf222e","issues":1}`) ||
-		!strings.Contains(out, `{"name":"docs","color":"#1f6feb","issues":0}`) {
+	if !strings.Contains(out, `{"name":"bug","color":"#cf222e","issues":1,"mrs":0}`) ||
+		!strings.Contains(out, `{"name":"docs","color":"#1f6feb","issues":0,"mrs":0}`) {
 		t.Fatalf("labels not as posted:\n%s", out)
 	}
 
