@@ -41,6 +41,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | comment on a diff line | yes | yes | yes |
 | merge (all strategies) | yes | yes | yes |
 | close                  | yes | yes | yes |
+| close in favour of another | yes | yes | no |
 | create                 | yes | yes | yes |
 | draft, ready           | yes | yes | yes |
 | search title and body  | yes | yes | yes |
