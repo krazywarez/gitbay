@@ -100,6 +100,12 @@ type Registration struct {
 	// unverified before it is removed, as a duration ("168h"). Empty
 	// keeps such accounts forever.
 	PendingExpiry string `toml:"pending_expiry"`
+	// NotifyAdmin mails the instance's admins when an account becomes
+	// active: an invite redeemed, or an open-mode signup that verified
+	// its address. The unverified row an open signup creates is not
+	// reported — anyone can post the form, so mailing on that would
+	// aim a flood at the admins (#234).
+	NotifyAdmin bool `toml:"notify_admin"`
 }
 
 // PendingExpiryDuration parses PendingExpiry; zero means never.
@@ -326,6 +332,10 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf(
 			"registration.mode = %q requires [mail] smtp_host: email verification cannot run without SMTP",
 			c.Registration.Mode))
+	}
+	if c.Registration.NotifyAdmin && c.Mail.SMTPHost == "" {
+		errs = append(errs, errors.New(
+			"registration.notify_admin = true requires [mail] smtp_host: there is nowhere to send the notice"))
 	}
 	if c.SSH.Mode == "system" && c.Registration.Mode != "closed" {
 		errs = append(errs, fmt.Errorf(

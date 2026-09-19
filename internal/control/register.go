@@ -133,6 +133,29 @@ func sendVerification(cfg config.Config, st *store.Store, userID int64, address 
 	return mail.Send(cfg, address, "verify your email on "+siteHost(cfg), body)
 }
 
+// notifyAdminsOfSignup tells the instance's admins that an account just
+// became active, when registration.notify_admin is on. It is queued like
+// any other notice, so a dead SMTP host shows up in the admin page's
+// Mail table rather than failing the registration that caused it: the
+// person signing up is not responsible for the operator's mail (#234).
+func notifyAdminsOfSignup(cfg config.Config, st *store.Store, username, mode string) {
+	if !cfg.Registration.NotifyAdmin {
+		return
+	}
+	addrs, err := st.AdminMailAddresses()
+	if err != nil || len(addrs) == 0 {
+		return
+	}
+	host := siteHost(cfg)
+	subject := fmt.Sprintf("new account on %s: %s", host, username)
+	body := fmt.Sprintf("%s registered on %s and the account is active (%s registration).\n\n"+
+		"    https://%s/%s\n\nAccounts: ssh git@%s admin user list\n",
+		username, host, mode, host, username, host)
+	for _, a := range addrs {
+		st.EnqueueMail(a, subject, body)
+	}
+}
+
 const maxEmailAddsPerHour = 5
 
 func runEmailAdd(c *Ctx, args []string) int {
@@ -186,8 +209,14 @@ func runEmailVerify(c *Ctx, args []string) int {
 	if err := c.Store.VerifyEmail(c.User.ID, address, "smtp"); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	wasPending := c.User.Pending
 	if err := c.Store.ClearPending(c.User.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	// The open-mode account becomes real here, not when the form was
+	// posted, so this is where the admins hear about it.
+	if wasPending {
+		notifyAdminsOfSignup(c.Cfg, c.Store, c.User.Username, "open")
 	}
 	return c.emit(map[string]string{"address": address, "status": "verified"}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s verified; your account is active\n", address)
@@ -249,6 +278,7 @@ func RegisterAccount(cfg config.Config, st *store.Store, pub ssh.PublicKey, user
 			return "", err.Error(), protocol.ExitUsage
 		}
 		st.Audit(0, "auth.registered", map[string]any{"user": username, "mode": "invite", "fingerprint": fp})
+		notifyAdminsOfSignup(cfg, st, username, "invite")
 		return fmt.Sprintf("welcome, %s — your account is active\n", username), "", protocol.ExitOK
 
 	case "open":

@@ -101,6 +101,17 @@ default, is right when gitbayd terminates TLS itself.
   self-registered account still unverified after that long is removed,
   hourly and at start, audited as =pending.expired=.
 
+- =notify_admin= (false) — mail every instance admin when an account
+  becomes active: an invite redeemed, or an open-mode signup that
+  verified its address. The unverified row an open signup creates is
+  not reported, because anyone can post the form and mailing on that
+  would point a flood at the admins. Recipients are the verified
+  primary addresses of active admins who have activity mail on, the
+  same rule any other notice follows, so an admin with no verified
+  address hears nothing. The notice is queued, so a dead SMTP host
+  shows up in the admin page's Mail table instead of failing the
+  registration. Requires [mail].
+
 ** [mail]
 - =smtp_host= (host:port, 587 assumed), =from=, optional =smtp_user= /
   =smtp_pass=. STARTTLS when offered. Required for invite/open
