@@ -31,6 +31,9 @@ type basePage struct {
 	Viewer string
 	Admin  bool // the viewer is an instance admin: the rail shows /admin
 	Rail   rail
+	// Theme is stamped on <html> as data-theme: light or dark when the
+	// viewer chose one, empty when the browser's own scheme decides.
+	Theme string
 }
 
 // base builds the layout-wide data for a request that has not already
@@ -52,6 +55,9 @@ func (s *Server) baseFor(viewer store.User) basePage {
 	b.Viewer = viewer.Username
 	b.Admin = viewer.IsAdmin
 	b.Rail = s.railFor(viewer)
+	if theme, err := s.st.Theme(viewer.ID); err == nil && theme != "system" {
+		b.Theme = theme
+	}
 	return b
 }
 

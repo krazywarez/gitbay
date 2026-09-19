@@ -230,13 +230,16 @@ func (s *Server) Handler() http.Handler {
 	for _, r := range s.Routes() {
 		mux.HandleFunc(r.Method+" "+r.Pattern, r.Handler)
 	}
+	// A path no pattern matches gets the 404 page, not net/http's
+	// plain-text body (#232).
+	mux.HandleFunc("/", s.notFound)
 	var h http.Handler = mux
 	if len(s.cfg.GoImport) > 0 {
 		h = s.goImportHandler(mux)
 	}
 	// Always wrapped: custom pages domains work with or without the
 	// built-in [pages] domain.
-	return s.pagesRouter(s.securityHeaders(h))
+	return compressed(s.pagesRouter(s.securityHeaders(h)))
 }
 
 // securityHeaders sets defensive response headers on every reply. The CSP

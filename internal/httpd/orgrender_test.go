@@ -107,7 +107,7 @@ func TestOrgRenderingIsUnaffectedByTheIncludeGuard(t *testing.T) {
 	// The source block is chroma-highlighted, so its text is split across spans;
 	// check the block and a token rather than the joined source line.
 	for _, want := range []string{"Heading", "<em>emphasis</em>", "<code>code</code>",
-		`<pre class="chroma">`, "Println"} {
+		`<pre tabindex="0" class="chroma">`, "Println"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output:\n%s", want, out)
 		}

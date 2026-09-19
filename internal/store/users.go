@@ -237,6 +237,22 @@ func (s *Store) SetWatchEnabled(userID int64, on bool) error {
 	return err
 }
 
+// Theme is the web colour scheme the account chose: system, light or
+// dark (#232).
+func (s *Store) Theme(userID int64) (string, error) {
+	var theme string
+	err := s.DB.QueryRow("SELECT theme FROM users WHERE id = ?", userID).Scan(&theme)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return theme, err
+}
+
+func (s *Store) SetTheme(userID int64, theme string) error {
+	_, err := s.DB.Exec("UPDATE users SET theme = ? WHERE id = ?", theme, userID)
+	return err
+}
+
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
 	var admin, pending, disabled int

@@ -4,7 +4,7 @@
 <div class="landing">
 <h1>{{template "mark"}}{{.Site}}</h1>
 <p class="lede">A git forge you drive from the terminal. Repositories, issues, merge requests and CI over SSH, with a fast, readable web view of the same state.</p>
-<pre class="quickstart">ssh git@{{.Host}} help                        # every command, no client to install
+<pre class="quickstart" tabindex="0">ssh git@{{.Host}} help                        # every command, no client to install
 git clone ssh://git@{{.Host}}/owner/repo.git</pre>
 <div class="routes"><a class="button primary" href="/explore">Explore repositories</a>{{if .Signup}}<a class="button btn" href="/register">Create an account</a>{{end}}</div>
 <div class="shot"><picture>

@@ -4,6 +4,31 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.30.0 — unreleased
+
+The web findings from the forge comparison (#232).
+
+- Links inside running text are underlined: the meta lines on issues,
+  merge requests and releases no longer tell a link apart by colour
+  alone.
+- File view line numbers are 24px targets and keep the focus ring;
+  chroma's LineLink rule, which set =outline: none=, is dropped from the
+  served palette.
+- Every rendered =<pre>= and the landing page's quickstart block take
+  keyboard focus, so a block that scrolls sideways can be reached.
+- On one column the issue and merge request aside follows the thread
+  instead of preceding it.
+- The file tree at 320px keeps its last column inside the card.
+- A path no route matches renders the 404 page instead of a plain-text
+  body.
+- An org image link with no description gets its file name as alt text,
+  so a README badge is a named link.
+- Release titles are h2.
+- Text responses are gzipped for clients that accept it.
+- =web theme set system|light|dark= and an Appearance section on the
+  account page fix the colour scheme per account. Migration 0057 adds
+  =users.theme=.
+
 * v1.29.0 — 2026-09-19
 
 The icon nav is a top bar at every width.

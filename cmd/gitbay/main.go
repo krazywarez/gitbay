@@ -647,6 +647,10 @@ func webCmd() *cobra.Command {
 			pass("list", "list your browser sessions", passOpts{server: []string{"web", "sessions", "list"}}),
 			pass("revoke", "end a browser session: <id>|--all", passOpts{server: []string{"web", "sessions", "revoke"}}),
 		),
+		group("theme", "the colour scheme the web UI uses for you",
+			pass("show", "show your colour scheme", passOpts{server: []string{"web", "theme", "show"}}),
+			pass("set", "follow the browser, or force one: system|light|dark", passOpts{server: []string{"web", "theme", "set"}}),
+		),
 	)
 }
 

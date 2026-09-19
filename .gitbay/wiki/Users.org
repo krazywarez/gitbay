@@ -653,6 +653,11 @@ id with its creation and expiry, and =gitbay web sessions revoke <id>=
 or =--all= ends them from the terminal, which is where a lost laptop is
 handled.
 
+=web theme set light= or =dark= fixes the web UI's colour scheme for
+your account; =system=, the default, follows the browser's own
+preference. =web theme show= prints it. The account page has the same
+control under Appearance.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you as well as

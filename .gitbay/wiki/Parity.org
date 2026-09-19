@@ -308,6 +308,7 @@ client has no use for one (krz/gitbay#57).
 | notification inbox          | yes | yes | yes |
 | activity mail on, off       | yes | yes | yes |
 | watch writable repos        | yes | yes | yes |
+| web colour scheme           | yes | yes | n/a |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |

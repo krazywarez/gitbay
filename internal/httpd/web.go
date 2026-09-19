@@ -70,7 +70,7 @@ func (s *Server) siteName() string {
 // changes the bytes (#132).
 var stylesheetETag = func() string {
 	h := sha256.New()
-	h.Write(web.StyleCSS)
+	h.Write(styleCSS)
 	h.Write(chromaCSS)
 	return `"` + hex.EncodeToString(h.Sum(nil))[:16] + `"`
 }()
@@ -83,7 +83,7 @@ func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Write(web.StyleCSS)
+	w.Write(styleCSS)
 	w.Write(chromaCSS)
 }
 
@@ -953,9 +953,9 @@ func highlightWith(formatter *html.Formatter, filePath string, data []byte) temp
 	}
 	var buf bytes.Buffer
 	if err := formatter.Format(&buf, styles.Get(lightStyle), iterator); err != nil {
-		return template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>")
+		return focusableBlocks(template.HTML("<pre>" + template.HTMLEscapeString(string(data)) + "</pre>"))
 	}
-	return template.HTML(buf.String())
+	return focusableBlocks(template.HTML(buf.String()))
 }
 
 // chromaCSS is both syntax palettes, each scoped to the scheme it is for.
@@ -974,21 +974,31 @@ const (
 )
 
 var chromaCSS = func() []byte {
-	var buf bytes.Buffer
-	buf.WriteString("@media (prefers-color-scheme: light) {\n")
-	chromaFormatter.WriteCSS(&buf, styles.Get(lightStyle))
+	var light, dark bytes.Buffer
+	chromaFormatter.WriteCSS(&light, styles.Get(lightStyle))
 	// xcode's NameAttribute is its one token under 4.5:1 against the diff
 	// tints (4.51 on additions, 4.38 on deletions); darkened it clears both.
-	buf.WriteString(".chroma .na { color: #6f5a21 }\n")
+	light.WriteString(".chroma .na { color: #6f5a21 }\n")
+	chromaFormatter.WriteCSS(&dark, styles.Get(darkStyle))
+	// Each palette applies under its media query unless the page is
+	// stamped with the other theme, and again, outside any media query,
+	// when the page is stamped with its own (#232).
+	var buf bytes.Buffer
+	buf.WriteString("@media (prefers-color-scheme: light) {\n")
+	buf.WriteString(scopeChroma(light.String(), `:root:not([data-theme="dark"])`))
 	buf.WriteString("}\n@media (prefers-color-scheme: dark) {\n")
-	chromaFormatter.WriteCSS(&buf, styles.Get(darkStyle))
-	buf.WriteString("}\n.chroma, .bg { background: transparent !important; }\n")
+	buf.WriteString(scopeChroma(dark.String(), `:root:not([data-theme="light"])`))
+	buf.WriteString("}\n")
+	buf.WriteString(scopeChroma(light.String(), `:root[data-theme="light"]`))
+	buf.WriteString(scopeChroma(dark.String(), `:root[data-theme="dark"]`))
+	buf.WriteString(".chroma, .bg { background: transparent !important; }\n")
 	// Line numbers take the site's own gutter colour in both schemes. Left
 	// alone they are github-dark's #6e7681 (4.31:1 on the page) in dark and
 	// chroma's built-in #7f7f7f (3.67:1 on a code block) in light — the
 	// latter is a formatter fallback, not a style entry, so no palette test
-	// can see it.
-	buf.WriteString(".chroma .lnt, .chroma .ln { color: var(--muted) }\n")
+	// can see it. !important because the scoped palette rules above outrank
+	// a bare .chroma .ln.
+	buf.WriteString(".chroma .lnt, .chroma .ln { color: var(--muted) !important }\n")
 	return buf.Bytes()
 }()
 
@@ -1088,9 +1098,9 @@ func mdHTML(raw string) template.HTML {
 	}
 	var buf bytes.Buffer
 	if markdown.Convert([]byte(raw), &buf) != nil {
-		return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
+		return focusableBlocks(template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>"))
 	}
-	return template.HTML(buf.String())
+	return focusableBlocks(template.HTML(buf.String()))
 }
 
 // aboutHTML renders a profile's about text. It has no filename to
@@ -1163,9 +1173,9 @@ type ugcRenderer func(raw, format string) template.HTML
 // rather than growing a second org renderer to keep in step.
 func ugcHTML(raw, format string) template.HTML {
 	if format == "org" {
-		return renderOrg("body.org", []byte(raw), false, func() template.HTML {
+		return focusableBlocks(renderOrg("body.org", []byte(raw), false, func() template.HTML {
 			return template.HTML("<pre>" + template.HTMLEscapeString(raw) + "</pre>")
-		})
+		}))
 	}
 	return mdHTML(raw)
 }
@@ -1265,7 +1275,7 @@ func renderOrg(name string, raw []byte, contents bool, fallback func() template.
 	if err != nil {
 		return fallback()
 	}
-	return template.HTML(ugcPolicy.Sanitize(out))
+	return imageAlt(template.HTML(ugcPolicy.Sanitize(out)))
 }
 
 // orgWriter overrides go-org's autolink rendering. go-org ends a bare URL
@@ -1332,20 +1342,22 @@ func renderReadme(name string, raw []byte) template.HTML {
 	if gitutil.IsBinary(raw) {
 		return ""
 	}
+	var out template.HTML
 	switch path.Ext(strings.ToLower(name)) {
 	case ".md", ".markdown":
 		var buf bytes.Buffer
 		if markdown.Convert(raw, &buf) != nil {
-			return plain()
+			return focusableBlocks(plain())
 		}
-		return demoteHeadings(template.HTML(buf.String()))
+		out = demoteHeadings(template.HTML(buf.String()))
 	case ".org":
-		return demoteHeadings(renderOrg(name, raw, true, plain))
+		out = demoteHeadings(renderOrg(name, raw, true, plain))
 	case ".html", ".htm":
-		return template.HTML(ugcPolicy.Sanitize(string(raw)))
+		out = template.HTML(ugcPolicy.Sanitize(string(raw)))
 	default:
-		return plain()
+		out = plain()
 	}
+	return focusableBlocks(out)
 }
 
 type diffThread struct {

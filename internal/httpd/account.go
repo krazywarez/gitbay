@@ -59,22 +59,24 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 	s.runControlInto(u, []string{"profile", "show"}, &profile)
 	mailOn, _ := s.st.MailEnabled(u.ID)
 	watchOn, _ := s.st.WatchEnabled(u.ID)
+	theme, _ := s.st.Theme(u.ID)
 
 	s.render(w, "account.html", struct {
 		basePage
-		Tab       string // marks the rail's Settings row as current
-		Keys      []accountKey
-		PGP       []accountPGP
-		Emails    []store.Email
-		Profile   control.ProfileOut
-		LinksText string
-		Host      string
-		Notice    string
-		Message   string
-		MailOn    bool
-		WatchOn   bool
+		Tab          string // marks the rail's Settings row as current
+		Keys         []accountKey
+		PGP          []accountPGP
+		Emails       []store.Email
+		Profile      control.ProfileOut
+		LinksText    string
+		Host         string
+		Notice       string
+		Message      string
+		MailOn       bool
+		WatchOn      bool
+		ThemeSetting string // system, light or dark: the form's selected option
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn})
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -219,6 +221,12 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "primary address changed")
+	case "theme":
+		if _, msg, ok := s.runControl(u, []string{"web", "theme", "set", r.FormValue("theme")}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "colour scheme saved")
 	case "notify-mail", "notify-watch":
 		pref := strings.TrimPrefix(r.FormValue("field"), "notify-")
 		state := "off"

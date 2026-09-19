@@ -20,7 +20,7 @@
 {{range $rel := .Releases}}
 <article class="release">
   <header class="releasehead">
-    <h3>{{$rel.Title}}</h3>
+    <h2>{{$rel.Title}}</h2>
     <p class="meta"><span class="refchip">{{$rel.Tag}}</span> {{if $rel.Author}}{{$rel.Author}} · {{end}}{{when $rel.CreatedAt}} · <a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/archive/{{$rel.Tag}}.tar.gz">source tar.gz</a></p>
   </header>
   {{if $rel.NotesHTML}}<div class="rendered">{{$rel.NotesHTML}}</div>{{end}}

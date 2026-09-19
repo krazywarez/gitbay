@@ -209,6 +209,12 @@ h3 { font-size: var(--fs-3); margin: var(--sp-5) 0 var(--sp-2); }
 p { margin: 0 0 var(--sp-3); }
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* a link inside running text is told apart by its underline: link and
+   muted text are 1.07:1 apart in dark, and colour alone is not a cue
+   (#232). Navigation, chips and buttons keep position as their cue. */
+p a, .syscomment a { text-decoration: underline; }
+/* a title or a path is the whole line: position is the cue */
+p a.button, p a.btn, p a.chip, .repotitle a, p.title a, .pathbar a, .pager a { text-decoration: none; }
 a.xref { color: var(--link); text-decoration: none; }
 
 code, pre, .mono, .code, td.mode, td.size {
@@ -919,7 +925,7 @@ ul.milestonelist .title { font-weight: 500; }
 
 article.release { padding: var(--sp-4); margin: var(--sp-4) 0; }
 .releasehead { background: none; border: 0; padding: 0; }
-.releasehead h3 { margin: 0 0 var(--sp-1); }
+.releasehead h2 { margin: 0 0 var(--sp-1); font-size: var(--fs-3); }
 .releasehead .meta { margin: 0 0 var(--sp-2); }
 
 ul.matchlist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
@@ -1188,6 +1194,11 @@ table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underli
 /* chroma writes the highlighted spans; the container only supplies the
    ground and the face */
 .chroma { font-family: var(--mono); background: none; }
+/* chroma's own LineLink rule is dropped from the served palette: it set
+   outline: none and hid the focus ring. This is that rule without it, on
+   a 24px box so a line number is a target and not a glyph (#232) */
+.chroma .lnlinks { display: inline-block; min-width: 24px; min-height: 24px; line-height: 24px; text-decoration: none; color: inherit; }
+.chroma .line { line-height: 24px; }
 
 .blamehunk { display: flex; gap: var(--sp-3); border-top: 1px solid var(--line); align-items: flex-start; }
 .blamehunk:first-child { border-top: 0; }
@@ -1268,6 +1279,8 @@ a.memberchip .role { color: var(--muted); }
 .pathbar { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); margin: 0 0 var(--sp-3); flex-wrap: wrap; font-size: var(--fs-2); }
 .pathbar .spacer { flex: 1; }
 .pathbar .actions { display: flex; gap: var(--sp-2); }
+/* history · blame · raw were 21px tall and "raw" 22px wide (#232) */
+.pathbar .actions a { display: inline-block; padding: 6px 4px; }
 .pathbar .acts { display: flex; gap: var(--sp-2); }
 .crumbs { color: var(--muted); }
 .crumbs a { color: var(--link); }
@@ -1460,9 +1473,9 @@ svg.icon { vertical-align: -0.125em; }
 
 /* ---- breakpoints ---- */
 @media (max-width: 62rem) {
+  /* one column, the aside after the thread: a phone shows the
+     description first, checks and reviewers after it (#232) */
   .withaside { grid-template-columns: 1fr; }
-  /* checks and reviewers before a long thread */
-  .withaside .aside { order: -1; }
 }
 
 @media (max-width: 52rem) {
@@ -1486,6 +1499,9 @@ svg.icon { vertical-align: -0.125em; }
      latest commit */
   table.tree td.lastcommit, table.tree th.lastcommit { display: none; }
   table.tree td.mode, table.tree th.mode { display: none; }
+  /* at 320px a nowrap name plus the age column overran the card by the
+     cell padding and the card clipped the age; a long name wraps (#232) */
+  table.tree td.name { white-space: normal; overflow-wrap: anywhere; }
   .clone pre { white-space: pre-wrap; word-break: break-all; }
   .pathbar { overflow-wrap: anywhere; }
   .readme .cardbody, .code { padding: var(--sp-3); }
