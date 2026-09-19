@@ -4,6 +4,23 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.28.0 — 2026-09-19
+
+Labels on merge requests (#231), and a one-column dashboard. Migration
+0056 adds =mr_labels=; the daemon migrates on start.
+
+- =mr label <owner/name> <n> --add <l> --remove <l>= attaches and
+  detaches labels the way =issue label= does, resolving an org's label
+  first and creating a repository label on the fly; =mr list --label=
+  filters; =mr show= carries them; the event is =mr.labeled=.
+- The merge request page has a Labels group with the same form as an
+  issue; list rows show label chips and =?label== filters the list.
+- =label list= and the labels pages count merge requests beside issues;
+  removing a label detaches it from every issue and merge request. An
+  org label folding repository rows moves merge request rows too.
+- The dashboard is one column: the activity feed is a section after
+  the queues, since the icon rail leaves no wide column to balance.
+
 * v1.27.0 — 2026-09-19
 
 The follow-ups from the forge benchmark (#226) and two profile fixes.
