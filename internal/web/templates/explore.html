@@ -1,6 +1,9 @@
 {{define "width"}}wide{{end}}
 {{define "title"}}explore · {{.Site}}{{end}}
 {{define "content"}}
+<div class="withcol">
+{{template "sidecol" .Facets}}
+<div class="colmain">
 <div class="headrow">
 <h1>Explore</h1>
 <form method="get" action="/explore" class="searchform compact">
@@ -13,4 +16,6 @@
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">no public repositories yet</li>{{end}}
 </ul>
+</div>
+</div>
 {{end}}

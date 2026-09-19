@@ -210,12 +210,14 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 		viewer = s.viewer(r)
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	described := s.describeAll(repos)
 	s.render(w, "explore.html", struct {
 		basePage
-		Tab   string
-		Query string
-		Repos []describedRepo
-	}{s.baseFor(viewer), "explore", q, s.filterRepos(q, s.describeAll(repos))})
+		Tab    string
+		Query  string
+		Facets []facetGroup
+		Repos  []describedRepo
+	}{s.baseFor(viewer), "explore", q, []facetGroup{topicFacets(described, q)}, s.filterRepos(q, described)})
 }
 
 // privacy renders the privacy page: what the gitbay software does with
