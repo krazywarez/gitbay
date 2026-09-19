@@ -15,6 +15,8 @@ type acmeFixture struct {
 	app        Repo
 	coreIssue  int64
 	siteIssue  int64
+	coreMR     int64
+	siteMR     int64
 }
 
 func newAcme(t *testing.T) acmeFixture {
@@ -63,6 +65,21 @@ func newAcme(t *testing.T) acmeFixture {
 	}
 	f.coreIssue = mkIssue(f.core, "c1")
 	f.siteIssue = mkIssue(f.site, "s1")
+	// Same resolution for merge requests: CreateMR returns the per-repo
+	// number, mr_labels.mr_id references merge_requests.id.
+	mkMR := func(repo Repo, title string) int64 {
+		n, err := s.CreateMR(repo.ID, f.alice, repo.ID, "topic", "main", title, "", "deadbeef", "md", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := s.MRByNumber(repo.ID, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.ID
+	}
+	f.coreMR = mkMR(f.core, "c!1")
+	f.siteMR = mkMR(f.site, "s!1")
 	return f
 }
 
@@ -159,6 +176,89 @@ func TestListIssueLabelsIncludesOrgRows(t *testing.T) {
 	// Another repository under the org does not pick up core's attachment.
 	if got, _ := f.s.ListIssueLabels(f.site); len(got) != 0 {
 		t.Fatalf("site issue labels = %v", got)
+	}
+}
+
+// The web merge request list reads labels per repository, the same shape
+// the issue list reads them in; an org label attached to a merge request
+// comes back from there like the repository's own (#231).
+func TestListMRLabelsIncludesOrgRows(t *testing.T) {
+	f := newAcme(t)
+	if _, err := f.s.SetOrgLabel(f.org, "bug", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetLabel(f.core, "docs", ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"bug", "docs"} {
+		if err := f.s.SetMRLabel(f.core, f.coreMR, name, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := f.s.ListMRLabels(f.core)
+	if err != nil || len(got[f.coreMR]) != 2 || got[f.coreMR][0] != "bug" || got[f.coreMR][1] != "docs" {
+		t.Fatalf("core MR labels = %v, %v", got, err)
+	}
+	// Another repository under the org does not pick up core's attachment.
+	if got, _ := f.s.ListMRLabels(f.site); len(got) != 0 {
+		t.Fatalf("site MR labels = %v", got)
+	}
+	// MRByNumber carries them, and the label listing counts them apart
+	// from issues.
+	m, err := f.s.MRByNumber(f.core.ID, 1)
+	if err != nil || len(m.Labels) != 2 || m.Labels[0] != "bug" {
+		t.Fatalf("MRByNumber labels = %v, %v", m.Labels, err)
+	}
+	rows, _ := f.s.ListLabels(f.core, f.orgRepos())
+	if len(rows) != 2 || rows[0].Name != "bug" || rows[0].MRs != 1 || rows[0].Issues != 0 {
+		t.Fatalf("label rows = %+v", rows)
+	}
+	// The filter narrows to the merge requests carrying the name.
+	mrs, err := f.s.QueryMRs(f.core.ID, MRFilter{State: "all", Label: "bug"})
+	if err != nil || len(mrs) != 1 || mrs[0].ID != f.coreMR {
+		t.Fatalf("QueryMRs by label = %+v, %v", mrs, err)
+	}
+	if mrs, _ := f.s.QueryMRs(f.core.ID, MRFilter{State: "all", Label: "nope"}); len(mrs) != 0 {
+		t.Fatalf("QueryMRs by absent label = %+v", mrs)
+	}
+	// Removing a name nothing carries is not found.
+	if err := f.s.SetMRLabel(f.core, f.coreMR, "nope", false); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("remove of absent label: %v, want ErrNotFound", err)
+	}
+}
+
+// Folding a repository label onto its org's row moves the merge requests
+// carrying it, not only the issues.
+func TestSetOrgLabelFoldsMRLabels(t *testing.T) {
+	f := newAcme(t)
+	if err := f.s.SetMRLabel(f.core, f.coreMR, "bug", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.SetMRLabel(f.site, f.siteMR, "bug", true); err != nil {
+		t.Fatal(err)
+	}
+	folded, err := f.s.SetOrgLabel(f.org, "bug", "#ff0000")
+	if err != nil || folded != 2 {
+		t.Fatalf("SetOrgLabel folded %d, %v; want 2", folded, err)
+	}
+	var n int
+	f.s.DB.QueryRow("SELECT COUNT(*) FROM labels WHERE name = 'bug'").Scan(&n)
+	if n != 1 {
+		t.Fatalf("labels named bug after folding: %d, want 1", n)
+	}
+	// Both merge requests still carry it, now through the org's row.
+	for _, c := range []struct {
+		repo Repo
+		mr   int64
+	}{{f.core, f.coreMR}, {f.site, f.siteMR}} {
+		got, _ := f.s.ListMRLabels(c.repo)
+		if len(got[c.mr]) != 1 || got[c.mr][0] != "bug" {
+			t.Fatalf("%s MR labels after folding = %v", c.repo.Name, got)
+		}
+	}
+	rows, _ := f.s.ListOrgLabels(f.org, f.orgRepos())
+	if len(rows) != 1 || rows[0].MRs != 2 {
+		t.Fatalf("org label rows = %+v", rows)
 	}
 }
 

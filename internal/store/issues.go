@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -275,26 +274,7 @@ func (s *Store) AddIssueSystemComment(issueID, actorID int64, body string) error
 // issue listing; ListIssues itself stays label-free for the CLI's lean
 // list output.
 func (s *Store) ListIssueLabels(repo Repo) (map[int64][]string, error) {
-	where, args := scopeClause("l", repo)
-	rows, err := s.DB.Query(`
-		SELECT il.issue_id, l.name FROM issue_labels il
-		JOIN labels l ON l.id = il.label_id
-		JOIN issues i ON i.id = il.issue_id
-		WHERE i.repo_id = ? AND `+where+` ORDER BY l.name`, append([]any{repo.ID}, args...)...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[int64][]string{}
-	for rows.Next() {
-		var id int64
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return nil, err
-		}
-		out[id] = append(out[id], name)
-	}
-	return out, rows.Err()
+	return s.listItemLabels(issueLabelJoin, repo)
 }
 
 // LabelColors returns the colours of the labels a repository sees, keyed
@@ -321,39 +301,7 @@ func (s *Store) LabelColors(repo Repo) (map[string]string, error) {
 // resolves the org's row when the org has the name, else the repository's,
 // creating that on first use.
 func (s *Store) SetIssueLabel(repo Repo, issueID int64, name string, add bool) error {
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	where, args := scopeClause("l", repo)
-	if add {
-		if held, err := orgHoldsLabel(tx, repo, name); err != nil {
-			return err
-		} else if !held {
-			if _, err := tx.Exec(`INSERT INTO labels (repo_id, name) VALUES (?, ?)
-				ON CONFLICT (repo_id, name) WHERE repo_id IS NOT NULL DO NOTHING`, repo.ID, name); err != nil {
-				return err
-			}
-		}
-		if _, err := tx.Exec(`INSERT INTO issue_labels (issue_id, label_id)
-			SELECT ?, l.id FROM labels l WHERE `+where+` AND l.name = ?
-			ORDER BY l.org_id IS NULL LIMIT 1
-			ON CONFLICT DO NOTHING`, append(append([]any{issueID}, args...), name)...); err != nil {
-			return err
-		}
-	} else {
-		res, err := tx.Exec(`DELETE FROM issue_labels WHERE issue_id = ? AND label_id IN
-			(SELECT l.id FROM labels l WHERE `+where+` AND l.name = ?)`,
-			append(append([]any{issueID}, args...), name)...)
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return fmt.Errorf("label %q: %w", name, ErrNotFound)
-		}
-	}
-	return tx.Commit()
+	return s.setItemLabel(issueLabelJoin, repo, issueID, name, add)
 }
 
 // SetIssueAssignee adds or removes an assignee by user id.

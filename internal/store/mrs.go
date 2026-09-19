@@ -34,6 +34,7 @@ type MR struct {
 	SupersededBy int64
 	CreatedAt    string
 	UpdatedAt    string
+	Labels       []string
 	// ReviewRequests is who has been asked, directly, for a review — the
 	// mr review request counterpart of Issue.Assignees.
 	ReviewRequests []string
@@ -121,10 +122,30 @@ func (s *Store) MRByNumber(repoID, number int64) (MR, error) {
 	if err != nil {
 		return m, err
 	}
+	if m.Labels, err = s.issueStrings(m.ID, `
+		SELECT l.name FROM mr_labels ml JOIN labels l ON l.id = ml.label_id
+		WHERE ml.mr_id = ? ORDER BY l.name`); err != nil {
+		return m, err
+	}
 	m.ReviewRequests, err = s.issueStrings(m.ID, `
 		SELECT u.username FROM mr_review_requests rr JOIN users u ON u.id = rr.user_id
 		WHERE rr.mr_id = ? ORDER BY u.username`)
 	return m, err
+}
+
+// ListMRLabels returns the label names attached to each merge request of
+// a repo, keyed by merge request id, its org's labels included. Used by
+// the web merge request listing; ListMRs itself stays label-free for the
+// CLI's lean list output.
+func (s *Store) ListMRLabels(repo Repo) (map[int64][]string, error) {
+	return s.listItemLabels(mrLabelJoin, repo)
+}
+
+// SetMRLabel attaches (add) or detaches a label by name, the issue rules
+// exactly: the org's row when the org has the name, else the
+// repository's, created on first use.
+func (s *Store) SetMRLabel(repo Repo, mrID int64, name string, add bool) error {
+	return s.setItemLabel(mrLabelJoin, repo, mrID, name, add)
 }
 
 // SetMRReviewRequest adds or removes a review request by user id — the
@@ -160,6 +181,7 @@ func (s *Store) MRReviewRequestIDs(mrID int64) ([]int64, error) {
 // too. Milestone "none" selects merge requests with no milestone.
 type MRFilter struct {
 	State     string
+	Label     string
 	Author    string
 	Milestone string
 	Search    string // full-text over title and body
@@ -179,6 +201,11 @@ func (s *Store) QueryMRs(repoID int64, f MRFilter) ([]MR, error) {
 	if f.State != "" && f.State != "all" {
 		q += " AND m.state = ?"
 		args = append(args, f.State)
+	}
+	if f.Label != "" {
+		q += ` AND EXISTS (SELECT 1 FROM mr_labels ml JOIN labels l ON l.id = ml.label_id
+			WHERE ml.mr_id = m.id AND l.name = ?)`
+		args = append(args, f.Label)
 	}
 	if f.Author != "" {
 		q += " AND u.username = ?"
