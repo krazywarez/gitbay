@@ -375,8 +375,9 @@ main.content {
   width: 100%;
   padding: var(--sp-5) var(--sp-6) var(--sp-7);
 }
-main.content, footer { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; }
-main.wide { max-width: calc(var(--container) + 2 * var(--sp-6)); }
+/* the container is the default width and what `wide` names; reading and
+   bounded follow, so equal specificity gives them the cascade */
+main.content, main.wide, footer { max-width: calc(var(--container) + 2 * var(--sp-6)); margin: 0 auto; }
 main.reading { max-width: calc(72rem + 2 * var(--sp-6)); margin: 0 auto; }
 main.bounded { max-width: calc(48rem + 2 * var(--sp-6)); margin: 0 auto; }
 footer {
@@ -1410,6 +1411,14 @@ a.memberchip .role { color: var(--muted); }
 .sidecol form.searchform { margin-top: var(--sp-2); }
 .sidecol form.searchform input[type="text"] { min-width: 0; width: 100%; }
 
+/* a sticky column taller than the viewport scrolls inside itself, or its
+   tail is unreachable once the page scrolls. Above 62rem only: below it
+   .filenav is hidden and the other two are static. .dashpins stops being
+   a column at 80rem and resets both properties there. */
+@media (min-width: 62.01rem) {
+  .filenav, .sidecol, .dashgrid > aside { max-height: calc(100vh - 2 * var(--sp-4)); overflow-y: auto; }
+}
+
 .refchip {
   display: inline-flex;
   align-items: center;
@@ -1543,7 +1552,6 @@ pre.quickstart { margin: 0 0 var(--sp-4); }
 .profilehead .meta { margin: var(--sp-1) 0 0; }
 .activity { margin-bottom: var(--sp-5); }
 h2 .count { background: none; color: var(--muted); font-weight: 400; font-size: var(--fs-2); margin-left: var(--sp-2); padding: 0; }
-h2.empty { color: var(--muted); font-weight: 500; font-size: var(--fs-3); margin: var(--sp-2) 0; }
 /* 53 week columns x 7 day rows, tinted with the link blue */
 .actgraph-scroll { overflow-x: auto; padding-bottom: var(--sp-1); }
 .actgraph { display: flex; gap: 3px; width: max-content; padding-top: 18px; }
@@ -1599,7 +1607,12 @@ svg.icon { vertical-align: -0.125em; }
 /* ---- breakpoints ---- */
 @media (max-width: 80rem) {
   .dashgrid { grid-template-columns: minmax(0, 1fr) 20rem; }
-  .dashgrid > .dashpins { grid-column: 1 / -1; position: static; }
+  /* not a column any more, so it neither sticks nor scrolls in itself */
+  .dashgrid > .dashpins { grid-column: 1 / -1; position: static; max-height: none; overflow: visible; }
+  /* a pinned block that is not a column is the chip row (spec rule 7) */
+  .pins { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .pins li { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
+  .pins .n, .dashpins .meta { display: none; }
 }
 
 @media (max-width: 62rem) {
@@ -1610,13 +1623,13 @@ svg.icon { vertical-align: -0.125em; }
   /* rows go back to two lines where one does not fit */
   ul.issuelist.rows .issuemain, ul.repolist.rows li, ul.loglist.rows .commitmain { display: block; }
   ul.issuelist.rows .title, ul.repolist.rows .desc { white-space: normal; }
+  /* a nowrap meta or topic line on one of these rows forces horizontal
+     page scroll on a phone: a long branch name, a long owner/repo#N */
+  ul.issuelist.rows .meta, ul.loglist.rows .meta,
+  ul.repolist.rows .meta, ul.repolist.rows .topics { white-space: normal; }
 
   .dashgrid { grid-template-columns: 1fr; }
   .dashgrid > aside { position: static; }
-  /* the pinned column goes back to a chip row on a phone */
-  .pins { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-  .pins li { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
-  .pins .n, .dashpins .meta { display: none; }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   /* the tree page is the navigator on a phone */
