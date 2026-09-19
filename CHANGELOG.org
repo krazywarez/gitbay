@@ -29,6 +29,21 @@ The desktop layout (#226): the web UI uses a wide screen.
   phone. Below 80rem the dashboard's pinned repositories return to a
   chip row above the queues.
 
+Three accessibility defects the wider scan found, on pages the
+sixteen-page one never covered (#226):
+
+- A label chip carries a tone per scheme. Chip text is 12px, which owes
+  4.5:1 against the ground mixed from the colour itself, and no single
+  colour clears that on both canvases; the stored hex still names the
+  label, and the page picks the tone. A page stamped light or dark now
+  sets =color-scheme= to match, so native controls follow the theme.
+- Every =pre= scrolls sideways, so every one takes =tabindex="0"=: a
+  keyboard reaches a blame view, a build log and a search match the way
+  it already reached the pre blocks of rendered markup.
+- A link that shares its line with other text is underlined — a path
+  crumb, a heading that names an owner, an empty-state note. Link and
+  muted text are 1.07:1 apart in dark.
+
 * v1.30.0 — 2026-09-19
 
 Every command runs on every surface, markup previews before it is
