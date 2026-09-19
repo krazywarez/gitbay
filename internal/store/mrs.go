@@ -487,6 +487,55 @@ func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	return out, rows.Err()
 }
 
+// MRCommentCounts totals, per MR, conversation comments plus diff-thread
+// roots — what the list page shows as one comment count. System comments,
+// diff-thread replies, and pending (unpublished) diff comments do not
+// count. The list handler asks for every row on a page in one call rather
+// than one query per MR.
+func (s *Store) MRCommentCounts(repoID int64, mrIDs []int64) (map[int64]int, error) {
+	out := map[int64]int{}
+	if len(mrIDs) == 0 {
+		return out, nil
+	}
+	ph := "?" + strings.Repeat(",?", len(mrIDs)-1)
+	args := make([]any, 0, len(mrIDs)+1)
+	args = append(args, repoID)
+	for _, id := range mrIDs {
+		args = append(args, id)
+	}
+	add := func(query string) error {
+		rows, err := s.DB.Query(query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var mrID int64
+			var n int
+			if err := rows.Scan(&mrID, &n); err != nil {
+				return err
+			}
+			out[mrID] += n
+		}
+		return rows.Err()
+	}
+	if err := add(`
+		SELECT c.mr_id, COUNT(*) FROM mr_comments c
+		JOIN merge_requests m ON m.id = c.mr_id
+		WHERE m.repo_id = ? AND c.kind <> 'system' AND c.mr_id IN (` + ph + `)
+		GROUP BY c.mr_id`); err != nil {
+		return nil, err
+	}
+	if err := add(`
+		SELECT c.mr_id, COUNT(*) FROM mr_diff_comments c
+		JOIN merge_requests m ON m.id = c.mr_id
+		WHERE m.repo_id = ? AND c.reply_to IS NULL AND c.pending = 0 AND c.mr_id IN (` + ph + `)
+		GROUP BY c.mr_id`); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (s *Store) AddMRReview(mrID, reviewerID int64, verdict, headSHA string) error {
 	_, err := s.DB.Exec(
 		"INSERT INTO mr_reviews (mr_id, reviewer_id, verdict, head_sha) VALUES (?, ?, ?, ?)",

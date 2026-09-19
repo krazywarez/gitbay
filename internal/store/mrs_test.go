@@ -184,3 +184,53 @@ func TestPreferredVerifiedEmailDeterministicTiebreak(t *testing.T) {
 		t.Fatalf("tiebreak should be alphabetical: %q, %v", addr, err)
 	}
 }
+
+// MRCommentCounts folds conversation comments and diff-thread roots into
+// one count per MR, for the list page. System comments, diff-thread
+// replies, and pending (unpublished) diff comments do not count.
+func TestMRCommentCounts(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	mr1, err := s.MRByNumber(repoID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateMR(repoID, uid, repoID, "feature2", "main", "t2", "", "def456", "md", false); err != nil {
+		t.Fatal(err)
+	}
+	mr2, err := s.MRByNumber(repoID, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.AddMRComment(mr1.ID, uid, "hi", "md"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMRSystemComment(mr1.ID, uid, "merged"); err != nil {
+		t.Fatal(err)
+	}
+	rootID, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, "root", 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, "reply", rootID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 2, "pending root", 0, true); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := s.MRCommentCounts(repoID, []int64{mr1.ID, mr2.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[mr1.ID] != 2 {
+		t.Fatalf("mr1 count = %d, want 2 (1 comment + 1 diff root)", counts[mr1.ID])
+	}
+	if counts[mr2.ID] != 0 {
+		t.Fatalf("mr2 count = %d, want 0", counts[mr2.ID])
+	}
+
+	if empty, err := s.MRCommentCounts(repoID, nil); err != nil || len(empty) != 0 {
+		t.Fatalf("MRCommentCounts(nil) = %v, %v", empty, err)
+	}
+}
