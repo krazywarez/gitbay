@@ -9,11 +9,6 @@
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 {{if and (eq .Kind "org") .Repos}}<p class="meta"><a href="/{{.Owner}}/-/labels">labels</a> · <a href="/{{.Owner}}/-/milestones">milestones</a></p>{{end}}
 </section>
-<h2>repositories <span class="count">{{len .Repos}}</span></h2>
-<ul class="repolist">
-{{range .Repos}}{{template "reporow" .}}
-{{else}}<li class="empty">no visible repositories</li>{{end}}
-</ul>
 {{if .AboutHTML}}<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>{{end}}
 <section class="activity">
 <h2>activity <span class="count">{{.ActivityTotal}} in the last year</span></h2>
@@ -24,6 +19,11 @@
 </div>
 <p class="actlegend"><span>Less</span><span class="actday l0"></span><span class="actday l1"></span><span class="actday l2"></span><span class="actday l3"></span><span class="actday l4"></span><span>More</span></p>
 </section>
+<h2>repositories <span class="count">{{len .Repos}}</span></h2>
+<ul class="repolist">
+{{range .Repos}}{{template "reporow" .}}
+{{else}}<li class="empty">no visible repositories</li>{{end}}
+</ul>
 {{if or .Snippets .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets">snippets{{if .Snippets}} <span class="count">{{.Snippets}}</span>{{end}}</a></p>{{end}}
 
 {{if .Self}}
