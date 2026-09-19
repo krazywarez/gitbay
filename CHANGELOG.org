@@ -4,6 +4,24 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.26.0 — 2026-09-18
+
+A closed merge request can name the request that carried its change
+(#223). Migration 0055 adds the column; the daemon migrates on start.
+
+- =mr close <owner/name> <n> --by <m>= records, at close time, that !m
+  supersedes !n; =mr edit <n> --superseded-by <m>= sets it on a request
+  already closed and =--superseded-by none= clears it. Both refuse a
+  number that is not a request in the same repository, or the request
+  itself. =mr show= carries the field.
+- The web close form takes the number as an optional field. The closed
+  request's title line says "in favour of !m"; the request it names
+  says "supersedes !n". The state stays closed; nothing is inferred
+  from prose.
+- On a phone the dashboard's activity feed stacks after the queues; the
+  aside-first rule is for checks and reviewers on a merge request
+  (#222).
+
 * v1.25.0 — 2026-09-18
 
 The site rail is an icon column (#220).
