@@ -24,10 +24,10 @@ The desktop layout (#226): the web UI uses a wide screen.
   merge request lists; status, jobs and branches on builds; topics on
   explore; kinds on search; sections on repository settings, account
   settings and admin.
-- Below 64rem the facet and section columns stack after their content,
-  the dashboard's pinned repositories return to a chip row above the
-  queues, and the navigator hides, since the tree page is the navigator
-  on a phone.
+- Below 62rem the facet and section columns stack after their content
+  and the navigator hides, since the tree page is the navigator on a
+  phone. Below 80rem the dashboard's pinned repositories return to a
+  chip row above the queues.
 
 * v1.30.0 — 2026-09-19
 

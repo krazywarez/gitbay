@@ -63,10 +63,10 @@ feed rows are the row format the lists should adopt.
    description with topics and website inline in muted text, the
    Pin/Watch/Bookmark/Fork buttons at the right. Row two: the tabs. The
    toggles hint moves to `title` text on the three buttons.
-7. **Below 64rem** a facet or section column stacks after the content,
+7. **Below 62rem** a facet or section column stacks after the content,
    the way the issue aside does; the file navigator disappears (the
-   tree page exists); the dashboard's pinned column returns to the chip
-   row. Nothing the phone layout fixed moves.
+   tree page exists). **Below 80rem** the dashboard's pinned column
+   returns to the chip row. Nothing the phone layout fixed moves.
 
 ## Pages
 
