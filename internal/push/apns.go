@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +46,7 @@ func NewClient(cfg config.Push) (*Client, error) {
 		// requires; no explicit http2 transport is needed.
 		http:   &http.Client{Timeout: 30 * time.Second},
 		host:   cfg.Host(),
-		scheme: "https",
+		scheme: apnsScheme(),
 		topic:  cfg.Topic,
 	}
 	if cfg.KeyFile != "" {
@@ -57,6 +58,18 @@ func NewClient(cfg config.Push) (*Client, error) {
 		c.tokens = newTokenSource(key, cfg.KeyID, cfg.TeamID)
 	}
 	return c, nil
+}
+
+// apnsScheme is https for the real Apple hosts. GITBAY_APNS_HOST redirects
+// the endpoint for tests (config.Push.Host), and the fake it points at
+// speaks plain HTTP/1.1 rather than negotiating TLS, so the same override
+// has to drop the scheme too, or every request fails with "server gave
+// HTTP response to HTTPS client" instead of reaching the fake at all.
+func apnsScheme() string {
+	if os.Getenv("GITBAY_APNS_HOST") != "" {
+		return "http"
+	}
+	return "https"
 }
 
 // Send delivers one alert. The returned duration is the server's
