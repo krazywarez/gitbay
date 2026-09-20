@@ -30,7 +30,7 @@
 <h2>people <span class="count">{{len .Members}}</span></h2>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 <div class="tablewrap"><table class="keys">
-<tr class="cols"><th scope="col">member</th><th scope="col">role</th><th scope="col"></th></tr>
+<tr class="cols"><th scope="col">member</th><th scope="col">role</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .Members}}<tr>
   <td><a href="/{{.Name}}">{{.Name}}</a></td>
   <td>{{.Role}}</td>

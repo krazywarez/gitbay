@@ -264,6 +264,9 @@ a.skip {
   position: absolute;
   left: var(--sp-3); top: -3rem;
   z-index: 50;
+  display: flex;
+  align-items: center;
+  min-height: var(--rail-hit);
   background: var(--fill);
   color: var(--fill-fg);
   padding: var(--sp-2) var(--sp-4);

@@ -51,7 +51,7 @@ Write it with a push, or edit it here.</p>
 commands and push; a <code>git</code> key can only move git data, which is what
 a CI checkout wants.</p>
 {{if .Keys}}<div class="tablewrap"><table class="keys nowrap">
-<tr class="cols"><th scope="col">label</th><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
+<tr class="cols"><th scope="col">label</th><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .Keys}}<tr>
   <td>{{.Label}}</td>
   <td class="mono">{{.Fingerprint}}</td>
@@ -111,7 +111,7 @@ account, and where notifications go.</p>
 <p class="meta">Only needed if you sign commits with GPG. SSH signing
 (<code>gpg.format = ssh</code>) uses the keys above.</p>
 {{if .PGP}}<div class="tablewrap"><table class="keys">
-<tr class="cols"><th scope="col">fingerprint</th><th scope="col">identities</th><th scope="col"></th></tr>
+<tr class="cols"><th scope="col">fingerprint</th><th scope="col">identities</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .PGP}}<tr>
   <td class="mono">{{.Fingerprint}}</td>
   <td>{{range .UIDs}}{{.}}<br>{{end}}{{if .Revoked}}<span class="badge badge-bad_signature">revoked</span>{{else if .Expired}}<span class="badge badge-signed_key_expired">expired</span>{{end}}</td>
