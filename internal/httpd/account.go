@@ -39,6 +39,7 @@ type accountDevice struct {
 	Label      string
 	Token      string
 	LastSeenAt string
+	Confirm    string // the truncated token, typed back to confirm removal
 }
 
 // accountForm renders the account's own settings: keys, addresses, and the
@@ -80,7 +81,8 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 	var devices []accountDevice
 	if list, err := s.st.PushDevices(u.ID); err == nil {
 		for _, d := range list {
-			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label, Token: prefix8(d.Token), LastSeenAt: d.LastSeenAt})
+			token := prefix8(d.Token)
+			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label, Token: token, LastSeenAt: d.LastSeenAt, Confirm: token})
 		}
 	}
 
@@ -275,6 +277,11 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "notification preferences saved")
 	case "device-remove":
+		want := r.FormValue("tokenprefix")
+		if ok, msg := confirmed(r, want); !ok {
+			back(msg, "")
+			return
+		}
 		if _, msg, ok := s.runControl(u, []string{"notifications", "device", "remove", r.FormValue("id")}); !ok {
 			back(msg, "")
 			return

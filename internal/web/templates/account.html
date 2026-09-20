@@ -158,7 +158,7 @@ account and where notifications go.</p>
   <td>{{.Label}}</td>
   <td class="mono">{{.Token}}</td>
   <td>{{if .LastSeenAt}}{{when .LastSeenAt}}{{else}}never{{end}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="device-remove"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="device-remove"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="tokenprefix" value="{{.Confirm}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No registered devices.</p>{{end}}
