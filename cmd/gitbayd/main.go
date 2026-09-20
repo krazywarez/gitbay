@@ -30,6 +30,7 @@ import (
 	"gitbay.org/gitbay/internal/httpd"
 	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
+	"gitbay.org/gitbay/internal/push"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/toolpath"
@@ -175,6 +176,17 @@ func serveCmd() *cobra.Command {
 			go webhook.New(st, cfg.Webhooks.AllowLocal, retryBase).Run(whCtx)
 			if cfg.Mail.SMTPHost != "" {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
+			}
+			if cfg.Push.Enabled {
+				p, err := push.New(st, cfg.Push, retryBase)
+				if err != nil {
+					// Config validation already parsed the key, so this
+					// is not a misconfiguration; fail loudly rather than
+					// running with a silent delivery route.
+					slog.Error("push: starting deliverer", "err", err)
+				} else {
+					go p.Run(whCtx)
+				}
 			}
 			go mirror.New(st, cfg).Run(whCtx)
 			if d := cfg.Registration.PendingExpiryDuration(); d > 0 {
