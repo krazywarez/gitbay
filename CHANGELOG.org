@@ -23,8 +23,13 @@ phone the way it already reaches the inbox and mail.
 - =notifications device add= (token on stdin), =device list= (token
   shown truncated), =device remove <id>=, and =notifications settings
   push on|off=. A device is dropped automatically when Apple reports
-  the token dead (410 Unregistered or BadDeviceToken).
+  the token dead (410 Unregistered or BadDeviceToken). With =[push]
+  enabled = false= nothing is queued and =device add= refuses, rather
+  than registering a device nothing can deliver to.
 - =[retention] push= caps the delivery queue, beside =mail=.
+- =dashboard= reports the push queue for admins beside the other five,
+  by device id: a =key_id= or =team_id= Apple did not issue passes
+  config validation and then dead-letters every send.
 - =issue assign= now files a notice, so assignment reaches the inbox,
   mail and push.
 - Notification text is sent in full, private repositories included: a
