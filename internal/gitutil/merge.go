@@ -189,7 +189,13 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	branchRef := "refs/heads/" + branch
 	parent, err := ResolveRef(dir, branchRef)
 	if err != nil {
-		return "", fmt.Errorf("branch %s: %w", branch, err)
+		// An unborn branch is a root commit only in a repository with no
+		// refs at all. Anywhere else an unresolvable branch is a typo, and
+		// starting an orphan branch for it would be worse than refusing.
+		if !isEmptyRepo(dir) {
+			return "", fmt.Errorf("branch %s: %w", branch, err)
+		}
+		parent = ""
 	}
 
 	// Hash the new blob.
@@ -211,7 +217,11 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	defer os.Remove(idx.Name())
 	env := append(os.Environ(), "GIT_INDEX_FILE="+idx.Name())
 
-	rt := exec.Command(toolpath.Look("git"), "-C", dir, "read-tree", parent+"^{tree}")
+	tree0 := parent + "^{tree}"
+	if parent == "" {
+		tree0 = "--empty"
+	}
+	rt := exec.Command(toolpath.Look("git"), "-C", dir, "read-tree", tree0)
 	rt.Env = env
 	if out, err := rt.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("read-tree: %v\n%s", err, out)
@@ -229,7 +239,11 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	}
 	tree := strings.TrimSpace(string(out))
 
-	sha, err := CommitTree(dir, tree, []string{parent}, name, email, message)
+	var parents []string
+	if parent != "" {
+		parents = []string{parent}
+	}
+	sha, err := CommitTree(dir, tree, parents, name, email, message)
 	if err != nil {
 		return "", err
 	}
@@ -237,6 +251,13 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 		return "", fmt.Errorf("branch moved during edit; reload and retry: %w", err)
 	}
 	return sha, nil
+}
+
+// isEmptyRepo reports whether dir has no refs at all — a repository
+// created but never pushed to.
+func isEmptyRepo(dir string) bool {
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", "-n1", "--all").Output()
+	return err == nil && strings.TrimSpace(string(out)) == ""
 }
 
 // CommitParents returns the parent SHAs of a commit.
