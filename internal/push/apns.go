@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -65,8 +66,16 @@ func NewClient(cfg config.Push) (*Client, error) {
 // speaks plain HTTP/1.1 rather than negotiating TLS, so the same override
 // has to drop the scheme too, or every request fails with "server gave
 // HTTP response to HTTPS client" instead of reaching the fake at all.
+//
+// The drop is logged rather than silent. config.Push's own doc comment
+// promises a misconfigured [push] fails loudly at startup rather than
+// filling a queue nobody is watching; a stray GITBAY_APNS_HOST on a real
+// instance would otherwise send the provider JWT over cleartext with no
+// sign anything had changed, where the pre-override behaviour at least
+// failed loudly by attempting TLS against a host that cannot answer it.
 func apnsScheme() string {
-	if os.Getenv("GITBAY_APNS_HOST") != "" {
+	if h := os.Getenv("GITBAY_APNS_HOST"); h != "" {
+		slog.Warn("push: GITBAY_APNS_HOST is set, sending to it over plain HTTP instead of APNs", "host", h)
 		return "http"
 	}
 	return "https"
