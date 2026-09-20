@@ -111,7 +111,7 @@ func loopbackHost(hostport string) bool {
 
 // Send delivers one alert. The returned duration is the server's
 // Retry-After when it gave one, zero otherwise.
-func (c *Client) Send(ctx context.Context, token, user, title, body, path string) (result, time.Duration, error) {
+func (c *Client) Send(ctx context.Context, token, user string, badge int, title, body, path string) (result, time.Duration, error) {
 	if len(body) > maxBodyBytes {
 		// A raw byte cut can land mid-rune on multi-byte UTF-8 (emoji,
 		// accents, non-Latin usernames). ToValidUTF8 drops the
@@ -123,6 +123,7 @@ func (c *Client) Send(ctx context.Context, token, user, title, body, path string
 		"aps": map[string]any{
 			"alert":     map[string]string{"title": title, "body": body},
 			"sound":     "default",
+			"badge":     badge,
 			"thread-id": title,
 		},
 		"path": path,

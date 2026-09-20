@@ -14,6 +14,12 @@ A push alert names the account it is for (#89).
   =instance=, the instance's =site_url=, and =user=, the recipient's
   username — together the account's identity.
 - =DuePush= joins =users= for the recipient; no schema change.
+- =notifications device add= now returns the row id, so a client that
+  wants to deregister does not have to list devices and match its own
+  token against the truncated display value.
+- The alert carries =aps.badge=, the recipient's unread inbox count.
+  =DuePush= counts it at send time, a subquery against =inbox=, so a
+  cleared inbox is reflected even though the row was queued earlier.
 
 * v1.32.0 — 2026-09-20
 

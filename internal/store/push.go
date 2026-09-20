@@ -128,6 +128,9 @@ type QueuedPush struct {
 	Body     string
 	Path     string
 	Attempts int
+	// Badge is the recipient's unread inbox count, for the alert's badge.
+	// Counted here rather than at enqueue so a cleared inbox is reflected.
+	Badge int
 }
 
 // EnqueuePush writes one row per registered device, and nothing when the
@@ -149,7 +152,8 @@ func (s *Store) EnqueuePush(userID int64, title, body, path string) error {
 
 func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	rows, err := s.DB.Query(`
-		SELECT q.id, q.device_id, d.token, u.username, q.title, q.body, q.path, q.attempts
+		SELECT q.id, q.device_id, d.token, u.username, q.title, q.body, q.path, q.attempts,
+		       (SELECT COUNT(*) FROM inbox WHERE user_id = d.user_id AND read_at IS NULL)
 		FROM push_queue q
 		JOIN push_devices d ON d.id = q.device_id
 		JOIN users u ON u.id = d.user_id
@@ -163,7 +167,7 @@ func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	var out []QueuedPush
 	for rows.Next() {
 		var p QueuedPush
-		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts); err != nil {
+		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts, &p.Badge); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

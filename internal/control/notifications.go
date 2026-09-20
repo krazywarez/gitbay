@@ -274,11 +274,12 @@ func runNotificationsDeviceAdd(c *Ctx, args []string) int {
 	if len(token) > maxDeviceTokenBytes {
 		return c.fail(protocol.ExitUsage, "device token is too long")
 	}
-	if _, err := c.Store.AddPushDevice(c.User.ID, token, f.Value("--label")); err != nil {
+	id, err := c.Store.AddPushDevice(c.User.ID, token, f.Value("--label"))
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]string{"status": "registered"}, func(w io.Writer) {
-		fmt.Fprintln(w, "device registered")
+	return c.emit(map[string]any{"id": id, "status": "registered"}, func(w io.Writer) {
+		fmt.Fprintf(w, "device %d registered\n", id)
 	})
 }
 

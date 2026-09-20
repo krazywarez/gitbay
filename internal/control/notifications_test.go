@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -218,6 +219,27 @@ func TestNotificationsDeviceListMasksAShortToken(t *testing.T) {
 	}
 	if strings.Contains(out.String(), short) {
 		t.Fatal("the short token was printed verbatim")
+	}
+}
+
+// device add returns the row id. Without it a client that wants to
+// deregister has to list devices and match its own token against the
+// truncated display value, which is identity by rendered string.
+func TestNotificationsDeviceAddReturnsTheID(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	c.Stdin = strings.NewReader("DEVTOKEN\n")
+	var out bytes.Buffer
+	c.Stdout, c.JSON = &out, true
+	if code := runNotificationsDeviceAdd(c, nil); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	devices, _ := c.Store.PushDevices(c.User.ID)
+	if len(devices) != 1 {
+		t.Fatalf("want one device, got %d", len(devices))
+	}
+	want := fmt.Sprintf(`"id":%d`, devices[0].ID)
+	if !strings.Contains(out.String(), want) {
+		t.Fatalf("output %s does not carry %s", out.String(), want)
 	}
 }
 

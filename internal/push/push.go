@@ -49,7 +49,7 @@ func (d *Deliverer) drain(ctx context.Context) {
 		return
 	}
 	for _, q := range due {
-		res, after, sendErr := d.Cl.Send(ctx, q.Token, q.Username, q.Title, q.Body, q.Path)
+		res, after, sendErr := d.Cl.Send(ctx, q.Token, q.Username, q.Badge, q.Title, q.Body, q.Path)
 		msg := ""
 		if sendErr != nil {
 			msg = sendErr.Error()

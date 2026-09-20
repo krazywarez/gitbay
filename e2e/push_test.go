@@ -133,6 +133,10 @@ environment = "production"
 	if inst, _ := got[0]["instance"].(string); !strings.HasPrefix(inst, "https://") {
 		t.Fatalf("instance = %v, want this instance's site_url", inst)
 	}
+	// Bob's one unread notice, for the app icon badge.
+	if aps["badge"] != float64(1) {
+		t.Fatalf("badge = %v", aps["badge"])
+	}
 
 	// Apple retires the token. The next push reaps the device.
 	mu.Lock()

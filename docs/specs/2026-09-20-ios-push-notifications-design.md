@@ -151,7 +151,7 @@ The capability lands in the registry; the surfaces render it.
 
 | Command | Notes |
 |---|---|
-| `notifications device add` | `--label <name>`, token on stdin. `ReadsStdin: true`. |
+| `notifications device add` | `--label <name>`, token on stdin. `ReadsStdin: true`. Returns the row id, for deregistration. |
 | `notifications device list` | `ReadOnly`. Token shown truncated, never in full. |
 | `notifications device remove <id>` | Own devices only. |
 | `notifications settings push on\|off` | Joins `settings mail` and `settings watch`. |
@@ -205,6 +205,7 @@ The payload:
   "aps": {
     "alert": {"title": "krz/gitbay", "body": "cmc opened issue #12"},
     "sound": "default",
+    "badge": 3,
     "thread-id": "krz/gitbay"
   },
   "path": "krz/gitbay/issues/12",
@@ -217,7 +218,9 @@ The payload:
 string the inbox row carries, so the two surfaces cannot disagree.
 `thread-id` groups a repository's notices in Notification Center.
 `path` is the inbox row's `path` field, which the app already knows how
-to turn into a link.
+to turn into a link. `badge` is the recipient's unread inbox count,
+counted by `DuePush` at send time rather than at enqueue, so a cleared
+inbox is reflected.
 
 `instance` is this instance's `site_url` and `user` the recipient's
 username. A device token is one install, and an install registers

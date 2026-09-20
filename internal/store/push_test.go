@@ -275,3 +275,40 @@ func TestDuePushCarriesTheUsername(t *testing.T) {
 		t.Fatalf("Username = %q, want alice", due[0].Username)
 	}
 }
+
+// The queue row carries the recipient's unread count, so the alert can
+// badge the app icon. Counted at send rather than at enqueue: an inbox
+// cleared in the seconds before delivery is reflected.
+func TestDuePushCarriesTheUnreadCount(t *testing.T) {
+	s := pushFixture(t)
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repoID, err := s.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddPushDevice(uid, "tok-a", "iphone"); err != nil {
+		t.Fatal(err)
+	}
+	// Two unread inbox rows, then a queued push.
+	for i := 0; i < 2; i++ {
+		if err := s.AddNotice(uid, repoID, "issue", "bob", "opened issue #1", "alice/app/issues/1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.EnqueuePush(uid, "alice/app", "bob opened issue #1", "alice/app/issues/1"); err != nil {
+		t.Fatal(err)
+	}
+	due, err := s.DuePush(20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 1 {
+		t.Fatalf("want one queued push, got %d", len(due))
+	}
+	if due[0].Badge != 2 {
+		t.Fatalf("Badge = %d, want 2", due[0].Badge)
+	}
+}
