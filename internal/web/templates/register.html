@@ -6,7 +6,7 @@
 {{else}}<p class="lede">Open registration. Your account activates once you verify your email.</p>{{end}}
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/register" class="signupform">
-<div class="field"><label for="username">Username</label><input type="text" id="username" name="username" value="{{.Username}}" required autofocus></div>
+<div class="field"><label for="username">Username</label><input type="text" id="username" name="username" value="{{.Username}}" required></div>
 {{if eq .Mode "invite"}}<div class="field"><label for="invite">Invite code</label><input type="text" id="invite" name="invite" required></div>
 {{else}}<div class="field"><label for="email">Email</label><input type="text" id="email" name="email" required></div>{{end}}
 <div class="field"><label for="key">SSH public key</label>

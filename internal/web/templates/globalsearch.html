@@ -20,7 +20,7 @@
   {{if and .Query (not .QueryErr)}}<p class="meta">{{len .Results}} {{if eq (len .Results) 1}}result{{else}}results{{end}} for <q>{{.Query}}</q>{{if .Kind}} in {{.Kind}}{{end}}</p>{{end}}
 </div>
 <form method="get" action="/search" class="searchform">
-  <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names and topics, issue and merge request text" autofocus>
+  <input type="search" name="q" aria-label="Search" value="{{.Query}}" placeholder="repository names and topics, issue and merge request text">
   {{if .Kind}}<input type="hidden" name="kind" value="{{.Kind}}">{{end}}
   <button type="submit" class="btn">Search</button>
 </form>
