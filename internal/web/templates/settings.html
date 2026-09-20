@@ -44,7 +44,7 @@
 </form>
 {{if .Branches}}<form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="default-branch">
-  <div><label for="default-branch">Default branch</label><p class="hint">What a clone checks out and what CI builds on trigger.</p></div>
+  <div><label for="default-branch">Default branch</label></div>
   <div><select id="default-branch" name="default-branch">{{$cur := .Repo.DefaultBranch}}{{range .Branches}}<option value="{{.Name}}"{{if eq .Name $cur}} selected{{end}}>{{.Name}}</option>{{end}}</select></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>{{end}}
@@ -53,7 +53,7 @@
 <section id="access"><h2>Access</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="visibility">
-  <div><span class="fieldname">Visibility</span><p class="hint">Private repositories answer not found to everyone without access, including in search and on your profile.</p></div>
+  <div><span class="fieldname">Visibility</span></div>
   <div class="check">
     <label><input type="radio" name="visibility" value="public"{{if eq .Repo.Visibility "public"}} checked{{end}}> Public</label>
     <label><input type="radio" name="visibility" value="private"{{if eq .Repo.Visibility "private"}} checked{{end}}> Private</label>
@@ -62,7 +62,7 @@
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="git-daemon">
-  <div><label for="git-daemon">Serve over git://</label><p class="hint">Unauthenticated, unencrypted read access on port 9418. Public repositories only.</p></div>
+  <div><label for="git-daemon">Serve over git://</label><p class="hint">Public repositories only.</p></div>
   <div class="check"><input type="checkbox" id="git-daemon" name="git-daemon" value="on"{{if .Repo.Settings.GitDaemon}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
@@ -72,13 +72,13 @@
 <p class="meta">Checked before a merge, in this order: checks, approvals, resolved threads, signatures.</p>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-checks">
-  <div><label for="require-checks">Required checks</label><p class="hint">A request waits until every CI job that would report on its head has succeeded.</p></div>
+  <div><label for="require-checks">Required checks</label><p class="hint">Requires CI to succeed.</p></div>
   <div class="check"><input type="checkbox" id="require-checks" name="require-checks" value="on"{{if .Repo.Settings.RequireChecks}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-approvals">
-  <div><label for="approvals">Approvals</label><p class="hint">Approvals from people with write access. Zero means none required.</p></div>
+  <div><label for="approvals">Approvals</label><p class="hint">Approvals from anyone with write access. Zero means none required.</p></div>
   <div><input type="number" id="approvals" name="approvals" min="0" max="10" value="{{.Repo.Settings.RequireApprovals}}"></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
@@ -90,7 +90,7 @@
 </form>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-codeowners">
-  <div><label for="require-codeowners">CODEOWNERS</label><p class="hint">Owners of every touched path must approve.</p></div>
+  <div><label for="require-codeowners">CODEOWNERS</label><p class="hint">Code owners must approve.</p></div>
   <div class="check"><input type="checkbox" id="require-codeowners" name="require-codeowners" value="on"{{if .Repo.Settings.RequireCodeowners}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
@@ -151,12 +151,12 @@
 <section id="deps"><h2>Dependencies</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="deps">
-  <div><label for="deps-enabled">Check for updates</label><p class="hint">Compares the manifests on <code>{{.Repo.DefaultBranch}}</code> against proxy.golang.org, npm, crates.io, and PyPI once a day, and tracks what is behind in an issue. Checking a private repository tells those registries what it depends on.</p></div>
+  <div><label for="deps-enabled">Check for updates</label><p class="hint">Evaluates the manifests on <code>{{.Repo.DefaultBranch}}</code> and opens an issue. Go, NPM, Crates, and PyPI only.</p></div>
   <div class="check"><input type="checkbox" id="deps-enabled" name="deps" value="on"{{if .DepsEnabled}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
 {{if .DepsEnabled}}
-<p class="meta">Last checked {{if .Deps.LastCheck}}{{when .Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · tracked in <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
+<p class="meta">Last checked {{if .Deps.LastCheck}}{{when .Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
 {{if .Deps.LastError}}<p class="error" role="alert">{{.Deps.LastError}}</p>{{end}}
 {{if .Deps.Behind}}<div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">dependency</th><th scope="col">pinned</th><th scope="col">latest</th></tr>

@@ -97,7 +97,7 @@ func TestDashboard(t *testing.T) {
 		"Waiting on your review", "assigned to you", "Recent activity",
 		"from bob", "alice/app!1", "todo one", "alice/app#1",
 		`href="/alice/app/mrs/1"`, `href="/alice/app/issues/1"`,
-		"Yours anywhere, and every one in a repository you can write to.",
+		"Your MRs across all repos.",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard missing %q", want)

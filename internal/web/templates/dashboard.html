@@ -39,9 +39,9 @@
 </div>
 {{if .Reviews}}{{template "queue" dict "ID" "reviews" "Title" "Waiting on your review" "Items" .Reviews "Kind" "mrs" "Empty" "Nothing waiting on you"}}{{end}}
 {{if .Assigned}}{{template "queue" dict "ID" "assigned" "Title" "Assigned to you" "Items" .Assigned "Kind" "issues" "Empty" "Nothing assigned to you"}}{{end}}
-{{if .MRs}}{{template "queue" dict "ID" "mrs" "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
-{{if .Issues}}{{template "queue" dict "ID" "issues" "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Yours anywhere, and every one in a repository you can write to."}}{{end}}
-{{if not (or .Reviews .Assigned .MRs .Issues)}}<p class="none">Nothing open anywhere you can write to.</p>{{end}}
+{{if .MRs}}{{template "queue" dict "ID" "mrs" "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Your MRs across all repos."}}{{end}}
+{{if .Issues}}{{template "queue" dict "ID" "issues" "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Your issues across all repos."}}{{end}}
+{{if not (or .Reviews .Assigned .MRs .Issues)}}<p class="none">Nothing open.</p>{{end}}
 </section>
 
 <aside class="feedcol" aria-label="Recent activity">

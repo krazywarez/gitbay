@@ -2,8 +2,8 @@
 {{define "content"}}
 <h1>Bookmarks</h1>
 <p class="meta">Repositories you saved to come back to. A pin is private quick
-access to your own work; a bookmark says something is worth returning to, and
-its count is public.</p>
+  access to your own work; a bookmark is a public vote to save access to another
+  repo.</p>
 <ul class="repolist">
 {{range .Bookmarks}}<li>
   <p class="title"><a href="/{{.Path}}">{{.Path}}</a>
@@ -11,6 +11,6 @@ its count is public.</p>
     <span class="count">{{.Bookmarks}}</span></p>
   {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
 </li>
-{{else}}<li class="empty">nothing bookmarked yet — open a repository and press Bookmark</li>{{end}}
+{{else}}<li class="empty">nothing bookmarked yet. open a repository and press Bookmark</li>{{end}}
 </ul>
 {{end}}

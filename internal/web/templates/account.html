@@ -48,8 +48,7 @@ Write it with a push, or edit it here.</p>
 
 <section id="keys"><h2>SSH keys</h2>
 <p class="meta">Your keys are your identity here. A <code>full</code> key can run
-commands and push; a <code>git</code> key can only move git data, which is what
-a CI checkout wants.</p>
+commands and push; a <code>git</code> key can only move git data (e.g., CI).</p>
 {{if .Keys}}<div class="tablewrap"><table class="keys nowrap">
 <tr class="cols"><th scope="col">label</th><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .Keys}}<tr>
@@ -60,7 +59,7 @@ a CI checkout wants.</p>
   <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="key-remove"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
-{{else}}<p class="none">No SSH keys — which cannot be right, since you signed in.</p>{{end}}
+{{else}}<p class="none">No SSH keys? Which cannot be right, since you signed in.</p>{{end}}
 <details class="editbox">
   <summary>Add an SSH key</summary>
   <form method="post" action="/settings" class="setform stack">
@@ -71,8 +70,8 @@ a CI checkout wants.</p>
     <input id="key-label" name="label" maxlength="64" placeholder="defaults to the key's comment">
     <label for="scope">Scope</label>
     <select id="scope" name="scope">
-      <option value="full">full — commands and git</option>
-      <option value="git">git — git transport only</option>
+      <option value="full">full: commands and git</option>
+      <option value="git">git: git transport only</option>
     </select>
     <button type="submit" class="btn">Add key</button>
   </form>
@@ -80,8 +79,8 @@ a CI checkout wants.</p>
 </section>
 
 <section id="emails"><h2>Email addresses</h2>
-<p class="meta">A verified address is what ties your signed commits to this
-account, and where notifications go.</p>
+<p class="meta">A verified address ties signed commits to this
+account and where notifications go.</p>
 {{if .Emails}}<ul class="plain">
 {{range .Emails}}<li>{{.Address}}
   {{if .Primary}}<span class="chip">primary</span>{{end}}
@@ -137,14 +136,14 @@ account, and where notifications go.</p>
   <input type="checkbox" id="notify-mail" name="mail" value="on"{{if .MailOn}} checked{{end}}>
   <button type="submit" class="btn">Save</button>
 </form>
-<p class="meta">The inbox is filed either way; this is the mail half. Login links are not activity and still arrive.</p>
+<p class="meta">Enable to receive activity alerts by email. Login links will arrive regardless of this setting.</p>
 <form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-watch">
   <label for="notify-watch">Watch repositories you can write to</label>
   <input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}>
   <button type="submit" class="btn">Save</button>
 </form>
-<p class="meta">Every issue and merge request on those repositories, as if you had watched each. A watch or mute on a repository still wins.</p>
+<p class="meta">Alerts for every issue and merge request on those repositories. A watch or mute on a repository has priority over this setting.</p>
 </section>
 
 <section id="appearance"><h2>Appearance</h2>
