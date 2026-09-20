@@ -165,6 +165,67 @@ func TestEnqueuePushRespectsSettingAndDevices(t *testing.T) {
 	}
 }
 
+// A token changing hands takes its undelivered queue with it. The row id
+// survives the upsert, so anything queued for the previous owner would
+// otherwise be delivered to a phone that now belongs to someone else —
+// and an alert carries the repository name and item number in full. The
+// iOS app calls device add on every sign-in, which is exactly when
+// ownership changes.
+func TestAddPushDeviceDropsThePreviousOwnersQueue(t *testing.T) {
+	s := pushFixture(t)
+	alice, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := s.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := s.AddPushDevice(alice, "tok-a", "iphone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnqueuePush(alice, "alice/secret", "alice opened issue #1", "alice/secret/issues/1"); err != nil {
+		t.Fatal(err)
+	}
+	due, err := s.DuePush(20)
+	if err != nil || len(due) != 1 {
+		t.Fatalf("DuePush: %v %+v", err, due)
+	}
+	// A second row, already sent: history, not a pending delivery.
+	if err := s.EnqueuePush(alice, "alice/secret", "alice closed issue #1", "alice/secret/issues/1"); err != nil {
+		t.Fatal(err)
+	}
+	sent, _ := s.DuePush(20)
+	if err := s.MarkPushSent(sent[len(sent)-1].ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddPushDevice(bob, "tok-a", "iphone"); err != nil {
+		t.Fatalf("re-register: %v", err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 0 {
+		t.Fatalf("alice's pending push survived the handover: %+v", due)
+	}
+	var kept int
+	s.DB.QueryRow("SELECT COUNT(*) FROM push_queue WHERE device_id = ? AND sent_at IS NOT NULL", id).Scan(&kept)
+	if kept != 1 {
+		t.Fatalf("delivered rows deleted too: %d remain", kept)
+	}
+
+	// Re-registering to the same owner leaves the queue alone: the app
+	// calls device add on every launch.
+	if err := s.EnqueuePush(bob, "bob/app", "bob opened issue #2", "bob/app/issues/2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddPushDevice(bob, "tok-a", "iphone"); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 1 {
+		t.Fatalf("re-registering to the same owner dropped its own queue: %+v", due)
+	}
+}
+
 func TestDeletePushDeviceByTokenTakesItsQueue(t *testing.T) {
 	s := pushFixture(t)
 	uid, err := s.CreateUser("alice", false)

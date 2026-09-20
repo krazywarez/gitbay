@@ -23,17 +23,39 @@ type PushDevice struct {
 // hands the same one to whichever account signs in next. The id is read
 // back by token rather than taken from LastInsertId, which SQLite leaves
 // unchanged when the DO UPDATE arm fires instead of the INSERT.
+//
+// The row id survives that handover, so queue rows written for the
+// previous owner would still be delivered to the device — and an alert
+// carries the repository name and item number in full. Undelivered rows
+// go with the ownership, in the same transaction; sent and dead-lettered
+// rows are history and stay.
 func (s *Store) AddPushDevice(userID int64, token, label string) (int64, error) {
-	_, err := s.DB.Exec(`
-		INSERT INTO push_devices (user_id, token, label) VALUES (?, ?, ?)
-		ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, label = excluded.label`,
-		userID, token, label)
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
 	}
+	defer tx.Rollback()
+	var prev int64
+	if err := tx.QueryRow("SELECT user_id FROM push_devices WHERE token = ?", token).Scan(&prev); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO push_devices (user_id, token, label) VALUES (?, ?, ?)
+		ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, label = excluded.label`,
+		userID, token, label); err != nil {
+		return 0, err
+	}
 	var id int64
-	err = s.DB.QueryRow("SELECT id FROM push_devices WHERE token = ?", token).Scan(&id)
-	return id, err
+	if err := tx.QueryRow("SELECT id FROM push_devices WHERE token = ?", token).Scan(&id); err != nil {
+		return 0, err
+	}
+	if prev != 0 && prev != userID {
+		if _, err := tx.Exec(
+			"DELETE FROM push_queue WHERE device_id = ? AND sent_at IS NULL AND failed_at IS NULL", id); err != nil {
+			return 0, err
+		}
+	}
+	return id, tx.Commit()
 }
 
 func (s *Store) PushDevices(userID int64) ([]PushDevice, error) {
