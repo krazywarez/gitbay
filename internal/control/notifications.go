@@ -1,6 +1,7 @@
 package control
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -30,6 +31,22 @@ func init() {
 	register(Command{Path: []string{"notifications", "settings", "watch"},
 		Summary: "every issue and merge request on repositories you can write to",
 		Usage:   "notifications settings watch on|off", Run: runNotificationsSettingsWatch})
+	register(Command{Path: []string{"notifications", "device", "add"},
+		Summary: "register an Apple device for push, token on stdin",
+		Usage:   "notifications device add [--label <name>] < token",
+		// Mandatory: without it control.go swaps in an empty reader and
+		// this command stores an empty token without erroring.
+		ReadsStdin: true, Run: runNotificationsDeviceAdd})
+	register(Command{Path: []string{"notifications", "device", "list"},
+		Summary:  "your registered devices",
+		Usage:    "notifications device list",
+		ReadOnly: true, Run: runNotificationsDeviceList})
+	register(Command{Path: []string{"notifications", "device", "remove"},
+		Summary: "deregister a device",
+		Usage:   "notifications device remove <id>", Run: runNotificationsDeviceRemove})
+	register(Command{Path: []string{"notifications", "settings", "push"},
+		Summary: "activity on your registered devices as well as the inbox",
+		Usage:   "notifications settings push on|off", Run: runNotificationsSettingsPush})
 	register(Command{Path: []string{"repo", "watch"},
 		Summary: "hear about all activity on a repository",
 		Usage:   "repo watch <owner/name>", Run: runRepoWatch})
@@ -155,14 +172,18 @@ func emitNotificationSettings(c *Ctx) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]bool{"mail": mail, "watch": watch}, func(w io.Writer) {
+	push, err := c.Store.PushEnabled(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]bool{"mail": mail, "watch": watch, "push": push}, func(w io.Writer) {
 		onOff := func(on bool) string {
 			if on {
 				return "on"
 			}
 			return "off"
 		}
-		fmt.Fprintf(w, "mail: %s\nwatch: %s\n", onOff(mail), onOff(watch))
+		fmt.Fprintf(w, "mail: %s\nwatch: %s\npush: %s\n", onOff(mail), onOff(watch), onOff(push))
 	})
 }
 
@@ -196,6 +217,101 @@ func runNotificationsSettingsWatch(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitNotificationSettings(c)
+}
+
+func runNotificationsSettingsPush(c *Ctx, args []string) int {
+	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
+		return c.usage()
+	}
+	if err := c.Store.SetPushEnabled(c.User.ID, args[0] == "on"); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return emitNotificationSettings(c)
+}
+
+// maxDeviceTokenBytes is well past APNs' 32-byte token rendered as 64 hex
+// characters, and stops a stdin that is not a token from becoming a row.
+const maxDeviceTokenBytes = 512
+
+func runNotificationsDeviceAdd(c *Ctx, args []string) int {
+	f, err := parseFlags(args, flagSpec{Values: []string{"--label"}, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if len(f.Pos) != 0 {
+		return c.usage()
+	}
+	raw, err := io.ReadAll(io.LimitReader(c.Stdin, maxDeviceTokenBytes+1))
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "reading stdin: %v", err)
+	}
+	token := strings.TrimSpace(string(raw))
+	if token == "" {
+		return c.usageWith("no device token on stdin")
+	}
+	if len(token) > maxDeviceTokenBytes {
+		return c.fail(protocol.ExitUsage, "device token is too long")
+	}
+	if _, err := c.Store.AddPushDevice(c.User.ID, token, f.Value("--label")); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"status": "registered"}, func(w io.Writer) {
+		fmt.Fprintln(w, "device registered")
+	})
+}
+
+func runNotificationsDeviceList(c *Ctx, args []string) int {
+	if len(args) != 0 {
+		return c.usage()
+	}
+	devices, err := c.Store.PushDevices(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	type row struct {
+		ID    int64  `json:"id"`
+		Label string `json:"label"`
+		Token string `json:"token"` // truncated; a token is not echoed in full
+		Added string `json:"added"`
+	}
+	rows := make([]row, 0, len(devices))
+	for _, d := range devices {
+		rows = append(rows, row{ID: d.ID, Label: d.Label,
+			Token: shortToken(d.Token), Added: d.CreatedAt})
+	}
+	return c.emit(rows, func(w io.Writer) {
+		for _, r := range rows {
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", r.ID, r.Label, r.Token, r.Added)
+		}
+	})
+}
+
+// shortToken renders a device token as its first eight characters. Enough
+// to tell two devices apart in a list, not enough to push to one.
+func shortToken(t string) string {
+	if len(t) <= 8 {
+		return t
+	}
+	return t[:8] + "…"
+}
+
+func runNotificationsDeviceRemove(c *Ctx, args []string) int {
+	if len(args) != 1 {
+		return c.usage()
+	}
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		return c.usageWith("device id must be a number")
+	}
+	if err := c.Store.RemovePushDevice(c.User.ID, id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "no such device; notifications device list shows yours")
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]string{"status": "removed"}, func(w io.Writer) {
+		fmt.Fprintln(w, "device removed")
+	})
 }
 
 // noticesDefaultLimit caps a bare list; pagination reaches further back.
