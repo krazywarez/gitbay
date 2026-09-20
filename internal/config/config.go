@@ -2,6 +2,9 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -35,6 +38,7 @@ type Config struct {
 	Mirrors      Mirrors      `toml:"mirrors"`
 	Deps         Deps         `toml:"deps"`
 	Retention    Retention    `toml:"retention"`
+	Push         Push         `toml:"push"`
 	// GoImport maps vanity Go module paths to repositories, e.g.
 	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
 	// under a mapped path get a go-import meta tag.
@@ -211,6 +215,58 @@ type Mail struct {
 	SMTPPass string `toml:"smtp_pass,omitempty"`
 }
 
+// Push is APNs delivery to registered Apple devices. A key belongs to a
+// bundle ID, so an instance pushes to the app built under the topic named
+// here and no other; a self-hoster points this at their own key and their
+// own build.
+type Push struct {
+	Enabled bool   `toml:"enabled"`
+	KeyFile string `toml:"key_file"`
+	KeyID   string `toml:"key_id"`
+	TeamID  string `toml:"team_id"`
+	Topic   string `toml:"topic"` // the app's bundle identifier
+	// Environment is a name rather than a URL so a typo cannot aim the
+	// key at a host that is not Apple's.
+	Environment string `toml:"environment"` // production | sandbox
+}
+
+// Host is the APNs endpoint for the configured environment.
+// GITBAY_APNS_HOST overrides it for tests, as GITBAY_SWEEP_TICK does for
+// the retention sweep.
+func (p Push) Host() string {
+	if h := os.Getenv("GITBAY_APNS_HOST"); h != "" {
+		return h
+	}
+	if p.Environment == "sandbox" {
+		return "api.sandbox.push.apple.com"
+	}
+	return "api.push.apple.com"
+}
+
+// LoadAPNSKey reads Apple's .p8 provider key: a PEM-wrapped PKCS#8
+// P-256 private key. Read at startup and validated there, so a
+// misconfigured [push] refuses to start rather than filling a queue
+// nobody is watching.
+func LoadAPNSKey(path string) (*ecdsa.PrivateKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, errors.New("not PEM")
+	}
+	any, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := any.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("not an EC private key")
+	}
+	return key, nil
+}
+
 // Default returns the configuration used when a key is absent from the file.
 func Default() Config {
 	return Config{
@@ -287,6 +343,26 @@ func (c Config) Validate() error {
 	}
 	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 {
 		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user and max_snippets_per_user must not be negative"))
+	}
+	if c.Push.Enabled {
+		for _, f := range []struct{ name, val string }{
+			{"push.key_file", c.Push.KeyFile},
+			{"push.key_id", c.Push.KeyID},
+			{"push.team_id", c.Push.TeamID},
+			{"push.topic", c.Push.Topic},
+		} {
+			if f.val == "" {
+				errs = append(errs, fmt.Errorf("%s is required when push.enabled", f.name))
+			}
+		}
+		if err := oneOf("push.environment", c.Push.Environment, "production", "sandbox"); err != nil {
+			errs = append(errs, err)
+		}
+		if c.Push.KeyFile != "" {
+			if _, err := LoadAPNSKey(c.Push.KeyFile); err != nil {
+				errs = append(errs, fmt.Errorf("push.key_file: %w", err))
+			}
+		}
 	}
 	if c.SSH.Port < 1 || c.SSH.Port > 65535 {
 		errs = append(errs, fmt.Errorf("ssh.port %d out of range", c.SSH.Port))

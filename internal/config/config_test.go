@@ -1,6 +1,11 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,5 +146,106 @@ func TestValidCombinations(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// writeP8 writes a PEM-wrapped PKCS#8 P-256 key, the shape of Apple's
+// .p8 provider key, and returns its path.
+func writeP8(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "apns.p8")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := pem.Encode(f, &pem.Block{Type: "PRIVATE KEY", Bytes: der}); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestPushConfigValidation(t *testing.T) {
+	keyPath := writeP8(t)
+	full := `
+[push]
+enabled = true
+key_file = "` + keyPath + `"
+key_id = "KEYID"
+team_id = "TEAMID"
+topic = "org.gitbay.gitbay"
+environment = "production"
+`
+	cases := []struct {
+		name string
+		body string
+		want string // substring of the expected error; "" means valid
+	}{
+		{"disabled needs nothing", "\n[push]\nenabled = false\n", ""},
+		{"complete is valid", full, ""},
+		{"key_id required", strings.Replace(full, `key_id = "KEYID"`, "", 1), "push.key_id"},
+		{"team_id required", strings.Replace(full, `team_id = "TEAMID"`, "", 1), "push.team_id"},
+		{"topic required", strings.Replace(full, `topic = "org.gitbay.gitbay"`, "", 1), "push.topic"},
+		{"environment must be a known name",
+			strings.Replace(full, `environment = "production"`, `environment = "staging"`, 1),
+			"push.environment"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, minimal+tc.body))
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("want valid, got %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("want an error mentioning %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
+// A key_file that exists but is not a PKCS#8 EC key is refused at load,
+// not at the first notice: the failure mode otherwise is a queue that
+// fills and dead-letters with nobody watching.
+func TestPushConfigRejectsAnUnparseableKey(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "junk.p8")
+	if err := os.WriteFile(p, []byte("not a key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	body := `
+[push]
+enabled = true
+key_file = "` + p + `"
+key_id = "K"
+team_id = "T"
+topic = "org.gitbay.gitbay"
+environment = "production"
+`
+	_, err := Load(writeConfig(t, minimal+body))
+	if err == nil || !strings.Contains(err.Error(), "push.key_file") {
+		t.Fatalf("want a push.key_file error, got %v", err)
+	}
+}
+
+func TestPushHost(t *testing.T) {
+	if got := (Push{Environment: "production"}).Host(); got != "api.push.apple.com" {
+		t.Fatalf("production host = %q", got)
+	}
+	if got := (Push{Environment: "sandbox"}).Host(); got != "api.sandbox.push.apple.com" {
+		t.Fatalf("sandbox host = %q", got)
+	}
+	t.Setenv("GITBAY_APNS_HOST", "127.0.0.1:1234")
+	if got := (Push{Environment: "production"}).Host(); got != "127.0.0.1:1234" {
+		t.Fatalf("GITBAY_APNS_HOST ignored: %q", got)
 	}
 }
