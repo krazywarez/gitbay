@@ -1,6 +1,9 @@
 package policy
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateOwnerName(t *testing.T) {
 	valid := []string{"alice", "krz", "a", "user-1", "a.b_c", "0day"}
@@ -41,5 +44,36 @@ func TestRepoNameAllowsReservedWords(t *testing.T) {
 	}
 	if err := ValidateName("activity.atom"); err == nil {
 		t.Error("ValidateName(\"activity.atom\") = nil, want error")
+	}
+}
+
+func TestRepoNameAllowsLeadingDot(t *testing.T) {
+	// .gitbay holds an owner's profile content; a leading dot marks a
+	// repository as infrastructure rather than a project.
+	for _, n := range []string{".gitbay", ".dotfiles", ".a"} {
+		if err := ValidateName(n); err != nil {
+			t.Errorf("ValidateName(%q) = %v, want nil", n, err)
+		}
+	}
+	for _, n := range []string{".", "..", ".git", "repo.git", "..a", ".-a"} {
+		if err := ValidateName(n); err == nil {
+			t.Errorf("ValidateName(%q) = nil, want error", n)
+		}
+	}
+	// The ceiling is 63 characters, the dot included.
+	if err := ValidateName("." + strings.Repeat("a", 62)); err != nil {
+		t.Errorf("63-character dotted name rejected: %v", err)
+	}
+	if err := ValidateName("." + strings.Repeat("a", 63)); err == nil {
+		t.Error("64-character dotted name accepted")
+	}
+}
+
+func TestOwnerNameRefusesLeadingDot(t *testing.T) {
+	// The dot is a repository affordance. An owner is a top-level route.
+	for _, n := range []string{".gitbay", ".hidden", ".a"} {
+		if err := ValidateOwnerName(n); err == nil {
+			t.Errorf("ValidateOwnerName(%q) = nil, want error", n)
+		}
 	}
 }

@@ -34,14 +34,22 @@ var reservedNames = map[string]bool{
 }
 
 // namePat matches valid user, org, and repo names: lowercase alphanumerics,
-// dot, dash, underscore; must start with an alphanumeric. Dots are further
-// restricted by ValidateName to avoid "." / ".." and ".git" suffixes.
-var namePat = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
+// dot, dash, underscore; must start with an alphanumeric, or with a single
+// dot before one. A leading dot marks a repository as infrastructure rather
+// than a project — .gitbay holds an owner's profile content — and is refused
+// for owners by ValidateOwnerName. Dots are further restricted by
+// ValidateName to avoid "." / ".." and ".git" suffixes.
+var namePat = regexp.MustCompile(`^\.?[a-z0-9][a-z0-9._-]{0,61}$`)
 
 // ValidateOwnerName checks a username or org name.
 func ValidateOwnerName(name string) error {
 	if err := ValidateName(name); err != nil {
 		return err
+	}
+	// The leading dot is a repository affordance. An owner is a top-level
+	// route, and /.gitbay is not one.
+	if strings.HasPrefix(name, ".") {
+		return fmt.Errorf("invalid name %q: must start with a letter or digit", name)
 	}
 	if reservedNames[name] {
 		return fmt.Errorf("name %q is reserved", name)
@@ -58,7 +66,9 @@ func ValidateName(name string) error {
 	if name == "." || name == ".." {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	if len(name) > 4 && name[len(name)-4:] == ".git" {
+	// HasSuffix covers "repo.git" and the bare ".git" the leading-dot rule
+	// would otherwise let through.
+	if strings.HasSuffix(name, ".git") {
 		return fmt.Errorf("invalid name %q: must not end in .git", name)
 	}
 	// /{owner}/activity.atom is the owner's feed; a repository by that
