@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"bufio"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -37,6 +38,23 @@ func TestTrailingSlashRedirects(t *testing.T) {
 			t.Errorf("%s: Location %q leaves the site", p, loc)
 		}
 	}
+	// An absolute-form request line, which RFC 7230 requires a server to
+	// accept, fills URL.Scheme and URL.Host. Neither may reach Location.
+	// ReadRequest also takes Host from the URL; it is pinned back to the
+	// site so this stays a test of the forge handler rather than of the
+	// pages router.
+	raw := "GET http://evil.example/cmc/ HTTP/1.1\r\nHost: forge.test\r\n\r\n"
+	abs, err := http.ReadRequest(bufio.NewReader(strings.NewReader(raw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	abs.Host = "forge.test"
+	aw := httptest.NewRecorder()
+	h.ServeHTTP(aw, abs)
+	if loc := aw.Header().Get("Location"); loc != "/cmc" {
+		t.Errorf("absolute-form request: Location %q, want %q", loc, "/cmc")
+	}
+
 	r := httptest.NewRequest("POST", "/cmc/", nil)
 	r.Host = "forge.test"
 	w := httptest.NewRecorder()

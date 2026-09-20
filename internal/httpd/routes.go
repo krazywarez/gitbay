@@ -263,6 +263,11 @@ func (s *Server) unmatched(mux *http.ServeMux) http.HandlerFunc {
 			// The fallback itself is registered at "/", so a miss
 			// reports that pattern; a real route reports its own.
 			if _, pattern := mux.Handler(trimmed); pattern != "" && pattern != "/" {
+				// net/http fills Scheme and Host from an
+				// absolute-form request line, which RFC 7230
+				// requires a server to accept; carrying them
+				// into Location sends the reader off-site.
+				u.Scheme, u.Host, u.User = "", "", nil
 				http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
 				return
 			}
