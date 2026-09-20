@@ -134,8 +134,12 @@ environment = "production"
 		t.Fatalf("issue comment: %s%s", out, errOut)
 	}
 	waitFor(t, "the device to be reaped after a 410", func() bool {
-		out, _, _ := inst.ssh(t, bobKey, "", "notifications", "device", "list", "--json")
-		return !strings.Contains(out, "iphone")
+		// This is an absence check, unlike every other waitFor in the
+		// suite: a transient ssh failure returns empty stdout, which
+		// would otherwise read as a false "reaped". The exit code rules
+		// that out.
+		out, _, code := inst.ssh(t, bobKey, "", "notifications", "device", "list", "--json")
+		return code == 0 && !strings.Contains(out, "iphone")
 	})
 
 	// The inbox is untouched by any of it: push is a side channel.
