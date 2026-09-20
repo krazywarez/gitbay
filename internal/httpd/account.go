@@ -32,14 +32,16 @@ type accountPGP struct {
 }
 
 // accountDevice is one registered APNs device as the settings page shows
-// it. Token is truncated to its first 8 characters: the full token is
-// device-identifying and never reaches the page.
+// it. The full token is device-identifying and never reaches the page.
 type accountDevice struct {
-	ID         int64
-	Label      string
+	ID    int64
+	Label string
+	// Token is rendered by control.ShortToken, the same renderer
+	// notifications device list uses: prefix8 returns anything under nine
+	// characters unchanged, and device add enforces no minimum length.
 	Token      string
 	LastSeenAt string
-	Confirm    string // the truncated token, typed back to confirm removal
+	Confirm    string // the token's first 8 characters, typed back to confirm removal
 }
 
 // accountForm renders the account's own settings: keys, addresses, and the
@@ -81,8 +83,8 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 	var devices []accountDevice
 	if list, err := s.st.PushDevices(u.ID); err == nil {
 		for _, d := range list {
-			token := prefix8(d.Token)
-			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label, Token: token, LastSeenAt: d.LastSeenAt, Confirm: token})
+			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label,
+				Token: control.ShortToken(d.Token), LastSeenAt: d.LastSeenAt, Confirm: prefix8(d.Token)})
 		}
 	}
 

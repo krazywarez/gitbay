@@ -135,3 +135,33 @@ func TestAccountSubmitDeviceRemove(t *testing.T) {
 		t.Fatalf("device not removed: %v", devices)
 	}
 }
+
+// A token at or under the truncation length is masked rather than shown
+// whole, as notifications device list masks it. prefix8 returns anything
+// shorter than nine characters unchanged, and device add enforces no
+// minimum length, so the short token is a value that reaches the page.
+func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddPushDevice(uid, "abc123", "iphone"); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(config.Default(), st)
+	rr := httptest.NewRecorder()
+	s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), store.User{ID: uid, Username: "alice"})
+
+	if strings.Contains(rr.Body.String(), `class="mono">abc123<`) {
+		t.Fatalf("the page printed the short token verbatim:\n%s", rr.Body.String())
+	}
+}
