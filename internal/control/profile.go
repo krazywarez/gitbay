@@ -30,6 +30,49 @@ func init() {
 // not a linktree.
 const maxProfileLinks = 5
 
+// ProfileRepoName is the repository that holds an owner's profile
+// content. A dot-repo because it is infrastructure rather than a
+// project: later per-owner configuration goes beside the about text,
+// and the leading dot keeps it out of the listings.
+const ProfileRepoName = ".gitbay"
+
+// AboutBase is the about file's path in that repository, without its
+// extension.
+const AboutBase = "profile/README"
+
+// aboutExts are the formats the about is read from, in resolution order
+// — the wiki's order, for the same reason.
+var aboutExts = []string{".md", ".org", ".markdown"}
+
+// ownerAbout reads an owner's about text from <owner>/.gitbay. Anything
+// missing — the repository, the branch, the file — is an empty about,
+// and so is a repository this caller cannot read: a profile must not
+// confirm a private namespace. path is the file it came from, so a
+// client can link to it instead of guessing the extension.
+func ownerAbout(c *Ctx, owner string) (text, format, path string) {
+	repo, err := c.Store.RepoByPath(owner + "/" + ProfileRepoName)
+	if err != nil {
+		return "", "", ""
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil || !policy.CanRead(c.User, repo, grant) {
+		return "", "", ""
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	for _, ext := range aboutExts {
+		raw, err := gitutil.ReadBlob(dir, repo.DefaultBranch, AboutBase+ext, maxCommitFileBytes)
+		if err != nil || len(raw) == 0 {
+			continue
+		}
+		f := "md"
+		if ext == ".org" {
+			f = "org"
+		}
+		return string(raw), f, AboutBase + ext
+	}
+	return "", "", ""
+}
+
 // profileEdit is the set of profile fields a command may change. A nil
 // field is left alone; an empty value clears it.
 type profileEdit struct {
@@ -169,9 +212,12 @@ type ProfileOut struct {
 	Website     string `json:"website,omitempty"`
 	// About is long-form markdown, rendered by the web between the
 	// header and the activity graph.
-	About       string              `json:"about,omitempty"`
-	AboutFormat string              `json:"about_format,omitempty"`
-	Links       []store.ProfileLink `json:"links,omitempty"`
+	About       string `json:"about,omitempty"`
+	AboutFormat string `json:"about_format,omitempty"`
+	// AboutPath is where the about was read from in <owner>/.gitbay, so a
+	// client can link to the file rather than guess its extension.
+	AboutPath string              `json:"about_path,omitempty"`
+	Links     []store.ProfileLink `json:"links,omitempty"`
 	// The rest is what a profile page shows: who they work with, what
 	// they own that you can see, and how active they have been. The web
 	// read these straight out of the store, which kept them off every
@@ -271,8 +317,10 @@ func runProfileShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	about, aboutFormat, aboutPath := ownerAbout(c, name)
 	d := ProfileOut{Name: name, Kind: kind, Description: p.Description, Website: p.Website,
-		About: p.About, AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}}
+		About: about, AboutFormat: aboutFormat, AboutPath: aboutPath,
+		Links: p.Links, Repos: []ProfileRepo{}}
 
 	// Who they work with. Both lists are public on a profile — the web
 	// has always shown them — and neither exposes anything a member

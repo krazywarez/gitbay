@@ -442,8 +442,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	weeks, activityTotal := activityGrid(counts)
 
 	teams, canAdmin := s.orgAdminView(viewer, d.Kind, name)
-	profile := store.Profile{Description: d.Description, Website: d.Website,
-		About: d.About, AboutFormat: d.AboutFormat, Links: d.Links}
+	profile := store.Profile{Description: d.Description, Website: d.Website, Links: d.Links}
 	s.render(w, "owner.html", struct {
 		basePage
 		Owner         string
@@ -461,7 +460,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Snippets      int
 		Notice        string
 		Feed          string
-	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(profile),
+	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(d.About, d.AboutFormat),
 		d.Repos, d.Members, d.Orgs,
 		weeks, activityTotal, teams, canAdmin,
 		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
@@ -1124,18 +1123,17 @@ func mdHTML(raw string) template.HTML {
 	return focusableBlocks(template.HTML(buf.String()))
 }
 
-// aboutHTML renders a profile's about text. It has no filename to
-// dispatch on, so the stored format picks the extension; anything other
-// than org is markdown.
-func aboutHTML(p store.Profile) template.HTML {
-	if strings.TrimSpace(p.About) == "" {
+// aboutHTML renders a profile's about text. The format comes from the
+// file it was read from: org is org, anything else markdown.
+func aboutHTML(text, format string) template.HTML {
+	if strings.TrimSpace(text) == "" {
 		return ""
 	}
 	name := "about.md"
-	if p.AboutFormat == "org" {
+	if format == "org" {
 		name = "about.org"
 	}
-	return renderReadme(name, []byte(p.About))
+	return renderReadme(name, []byte(text))
 }
 
 // webResolver answers autolink lookups for one viewer. Cross-repo
