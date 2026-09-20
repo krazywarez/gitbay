@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -67,18 +68,40 @@ func NewClient(cfg config.Push) (*Client, error) {
 // has to drop the scheme too, or every request fails with "server gave
 // HTTP response to HTTPS client" instead of reaching the fake at all.
 //
-// The drop is logged rather than silent. config.Push's own doc comment
-// promises a misconfigured [push] fails loudly at startup rather than
-// filling a queue nobody is watching; a stray GITBAY_APNS_HOST on a real
-// instance would otherwise send the provider JWT over cleartext with no
-// sign anything had changed, where the pre-override behaviour at least
-// failed loudly by attempting TLS against a host that cannot answer it.
+// The drop only applies to a host on this machine. The provider token is
+// a bearer credential, valid for an hour and good for any device under
+// the topic; putting it on the wire in cleartext to somewhere else is not
+// a thing the test override should be able to arrange. Every fake in the
+// tree is an httptest server, which always binds loopback, so nothing
+// loses anything by the restriction. Either way the decision is logged,
+// so an operator who set the variable learns what it did.
 func apnsScheme() string {
-	if h := os.Getenv("GITBAY_APNS_HOST"); h != "" {
-		slog.Warn("push: GITBAY_APNS_HOST is set, sending to it over plain HTTP instead of APNs", "host", h)
-		return "http"
+	h := os.Getenv("GITBAY_APNS_HOST")
+	if h == "" {
+		return "https"
 	}
-	return "https"
+	if !loopbackHost(h) {
+		slog.Warn("push: GITBAY_APNS_HOST is not on this machine, still sending over HTTPS; the provider token is a bearer credential and does not travel in cleartext", "host", h)
+		return "https"
+	}
+	slog.Warn("push: GITBAY_APNS_HOST is set, sending to it over plain HTTP instead of APNs", "host", h)
+	return "http"
+}
+
+// loopbackHost reports whether a host:port names this machine. The port
+// is optional: config.Push.Host returns a bare hostname for the real
+// endpoints, and the override may or may not carry one.
+func loopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // Send delivers one alert. The returned duration is the server's

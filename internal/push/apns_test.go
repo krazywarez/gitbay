@@ -148,3 +148,27 @@ func TestSendTruncatesBodyOnRuneBoundary(t *testing.T) {
 		t.Fatalf("body is %d bytes, want <= %d", len(body), maxBodyBytes)
 	}
 }
+
+// The override drops to plain HTTP only for a host on this machine. The
+// provider token is a bearer credential valid for an hour that can push
+// to any device under the topic, so a GITBAY_APNS_HOST aimed anywhere
+// else keeps HTTPS rather than putting it on the wire in cleartext.
+func TestAPNSSchemeDowngradesOnlyOnLoopback(t *testing.T) {
+	for _, tc := range []struct{ host, want string }{
+		{"", "https"},
+		{"127.0.0.1:8080", "http"},
+		{"127.0.0.53:2197", "http"},
+		{"localhost:1234", "http"},
+		{"[::1]:1234", "http"},
+		{"::1", "http"},
+		{"10.0.0.5:2197", "https"},
+		{"apns.example.com", "https"},
+		{"api.push.apple.com:443", "https"},
+		{"not a host", "https"},
+	} {
+		t.Setenv("GITBAY_APNS_HOST", tc.host)
+		if got := apnsScheme(); got != tc.want {
+			t.Errorf("apnsScheme() with host %q = %q, want %q", tc.host, got, tc.want)
+		}
+	}
+}
