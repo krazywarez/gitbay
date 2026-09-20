@@ -299,7 +299,7 @@ Every background worker keeps a backlog and a failure state. An instance
 admin reads them all in one place:
 
 #+begin_src sh
-gitbay dashboard --json | jq .queues   # webhooks, mail, mirrors, builds, deps
+gitbay dashboard --json | jq .queues   # webhooks, mail, push, mirrors, builds, deps
 #+end_src
 
 Per worker: pending, retrying (pending with a failed attempt) and
@@ -310,6 +310,12 @@ is scoped to claim is visible here rather than only in its repository;
 mirrors list the ones whose last sync failed;
 dependency checks list the ones whose last check errored. Non-admins get
 no =queues= key at all.
+
+Push rows name the device id, never the token. Watch this one after
+configuring =[push]=: a =key_id= or =team_id= Apple did not issue passes
+config validation, which can only check that the =.p8= parses, and then
+every send comes back =403 InvalidProviderToken= and dead-letters on its
+first attempt.
 
 In accounts mode the same read renders at =/admin=, linked from the rail
 for admins. Anyone else gets a 404 there.

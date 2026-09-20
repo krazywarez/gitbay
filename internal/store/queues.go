@@ -11,6 +11,7 @@ type Queues struct {
 	Mirrors  QueueMirrors  `json:"mirrors"`
 	Builds   QueueBuilds   `json:"builds"`
 	Deps     QueueDeps     `json:"deps"`
+	Push     QueuePush     `json:"push"`
 }
 
 type QueueWebhooks struct {
@@ -44,6 +45,26 @@ type QueueMailRow struct {
 	ID        int64  `json:"id"`
 	Recipient string `json:"recipient"`
 	Subject   string `json:"subject"`
+	Attempts  int64  `json:"attempts"`
+	LastError string `json:"last_error,omitempty"`
+	FailedAt  string `json:"failed_at,omitempty"`
+	CreatedAt string `json:"created_at"`
+}
+
+// QueuePush is the APNs delivery queue, the mail queue's shape with the
+// device id where the recipient is: a device token is never echoed.
+type QueuePush struct {
+	Pending       int64          `json:"pending"`
+	Retrying      int64          `json:"retrying"`
+	Failed        int64          `json:"failed"`
+	OldestPending string         `json:"oldest_pending,omitempty"`
+	Items         []QueuePushRow `json:"items"`
+}
+
+type QueuePushRow struct {
+	ID        int64  `json:"id"`
+	DeviceID  int64  `json:"device_id"`
+	Title     string `json:"title"`
 	Attempts  int64  `json:"attempts"`
 	LastError string `json:"last_error,omitempty"`
 	FailedAt  string `json:"failed_at,omitempty"`
@@ -112,6 +133,7 @@ func (s *Store) QueueStatus() (Queues, error) {
 		Mirrors:  QueueMirrors{Items: []QueueMirrorRow{}},
 		Builds:   QueueBuilds{Items: []QueueBuildRow{}},
 		Deps:     QueueDeps{Items: []QueueDepRow{}},
+		Push:     QueuePush{Items: []QueuePushRow{}},
 	}
 
 	if err := s.DB.QueryRow(`SELECT
@@ -186,6 +208,27 @@ func (s *Store) QueueStatus() (Queues, error) {
 			return err
 		}
 		q.Builds.Items = append(q.Builds.Items, b)
+		return nil
+	}); err != nil {
+		return q, err
+	}
+
+	if err := s.DB.QueryRow(`SELECT
+		COUNT(*) FILTER (WHERE sent_at IS NULL AND failed_at IS NULL),
+		COUNT(*) FILTER (WHERE sent_at IS NULL AND failed_at IS NULL AND attempts > 0),
+		COUNT(*) FILTER (WHERE failed_at IS NOT NULL),
+		COALESCE(MIN(created_at) FILTER (WHERE sent_at IS NULL AND failed_at IS NULL), '')
+		FROM push_queue`).Scan(&q.Push.Pending, &q.Push.Retrying, &q.Push.Failed, &q.Push.OldestPending); err != nil {
+		return q, err
+	}
+	if err := s.queryEach(`SELECT id, device_id, title, attempts, COALESCE(last_error, ''), COALESCE(failed_at, ''), created_at
+		FROM push_queue WHERE sent_at IS NULL AND (failed_at IS NOT NULL OR attempts > 0)
+		ORDER BY id DESC LIMIT ?`, func(sc scanner) error {
+		var p QueuePushRow
+		if err := sc.Scan(&p.ID, &p.DeviceID, &p.Title, &p.Attempts, &p.LastError, &p.FailedAt, &p.CreatedAt); err != nil {
+			return err
+		}
+		q.Push.Items = append(q.Push.Items, p)
 		return nil
 	}); err != nil {
 		return q, err

@@ -203,6 +203,11 @@ func runDashboard(c *Ctx, args []string) int {
 			for _, it := range q.Mail.Items {
 				fmt.Fprintf(w, "    %s\t%s\tattempts %d\t%s\n", it.Recipient, it.Subject, it.Attempts, it.LastError)
 			}
+			// The device id, not the token: a token is never echoed.
+			fmt.Fprintf(w, "  push\tpending %d\tretrying %d\tfailed %d\n", q.Push.Pending, q.Push.Retrying, q.Push.Failed)
+			for _, it := range q.Push.Items {
+				fmt.Fprintf(w, "    device %d\t%s\tattempts %d\t%s\n", it.DeviceID, it.Title, it.Attempts, it.LastError)
+			}
 			fmt.Fprintf(w, "  mirrors\tdirty %d\terrors %d\n", q.Mirrors.Dirty, q.Mirrors.Errors)
 			for _, it := range q.Mirrors.Items {
 				fmt.Fprintf(w, "    %s\t%s\t%s\t%s\n", it.Repo, it.Direction, it.URL, it.LastError)
