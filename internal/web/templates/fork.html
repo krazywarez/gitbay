@@ -1,0 +1,18 @@
+{{define "width"}}bounded{{end}}
+{{define "title"}}fork {{.Repo.OwnerName}}/{{.Repo.Name}} · {{.Site}}{{end}}
+{{define "content"}}
+<h1>Fork {{.Repo.OwnerName}}/{{.Repo.Name}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+<p class="meta">A fork is a copy of every branch, owned by you or by an
+organization you administer. Its issues, merge requests and settings are its
+own.</p>
+<form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/fork">
+<p><label>Owner <select name="owner">
+  <option value="{{.Viewer}}">{{.Viewer}}</option>
+  {{range .Orgs}}<option value="{{.}}"{{if eq . $.Owner}} selected{{end}}>{{.}}</option>{{end}}
+</select></label>
+<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" value="{{.Name}}" aria-describedby="forkhint"></label>
+<span class="hint" id="forkhint">Defaults to the source name; change it to fork twice into the same owner.</span></p>
+<p><button type="submit">Create fork</button></p>
+</form>
+{{end}}

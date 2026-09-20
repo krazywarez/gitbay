@@ -186,20 +186,9 @@ func runRepoCreate(c *Ctx, args []string) int {
 	if err := policyValidateRepoName(name); err != nil {
 		return c.failInput(err)
 	}
-	ownerKind, ownerID := "user", c.User.ID
-	if owner != c.User.Username {
-		org, err := c.Store.OrgByName(owner)
-		if err != nil {
-			return c.fail(protocol.ExitDenied, "cannot create repositories under %q: not you and not an organization you can see", owner)
-		}
-		role, err := c.Store.OrgRole(org.ID, c.User.ID)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if role != "admin" {
-			return c.fail(protocol.ExitDenied, "only admins of %s can create repositories there", owner)
-		}
-		ownerKind, ownerID = "org", org.ID
+	ownerKind, ownerID, code := resolveNewRepoOwner(c, owner)
+	if code >= 0 {
+		return code
 	}
 	repoCreateMu.Lock()
 	if ownerKind == "user" {
@@ -232,6 +221,27 @@ func runRepoCreate(c *Ctx, args []string) int {
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s (%s)\nclone: git clone %s\n", d.Path, d.Visibility, d.SSHURL)
 	})
+}
+
+// resolveNewRepoOwner answers who a new repository belongs to: the
+// caller, or an organization they administer. The returned code is -1
+// when the owner is good, and the exit code to return otherwise.
+func resolveNewRepoOwner(c *Ctx, owner string) (kind string, id int64, code int) {
+	if owner == c.User.Username {
+		return "user", c.User.ID, -1
+	}
+	org, err := c.Store.OrgByName(owner)
+	if err != nil {
+		return "", 0, c.fail(protocol.ExitDenied, "cannot create repositories under %q: not you and not an organization you can see", owner)
+	}
+	role, err := c.Store.OrgRole(org.ID, c.User.ID)
+	if err != nil {
+		return "", 0, c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if role != "admin" {
+		return "", 0, c.fail(protocol.ExitDenied, "only admins of %s can create repositories there", owner)
+	}
+	return "org", org.ID, -1
 }
 
 func policyValidateRepoName(name string) error { return policy.ValidateName(name) }

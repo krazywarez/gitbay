@@ -74,6 +74,30 @@ Nothing is lost in between — the table keeps the text.
   never been pushed to. An unresolvable branch is still an error
   anywhere the repository already has refs.
 
+A web UI sweep.
+
+- The rail's squares are 44px at every width, and its glyphs are 20px
+  on a phone. Below 34rem eleven squares no longer fit, so explore,
+  bookmarks, snippets, new repository, settings, admin and log out
+  move into a More menu and the strip keeps dashboard, search,
+  notifications, More and your account.
+- Snippets are on the rail. The link on a profile page stays.
+- =/new= creates an organization as well as a repository; the form
+  leaves the profile page.
+- =repo fork= takes =--owner=, and the web's Fork button opens a form
+  with an owner and a name. The owner is you or an organization you
+  administer, checked as =repo create= checks it; an organization's
+  fork is not counted against your repository quota. A name of your
+  own is how you fork the same repository twice.
+- The dashboard's pinned key reads above the list rather than under
+  it, its build dot sits on the row's centre line, and a pinned chip
+  on the second row has its bottom border back.
+- The activity feed drops its state dot.
+- The SSH key and account tables keep each row on one line and scroll
+  sideways, rather than wrapping a fingerprint or a timestamp.
+- =.pathbar= actions sit on the centre line with the ref and the
+  crumbs.
+
 * v1.30.0 — 2026-09-19
 
 Every command runs on every surface, markup previews before it is

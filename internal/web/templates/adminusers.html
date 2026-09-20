@@ -13,7 +13,7 @@
   <a {{if eq .State "admin"}}class="active" aria-current="page" {{end}}href="?state=admin">admins</a>
 </nav>
 
-{{if .Users}}<div class="tablewrap"><table class="keys accounts">
+{{if .Users}}<div class="tablewrap"><table class="keys accounts nowrap">
 <thead><tr class="cols"><th>Account</th><th>State</th><th>Created</th><th>Last seen</th><th>Actions</th></tr></thead>
 <tbody>
 {{range .Users}}<tr>

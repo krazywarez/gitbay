@@ -22,10 +22,10 @@
 
 <aside class="dashpins" aria-label="Pinned repositories">
   <h2 class="colhead">Pinned</h2>
-  {{if .Pins}}<ul class="pins">
+  {{if .Pins}}<p class="meta">issues · merge requests · last build</p>
+  <ul class="pins">
   {{range .Pins}}<li><a href="/{{.Owner}}/{{.Name}}"><span class="owner">{{.Owner}}/</span>{{.Name}}</a><span class="n" title="{{.Issues}} open issue{{if ne .Issues 1}}s{{end}}, {{.MRs}} open merge request{{if ne .MRs 1}}s{{end}}{{with .Build}}, last build {{.}}{{end}}"><b{{if .Issues}} class="wants"{{end}}>{{.Issues}} <span class="vh">open issues</span></b> <b{{if .MRs}} class="wants"{{end}}>{{.MRs}} <span class="vh">open merge requests</span></b> <span class="dot{{if eq .Build "success"}} ok{{else if or (eq .Build "failure") (eq .Build "error")}} bad{{else if or (eq .Build "pending") (eq .Build "running")}} pend{{end}}"><span class="vh">{{with .Build}}last build {{.}}{{else}}no builds{{end}}</span></span></span></li>
   {{end}}</ul>
-  <p class="meta">issues · merge requests · last build</p>
   {{else}}<p class="none">Nothing pinned yet. Press Pin on a repository.</p>{{end}}
 </aside>
 
@@ -46,7 +46,7 @@
 
 <aside class="feedcol" aria-label="Recent activity">
   <h2 class="colhead">Recent activity</h2>
-  {{range .Feed}}<p class="feedline">{{if eq .State "failure"}}<span class="dot bad"></span>{{else if eq .State "success"}}<span class="dot ok"></span>{{else if .State}}<span class="dot pend"></span>{{end}}<a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
+  {{range .Feed}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
   {{else}}<p class="none">No activity yet</p>{{end}}
 </aside>
 

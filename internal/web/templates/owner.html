@@ -26,20 +26,6 @@
 </ul>
 {{if or .Snippets .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets">snippets{{if .Snippets}} <span class="count">{{.Snippets}}</span>{{end}}</a></p>{{end}}
 
-{{if .Self}}
-<h2>organizations</h2>
-{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
-<details class="editbox">
-  <summary>New organization</summary>
-  <form method="post" action="/{{.Owner}}" class="setform">
-    <input type="hidden" name="field" value="org-create">
-    <label for="orgname">Name</label>
-    <input type="text" id="orgname" name="name" required>
-    <button type="submit" class="btn">Create</button>
-  </form>
-</details>
-{{end}}
-
 {{if .CanAdmin}}{{$org := .Owner}}
 <h2>people <span class="count">{{len .Members}}</span></h2>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}

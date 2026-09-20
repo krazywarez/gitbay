@@ -200,7 +200,19 @@ func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.Use
 	s.renderNewRepo(w, u, "")
 }
 
-func (s *Server) newRepoSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+// newSubmit creates a repository or an organization: /new carries both
+// forms, told apart by the org form's field. An organization's page is
+// the redirect, the same as org-create from anywhere else.
+func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	if r.FormValue("field") == "org-create" {
+		name := strings.TrimSpace(r.FormValue("name"))
+		if _, msg, ok := s.runControl(u, []string{"org", "create", name}); !ok {
+			s.renderNewRepo(w, u, msg)
+			return
+		}
+		http.Redirect(w, r, "/"+name, http.StatusSeeOther)
+		return
+	}
 	owner := r.FormValue("owner")
 	if owner == "" {
 		owner = u.Username
@@ -260,19 +272,48 @@ func (s *Server) bookmarksPage(w http.ResponseWriter, r *http.Request, u store.U
 	}{s.baseFor(u), "bookmarks", rows})
 }
 
-// forkSubmit forks the repository under the viewer's account and sends
+// renderFork draws the fork form: where the copy lands and what it is
+// called. owner and name are what the field should hold, which after a
+// refusal is what was submitted.
+func (s *Server) renderFork(w http.ResponseWriter, u store.User, repo store.Repo, owner, name, errMsg string) {
+	s.render(w, "fork.html", struct {
+		basePage
+		Repo  store.Repo
+		Orgs  []string
+		Owner string
+		Name  string
+		Error string
+	}{s.baseFor(u), repo, s.adminOrgs(u), owner, name, errMsg})
+}
+
+func (s *Server) forkForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
+	if !ok {
+		return
+	}
+	s.renderFork(w, u, repo, u.Username, repo.Name, "")
+}
+
+// forkSubmit forks the repository to the owner the form picked and sends
 // them to it. The command decides everything that matters — read access,
-// quota, name collisions — so a refusal comes back as its own message on
-// the page the button was pressed from (#174).
+// the right to create under that owner, quota, name collisions — so a
+// refusal comes back as its own message on the form (#174).
 func (s *Server) forkSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
 	if !ok {
 		return
 	}
+	owner, name := r.FormValue("owner"), r.FormValue("name")
+	if owner == "" {
+		owner = u.Username
+	}
+	if name == "" {
+		name = repo.Name
+	}
 	var fork control.ForkOut
-	if msg, ok := s.runControlInto(u, []string{"repo", "fork", repo.Path()}, &fork); !ok {
-		s.setFlash(w, msg)
-		http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
+	argv := []string{"repo", "fork", repo.Path(), "--owner", owner, "--name", name}
+	if msg, ok := s.runControlInto(u, argv, &fork); !ok {
+		s.renderFork(w, u, repo, owner, name, msg)
 		return
 	}
 	http.Redirect(w, r, "/"+fork.Path, http.StatusSeeOther)

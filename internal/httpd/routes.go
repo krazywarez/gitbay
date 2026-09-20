@@ -142,7 +142,7 @@ func (s *Server) Routes() []Route {
 		}
 		routes = append(routes,
 			Route{Method: "POST", Pattern: "/new", Mutating: true,
-				Handler: s.checkOrigin(s.requireUser(s.newRepoSubmit))},
+				Handler: s.checkOrigin(s.requireUser(s.newSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/pin", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.pinToggle))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/watch", Mutating: true,
@@ -182,6 +182,7 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.snippetFileRemoveSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/bookmark", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.bookmarkToggle))},
+			Route{Method: "GET", Pattern: "/{owner}/{repo}/fork", Handler: s.requireUser(s.forkForm)},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/fork", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.forkSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/builds", Mutating: true,

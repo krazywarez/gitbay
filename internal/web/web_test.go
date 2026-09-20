@@ -90,7 +90,7 @@ func TestWhenNamesTheZone(t *testing.T) {
 // a per-view define instead of a fixed one.
 func TestMainWidthClass(t *testing.T) {
 	wide := map[string]bool{"tree.html": true, "blob.html": true, "blame.html": true, "log.html": true, "commit.html": true, "compare.html": true, "builds.html": true, "build.html": true, "search.html": true, "globalsearch.html": true, "edit.html": true, "dashboard.html": true, "issues.html": true, "mrs.html": true, "explore.html": true, "notifications.html": true, "settings.html": true, "account.html": true, "admin.html": true}
-	bounded := map[string]bool{"landing.html": true, "login.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "adminusers.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
+	bounded := map[string]bool{"landing.html": true, "fork.html": true, "login.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "adminusers.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
 	perView := map[string]string{"mr.html": `{{define "width"}}{{if eq .View "diff"}}wide{{else}}reading{{end}}{{end}}`}
 	for _, name := range Pages() {
 		src, err := TemplateSource(name)
@@ -137,9 +137,32 @@ func TestRailIconsAreLabelled(t *testing.T) {
 	glyph := func(s string) bool {
 		return strings.Contains(s, `{{template "icon" `) || strings.Contains(s, "<svg")
 	}
-	tagRe := regexp.MustCompile(`(?s)<a class="railicon".*?</a>|<button [^>]*class="railicon".*?</button>`)
+	// Every square in the strip comes from the raillink partial, so the
+	// rule is checked once there and once for each control written out
+	// in full: the More summary, Log out and Sign in.
+	link := src[strings.Index(src, `{{define "raillink"}}`):]
+	link = link[:strings.Index(link, "\n")] // the partial is one line
+	for _, want := range []string{`aria-label="{{.Name}}"`, `<span class="vh">{{.Name}}</span>`} {
+		if !strings.Contains(link, want) {
+			t.Errorf("raillink partial missing %s", want)
+		}
+	}
+	if !strings.Contains(link, `{{template "icon" .Icon}}`) {
+		t.Error("raillink partial draws no glyph")
+	}
+	// A call site that names no icon or no name would render a square
+	// with neither, which the partial alone cannot catch.
+	for _, call := range regexp.MustCompile(`{{template "raillink" dict [^}]*}}`).FindAllString(src, -1) {
+		for _, want := range []string{`"Icon" `, `"Name" `} {
+			if !strings.Contains(call, want) {
+				t.Errorf("raillink call missing %s: %.90s", want, call)
+			}
+		}
+	}
+
+	tagRe := regexp.MustCompile(`(?s)<a class="railicon".*?</a>|<summary class="railicon".*?</summary>|<button [^>]*class="railicon".*?</button>`)
 	controls := tagRe.FindAllString(src, -1)
-	if len(controls) < 7 {
+	if len(controls) < 3 {
 		t.Fatalf("found %d railicon controls in layout.html, want the rail's full set", len(controls))
 	}
 	for _, c := range controls {
@@ -153,13 +176,14 @@ func TestRailIconsAreLabelled(t *testing.T) {
 		}
 	}
 
-	// Every button in the rail's foot is an icon button under the same
-	// rule: the Log out form's submit is the only one today.
+	// An icon button in the rail's foot is under the same rule: Log out
+	// is the only one today. The More menu's own rows are not icon
+	// buttons — their visible text is their name.
 	foot := src[strings.Index(src, `<div class="railfoot">`):]
 	foot = foot[:strings.Index(foot, "</nav>")]
-	buttons := regexp.MustCompile(`(?s)<button.*?</button>`).FindAllString(foot, -1)
+	buttons := regexp.MustCompile(`(?s)<button [^>]*class="railicon".*?</button>`).FindAllString(foot, -1)
 	if len(buttons) == 0 {
-		t.Fatal("no button in the rail foot")
+		t.Fatal("no icon button in the rail foot")
 	}
 	for _, b := range buttons {
 		for _, want := range []string{`aria-label="`, `<span class="vh">`} {

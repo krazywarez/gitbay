@@ -20,7 +20,7 @@ import (
 func init() {
 	register(Command{Path: []string{"repo", "fork"},
 		Summary: "fork a repository under your account",
-		Usage:   "repo fork <owner/name> [--name <n>]", Run: runRepoFork})
+		Usage:   "repo fork <owner/name> [--owner <o>] [--name <n>]", Run: runRepoFork})
 	register(Command{Path: []string{"repo", "settings", "require-approvals"},
 		Summary: "require N fresh approvals to merge",
 		Usage:   "repo settings require-approvals <owner/name> <n> (0 = off)", Run: runRequireApprovals})
@@ -102,11 +102,11 @@ type ForkOut struct {
 }
 
 func runRepoFork(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--name"}, MaxPos: 1, Usage: "repo fork <owner/name> [--name <n>]"})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--owner"}, MaxPos: 1, Usage: "repo fork <owner/name> [--owner <o>] [--name <n>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	path, name := f.pos(0), f.Value("--name")
+	path, name, owner := f.pos(0), f.Value("--name"), f.Value("--owner")
 	if path == "" {
 		return c.usage()
 	}
@@ -120,17 +120,28 @@ func runRepoFork(c *Ctx, args []string) int {
 	if err := policy.ValidateName(name); err != nil {
 		return c.failInput(err)
 	}
-	repoCreateMu.Lock()
-	if code := checkRepoQuota(c); code >= 0 {
-		repoCreateMu.Unlock()
+	if owner == "" {
+		owner = c.User.Username
+	}
+	ownerKind, ownerID, code := resolveNewRepoOwner(c, owner)
+	if code >= 0 {
 		return code
 	}
-	id, err := c.Store.CreateFork("user", c.User.ID, name, src.Visibility, src.ID)
+	repoCreateMu.Lock()
+	// An organization's repositories are not counted against the quota,
+	// the same as repo create.
+	if ownerKind == "user" {
+		if code := checkRepoQuota(c); code >= 0 {
+			repoCreateMu.Unlock()
+			return code
+		}
+	}
+	id, err := c.Store.CreateFork(ownerKind, ownerID, name, src.Visibility, src.ID)
 	repoCreateMu.Unlock()
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	dstDir := RepoDir(c.Cfg.Server.Root, c.User.Username, name)
+	dstDir := RepoDir(c.Cfg.Server.Root, owner, name)
 	srcDir := RepoDir(c.Cfg.Server.Root, src.OwnerName, src.Name)
 	if err := gitutil.InitBare(dstDir, "main", HooksDir(c.Cfg.Server.Root)); err != nil {
 		c.Store.DeleteRepo(id)
@@ -146,7 +157,7 @@ func runRepoFork(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "copying refs: %v", err)
 		}
 	}
-	forkPath := c.User.Username + "/" + name
+	forkPath := owner + "/" + name
 	return c.emit(ForkOut{Path: forkPath, ForkOf: src.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "forked %s to %s\n", src.Path(), forkPath)
 	})

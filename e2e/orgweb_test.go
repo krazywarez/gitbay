@@ -162,15 +162,16 @@ func TestOrgLifecycleWeb(t *testing.T) {
 	alice := loginBrowser(t, inst, aliceKey)
 	bob := loginBrowser(t, inst, bobKey)
 
-	// The create form is on your own page and nobody else's.
-	if _, body := browserGet(t, alice, inst.base()+"/alice"); !strings.Contains(body, `value="org-create"`) {
-		t.Fatalf("no create form on your own page:\n%s", body)
+	// The create form is on /new, beside the repository form, and no
+	// profile page carries it.
+	if _, body := browserGet(t, alice, inst.base()+"/new"); !strings.Contains(body, `value="org-create"`) {
+		t.Fatalf("no create form on /new:\n%s", body)
 	}
-	if _, body := browserGet(t, bob, inst.base()+"/alice"); strings.Contains(body, `value="org-create"`) {
-		t.Fatal("create form on someone else's page")
+	if _, body := browserGet(t, alice, inst.base()+"/alice"); strings.Contains(body, `value="org-create"`) {
+		t.Fatal("create form still on the profile page")
 	}
 
-	if status, _ := browserPost(t, alice, inst.base()+"/alice", url.Values{
+	if status, _ := browserPost(t, alice, inst.base()+"/new", url.Values{
 		"field": {"org-create"}, "name": {"acmeco"}}); status != 200 {
 		t.Fatal("org create failed")
 	}

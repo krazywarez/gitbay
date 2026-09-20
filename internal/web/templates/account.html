@@ -50,7 +50,7 @@ Write it with a push, or edit it here.</p>
 <p class="meta">Your keys are your identity here. A <code>full</code> key can run
 commands and push; a <code>git</code> key can only move git data, which is what
 a CI checkout wants.</p>
-{{if .Keys}}<div class="tablewrap"><table class="keys">
+{{if .Keys}}<div class="tablewrap"><table class="keys nowrap">
 <tr class="cols"><th scope="col">label</th><th scope="col">fingerprint</th><th scope="col">type</th><th scope="col">scope</th><th scope="col"></th></tr>
 {{range .Keys}}<tr>
   <td>{{.Label}}</td>

@@ -120,7 +120,7 @@
   --sp-7: 48px;
 
   /* the rail: a column the width of one hit target, a row one tall */
-  --rail-hit: 40px;
+  --rail-hit: 44px;
   --rail-strip-h: 48px;
   --rail-mark: 24px;
   --rail-mark-box: 32px;
@@ -365,6 +365,44 @@ a.railuser {
   height: var(--rail-strip-h);
 }
 a.railuser:hover { text-decoration: none; }
+/* the phone rail's overflow: every square .railopt hides, and log out,
+   as a labelled list under the rail. Shown only below 34rem. */
+.railmore { display: none; position: relative; }
+.railmore > summary { list-style: none; cursor: pointer; }
+.railmore > summary::-webkit-details-marker { display: none; }
+.railmore[open] > summary { background: var(--shell-hover); }
+.raildrop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 12rem;
+  padding: var(--sp-1) 0;
+  background: var(--shell-bg);
+  border: 1px solid var(--shell-line);
+  border-radius: var(--r-card);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+}
+.raildrop a, .raildrop button {
+  display: flex;
+  align-items: center;
+  /* a button's own default is centred; the rows read as one list */
+  justify-content: flex-start;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--rail-hit);
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-2);
+  text-align: left;
+  color: var(--shell-fg);
+  cursor: pointer;
+}
+.raildrop a:hover, .raildrop button:hover { background: var(--shell-hover); text-decoration: none; }
+.raildrop form { margin: 0; }
+.raildrop svg { flex: none; }
 a.railuser .avatar { width: var(--rail-mark); height: var(--rail-mark); }
 .avatar {
   display: inline-grid;
@@ -846,6 +884,9 @@ table.keys, table.assets { background: none; border: 0; border-radius: 0; }
 table.keys th, table.assets th, table.keys tr.cols th { background: transparent; padding-left: 0; }
 table.keys td { padding-left: 0; }
 table.keys td.act, table.assets td.size { text-align: right; }
+/* a fingerprint or an account row is read across, not down: the cells
+   keep one line each and .tablewrap scrolls what does not fit */
+table.keys.nowrap th, table.keys.nowrap td { white-space: nowrap; }
 /* The account list types a username to confirm, which is longer than
    the key prefixes the confirm field is sized for elsewhere. */
 table.accounts input[name="confirm"] { width: 11rem; }
@@ -1075,7 +1116,7 @@ pre.message {
 .pins a { color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pins a:hover { color: var(--link); }
 .pins .owner { color: var(--muted); }
-.pins .n { margin-left: auto; flex: none; display: flex; gap: var(--sp-2); font-size: var(--fs-1); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pins .n { margin-left: auto; flex: none; display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-1); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pins .n b { font-weight: 600; color: var(--fg); }
 .pins .n b.wants { color: var(--warn); }
 .pins .dot { margin: 0; }
@@ -1384,7 +1425,7 @@ a.memberchip .role { color: var(--muted); }
 
 .pathbar { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); margin: 0 0 var(--sp-3); flex-wrap: wrap; font-size: var(--fs-2); }
 .pathbar .spacer { flex: 1; }
-.pathbar .actions { display: flex; gap: var(--sp-2); }
+.pathbar .actions { display: flex; align-items: center; gap: var(--sp-2); }
 /* history · blame · raw were 21px tall and "raw" 22px wide (#232) */
 .pathbar .actions a { display: inline-block; padding: 6px 4px; }
 .pathbar .acts { display: flex; gap: var(--sp-2); }
@@ -1670,7 +1711,9 @@ svg.icon { vertical-align: -0.125em; }
   .dashgrid > .dashpins { grid-column: 1 / -1; position: static; max-height: none; overflow: visible; }
   /* a pinned block that is not a column is the chip row (spec rule 7) */
   .pins { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-  .pins li { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
+  /* the shorthand loses to .pins li:last-child, which drops the bottom
+     border of the last chip -- and so of the second row */
+  .pins li, .pins li:last-child { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: var(--sp-1) var(--sp-3); }
   .pins .n, .dashpins .meta { display: none; }
 }
 
@@ -1743,8 +1786,15 @@ svg.icon { vertical-align: -0.125em; }
   ul.loglist .commitside { width: 100%; justify-content: flex-start; }
 }
 
-/* eleven squares at 40px overrun a phone; 32px keeps the row whole and
-   the 48px height keeps the target big enough to hit */
-@media (max-width: 30rem) {
-  :root { --rail-hit: 32px; }
+/* Eleven 44px squares and the mark are 524px, so below 34rem the rail
+   keeps five — dashboard, search, notifications, More, your avatar — and
+   the More menu holds the rest. Shrinking the squares instead is what
+   this replaces: 32px was under the target every phone guideline asks
+   for, and the count only grows. */
+@media (max-width: 34rem) {
+  .railopt { display: none; }
+  .railmore { display: block; }
+  .railicon svg { width: 20px; height: 20px; }
+  /* the mark is a link home too, so it is a target like the rest */
+  a.brand { width: var(--rail-hit); }
 }

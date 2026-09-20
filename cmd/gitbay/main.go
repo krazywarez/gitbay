@@ -435,7 +435,7 @@ func repoCmd() *cobra.Command {
 		pass("transfer", "move a repository to another owner: <new-owner>", passOpts{server: []string{"repo", "transfer"}, needsRepo: true}),
 		pass("rename", "rename a repository: <new-name> (clone URLs change)", passOpts{server: []string{"repo", "rename"}, needsRepo: true}),
 		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
-		pass("fork", "fork a repository under your account", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
+		pass("fork", "fork a repository to you or an organization", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
 		pass("search", "find repositories by name, description, or topic: <query>", passOpts{server: []string{"repo", "search"}}),
 		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
 		pass("diff", "the patch between two refs: <base> <head>", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),

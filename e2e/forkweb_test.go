@@ -69,10 +69,33 @@ func TestForkWeb(t *testing.T) {
 		t.Fatalf("merge request not opened from the fork:\n%s", out)
 	}
 
-	// Forking twice collides on the name, and says so on the page rather
+	// Forking twice collides on the name, and says so on the form rather
 	// than failing silently.
 	_, body := browserPost(t, bob, base+"/fork", url.Values{})
 	if !strings.Contains(body, `class="error"`) {
 		t.Errorf("a second fork reported nothing:\n%s", body)
+	}
+
+	// A fork can land in an organization the forker administers, under a
+	// name of its own — which is also how you fork the same repository
+	// twice.
+	inst.ssh(t, bobKey, "", "org", "create", "bobco")
+	if _, page := browserGet(t, bob, base+"/fork"); !strings.Contains(page, `<option value="bobco"`) {
+		t.Fatalf("the fork form does not offer the organization:\n%s", page)
+	}
+	if status, body := browserPost(t, bob, base+"/fork", url.Values{
+		"owner": {"bobco"}, "name": {"app2"}}); status != 200 || !strings.Contains(body, "bobco/app2") {
+		t.Fatalf("fork into the organization did not land: %d\n%s", status, body)
+	}
+	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "bobco/app2", "--json"); !strings.Contains(out, `"fork_of":"alice/app"`) {
+		t.Fatalf("the organization's fork does not name its parent:\n%s", out)
+	}
+
+	// An organization you are only a member of is not somewhere you can
+	// put one: the owner is checked as it is on repo create.
+	inst.ssh(t, aliceKey, "", "org", "create", "aliceco")
+	inst.ssh(t, aliceKey, "", "org", "members", "add", "aliceco", "bob")
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "fork", "alice/app", "--owner", "aliceco"); code != 4 {
+		t.Errorf("fork into an org bob does not administer exited %d, want 4", code)
 	}
 }

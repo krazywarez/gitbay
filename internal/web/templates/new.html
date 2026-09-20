@@ -1,7 +1,8 @@
 {{define "width"}}bounded{{end}}
 {{define "title"}}new repository · {{.Site}}{{end}}
 {{define "content"}}
-<h1>New repository</h1>
+<h1>New</h1>
+<h2>Repository</h2>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/new">
 <p><label>Owner <select name="owner">
@@ -18,5 +19,15 @@
   </div>
 </fieldset>
 <p><button type="submit">Create repository</button></p>
+</form>
+
+<h2 id="org">Organization</h2>
+<p class="meta">An organization owns repositories, labels and milestones, and
+grants access through teams. You are its first admin.</p>
+<form method="post" action="/new">
+<input type="hidden" name="field" value="org-create">
+<p><label>Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="orghint"></label>
+<span class="hint" id="orghint">The same rules as a repository name, and it becomes a top-level path.</span></p>
+<p><button type="submit">Create organization</button></p>
 </form>
 {{end}}
