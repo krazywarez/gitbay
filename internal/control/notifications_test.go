@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -27,9 +29,12 @@ func notifTestCtx(t *testing.T, username string) *Ctx {
 	}
 	var out bytes.Buffer
 	return &Ctx{
-		User:   store.User{ID: uid, Username: username},
-		Scope:  "full",
-		Store:  st,
+		User:  store.User{ID: uid, Username: username},
+		Scope: "full",
+		Store: st,
+		// Push enabled is the instance state the push tests assume; the
+		// disabled case sets it back to false explicitly.
+		Cfg:    config.Config{Push: config.Push{Enabled: true}},
 		Stdin:  strings.NewReader(""),
 		Stdout: &out,
 		Stderr: &out,
@@ -106,6 +111,50 @@ func TestNotifyQueuesNoPushForTheActor(t *testing.T) {
 	}
 }
 
+// TestNotifyQueuesNoPushWhenDisabled: on an instance with [push]
+// enabled = false nothing drains the queue, and the retention sweep only
+// collects rows that were sent or dead-lettered, so a row written here is
+// never collected. The mail half already gates on the instance having
+// SMTP; push gates the same way.
+func TestNotifyQueuesNoPushWhenDisabled(t *testing.T) {
+	c, repo, bob := testRepoWithWatcher(t)
+	c.Cfg.Push.Enabled = false
+	c.Store.AddPushDevice(bob, "tok-b", "iphone")
+
+	notify(c, []int64{bob}, notice{repo: repo, kind: "issue",
+		subject: "s", action: "opened issue #1", path: "alice/app/issues/1"})
+
+	if due, _ := c.Store.DuePush(20); len(due) != 0 {
+		t.Fatalf("queued %d pushes on a push-disabled instance", len(due))
+	}
+	// The inbox row is still filed: push is the optional half, not the
+	// notice.
+	if n := c.Store.UnreadNotices(bob); n != 1 {
+		t.Fatalf("unread notices = %d, want 1", n)
+	}
+}
+
+// TestNotificationsDeviceAddRefusedWhenPushDisabled: registering a device
+// on an instance that cannot deliver would report success and then never
+// push, with notifications settings show still saying push is on.
+func TestNotificationsDeviceAddRefusedWhenPushDisabled(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	c.Cfg.Push.Enabled = false
+	c.Stdin = strings.NewReader("DEVTOKEN\n")
+	var out bytes.Buffer
+	c.Stdout, c.Stderr = &out, &out
+
+	if code := runNotificationsDeviceAdd(c, nil); code != protocol.ExitFailure {
+		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
+	}
+	if devices, _ := c.Store.PushDevices(c.User.ID); len(devices) != 0 {
+		t.Fatalf("device registered anyway: %+v", devices)
+	}
+	if !strings.Contains(out.String(), "[push] enabled = false") {
+		t.Fatalf("message does not name the instance setting: %q", out.String())
+	}
+}
+
 func TestNotificationsDeviceAddReadsStdin(t *testing.T) {
 	c := notifTestCtx(t, "alice")
 	c.Stdin = strings.NewReader("DEVTOKEN\n")
@@ -154,7 +203,7 @@ func TestNotificationsDeviceListTruncatesTheTokenJSON(t *testing.T) {
 }
 
 // TestNotificationsDeviceListMasksAShortToken: a token at or under the
-// truncation cut length is not returned unchanged. shortToken's short
+// truncation cut length is not returned unchanged. ShortToken's short
 // path used to return the token verbatim, a full echo of anything eight
 // characters or fewer; runNotificationsDeviceAdd enforces no minimum
 // length, so a short token is a value the command will store.

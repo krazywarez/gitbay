@@ -87,10 +87,16 @@ func notify(c *Ctx, userIDs []int64, n notice) {
 		return
 	}
 	sendMail := c.Cfg.Mail.SMTPHost != ""
+	// Nothing drains push_queue unless the daemon started the deliverer,
+	// and the retention sweep only collects rows that were sent or
+	// dead-lettered, so a row written here would sit there forever.
+	sendPush := c.Cfg.Push.Enabled
 	body := noticeBody(c, n)
 	for _, id := range recipients {
 		c.Store.AddNotice(id, n.repo.ID, n.kind, c.User.Username, n.action, n.path)
-		c.Store.EnqueuePush(id, pushTitle(n), pushBody(c.User.Username, n), n.path)
+		if sendPush {
+			c.Store.EnqueuePush(id, pushTitle(n), pushBody(c.User.Username, n), n.path)
+		}
 		if !sendMail {
 			continue
 		}
@@ -250,6 +256,13 @@ func runNotificationsDeviceAdd(c *Ctx, args []string) int {
 	if len(f.Pos) != 0 {
 		return c.usage()
 	}
+	// The registration itself would succeed and then deliver nothing,
+	// while notifications settings show still reported push on. Say what
+	// is actually wrong instead.
+	if !c.Cfg.Push.Enabled {
+		return c.fail(protocol.ExitFailure,
+			"this instance does not send push notifications ([push] enabled = false); ask an admin")
+	}
 	raw, err := io.ReadAll(io.LimitReader(c.Stdin, maxDeviceTokenBytes+1))
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "reading stdin: %v", err)
@@ -286,7 +299,7 @@ func runNotificationsDeviceList(c *Ctx, args []string) int {
 	rows := make([]row, 0, len(devices))
 	for _, d := range devices {
 		rows = append(rows, row{ID: d.ID, Label: d.Label,
-			Token: shortToken(d.Token), Added: d.CreatedAt})
+			Token: ShortToken(d.Token), Added: d.CreatedAt})
 	}
 	return c.emit(rows, func(w io.Writer) {
 		for _, r := range rows {
@@ -295,12 +308,15 @@ func runNotificationsDeviceList(c *Ctx, args []string) int {
 	})
 }
 
-// shortToken renders a device token as its first eight characters. Enough
+// ShortToken renders a device token as its first eight characters. Enough
 // to tell two devices apart in a list, not enough to push to one. A real
 // APNs token is 64 hex characters, so anything at or under the cut length
 // is not a token worth showing part of — it is masked outright rather
 // than echoed whole, which "abc…" would imply is a truncation.
-func shortToken(t string) string {
+//
+// Exported because the account page lists the same devices: one renderer,
+// so the two surfaces cannot come to disagree about what they print.
+func ShortToken(t string) string {
 	if len(t) > 8 {
 		return t[:8] + "…"
 	}
