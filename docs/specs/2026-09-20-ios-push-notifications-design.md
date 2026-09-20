@@ -318,8 +318,8 @@ server has shipped.
 Unit, `internal/push`:
 
 - The JWT signs, carries `alg: ES256` and the key id in its header,
-  `iss`/`iat`/`sub` in its claims, and verifies against the public half
-  of a generated test key.
+  `iss` (team id) and `iat` in its claims, and verifies against the
+  public half of a generated test key.
 - The cached token is reused inside fifty minutes and reminted after.
 - Response mapping: 200 sent, 410 and BadDeviceToken reap, 429 and 503
   retry, 403 dead-letters.
@@ -336,7 +336,10 @@ commands without being edited — the `cmd/gitbay/main.go` `pass()` table
 does need the new commands or its coverage test fails.
 
 E2E, `e2e/push_test.go`: an httptest server standing in for APNs, its
-host injected through config. Register a device, act as another user on
+host injected through `GITBAY_APNS_HOST`, following the
+`GITBAY_SWEEP_TICK` precedent. An env var rather than a config key, so
+`environment` stays a two-name mode that an operator cannot point at a
+host that is not Apple's. Register a device, act as another user on
 a watched repository, assert the queue drains and the fake received a
 payload whose body matches the inbox row's summary. Then a 410 and
 assert the device row is gone. The fake speaks HTTP/1.1 — the real
