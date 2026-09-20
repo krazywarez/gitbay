@@ -64,19 +64,32 @@ func (s *Server) siteName() string {
 	return strings.TrimSuffix(h, "/")
 }
 
-// stylesheetETag is the hash of what stylesheet serves, computed once:
-// a browser revalidates with If-None-Match and gets a 304 until a deploy
-// changes the bytes (#132).
-var stylesheetETag = func() string {
+// stylesheetHash is the hash of what stylesheet serves, computed once. It
+// is the ETag, so a browser revalidating with If-None-Match gets a 304
+// until a deploy changes the bytes (#132), and it is the ?v= the layout
+// stamps on the URL, so a deploy the browser has not fetched yet cannot be
+// answered from its cache (#239).
+var stylesheetHash = func() string {
 	h := sha256.New()
 	h.Write(styleCSS)
 	h.Write(chromaCSS)
-	return `"` + hex.EncodeToString(h.Sum(nil))[:16] + `"`
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }()
+
+var stylesheetETag = `"` + stylesheetHash + `"`
+
+func init() { web.StyleVersion = stylesheetHash }
 
 func (s *Server) stylesheet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("ETag", stylesheetETag)
-	w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
+	// A URL carrying this build's hash names bytes that cannot change, so
+	// it never needs revalidating. The bare URL still can, and keeps the
+	// policy it had.
+	if r.URL.Query().Get("v") == stylesheetHash {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
+	}
 	if r.Header.Get("If-None-Match") == stylesheetETag {
 		w.WriteHeader(http.StatusNotModified)
 		return

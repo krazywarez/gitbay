@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{template "title" .}}</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v={{styleVersion}}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 {{with field . "Feed"}}<link rel="alternate" type="application/atom+xml" href="{{.}}">
 {{end}}</head>

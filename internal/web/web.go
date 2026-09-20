@@ -62,9 +62,15 @@ var fullVersion = sync.OnceValue(func() string {
 	return ""
 })
 
+// StyleVersion identifies the bytes /static/style.css serves. The httpd
+// package sets it; the layout stamps it on the stylesheet URL so a deploy
+// changes that URL and a browser holding a cached copy cannot miss it.
+var StyleVersion string
+
 var funcs = template.FuncMap{
 	"gitbayVersion": func() string { return version() },
 	"gitbayCommit":  func() string { return fullVersion() },
+	"styleVersion":  func() string { return StyleVersion },
 	"join":          strings.Join,
 	// paragraphs splits plain text on blank lines for safe rich display.
 	"paragraphs": func(s string) []string {
