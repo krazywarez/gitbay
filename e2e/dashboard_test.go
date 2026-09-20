@@ -356,9 +356,10 @@ func TestDashboardQueues(t *testing.T) {
 	}
 }
 
-// D04/D05: two jobs on one commit fold into a single feed line, marked
-// with the worse of the two outcomes, and shown with a relative time
-// carrying the exact UTC time in its title.
+// D04/D05: two jobs on one commit fold into a single feed line, shown
+// with a relative time carrying the exact UTC time in its title. The
+// folded line's state is the worse of the two, which the feed no longer
+// draws; TestFeedLinesFoldsBuildRun covers that rule.
 func TestDashboardFeedFoldsBuildRun(t *testing.T) {
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	inst.runner = buildRunner(t)
@@ -391,9 +392,6 @@ func TestDashboardFeedFoldsBuildRun(t *testing.T) {
 	_, body := browserGet(t, inst.login(t, aliceKey), inst.base()+"/")
 	if !strings.Contains(body, "ran 2 jobs on") {
 		t.Fatalf("feed did not fold the two jobs into one run:\n%s", body)
-	}
-	if !strings.Contains(body, `class="dot bad"`) {
-		t.Fatalf("feed did not mark the run with the worse (failure) status:\n%s", body)
 	}
 	if !strings.Contains(body, sha[:10]) {
 		t.Fatalf("feed missing the short sha %q:\n%s", sha[:10], body)
