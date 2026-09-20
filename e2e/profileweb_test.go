@@ -7,8 +7,9 @@ import (
 )
 
 // TestProfileSettingsWeb covers profile set from the account settings page
-// (#161): description, website, links and about round-trip through the
-// form, and emptying a field actually clears it rather than being skipped.
+// (#161): description, website and links round-trip through the form, and
+// emptying a field actually clears it rather than being skipped. The about
+// text is not on this form — it is a file, covered below.
 func TestProfileSettingsWeb(t *testing.T) {
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
@@ -21,7 +22,7 @@ func TestProfileSettingsWeb(t *testing.T) {
 	_, body := browserGet(t, alice, settingsURL)
 	for _, want := range []string{
 		`<label for="p-description">`, `<label for="p-website">`,
-		`<label for="p-links">`, `<label for="p-about">`, `<label for="format">`,
+		`<label for="p-links">`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("profile form missing %q:\n%s", want, body)
@@ -34,8 +35,6 @@ func TestProfileSettingsWeb(t *testing.T) {
 		"description": {"builds small tools"},
 		"website":     {"https://alice.example"},
 		"links":       {"Mastodon|https://fosstodon.example/@alice\nhttps://alice.example/now"},
-		"about":       {"hello there"},
-		"format":      {"md"},
 	})
 	if status != 200 && status != 303 {
 		t.Fatalf("profile post: %d", status)
@@ -44,7 +43,7 @@ func TestProfileSettingsWeb(t *testing.T) {
 	for _, want := range []string{
 		`"description":"builds small tools"`, `"website":"https://alice.example"`,
 		`"label":"Mastodon"`, `"url":"https://fosstodon.example/@alice"`,
-		`"url":"https://alice.example/now"`, `"about":"hello there"`,
+		`"url":"https://alice.example/now"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("profile set missing %q: %s", want, out)
@@ -55,7 +54,7 @@ func TestProfileSettingsWeb(t *testing.T) {
 	_, body = browserGet(t, alice, settingsURL)
 	for _, want := range []string{
 		"builds small tools", "https://alice.example", "Mastodon|https://fosstodon.example/@alice",
-		"https://alice.example/now", "hello there",
+		"https://alice.example/now",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings page did not round-trip %q:\n%s", want, body)
@@ -66,22 +65,10 @@ func TestProfileSettingsWeb(t *testing.T) {
 	// each step below carries the fields already in place and changes one.
 	links := "Mastodon|https://fosstodon.example/@alice\nhttps://alice.example/now"
 
-	// The org choice is honoured on the profile page.
-	if status, _ := browserPost(t, alice, settingsURL, url.Values{
-		"field": {"profile"}, "description": {"builds small tools"},
-		"website": {"https://alice.example"}, "links": {links},
-		"about": {"a /note/ in org"}, "format": {"org"},
-	}); status != 200 && status != 303 {
-		t.Fatalf("profile post (org): %d", status)
-	}
-	if _, page := browserGet(t, alice, inst.base()+"/alice"); !strings.Contains(page, "<em>note</em>") {
-		t.Fatalf("about did not render as org:\n%s", page)
-	}
-
 	// Emptying the website clears it, not leaves it alone.
 	if status, _ := browserPost(t, alice, settingsURL, url.Values{
 		"field": {"profile"}, "description": {"builds small tools"},
-		"website": {""}, "links": {links}, "about": {"a /note/ in org"}, "format": {"org"},
+		"website": {""}, "links": {links},
 	}); status != 200 && status != 303 {
 		t.Fatalf("profile post (clear website): %d", status)
 	}
@@ -98,13 +85,52 @@ func TestProfileSettingsWeb(t *testing.T) {
 
 	// Emptying the links field clears the whole list.
 	if status, _ := browserPost(t, alice, settingsURL, url.Values{
-		"field": {"profile"}, "description": {"builds small tools"},
-		"links": {""}, "about": {"a /note/ in org"}, "format": {"org"},
+		"field": {"profile"}, "description": {"builds small tools"}, "links": {""},
 	}); status != 200 && status != 303 {
 		t.Fatalf("profile post (clear links): %d", status)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "--json")
 	if strings.Contains(out, "Mastodon") || strings.Contains(out, `"links"`) {
 		t.Fatalf("links not cleared: %s", out)
+	}
+}
+
+// The settings page does not edit the about text; it creates the
+// repository that holds it and points at the file editor.
+func TestProfileAboutRepoFromWeb(t *testing.T) {
+	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	alice := inst.login(t, aliceKey)
+	settingsURL := inst.base() + "/settings"
+
+	// With no repository yet, the page offers to create one.
+	_, body := browserGet(t, alice, settingsURL)
+	if !strings.Contains(body, "Create alice/.gitbay") {
+		t.Fatalf("settings page does not offer the profile repository:\n%s", body)
+	}
+
+	if status, _ := browserPost(t, alice, settingsURL, url.Values{
+		"field": {"profile-repo"},
+	}); status != 200 && status != 303 {
+		t.Fatalf("profile-repo post: %d", status)
+	}
+
+	// The repository exists with a starter file, and the page now links to
+	// the editor instead of offering to create it again.
+	out, _, code := inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if code != 0 {
+		t.Fatalf("profile show: %d", code)
+	}
+	if !strings.Contains(out, `"about_path":"profile/README.md"`) {
+		t.Fatalf("starter about not committed: %s", out)
+	}
+	_, body = browserGet(t, alice, settingsURL)
+	if !strings.Contains(body, "/alice/.gitbay/edit/main/profile/README.md") {
+		t.Fatalf("settings page does not link to the about file:\n%s", body)
+	}
+	if strings.Contains(body, "Create alice/.gitbay") {
+		t.Error("settings page still offers to create an existing repository")
 	}
 }

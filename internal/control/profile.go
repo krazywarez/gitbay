@@ -20,10 +20,10 @@ func init() {
 		Usage:   "profile show [name]", ReadOnly: true, Run: runProfileShow})
 	register(Command{Path: []string{"profile", "set"},
 		Summary: "set your profile",
-		Usage:   "profile set [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]... ('' clears)", ReadsStdin: true, Run: runProfileSet})
+		Usage:   "profile set [--description <d>] [--website <url>] [--link <label|url>]... ('' clears)", Run: runProfileSet})
 	register(Command{Path: []string{"org", "profile"},
 		Summary: "show or set an org's profile",
-		Usage:   "org profile <org> [--description <d>] [--website <url>] [--about <text>|--file -] [--about-format md|org] [--link <label|url>]...", ReadsStdin: true, Run: runOrgProfile})
+		Usage:   "org profile <org> [--description <d>] [--website <url>] [--link <label|url>]...", Run: runOrgProfile})
 }
 
 // maxProfileLinks caps the free-form link list. A profile is a header,
@@ -78,29 +78,24 @@ func ownerAbout(c *Ctx, owner string) (text, format, path string) {
 type profileEdit struct {
 	Description *string
 	Website     *string
-	About       *string
-	AboutFormat *string
 	Links       *[]store.ProfileLink
 }
 
 func (e profileEdit) empty() bool {
-	return e.Description == nil && e.Website == nil && e.About == nil &&
-		e.AboutFormat == nil && e.Links == nil
+	return e.Description == nil && e.Website == nil && e.Links == nil
 }
 
-// parseProfileFlags pulls the profile flags out of args. --about takes
-// inline text or reads stdin via --file -; --link repeats, and a single
-// empty --link clears the list.
-func parseProfileFlags(c *Ctx, args []string) (rest []string, e profileEdit, err error) {
-	about, file := "", ""
-	sawAbout := false
+// parseProfileFlags pulls the profile flags out of args. --link repeats,
+// and a single empty --link clears the list. The about text is not here:
+// it is a file in <owner>/.gitbay, written like any other file.
+func parseProfileFlags(args []string) (rest []string, e profileEdit, err error) {
 	var links []store.ProfileLink
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--website", "--about", "--about-format", "--file"}, Multi: []string{"--link"}, MaxPos: -1})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--website"}, Multi: []string{"--link"}, MaxPos: -1})
 	if err != nil {
 		return nil, e, err
 	}
 	rest = f.Pos
-	for _, name := range []string{"--description", "--website", "--about-format"} {
+	for _, name := range []string{"--description", "--website"} {
 		if !f.Has(name) {
 			continue
 		}
@@ -110,15 +105,7 @@ func parseProfileFlags(c *Ctx, args []string) (rest []string, e profileEdit, err
 			e.Description = &v
 		case "--website":
 			e.Website = &v
-		case "--about-format":
-			e.AboutFormat = &v
 		}
-	}
-	if f.Has("--about") {
-		about, sawAbout = f.Value("--about"), true
-	}
-	if f.Has("--file") {
-		file, sawAbout = f.Value("--file"), true
 	}
 	for _, v := range f.List("--link") {
 		if v == "" {
@@ -132,13 +119,6 @@ func parseProfileFlags(c *Ctx, args []string) (rest []string, e profileEdit, err
 		}
 		links = append(links, l)
 		e.Links = &links
-	}
-	if sawAbout {
-		body, berr := bodyFrom(c, about, file)
-		if berr != nil {
-			return nil, e, berr
-		}
-		e.About = &body
 	}
 	if len(links) > maxProfileLinks {
 		return nil, e, fmt.Errorf("at most %d links", maxProfileLinks)
@@ -189,16 +169,6 @@ func applyProfile(p store.Profile, e profileEdit) (store.Profile, error) {
 		}
 		p.Website = s
 	}
-	if e.About != nil {
-		p.About = strings.TrimSpace(*e.About)
-	}
-	if e.AboutFormat != nil {
-		f := strings.TrimSpace(*e.AboutFormat)
-		if f != "md" && f != "org" {
-			return p, errors.New("about format must be md or org")
-		}
-		p.AboutFormat = f
-	}
 	if e.Links != nil {
 		p.Links = *e.Links
 	}
@@ -210,8 +180,8 @@ type ProfileOut struct {
 	Kind        string `json:"kind"`
 	Description string `json:"description,omitempty"`
 	Website     string `json:"website,omitempty"`
-	// About is long-form markdown, rendered by the web between the
-	// header and the activity graph.
+	// About is the long-form text from <owner>/.gitbay, rendered by the
+	// web between the header and the activity graph.
 	About       string `json:"about,omitempty"`
 	AboutFormat string `json:"about_format,omitempty"`
 	// AboutPath is where the about was read from in <owner>/.gitbay, so a
@@ -403,7 +373,7 @@ func runProfileShow(c *Ctx, args []string) int {
 }
 
 func runProfileSet(c *Ctx, args []string) int {
-	rest, e, err := parseProfileFlags(c, args)
+	rest, e, err := parseProfileFlags(args)
 	if err != nil {
 		return c.failInput(err)
 	}
@@ -411,7 +381,7 @@ func runProfileSet(c *Ctx, args []string) int {
 		return c.usage()
 	}
 	if e.empty() {
-		return c.fail(protocol.ExitUsage, "nothing to set: pass --description, --website, --about and/or --link")
+		return c.fail(protocol.ExitUsage, "nothing to set: pass --description, --website and/or --link")
 	}
 	p, err := c.Store.OwnerProfile("user", c.User.ID)
 	if err != nil {
@@ -425,12 +395,12 @@ func runProfileSet(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitProfile(c, ProfileOut{Name: c.User.Username, Kind: "user",
-		Description: p.Description, Website: p.Website, About: p.About,
-		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}})
+		Description: p.Description, Website: p.Website, Links: p.Links,
+		Repos: []ProfileRepo{}})
 }
 
 func runOrgProfile(c *Ctx, args []string) int {
-	rest, e, err := parseProfileFlags(c, args)
+	rest, e, err := parseProfileFlags(args)
 	if err != nil {
 		return c.failInput(err)
 	}
@@ -457,6 +427,6 @@ func runOrgProfile(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitProfile(c, ProfileOut{Name: org.Name, Kind: "org",
-		Description: p.Description, Website: p.Website, About: p.About,
-		AboutFormat: p.AboutFormat, Links: p.Links, Repos: []ProfileRepo{}})
+		Description: p.Description, Website: p.Website, Links: p.Links,
+		Repos: []ProfileRepo{}})
 }

@@ -43,6 +43,19 @@ func TestProfileAboutFromRepo(t *testing.T) {
 	if !strings.Contains(body, "hello from a file") {
 		t.Error("web profile does not render the about")
 	}
+
+	// The extension drives the renderer: an .org about renders as org.
+	if _, _, code := inst.ssh(t, bobKey, "", "repo", "create", "bob/.gitbay"); code != 0 {
+		t.Fatal("creating bob/.gitbay failed")
+	}
+	if _, errOut, code := inst.ssh(t, bobKey, "a /note/ in org\n",
+		"repo", "commit-file", "bob/.gitbay", "profile/README.org",
+		"--ref", "main", "--file", "-"); code != 0 {
+		t.Fatalf("committing bob's org about: %s", errOut)
+	}
+	if _, page := inst.get(t, "/bob"); !strings.Contains(page, "<em>note</em>") {
+		t.Errorf("about did not render as org:\n%s", page)
+	}
 }
 
 // The extension picks the format, .md wins the resolution order, and a
@@ -85,5 +98,30 @@ func TestProfileAboutFormatAndPrivacy(t *testing.T) {
 	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
 	if !strings.Contains(out, "markdown wins") {
 		t.Errorf(".md did not win resolution: %s", out)
+	}
+}
+
+// The about is not settable through profile set any more: it is a file.
+func TestProfileSetHasNoAbout(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+
+	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--about", "'inline text'"); code == 0 {
+		t.Error("profile set --about still accepted")
+	}
+	if _, _, code := inst.ssh(t, aliceKey, "x", "profile", "set", "--file", "-"); code == 0 {
+		t.Error("profile set --file still accepted")
+	}
+
+	// The flags that stay still work.
+	if _, errOut, code := inst.ssh(t, aliceKey, "",
+		"profile", "set", "--description", "'a line'", "--link", "'site|https://example.org'"); code != 0 {
+		t.Fatalf("profile set --description --link: %s", errOut)
+	}
+	out, _, _ := inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, "a line") || !strings.Contains(out, "https://example.org") {
+		t.Errorf("description or link not saved: %s", out)
 	}
 }

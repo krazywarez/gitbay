@@ -34,12 +34,11 @@ type accountPGP struct {
 // accountForm renders the account's own settings: keys, addresses, and the
 // commands for everything that stays on SSH.
 func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.accountPage(w, r, u, nil)
+	s.accountPage(w, r, u)
 }
 
-// accountPage renders the settings page. d is non-nil when the profile
-// form asked to see its about text rather than save it (#235).
-func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.User, d *draft) {
+// accountPage renders the settings page.
+func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
@@ -67,6 +66,14 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 	watchOn, _ := s.st.WatchEnabled(u.ID)
 	theme, _ := s.st.Theme(u.ID)
 
+	// The about text is a file. The page points at it rather than editing
+	// it: the repository's own editor already does that job.
+	aboutRepo := u.Username + "/" + control.ProfileRepoName
+	aboutEdit := ""
+	if profile.AboutPath != "" {
+		aboutEdit = "/" + aboutRepo + "/edit/main/" + profile.AboutPath
+	}
+
 	s.render(w, "account.html", struct {
 		basePage
 		Tab          string // marks the rail's Settings row as current
@@ -75,15 +82,17 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 		Emails       []store.Email
 		Profile      control.ProfileOut
 		LinksText    string
+		AboutRepo    string // <user>/.gitbay, which holds the about text
+		AboutEdit    string // the file editor's URL, empty when there is no file yet
 		Host         string
 		Notice       string
 		Message      string
 		MailOn       bool
 		WatchOn      bool
 		ThemeSetting string // system, light or dark: the form's selected option
-		Draft        *draft
-	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links), s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme, d})
+	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
+		aboutRepo, aboutEdit, s.cfg.SiteHost(),
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -246,25 +255,34 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "notification preferences saved")
 	case "profile":
-		format := bodyFormat(r)
-		if wantsPreview(r) {
-			s.accountPage(w, r, u, s.draftWith(r, "about", format, r.FormValue("about"), ugcHTML))
-			return
-		}
 		argv := []string{"profile", "set",
 			"--description", r.FormValue("description"),
 			"--website", r.FormValue("website"),
-			"--about-format", format,
-			"--file", "-",
 		}
 		for _, link := range profileLinkArgs(r.FormValue("links")) {
 			argv = append(argv, "--link", link)
 		}
-		if msg, ok := s.runControlStdin(u, argv, r.FormValue("about")); !ok {
+		if _, msg, ok := s.runControl(u, argv); !ok {
 			back(msg, "")
 			return
 		}
 		back("", "profile updated")
+	case "profile-repo":
+		// The about text is a file. Create the repository that holds it and
+		// commit a starter README, so the file editor has a branch to open.
+		path := u.Username + "/" + control.ProfileRepoName
+		if _, msg, ok := s.runControl(u, []string{"repo", "create", path}); !ok {
+			back(msg, "")
+			return
+		}
+		starter := "# " + u.Username + "\n\nThis is the about text on your profile.\n"
+		if msg, ok := s.runControlStdin(u, []string{"repo", "commit-file", path,
+			control.AboutBase + ".md", "--ref", "main",
+			"--message", "add profile about", "--file", "-"}, starter); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "profile repository created")
 	default:
 		back("unknown form", "")
 	}
