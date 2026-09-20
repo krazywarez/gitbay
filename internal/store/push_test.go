@@ -18,7 +18,8 @@ func TestPushDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.AddPushDevice(uid, "tok-a", "iphone"); err != nil {
+	firstID, err := s.AddPushDevice(uid, "tok-a", "iphone")
+	if err != nil {
 		t.Fatalf("AddPushDevice: %v", err)
 	}
 	devices, err := s.PushDevices(uid)
@@ -28,14 +29,21 @@ func TestPushDevices(t *testing.T) {
 	if len(devices) != 1 || devices[0].Token != "tok-a" || devices[0].Label != "iphone" {
 		t.Fatalf("got %+v", devices)
 	}
+	if firstID != devices[0].ID {
+		t.Fatalf("AddPushDevice returned %d, row id is %d", firstID, devices[0].ID)
+	}
 
 	// Apple reuses tokens: re-registering updates the label and the owner
-	// rather than erroring, so a reinstall under another account works.
+	// rather than erroring, so a reinstall under another account works. The
+	// returned id must be the existing row's, not an unrelated rowid left
+	// over from SQLite's last real INSERT (the DO UPDATE arm does not
+	// advance last_insert_rowid()).
 	bob, err := s.CreateUser("bob", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddPushDevice(bob, "tok-a", "ipad"); err != nil {
+	reregID, err := s.AddPushDevice(bob, "tok-a", "ipad")
+	if err != nil {
 		t.Fatalf("re-register: %v", err)
 	}
 	if d, _ := s.PushDevices(uid); len(d) != 0 {
@@ -44,6 +52,12 @@ func TestPushDevices(t *testing.T) {
 	d, _ := s.PushDevices(bob)
 	if len(d) != 1 || d[0].Label != "ipad" {
 		t.Fatalf("got %+v", d)
+	}
+	if reregID != d[0].ID {
+		t.Fatalf("re-register returned %d, existing row id is %d", reregID, d[0].ID)
+	}
+	if reregID != firstID {
+		t.Fatalf("re-register returned %d, want the reused row's original id %d", reregID, firstID)
 	}
 
 	// Removal is scoped to the owner: alice cannot remove bob's device.

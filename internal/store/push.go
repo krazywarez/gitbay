@@ -19,16 +19,20 @@ type PushDevice struct {
 
 // AddPushDevice registers a token to an account. A token already present
 // changes hands rather than erroring: Apple reuses tokens, and a reinstall
-// hands the same one to whichever account signs in next.
+// hands the same one to whichever account signs in next. The id is read
+// back by token rather than taken from LastInsertId, which SQLite leaves
+// unchanged when the DO UPDATE arm fires instead of the INSERT.
 func (s *Store) AddPushDevice(userID int64, token, label string) (int64, error) {
-	res, err := s.DB.Exec(`
+	_, err := s.DB.Exec(`
 		INSERT INTO push_devices (user_id, token, label) VALUES (?, ?, ?)
 		ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, label = excluded.label`,
 		userID, token, label)
 	if err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	var id int64
+	err = s.DB.QueryRow("SELECT id FROM push_devices WHERE token = ?", token).Scan(&id)
+	return id, err
 }
 
 func (s *Store) PushDevices(userID int64) ([]PushDevice, error) {
