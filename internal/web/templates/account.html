@@ -144,6 +144,26 @@ account and where notifications go.</p>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Alerts for every issue and merge request on those repositories. A watch or mute on a repository has priority over this setting.</p>
+<form method="post" action="/settings" class="setform">
+  <input type="hidden" name="field" value="notify-push">
+  <label for="notify-push">Activity on your registered devices</label>
+  <input type="checkbox" id="notify-push" name="push" value="on"{{if .PushOn}} checked{{end}}>
+  <button type="submit" class="btn">Save</button>
+</form>
+<p class="meta">Notification text is sent in full, including for private repositories, so a repository name and item number reach Apple and appear on a lock screen.</p>
+<h3>Devices</h3>
+{{if .Devices}}<div class="tablewrap"><table class="keys nowrap">
+<tr class="cols"><th scope="col">label</th><th scope="col">token</th><th scope="col">last seen</th><th scope="col"><span class="vh">actions</span></th></tr>
+{{range .Devices}}<tr>
+  <td>{{.Label}}</td>
+  <td class="mono">{{.Token}}</td>
+  <td>{{if .LastSeenAt}}{{when .LastSeenAt}}{{else}}never{{end}}</td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="device-remove"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove</button></form></td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No registered devices.</p>{{end}}
+<p class="meta">Devices register themselves from the iOS app; there is no
+form here to add one, since a browser cannot produce an APNs token.</p>
 </section>
 
 <section id="appearance"><h2>Appearance</h2>

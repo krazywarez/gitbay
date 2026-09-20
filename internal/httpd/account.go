@@ -31,6 +31,16 @@ type accountPGP struct {
 	Confirm     string // the fingerprint's first 8 characters
 }
 
+// accountDevice is one registered APNs device as the settings page shows
+// it. Token is truncated to its first 8 characters: the full token is
+// device-identifying and never reaches the page.
+type accountDevice struct {
+	ID         int64
+	Label      string
+	Token      string
+	LastSeenAt string
+}
+
 // accountForm renders the account's own settings: keys, addresses, and the
 // commands for everything that stays on SSH.
 func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -64,7 +74,15 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 	s.runControlInto(u, []string{"profile", "show"}, &profile)
 	mailOn, _ := s.st.MailEnabled(u.ID)
 	watchOn, _ := s.st.WatchEnabled(u.ID)
+	pushOn, _ := s.st.PushEnabled(u.ID)
 	theme, _ := s.st.Theme(u.ID)
+
+	var devices []accountDevice
+	if list, err := s.st.PushDevices(u.ID); err == nil {
+		for _, d := range list {
+			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label, Token: prefix8(d.Token), LastSeenAt: d.LastSeenAt})
+		}
+	}
 
 	// The about text is a file. The page points at it rather than editing
 	// it: the repository's own editor already does that job.
@@ -89,10 +107,12 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 		Message      string
 		MailOn       bool
 		WatchOn      bool
+		PushOn       bool
+		Devices      []accountDevice
 		ThemeSetting string // system, light or dark: the form's selected option
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
 		aboutRepo, aboutEdit, s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, theme})
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -243,7 +263,7 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "colour scheme saved")
-	case "notify-mail", "notify-watch":
+	case "notify-mail", "notify-watch", "notify-push":
 		pref := strings.TrimPrefix(r.FormValue("field"), "notify-")
 		state := "off"
 		if r.FormValue(pref) == "on" {
@@ -254,6 +274,12 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "notification preferences saved")
+	case "device-remove":
+		if _, msg, ok := s.runControl(u, []string{"notifications", "device", "remove", r.FormValue("id")}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "device removed")
 	case "profile":
 		argv := []string{"profile", "set",
 			"--description", r.FormValue("description"),
