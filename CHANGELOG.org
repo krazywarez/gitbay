@@ -4,7 +4,7 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* v1.31.0 — unreleased
+* v1.31.0 — 2026-09-20
 
 The desktop layout (#226): the web UI uses a wide screen.
 
@@ -97,6 +97,22 @@ A web UI sweep.
   sideways, rather than wrapping a fingerprint or a timestamp.
 - =.pathbar= actions sit on the centre line with the ref and the
   crumbs.
+
+The SonarCloud dashboard is at zero (#238). Four of its 38 findings were
+real; the rest are dismissed with their reasons recorded on the
+dashboard.
+
+- A trailing-slash redirect cannot leave the site. =net/http= fills
+  =URL.Scheme= and =URL.Host= from an absolute-form request line, which
+  RFC 7230 requires a server to accept, so =GET http://evil.example/cmc/=
+  answered =301 Location: http://evil.example/cmc=. A browser sends
+  absolute form only to a proxy, so nothing reached this through one
+  directly.
+- The global search, repository search and register forms no longer
+  carry =autofocus=, which moved focus past the heading, the result
+  count and the search page's filters. The diff line-comment box keeps
+  it: that form renders only after the reader asks for it on a line,
+  and with no JavaScript nothing else carries focus across the reload.
 
 * v1.30.0 — 2026-09-19
 
