@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"gitbay.org/gitbay/internal/config"
 )
@@ -34,11 +35,12 @@ func fakeAPNs(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server) {
 }
 
 func TestSendShapesTheRequest(t *testing.T) {
-	var gotPath, gotTopic, gotType, gotAuth string
+	var gotPath, gotTopic, gotType, gotAuth, gotCollapse string
 	var payload map[string]any
 	c, _ := fakeAPNs(t, func(w http.ResponseWriter, r *http.Request) {
 		gotPath, gotTopic = r.URL.Path, r.Header.Get("apns-topic")
 		gotType, gotAuth = r.Header.Get("apns-push-type"), r.Header.Get("authorization")
+		gotCollapse = r.Header.Get("apns-collapse-id")
 		raw, _ := io.ReadAll(r.Body)
 		json.Unmarshal(raw, &payload)
 		w.WriteHeader(200)
@@ -67,9 +69,11 @@ func TestSendShapesTheRequest(t *testing.T) {
 	if payload["path"] != "krz/gitbay/issues/12" {
 		t.Fatalf("path = %v", payload["path"])
 	}
-	// Collapsing is wrong here: two comments are two notices.
-	if _, ok := payload["apns-collapse-id"]; ok {
-		t.Fatal("collapse id set")
+	// Collapsing is wrong here: two comments are two notices. This is an
+	// APNs HTTP header, not a body field, so it must be checked on the
+	// request the handler received, not on the decoded JSON payload.
+	if gotCollapse != "" {
+		t.Fatalf("apns-collapse-id = %q, want unset", gotCollapse)
 	}
 }
 
@@ -116,5 +120,31 @@ func TestSendMapsResponses(t *testing.T) {
 				t.Fatalf("retryAfter = %v, want %v", after, tc.wantAfter)
 			}
 		})
+	}
+}
+
+func TestSendTruncatesBodyOnRuneBoundary(t *testing.T) {
+	var payload map[string]any
+	c, _ := fakeAPNs(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		json.Unmarshal(raw, &payload)
+		w.WriteHeader(200)
+	})
+	// A leading ASCII byte shifts every following two-byte rune off an
+	// even offset, so a raw cut at maxBodyBytes is guaranteed to land on
+	// the second byte of one of them rather than a rune boundary.
+	long := "x" + strings.Repeat("é", 2000)
+	res, _, err := c.Send(context.Background(), "T", "t", long, "p")
+	if err != nil || res != resultSent {
+		t.Fatalf("res = %v, err = %v", res, err)
+	}
+	aps := payload["aps"].(map[string]any)
+	alert := aps["alert"].(map[string]any)
+	body := alert["body"].(string)
+	if !utf8.ValidString(body) {
+		t.Fatalf("body is not valid UTF-8: %q", body)
+	}
+	if len(body) > maxBodyBytes {
+		t.Fatalf("body is %d bytes, want <= %d", len(body), maxBodyBytes)
 	}
 }

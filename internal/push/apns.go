@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
@@ -62,7 +63,11 @@ func NewClient(cfg config.Push) (*Client, error) {
 // Retry-After when it gave one, zero otherwise.
 func (c *Client) Send(ctx context.Context, token, title, body, path string) (result, time.Duration, error) {
 	if len(body) > maxBodyBytes {
-		body = body[:maxBodyBytes]
+		// A raw byte cut can land mid-rune on multi-byte UTF-8 (emoji,
+		// accents, non-Latin usernames). ToValidUTF8 drops the
+		// resulting dangling bytes instead of leaving them for
+		// encoding/json to turn into a garbled U+FFFD.
+		body = strings.ToValidUTF8(body[:maxBodyBytes], "")
 	}
 	payload, err := json.Marshal(map[string]any{
 		"aps": map[string]any{
