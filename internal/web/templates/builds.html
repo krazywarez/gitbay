@@ -3,6 +3,8 @@
 {{define "content"}}
 <div class="withcol">
 <nav class="sidecol" aria-label="Filters">
+<details class="sidedrop">
+<summary><span class="sideword">Filters</span>{{range .Facets}}{{range .Items}}{{if .Active}} <span class="sideon">{{.Label}}</span>{{end}}{{end}}{{end}}</summary>
   {{range .Facets}}{{if .Items}}<div class="grp">
   <h2 class="colhead">{{.Title}}</h2>
   <ul>{{range .Items}}<li><a{{if .Active}} aria-current="page"{{end}} href="{{.Href}}">{{.Label}}</a></li>{{end}}</ul>
@@ -15,6 +17,7 @@
     <input type="hidden" name="job" value="{{.Filter.Job}}">
     <button type="submit" class="btn">Filter</button>
   </form>
+</details>
 </nav>
 <div class="colmain">
 <div class="listhead">

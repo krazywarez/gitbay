@@ -1430,6 +1430,46 @@ a.memberchip .role { color: var(--muted); }
 .sidecol form.searchform { margin-top: var(--sp-2); }
 .sidecol form.searchform input[type="text"] { min-width: 0; width: 100%; }
 
+/* The column's groups sit in a disclosure. Below 62rem that is all the
+   reader sees of the column: one closed line before the list, because a
+   repository with two dozen labels stacked the whole vocabulary under
+   the content it filters. Above 62rem the summary is hidden and the
+   content shown whatever the open state, so the column is what it
+   always was. The @supports guard is the fail-safe: an engine without
+   ::details-content keeps a working toggle at every width instead of
+   losing the column (#237). */
+.sidedrop > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 32px;
+  padding: 0 var(--sp-3);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  color: var(--fg);
+  font-size: var(--fs-2);
+  cursor: pointer;
+  list-style: none;
+}
+.sidedrop[open] > summary { margin-bottom: var(--sp-3); }
+.sidedrop > summary::-webkit-details-marker { display: none; }
+.sidedrop > summary:hover { background: var(--hover); }
+.sidedrop > summary::after { content: "\25be"; color: var(--muted); }
+.sidedrop[open] > summary::after { content: "\25b4"; }
+.sideword { font-weight: 600; }
+/* the filters in force: where you are */
+.sideon { color: var(--warn); }
+/* every group came out empty, so there is nothing to open */
+.sidedrop:not(:has(.grp)) { display: none; }
+
+@media (min-width: 62.01rem) {
+  @supports selector(::details-content) {
+    .sidedrop > summary { display: none; }
+    .sidedrop::details-content { content-visibility: visible; }
+  }
+}
+
 /* a sticky column taller than the viewport scrolls inside itself, or its
    tail is unreachable once the page scrolls. Above 62rem only: below it
    .filenav is hidden and the other two are static. .dashpins stops being
@@ -1655,9 +1695,12 @@ svg.icon { vertical-align: -0.125em; }
   .blobgrid { grid-template-columns: 1fr; }
   .filenav { display: none; }
 
-  /* the column follows the content on a phone, the way the aside does */
+  /* the column is a closed disclosure before the content: a filter you
+     reach without scrolling the list, and nothing to scroll past when
+     you do not want it. It leads rather than follows because it is what
+     the list is narrowed by, not a note on one row (#237) */
   .withcol, .withcol.narrow { grid-template-columns: 1fr; }
-  .sidecol { position: static; order: 2; }
+  .sidecol { position: static; margin-bottom: var(--sp-3); }
   .sidecol .grp { display: inline-block; vertical-align: top; margin-right: var(--sp-5); }
 }
 

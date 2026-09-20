@@ -3,6 +3,8 @@
 {{define "content"}}
 <div class="withcol">
 <nav class="sidecol" aria-label="Filters">
+<details class="sidedrop">
+<summary><span class="sideword">Filters</span>{{if .Kind}} <span class="sideon">{{.Kind}}</span>{{end}}</summary>
   <div class="grp"><h2 class="colhead">Kind</h2>
   <ul>
     <li><a{{if eq .Kind ""}} aria-current="page"{{end}} href="?q={{.Query}}">everything</a></li>
@@ -10,6 +12,7 @@
     <li><a{{if eq .Kind "issue"}} aria-current="page"{{end}} href="?q={{.Query}}&amp;kind=issue">issues</a></li>
     <li><a{{if eq .Kind "mr"}} aria-current="page"{{end}} href="?q={{.Query}}&amp;kind=mr">merge requests</a></li>
   </ul></div>
+</details>
 </nav>
 <div class="colmain">
 <div class="listhead">

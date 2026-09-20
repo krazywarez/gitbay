@@ -122,11 +122,20 @@
   {{end}}</ul>
 </nav>{{end}}
 
+{{/* Every side column's groups sit in a details.sidedrop. Below 62rem
+     that disclosure is what the reader sees of the column: one closed
+     line they open. Above it style.css hides the summary and shows the
+     content whatever the open state, so the column reads as it always
+     has (#237). The facet columns name the filters in force in the
+     summary; the section navs head with the word alone. */}}
 {{define "sidecol"}}<nav class="sidecol" aria-label="Filters">
+<details class="sidedrop">
+<summary><span class="sideword">Filters</span>{{range .}}{{range .Items}}{{if .Active}} <span class="sideon">{{.Label}}</span>{{end}}{{end}}{{end}}</summary>
   {{range .}}{{if .Items}}<div class="grp">
   <h2 class="colhead">{{.Title}}</h2>
   <ul>{{range .Items}}<li><a{{if .Active}} aria-current="page"{{end}} href="{{.Href}}">{{.Label}}{{if .Count}} <i>{{.Count}}</i>{{end}}</a></li>{{end}}</ul>
   </div>{{end}}{{end}}
+</details>
 </nav>{{end}}
 
 {{define "branchicon"}}<svg class="icon" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628a2.25 2.25 0 0 1-1.5-2.122ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>{{end}}
