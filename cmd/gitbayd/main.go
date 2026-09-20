@@ -515,9 +515,9 @@ func sweep(ctx context.Context, st *store.Store, cfg config.Config) {
 			tick = d
 		}
 	}
-	audit, events, deliveries, mail := cfg.Retention.Durations()
+	audit, events, deliveries, mail, push := cfg.Retention.Durations()
 	r := store.Retention{Audit: audit, Events: events,
-		WebhookDeliveries: deliveries, Mail: mail}
+		WebhookDeliveries: deliveries, Mail: mail, Push: push}
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	for {

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 // PushDevice is one Apple device an account has registered. Token is the
@@ -88,5 +89,82 @@ func (s *Store) SetPushEnabled(userID int64, on bool) error {
 		v = 1
 	}
 	_, err := s.DB.Exec("UPDATE users SET notify_push = ? WHERE id = ?", v, userID)
+	return err
+}
+
+// QueuedPush is one pending push, joined to the token it is bound for so
+// the drainer needs one query rather than two.
+type QueuedPush struct {
+	ID       int64
+	DeviceID int64
+	Token    string
+	Title    string
+	Body     string
+	Path     string
+	Attempts int
+}
+
+// EnqueuePush writes one row per registered device, and nothing when the
+// account has push off or no devices — the same shape as
+// ActivityMailAddress returning "" when notify_mail is off. Mute, watch
+// and actor-exclusion are already settled by NotifyRecipients before a
+// caller reaches here.
+func (s *Store) EnqueuePush(userID int64, title, body, path string) error {
+	on, err := s.PushEnabled(userID)
+	if err != nil || !on {
+		return err
+	}
+	_, err = s.DB.Exec(`
+		INSERT INTO push_queue (device_id, title, body, path)
+		SELECT id, ?, ?, ? FROM push_devices WHERE user_id = ?`,
+		title, body, path, userID)
+	return err
+}
+
+func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
+	rows, err := s.DB.Query(`
+		SELECT q.id, q.device_id, d.token, q.title, q.body, q.path, q.attempts
+		FROM push_queue q JOIN push_devices d ON d.id = q.device_id
+		WHERE q.sent_at IS NULL AND q.failed_at IS NULL
+		  AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= ?)
+		ORDER BY q.id LIMIT ?`, fmtTime(time.Now()), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []QueuedPush
+	for rows.Next() {
+		var p QueuedPush
+		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Title, &p.Body, &p.Path, &p.Attempts); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) MarkPushSent(id int64) error {
+	_, err := s.DB.Exec(
+		"UPDATE push_queue SET sent_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1 WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) MarkPushFailed(id int64, errMsg string, nextAt *time.Time) error {
+	if nextAt == nil {
+		_, err := s.DB.Exec(
+			"UPDATE push_queue SET failed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1, last_error = ? WHERE id = ?",
+			errMsg, id)
+		return err
+	}
+	_, err := s.DB.Exec(
+		"UPDATE push_queue SET attempts = attempts + 1, last_error = ?, next_attempt_at = ? WHERE id = ?",
+		errMsg, fmtTime(*nextAt), id)
+	return err
+}
+
+// DeletePushDeviceByToken drops a device Apple has told us is gone. The
+// queue rows cascade, so nothing is left retrying at a dead token.
+func (s *Store) DeletePushDeviceByToken(token string) error {
+	_, err := s.DB.Exec("DELETE FROM push_devices WHERE token = ?", token)
 	return err
 }

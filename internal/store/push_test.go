@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func pushFixture(t *testing.T) *Store {
 	t.Helper()
@@ -90,5 +93,96 @@ func TestPushEnabledDefaultsOn(t *testing.T) {
 	}
 	if on, _ := s.PushEnabled(uid); on {
 		t.Fatal("SetPushEnabled(false) did not stick")
+	}
+}
+
+func TestEnqueuePush(t *testing.T) {
+	s := pushFixture(t)
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.AddPushDevice(uid, "tok-a", "iphone")
+	s.AddPushDevice(uid, "tok-b", "ipad")
+
+	// One row per device, so a retry to the phone does not resend to the
+	// iPad.
+	if err := s.EnqueuePush(uid, "krz/gitbay", "cmc opened issue #12", "krz/gitbay/issues/12"); err != nil {
+		t.Fatalf("EnqueuePush: %v", err)
+	}
+	due, err := s.DuePush(20)
+	if err != nil {
+		t.Fatalf("DuePush: %v", err)
+	}
+	if len(due) != 2 {
+		t.Fatalf("want a row per device, got %d", len(due))
+	}
+	if due[0].Token == "" || due[0].Body != "cmc opened issue #12" {
+		t.Fatalf("got %+v", due[0])
+	}
+
+	// Sent rows stop being due.
+	if err := s.MarkPushSent(due[0].ID); err != nil {
+		t.Fatalf("MarkPushSent: %v", err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 1 {
+		t.Fatalf("sent row still due")
+	}
+
+	// A failure with a next attempt in the future is not due yet.
+	next := time.Now().Add(time.Hour)
+	if err := s.MarkPushFailed(due[1].ID, "503", &next); err != nil {
+		t.Fatalf("MarkPushFailed: %v", err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 0 {
+		t.Fatalf("backed-off row is due too early")
+	}
+}
+
+func TestEnqueuePushRespectsSettingAndDevices(t *testing.T) {
+	s := pushFixture(t)
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No devices: nothing queued, no error.
+	if err := s.EnqueuePush(uid, "t", "b", "p"); err != nil {
+		t.Fatalf("EnqueuePush with no devices: %v", err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 0 {
+		t.Fatalf("queued for an account with no devices")
+	}
+
+	// Setting off: nothing queued.
+	s.AddPushDevice(uid, "tok-a", "iphone")
+	s.SetPushEnabled(uid, false)
+	if err := s.EnqueuePush(uid, "t", "b", "p"); err != nil {
+		t.Fatalf("EnqueuePush with push off: %v", err)
+	}
+	if due, _ := s.DuePush(20); len(due) != 0 {
+		t.Fatalf("queued with notify_push off")
+	}
+}
+
+func TestDeletePushDeviceByTokenTakesItsQueue(t *testing.T) {
+	s := pushFixture(t)
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.AddPushDevice(uid, "tok-a", "iphone")
+	s.EnqueuePush(uid, "t", "b", "p")
+
+	if err := s.DeletePushDeviceByToken("tok-a"); err != nil {
+		t.Fatalf("DeletePushDeviceByToken: %v", err)
+	}
+	if d, _ := s.PushDevices(uid); len(d) != 0 {
+		t.Fatalf("device survived")
+	}
+	// push_queue.device_id is ON DELETE CASCADE, so the queued rows go
+	// with it rather than being retried at a dead token forever.
+	if due, _ := s.DuePush(20); len(due) != 0 {
+		t.Fatalf("queued rows outlived their device")
 	}
 }

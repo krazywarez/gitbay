@@ -32,6 +32,7 @@ type Retention struct {
 	Events            time.Duration
 	WebhookDeliveries time.Duration
 	Mail              time.Duration
+	Push              time.Duration
 }
 
 // Sweep deletes expired sessions and tokens, then the rows older than
@@ -79,6 +80,7 @@ func (s *Store) Sweep(r Retention, now time.Time) (Swept, error) {
 			SELECT 1 FROM webhook_deliveries d
 			WHERE d.event_id = events.id AND d.delivered_at IS NULL AND d.failed_at IS NULL)`, r.Events},
 		{"notifications", "created_at < ? AND (sent_at IS NOT NULL OR failed_at IS NOT NULL)", r.Mail},
+		{"push_queue", "created_at < ? AND (sent_at IS NOT NULL OR failed_at IS NOT NULL)", r.Push},
 	}
 	for _, a := range aged {
 		if a.keep <= 0 {

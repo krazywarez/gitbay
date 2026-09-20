@@ -125,10 +125,12 @@ type Retention struct {
 	WebhookDeliveries string `toml:"webhook_deliveries"`
 	// Mail is the outbound queue: rows already sent or given up on.
 	Mail string `toml:"mail"`
+	// Push is the outbound device queue: rows already sent or given up on.
+	Push string `toml:"push"`
 }
 
-// Durations parses the four, mapping each to zero when unset or bad.
-func (r Retention) Durations() (audit, events, deliveries, mail time.Duration) {
+// Durations parses the five, mapping each to zero when unset or bad.
+func (r Retention) Durations() (audit, events, deliveries, mail, push time.Duration) {
 	parse := func(s string) time.Duration {
 		d, err := time.ParseDuration(s)
 		if err != nil || d < 0 {
@@ -136,7 +138,7 @@ func (r Retention) Durations() (audit, events, deliveries, mail time.Duration) {
 		}
 		return d
 	}
-	return parse(r.Audit), parse(r.Events), parse(r.WebhookDeliveries), parse(r.Mail)
+	return parse(r.Audit), parse(r.Events), parse(r.WebhookDeliveries), parse(r.Mail), parse(r.Push)
 }
 
 // LFS stores large-file objects content-addressed under Root (default
