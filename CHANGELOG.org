@@ -23,11 +23,16 @@ The desktop layout (#226): the web UI uses a wide screen.
 - Side columns: state, labels and open milestones on the issue and
   merge request lists; status, jobs and branches on builds; topics on
   explore; kinds on search; sections on repository settings, account
-  settings and admin.
-- Below 62rem the facet and section columns stack after their content
-  and the navigator hides, since the tree page is the navigator on a
-  phone. Below 80rem the dashboard's pinned repositories return to a
-  chip row above the queues.
+  settings and admin. A label or milestone nothing is filed under is
+  left out, so the merge request list offers the labels that have
+  merge requests rather than every label the repository holds; the
+  branch group caps at ten, and the branch field below it still takes
+  any ref.
+- Below 62rem the facet and section columns become a closed disclosure
+  before their content, headed by the filters in force, and the
+  navigator hides, since the tree page is the navigator on a phone.
+  Below 80rem the dashboard's pinned repositories return to a chip row
+  above the queues.
 
 Three accessibility defects the wider scan found, on pages the
 sixteen-page one never covered (#226):

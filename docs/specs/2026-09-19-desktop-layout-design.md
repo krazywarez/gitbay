@@ -63,10 +63,18 @@ feed rows are the row format the lists should adopt.
    description with topics and website inline in muted text, the
    Pin/Watch/Bookmark/Fork buttons at the right. Row two: the tabs. The
    toggles hint moves to `title` text on the three buttons.
-7. **Below 62rem** a facet or section column stacks after the content,
-   the way the issue aside does; the file navigator disappears (the
-   tree page exists). **Below 80rem** the dashboard's pinned column
-   returns to the chip row. Nothing the phone layout fixed moves.
+7. **Below 62rem** a facet or section column becomes a closed
+   disclosure before the content, headed by its word and the filters in
+   force; the file navigator disappears (the tree page exists).
+   **Below 80rem** the dashboard's pinned column returns to the chip
+   row. Nothing the phone layout fixed moves.
+
+   *Amended 2026-09-19 (#237).* The rule read "stacks after the
+   content, the way the issue aside does". An aside carries a note on
+   one thing; a facet column carries the vocabulary the list is
+   narrowed by, and a repository with two dozen labels stacked all of
+   them under the content, taller than it. A column that stops being a
+   column is a control, so it collapses to one and leads the list.
 
 ## Pages
 
