@@ -445,6 +445,15 @@ func runIssueAssign(c *Ctx, args []string) int {
 		}
 		return u, -1
 	}
+	// issue is the read from before the update, so its Assignees are who
+	// was already on it. SetIssueAssignee inserts ON CONFLICT DO NOTHING
+	// and returns nil whether or not it inserted, and the notice below is
+	// for accounts newly added: a client reconciling the list by
+	// re-sending the whole set must not notify on every save.
+	assigned := make(map[string]bool, len(issue.Assignees))
+	for _, name := range issue.Assignees {
+		assigned[name] = true
+	}
 	var added []int64
 	for _, name := range adds {
 		u, code := resolve(name)
@@ -454,6 +463,10 @@ func runIssueAssign(c *Ctx, args []string) int {
 		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, true); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
+		if assigned[u.Username] {
+			continue
+		}
+		assigned[u.Username] = true
 		added = append(added, u.ID)
 	}
 	for _, name := range removes {
@@ -480,7 +493,7 @@ func runIssueAssign(c *Ctx, args []string) int {
 		// Removals file nothing, and notify drops the actor, so assigning
 		// yourself is silent.
 		notify(c, added, notice{repo: repo, kind: "issue", direct: true,
-			subject: fmt.Sprintf("[%s] #%d: %s", repo.Path(), issue.Number, issue.Title),
+			subject: issueSubject(repo, issue.Number, issue.Title),
 			action:  fmt.Sprintf("assigned you to #%d", issue.Number),
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
 	}
