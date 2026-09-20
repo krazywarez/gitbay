@@ -41,7 +41,9 @@ func facetHref(base url.Values, key, value string) string {
 // listFacets builds the issue or merge request list's column from the
 // active parameters, the states the page offers, and the repository's
 // labels and open milestones. Counts are the rows' own: a label's issue
-// count on the issue list, its MR count on the MR list.
+// count on the issue list, its MR count on the MR list. A count of zero
+// is left out — it links to an empty list — unless it is the filter in
+// force, which stays so it can be cleared (#237).
 func listFacets(base url.Values, states []string, state string, labels []store.Label, ms []store.Milestone, forMRs bool) []facetGroup {
 	var st facetGroup
 	st.Title = "State"
@@ -55,6 +57,9 @@ func listFacets(base url.Values, states []string, state string, labels []store.L
 			n = l.MRs
 		}
 		active := base.Get("label") == l.Name
+		if n == 0 && !active {
+			continue
+		}
 		href := facetHref(base, "label", l.Name)
 		if active {
 			href = facetHref(base, "label", "")
@@ -64,6 +69,9 @@ func listFacets(base url.Values, states []string, state string, labels []store.L
 	mg := facetGroup{Title: "Milestones"}
 	for _, m := range ms {
 		active := base.Get("milestone") == m.Title
+		if m.OpenItems == 0 && !active {
+			continue
+		}
 		href := facetHref(base, "milestone", m.Title)
 		if active {
 			href = facetHref(base, "milestone", "")

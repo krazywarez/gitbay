@@ -3,6 +3,7 @@ package httpd
 import (
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 
 	"gitbay.org/gitbay/internal/control"
@@ -61,6 +62,11 @@ func filterLinks(f buildFilter, jobs []control.JobOut) []buildFilterLink {
 	return links
 }
 
+// maxBranchFacets caps the Branches group, the way topicFacets caps
+// topics: a page of builds names as many refs as it likes and the column
+// is not a branch listing. The field below the column takes any ref.
+const maxBranchFacets = 10
+
 // buildFacets is the builds page's side column: filterLinks' rows split
 // into their groups, plus one link per branch seen, which keeps status
 // and job and clears itself when active.
@@ -77,7 +83,18 @@ func buildFacets(f buildFilter, jobs []control.JobOut, refs []string) []facetGro
 	}
 	branch := facetGroup{Title: "Branches"}
 	base := url.Values{"ref": {f.Ref}, "status": {f.Status}, "job": {f.Job}}
-	for _, ref := range refs {
+	shown := refs
+	if len(shown) > maxBranchFacets {
+		shown = shown[:maxBranchFacets]
+		// the ref in force belongs in the group wherever it sits, or the
+		// filter it set cannot be cleared from the column. The reslice
+		// caps the capacity so the append copies instead of writing
+		// through to refs.
+		if i := slices.Index(refs, f.Ref); i >= maxBranchFacets {
+			shown = append(shown[:maxBranchFacets-1:maxBranchFacets-1], refs[i])
+		}
+	}
+	for _, ref := range shown {
 		active := ref == f.Ref
 		href := facetHref(base, "ref", ref)
 		if active {

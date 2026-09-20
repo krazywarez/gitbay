@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -172,5 +173,38 @@ func TestBuildFacetsGroups(t *testing.T) {
 	}
 	if b := groups[2].Items[1]; b.Label != "dev" || b.Active || b.Href != "?ref=dev&status=success" {
 		t.Errorf("dev: %+v", b)
+	}
+}
+
+// The branch group caps, the way topicFacets caps topics: a page of
+// builds can name dozens of refs and the column is not a branch
+// listing. The ref in force is kept whatever its position (#237).
+func TestBuildFacetsCapsBranches(t *testing.T) {
+	var refs []string
+	for i := 0; i < 30; i++ {
+		refs = append(refs, fmt.Sprintf("b%02d", i))
+	}
+	groups := buildFacets(buildFilter{}, nil, refs)
+	branches := groups[2].Items
+	if len(branches) != maxBranchFacets {
+		t.Fatalf("branches: %d", len(branches))
+	}
+	if branches[0].Label != "b00" || branches[len(branches)-1].Label != "b09" {
+		t.Errorf("kept the wrong refs: %+v", branches)
+	}
+
+	groups = buildFacets(buildFilter{Ref: "b29"}, nil, refs)
+	branches = groups[2].Items
+	if len(branches) != maxBranchFacets {
+		t.Fatalf("branches with an active ref: %d", len(branches))
+	}
+	var active *facetItem
+	for i := range branches {
+		if branches[i].Label == "b29" {
+			active = &branches[i]
+		}
+	}
+	if active == nil || !active.Active || active.Href != "?" {
+		t.Errorf("active ref past the cap: %+v", branches)
 	}
 }
