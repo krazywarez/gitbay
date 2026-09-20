@@ -90,6 +90,7 @@ func notify(c *Ctx, userIDs []int64, n notice) {
 	body := noticeBody(c, n)
 	for _, id := range recipients {
 		c.Store.AddNotice(id, n.repo.ID, n.kind, c.User.Username, n.action, n.path)
+		c.Store.EnqueuePush(id, pushTitle(n), pushBody(c.User.Username, n), n.path)
 		if !sendMail {
 			continue
 		}
@@ -154,6 +155,14 @@ func noticeBody(c *Ctx, n notice) string {
 	fmt.Fprintf(&b, "\n%s/%s\n", strings.TrimSuffix(c.Cfg.Server.SiteURL, "/"), n.path)
 	return b.String()
 }
+
+// pushTitle and pushBody are the alert's two lines. The body is built
+// from the same two values AddNotice files, so the alert and the inbox
+// row cannot disagree about what happened. The title is the repository,
+// which also groups a repository's notices in Notification Center.
+func pushTitle(n notice) string { return n.repo.Path() }
+
+func pushBody(actor string, n notice) string { return actor + " " + n.action }
 
 func issueSubject(repo store.Repo, number int64, title string) string {
 	return fmt.Sprintf("[%s] #%d: %s", repo.Path(), number, title)

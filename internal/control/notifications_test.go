@@ -36,6 +36,73 @@ func notifTestCtx(t *testing.T, username string) *Ctx {
 	}
 }
 
+// testRepoWithWatcher returns a Ctx acting as alice, a repository she
+// owns, and bob's user id with a watch row on it — the shared setup for
+// notify's recipient-widening tests.
+func testRepoWithWatcher(t *testing.T) (*Ctx, store.Repo, int64) {
+	t.Helper()
+	c := notifTestCtx(t, "alice")
+	repoID, err := c.Store.CreateRepo("user", c.User.ID, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := c.Store.RepoByID(repoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := c.Store.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Store.SetRepoWatch(repo.ID, bob, "watching"); err != nil {
+		t.Fatal(err)
+	}
+	return c, repo, bob
+}
+
+func TestNotifyQueuesPush(t *testing.T) {
+	c, repo, bob := testRepoWithWatcher(t) // alice acts, bob watches
+	c.Store.AddPushDevice(bob, "tok-b", "iphone")
+
+	notify(c, []int64{bob}, notice{repo: repo, kind: "issue",
+		subject: "[alice/app] #1: title",
+		action:  "opened issue #1",
+		path:    "alice/app/issues/1"})
+
+	due, err := c.Store.DuePush(20)
+	if err != nil {
+		t.Fatalf("DuePush: %v", err)
+	}
+	if len(due) != 1 {
+		t.Fatalf("want one queued push, got %d", len(due))
+	}
+	// The push body is the inbox row's summary, so the two surfaces
+	// cannot disagree about what happened.
+	if due[0].Title != "alice/app" {
+		t.Fatalf("title = %q", due[0].Title)
+	}
+	if due[0].Body != "alice opened issue #1" {
+		t.Fatalf("body = %q", due[0].Body)
+	}
+	if due[0].Path != "alice/app/issues/1" {
+		t.Fatalf("path = %q", due[0].Path)
+	}
+}
+
+func TestNotifyQueuesNoPushForTheActor(t *testing.T) {
+	c, repo, _ := testRepoWithWatcher(t)
+	c.Store.AddPushDevice(c.User.ID, "tok-self", "iphone")
+
+	notify(c, []int64{c.User.ID}, notice{repo: repo, kind: "issue",
+		subject: "s", action: "opened issue #1", path: "alice/app/issues/1"})
+
+	// NotifyRecipients already drops the actor; push inherits that and
+	// must not find its own way around it.
+	if due, _ := c.Store.DuePush(20); len(due) != 0 {
+		t.Fatalf("queued a push to the actor")
+	}
+}
+
 func TestNotificationsDeviceAddReadsStdin(t *testing.T) {
 	c := notifTestCtx(t, "alice")
 	c.Stdin = strings.NewReader("DEVTOKEN\n")
