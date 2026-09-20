@@ -155,6 +155,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"snippet file get":            {snippetID, "a.txt"},
 		"notifications list":          nil,
 		"notifications settings show": nil,
+		"notifications device list":   nil,
 		"repo bookmarks":              nil,
 		"search":                      {"app"},
 		"mr revisions":                {"alice/app", "1"},

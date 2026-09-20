@@ -287,12 +287,15 @@ func runNotificationsDeviceList(c *Ctx, args []string) int {
 }
 
 // shortToken renders a device token as its first eight characters. Enough
-// to tell two devices apart in a list, not enough to push to one.
+// to tell two devices apart in a list, not enough to push to one. A real
+// APNs token is 64 hex characters, so anything at or under the cut length
+// is not a token worth showing part of — it is masked outright rather
+// than echoed whole, which "abc…" would imply is a truncation.
 func shortToken(t string) string {
-	if len(t) <= 8 {
-		return t
+	if len(t) > 8 {
+		return t[:8] + "…"
 	}
-	return t[:8] + "…"
+	return "(short token)"
 }
 
 func runNotificationsDeviceRemove(c *Ctx, args []string) int {
