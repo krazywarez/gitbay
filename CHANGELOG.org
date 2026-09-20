@@ -4,6 +4,19 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.31.1 — 2026-09-20
+
+The stylesheet URL carries the build's hash (#239).
+
+- =/static/style.css= was served with a day's cache lifetime at an
+  unversioned URL, and =must-revalidate= only forces a check once that
+  lifetime expires. For a day after a deploy a browser rendered the new
+  markup against its old stylesheet; the ETag was never consulted.
+- The layout stamps the served bytes' hash on the link. A deploy changes
+  the URL, so a cached copy cannot answer it, and a request carrying the
+  current hash names bytes that cannot change and is served without
+  revalidating at all.
+
 * v1.31.0 — 2026-09-20
 
 The desktop layout (#226): the web UI uses a wide screen.
