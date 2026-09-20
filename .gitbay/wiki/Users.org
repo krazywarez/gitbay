@@ -680,9 +680,10 @@ control under Appearance.
 When the instance has SMTP configured, activity mails you as well as
 filing the inbox row: someone opens an issue or MR on your repository,
 comments where you are a participant (author, commenter, reviewer, or
-mentioned), reviews, closes, or merges. =notifications settings mail
-off= keeps the inbox and stops that mail (login links are not activity
-and still arrive); the account page has the same switch.
+mentioned), reviews, closes, merges, or assigns you.
+=notifications settings mail off= keeps the inbox and stops that mail
+(login links are not activity and still arrive); the account page has
+the same switch.
 =notifications settings watch on= makes you a recipient of every issue
 and merge request on the repositories you can write to, as if you had
 run =repo watch= on each: it is consulted when a notice is delivered,
@@ -695,6 +696,23 @@ have not muted it; watchers are not told about a mention addressed to
 someone else.
 You are never mailed about your own actions, and only verified primary
 addresses receive anything. Delivery retries on relay failure.
+
+Push is the same activity again, delivered to a phone: the iOS app
+registers a device, and =notifications settings push off= silences it
+the way =mail off= silences mail, without deregistering anything.
+=notifications device list= shows what is registered (token shown
+truncated); =notifications device remove <id>= drops one by hand, from
+the CLI or the account page. A device is also dropped on its own the
+moment Apple reports the token dead, so an app deleted from a phone
+stops costing anything without you having to notice. Push only works
+when the instance operator has configured it — a self-hosted instance
+with no APNs key configured never sends any.
+
+Push notifications carry the notice in full: a private repository's
+name and the issue or merge request number reach Apple and can appear
+on a lock screen, the same as any other text a phone shows in a
+notification. This is deliberate, not an oversight — weigh it against
+what you keep in a private repository before registering a device.
 
 * Web vocabulary
 

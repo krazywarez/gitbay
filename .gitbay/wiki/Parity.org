@@ -331,6 +331,10 @@ client has no use for one (krz/gitbay#57).
 | notification inbox          | yes | yes | yes |
 | activity mail on, off       | yes | yes | yes |
 | watch writable repos        | yes | yes | yes |
+| push device add             | yes | yes | no  |
+| push device list            | yes | yes | no  |
+| push device remove          | yes | yes | no  |
+| activity push on, off       | yes | yes | no  |
 | web colour scheme           | yes | yes | n/a |
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
@@ -350,6 +354,13 @@ of, nothing more. =notifications settings watch on= widens that default
 to every repository you can write to, without a row per repository. A
 mute wins over owning the repository, having written the thread, or the
 preference.
+
+Push is the third leg beside inbox and mail, delivered to Apple devices
+an account has registered. =notifications device add= runs on every
+surface like every other command, but no web page offers a form for
+it, because only the iOS app can produce an APNs device token — a
+browser has no way to ask Apple for one. =device list= and =device
+remove= have no such limit and are yes on the web like the rest.
 
 A login link is requested from the login page by username or verified
 address, and arrives by mail: it works once and expires in fifteen

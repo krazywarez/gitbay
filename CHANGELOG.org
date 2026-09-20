@@ -4,6 +4,36 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.32.0 — unreleased
+
+Push notifications to iOS devices (#89): activity reaches a registered
+phone the way it already reaches the inbox and mail.
+
+- gitbayd talks to APNs directly over HTTP/2, authenticated by an
+  ES256 JWT signed with an operator-supplied =.p8= provider key. New
+  config section =[push]=: =enabled=, =key_file=, =key_id=, =team_id=,
+  =topic= (the app's bundle identifier) and =environment=
+  (=production= | =sandbox=), all validated at load when enabled — a
+  misconfigured =[push]= refuses to start rather than filling a queue
+  nobody is watching. An APNs key belongs to a bundle id: a self-hoster
+  ships their own build under their own =topic= to use this; the App
+  Store build talks to gitbay.org.
+- Migration 0059: =push_devices= and =push_queue=, and
+  =users.notify_push= (default on).
+- =notifications device add= (token on stdin), =device list= (token
+  shown truncated), =device remove <id>=, and =notifications settings
+  push on|off=. A device is dropped automatically when Apple reports
+  the token dead (410 Unregistered or BadDeviceToken).
+- =[retention] push= caps the delivery queue, beside =mail=.
+- =issue assign= now files a notice, so assignment reaches the inbox,
+  mail and push.
+- Notification text is sent in full, private repositories included: a
+  repository's name and item number reach Apple and can appear on a
+  lock screen.
+- Web: the notification settings page carries the push toggle and the
+  device list, with removal behind confirmation. No web page offers a
+  device-add form — only the app can mint an APNs token.
+
 * v1.31.1 — 2026-09-20
 
 The stylesheet URL carries the build's hash (#239).

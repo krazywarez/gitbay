@@ -118,6 +118,38 @@ default, is right when gitbayd terminates TLS itself.
   registration and self-service =email add=; in closed mode you may omit
   it entirely and assert addresses by hand (below).
 
+** [push]
+Push notifications to Apple devices, delivered by gitbayd talking to
+APNs directly over HTTP/2, authenticated by an ES256 JWT signed with an
+operator-supplied provider key. Off unless configured.
+
+- =enabled= (false).
+- =key_file= — path to the =.p8= provider key from Apple's developer
+  portal (Certificates, Identifiers & Profiles → Keys). It belongs at
+  =/etc/gitbay/apns.p8=, mode 0600, owned by the account gitbayd runs
+  as. Read and validated at startup: it must parse as a PEM-wrapped
+  PKCS#8 EC (P-256) private key, or the daemon refuses to start rather
+  than fill a queue nobody is watching.
+- =key_id=, =team_id= — the key's id and your Apple developer team id,
+  both from the same portal page.
+- =topic= — the app's bundle identifier. *An APNs key belongs to a
+  bundle ID.* gitbay.org pushes to the App Store build under its own
+  bundle id; a self-hoster who wants push ships their own iOS build
+  under their own bundle id, with its own =.p8= key from their own
+  developer account, and points =topic= at that id. There is no way to
+  push to someone else's build, by design — this is Apple's model, not
+  gitbay's.
+- =environment= — =production= or =sandbox=, naming the APNs host
+  rather than taking a URL, so a typo cannot aim the key at a host that
+  is not Apple's.
+
+All five of =key_file=, =key_id=, =team_id=, =topic= and =environment=
+are required when =enabled= is true; validation runs at config load,
+so a misconfigured =[push]= is caught before the daemon serves
+anything. The delivery queue (a device's undelivered and attempted
+pushes) is capped the same way the mail queue is, by =[retention]
+push=.
+
 ** [api]
 - =enabled= (false) — the JSON API surface; see [[API]]. Off
   means no credential-bearing HTTP endpoint exists at all.
