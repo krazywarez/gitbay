@@ -13,6 +13,7 @@
   <ul>
     <li><a href="#webhooks">Webhook deliveries</a></li>
     <li><a href="#mail">Mail</a></li>
+    <li><a href="#push">Push</a></li>
     <li><a href="#mirrors">Mirrors</a></li>
     <li><a href="#builds">Builds</a></li>
     <li><a href="#deps">Dependency checks</a></li>
@@ -37,6 +38,17 @@
 <p class="meta">{{.Pending}} pending · {{.Retrying}} retrying · {{.Failed}} failed{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
 {{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Mail</th><th>Recipient</th><th>Subject</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
 {{range .Items}}<tr><td class="mono">{{.ID}}</td><td>{{.Recipient}}</td><td>{{.Subject}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}failed {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{.LastError}}</td></tr>
+{{end}}</tbody></table></div>{{else}}<p class="none">Nothing retrying or failed</p>{{end}}
+</section>
+{{end}}
+
+{{/* A push row names the device id, never the token, as dashboard does. */}}
+{{with .Queues.Push}}
+<section id="push">
+<h2>Push <span class="count">{{.Pending}}</span></h2>
+<p class="meta">{{.Pending}} pending · {{.Retrying}} retrying · {{.Failed}} failed{{if .OldestPending}} · oldest pending {{when .OldestPending}}{{end}}</p>
+{{if .Items}}<div class="tablewrap"><table class="keys"><thead><tr class="cols"><th>Push</th><th>Device</th><th>Title</th><th>Attempts</th><th>State</th><th>Last error</th></tr></thead><tbody>
+{{range .Items}}<tr><td class="mono">{{.ID}}</td><td class="mono">device {{.DeviceID}}</td><td>{{.Title}}</td><td>{{.Attempts}}</td><td>{{if .FailedAt}}failed {{when .FailedAt}}{{else}}retrying{{end}}</td><td>{{.LastError}}</td></tr>
 {{end}}</tbody></table></div>{{else}}<p class="none">Nothing retrying or failed</p>{{end}}
 </section>
 {{end}}
