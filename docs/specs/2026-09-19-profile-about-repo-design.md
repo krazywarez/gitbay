@@ -54,6 +54,11 @@ and meanings; only the source changes. `AboutFormat` is `org` for a
 `.org` file and `md` otherwise. The API contract and the iOS client are
 untouched.
 
+One field is added: `about_path`, the repository-relative path the text
+was read from, empty when there is no about. The web needs it to link to
+the file rather than guess its extension, and every other client gets
+the same pointer.
+
 `aboutHTML` in `internal/httpd/web.go` becomes a direct
 `renderReadme(name, raw)` call — there is a filename to dispatch on now,
 so the stored-format indirection goes away.
@@ -75,6 +80,21 @@ characters.
 Relaxing the pattern rather than whitelisting the one name `.gitbay` is
 the smaller change, and it gives owners `.dotfiles` and the like for
 free.
+
+## A first commit into an empty repository
+
+`gitutil.CommitFileChange` resolves the target branch and fails when it
+does not exist, so committing the first file into a freshly created
+`.gitbay` is impossible today. Both the web's create button and the
+backfill need it to work.
+
+An unresolvable branch becomes a root commit **only when the repository
+has no refs at all**. Anywhere else it stays the error it is now — a
+typo'd branch name in a repository with history must not silently start
+an orphan branch.
+
+This also makes `repo commit-file` work on a repository created but
+never pushed to, which is the same gap seen from the CLI.
 
 ## Writing
 
@@ -175,6 +195,9 @@ Unit:
 - `ownerAbout`: `.md` wins over `.org`; a missing repo, a missing
   branch and a missing file each give an empty about; a repo the caller
   cannot read gives an empty about.
+- `gitutil.CommitFileChange`: the first commit into an empty repository
+  succeeds and reads back; the second takes the parented path; an
+  unknown branch in a repository with history is still an error.
 
 e2e, new `e2e/profileabout_test.go`:
 
