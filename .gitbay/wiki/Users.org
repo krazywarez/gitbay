@@ -142,13 +142,27 @@ gitbay profile show alice
 gitbay profile set --description "builds small tools" --website https://alice.example
 #+end_src
 
-About text is markdown by default, or org-mode. It takes inline text or
-stdin, so it can live in a file you keep:
+The about text is not a field. It is =profile/README.md= or
+=profile/README.org= on the default branch of =<owner>/.gitbay=, a
+repository you own like any other, written by a push or by
+=repo commit-file=:
 
 #+begin_src sh
-gitbay profile set --about "I maintain a few small tools."
-gitbay profile set --file - --about-format org < about.org
+gitbay repo create alice/.gitbay
+gitbay repo commit-file alice/.gitbay profile/README.org \
+       --ref main --file - < about.org
 #+end_src
+
+The extension picks the renderer; =.md=, =.org= and =.markdown= are
+resolved in that order, so a =README.md= beside a =README.org= wins.
+=profile show= reports the text as =about=, its format as
+=about_format=, and the file it came from as =about_path=.
+
+Access follows the repository: a private =.gitbay= keeps the about text
+to you and the admins. A repository whose name starts with a dot is
+infrastructure rather than a project, so it stays out of =explore= and
+off the profile's repository list — =repo list= still shows it, and it
+is reachable at its own URL.
 
 Up to five links, each =label|url= or a bare url, http(s) only. Passing
 =--link= replaces the whole set; a single empty one clears it:
@@ -164,13 +178,16 @@ leave out is untouched, and ='' clears the one you name. Org profiles
 work the same way and need org admin:
 
 #+begin_src sh
-gitbay org profile krz --description "software and experiments" --about-format org --file - < krz.org
+gitbay org profile krz --description "software and experiments"
 gitbay org profile krz            # no flags shows it
 #+end_src
 
-The web renders profiles but has no form for editing one, so the CLI is
-the only interface today. The JSON API runs =profile set= like any
-other write command.
+An org's about text works the same way, in =<org>/.gitbay=.
+
+The settings page edits description, website and links, and points at the
+about file — with a button that creates =<owner>/.gitbay= and its first
+README when you have none, so the file editor has a branch to open. The
+JSON API runs =profile set= like any other write command.
 
 * Repositories
 

@@ -148,7 +148,7 @@ always markdown.
 
 Every web form that takes markup has a Preview button beside its own
 submit: issue and merge request create, their edit and comment boxes,
-release create and edit, the profile about text, and the file editor on
+release create and edit, and the file editor on
 a path the forge renders. It posts to the form's own action, which
 renders the draft and hands the page back without writing, so what you
 see is the rendering the thread will show, autolinks included. It is a
@@ -287,6 +287,7 @@ now render the way the reference does. go-org is not yet on the corpus.
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
 | profile about and links          | yes | yes | yes |
+| profile about as a file          | yes | yes | yes |
 | activity feed                    | yes | yes | yes |
 | command reference                | yes | no  | n/a |
 
@@ -300,8 +301,14 @@ operator — =c++=, =AND=, a lone quote — is a word to match and never a
 syntax error. =repo grep= remains the per-repository file-contents
 search.
 
-About text renders as markdown or org-mode per the =about_format= it
-was stored with. The iOS client decodes and renders both,
+The about text is =profile/README.{md,org,markdown}= on the default
+branch of =<owner>/.gitbay=, resolved in that order, so the extension
+picks the renderer rather than a stored format. =profile show= reports
+it as =about=, =about_format= and =about_path=. It reads with the
+repository's own access, so a private =.gitbay= is a profile with no
+about text to anyone but its owner and the admins. A repository whose
+name starts with a dot stays out of =explore= and off the profile's
+repository list. The iOS client decodes and renders both formats,
 through the same OrgSwift path a README takes.
 
 =help= lists the command registry. Bare it is an index, one line per
@@ -328,7 +335,7 @@ client has no use for one (krz/gitbay#57).
 | API token mint              | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
-| preview profile about       | n/a | yes | no  |
+| write the profile about     | yes | yes | yes |
 | request a login link        | n/a | yes | n/a |
 | account import bundle       | yes | no  | n/a |
 
@@ -360,11 +367,17 @@ The account export bundle is =n/a= on iOS on the archive-download
 argument above — a JSON bundle has nowhere useful to land on a phone,
 and the web route stays the way to get one.
 
-=profile set= carries description, website, about and links; the JSON
-API runs it like any other write. The account settings page has the form, and so does the iOS client:
-=--link= replaces the whole set rather than appending, so a client sends
-every link it keeps on every save, and =--link ''= is how they are
-cleared.
+=profile set= carries description, website and links; the JSON API runs
+it like any other write. The account settings page has the form, and so
+does the iOS client: =--link= replaces the whole set rather than
+appending, so a client sends every link it keeps on every save, and
+=--link ''= is how they are cleared.
+
+The about text is not among those flags. It is a file, written by a push
+or =repo commit-file= like any other file, which is why writing it is
+yes on every surface: anything that can commit a file can write it. The
+settings page points at the file and offers to create =<owner>/.gitbay=
+when there is none.
 
 * Administration
 

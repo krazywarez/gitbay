@@ -44,6 +44,31 @@ sixteen-page one never covered (#226):
   crumb, a heading that names an owner, an empty-state note. Link and
   muted text are 1.07:1 apart in dark.
 
+The profile about text is a file (#236).
+
+*Upgrade note.* Run =gitbayd admin migrate-profile-about= after
+upgrading. Migration 0058 parks each owner's about text in a holding
+table and drops the columns; that command writes it into a public
+=<owner>/.gitbay=. Until it runs, profiles that had an about show none.
+Nothing is lost in between — the table keeps the text.
+
+- The about text on a profile is =profile/README.md= or
+  =profile/README.org= on the default branch of =<owner>/.gitbay=,
+  read with that repository's own access. The extension picks the
+  renderer; =.md=, =.org= and =.markdown= resolve in that order.
+  =profile show= gains =about_path=, the file the text came from.
+- =profile set= and =org profile= lose =--about=, =--about-format= and
+  =--file=. The about is written by a push or =repo commit-file=, the
+  way a wiki page is. The settings page points at the file and offers
+  to create the repository that holds it.
+- Repository names may start with a dot; owner names may not. A
+  repository whose name starts with a dot stays out of =explore= and
+  off the profile's repository list, and remains in =repo list= and at
+  its own URL.
+- =repo commit-file= writes the first commit of a repository that has
+  never been pushed to. An unresolvable branch is still an error
+  anywhere the repository already has refs.
+
 * v1.30.0 — 2026-09-19
 
 Every command runs on every surface, markup previews before it is
