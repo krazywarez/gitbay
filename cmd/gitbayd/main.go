@@ -399,6 +399,7 @@ func adminCmd() *cobra.Command {
 		backupCmd(),
 		gcCmd(),
 		adminMigrateCommitRefsCmd(),
+		adminMigrateProfileAboutCmd(),
 		adminBackfillActivityCmd(),
 	)
 	return admin

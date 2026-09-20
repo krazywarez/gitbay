@@ -166,8 +166,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "unsupported bundle %q (want %s)", b.Bundle, bundleVersion)
 	}
 
-	if b.Profile.Description != "" || b.Profile.Website != "" ||
-		b.Profile.About != "" || len(b.Profile.Links) > 0 {
+	if b.Profile.Description != "" || b.Profile.Website != "" || len(b.Profile.Links) > 0 {
 		c.Store.SetOwnerProfile("user", c.User.ID, b.Profile)
 	}
 	for _, addr := range b.Emails {

@@ -224,13 +224,12 @@ func (s *Store) RenameOrg(orgID int64, newName string) error {
 	return tx.Commit()
 }
 
-// Profile is the presentational half of a user or org.
+// Profile is the presentational half of a user or org. The about text is
+// not here: it is a file in <owner>/.gitbay, read through the control
+// layer.
 type Profile struct {
-	Description string `json:"description,omitempty"`
-	Website     string `json:"website,omitempty"`
-	About       string `json:"about,omitempty"`
-	// AboutFormat is "md" or "org"; About has no filename to dispatch on.
-	AboutFormat string        `json:"about_format,omitempty"`
+	Description string        `json:"description,omitempty"`
+	Website     string        `json:"website,omitempty"`
 	Links       []ProfileLink `json:"links,omitempty"`
 }
 
@@ -247,8 +246,8 @@ func (s *Store) OwnerProfile(kind string, id int64) (Profile, error) {
 	var p Profile
 	var linksJSON string
 	err := s.DB.QueryRow(
-		"SELECT description, website, about, about_format, links FROM "+table+" WHERE id = ?", id).
-		Scan(&p.Description, &p.Website, &p.About, &p.AboutFormat, &linksJSON)
+		"SELECT description, website, links FROM "+table+" WHERE id = ?", id).
+		Scan(&p.Description, &p.Website, &linksJSON)
 	if err != nil {
 		return p, err
 	}
@@ -263,9 +262,6 @@ func (s *Store) OwnerProfile(kind string, id int64) (Profile, error) {
 // SetOwnerProfile updates the profile for kind "user" or "org".
 func (s *Store) SetOwnerProfile(kind string, id int64, p Profile) error {
 	table := map[string]string{"user": "users", "org": "orgs"}[kind]
-	if p.AboutFormat != "org" {
-		p.AboutFormat = "md"
-	}
 	links := ""
 	if len(p.Links) > 0 {
 		raw, err := json.Marshal(p.Links)
@@ -275,7 +271,7 @@ func (s *Store) SetOwnerProfile(kind string, id int64, p Profile) error {
 		links = string(raw)
 	}
 	_, err := s.DB.Exec(
-		"UPDATE "+table+" SET description = ?, website = ?, about = ?, about_format = ?, links = ? WHERE id = ?",
-		p.Description, p.Website, p.About, p.AboutFormat, links, id)
+		"UPDATE "+table+" SET description = ?, website = ?, links = ? WHERE id = ?",
+		p.Description, p.Website, links, id)
 	return err
 }
