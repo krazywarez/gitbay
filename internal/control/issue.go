@@ -445,6 +445,7 @@ func runIssueAssign(c *Ctx, args []string) int {
 		}
 		return u, -1
 	}
+	var added []int64
 	for _, name := range adds {
 		u, code := resolve(name)
 		if code >= 0 {
@@ -453,6 +454,7 @@ func runIssueAssign(c *Ctx, args []string) int {
 		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, true); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
+		added = append(added, u.ID)
 	}
 	for _, name := range removes {
 		u, code := resolve(name)
@@ -472,6 +474,16 @@ func runIssueAssign(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.assigned",
 		fmt.Sprintf(`{"number":%d,"assignees":%s}`, issue.Number, jsonStrings(updated.Assignees)))
+	if len(added) > 0 {
+		// direct, as a mention is: an assignment is addressed to someone,
+		// and widening it to watchers would tell them "assigned you".
+		// Removals file nothing, and notify drops the actor, so assigning
+		// yourself is silent.
+		notify(c, added, notice{repo: repo, kind: "issue", direct: true,
+			subject: fmt.Sprintf("[%s] #%d: %s", repo.Path(), issue.Number, issue.Title),
+			action:  fmt.Sprintf("assigned you to #%d", issue.Number),
+			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
+	}
 	return c.emit(map[string]any{"number": issue.Number, "assignees": updated.Assignees}, func(w io.Writer) {
 		fmt.Fprintf(w, "assignees on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(updated.Assignees, ", "))
 	})

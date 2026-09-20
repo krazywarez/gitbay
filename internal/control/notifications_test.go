@@ -37,8 +37,8 @@ func notifTestCtx(t *testing.T, username string) *Ctx {
 }
 
 // testRepoWithWatcher returns a Ctx acting as alice, a repository she
-// owns, and bob's user id with a watch row on it — the shared setup for
-// notify's recipient-widening tests.
+// owns with issue #1 open on it, and bob's user id with a watch row on
+// it — the shared setup for notify's recipient-widening tests.
 func testRepoWithWatcher(t *testing.T) (*Ctx, store.Repo, int64) {
 	t.Helper()
 	c := notifTestCtx(t, "alice")
@@ -48,6 +48,9 @@ func testRepoWithWatcher(t *testing.T) (*Ctx, store.Repo, int64) {
 	}
 	repo, err := c.Store.RepoByID(repoID)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Store.CreateIssue(repo.ID, c.User.ID, "title", "", "markdown"); err != nil {
 		t.Fatal(err)
 	}
 	bob, err := c.Store.CreateUser("bob", false)
