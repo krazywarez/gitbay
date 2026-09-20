@@ -207,7 +207,9 @@ The payload:
     "sound": "default",
     "thread-id": "krz/gitbay"
   },
-  "path": "krz/gitbay/issues/12"
+  "path": "krz/gitbay/issues/12",
+  "instance": "https://gitbay.org",
+  "user": "cmc"
 }
 ```
 
@@ -216,6 +218,13 @@ string the inbox row carries, so the two surfaces cannot disagree.
 `thread-id` groups a repository's notices in Notification Center.
 `path` is the inbox row's `path` field, which the app already knows how
 to turn into a link.
+
+`instance` is this instance's `site_url` and `user` the recipient's
+username. A device token is one install, and an install registers
+against every account signed in on it, so `path` alone cannot say which
+account a notice belongs to — two instances can hold the same
+`owner/name`. The pair is the account's identity, and the client
+resolves it before routing.
 
 `apns-push-type: alert`, `apns-topic` from config, and
 `apns-collapse-id` unset — collapsing is wrong here, two comments are

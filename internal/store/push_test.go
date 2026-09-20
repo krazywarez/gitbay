@@ -247,3 +247,31 @@ func TestDeletePushDeviceByTokenTakesItsQueue(t *testing.T) {
 		t.Fatalf("queued rows outlived their device")
 	}
 }
+
+// A queued push carries the recipient's username, so the alert can name
+// the account it belongs to. A device token is one install, and one
+// install registers against every account signed in on it; without the
+// username the client cannot tell which of them a push is for.
+func TestDuePushCarriesTheUsername(t *testing.T) {
+	s := pushFixture(t)
+	uid, err := s.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddPushDevice(uid, "tok-a", "iphone"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnqueuePush(uid, "alice/app", "bob opened issue #1", "alice/app/issues/1"); err != nil {
+		t.Fatal(err)
+	}
+	due, err := s.DuePush(20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(due) != 1 {
+		t.Fatalf("want one queued push, got %d", len(due))
+	}
+	if due[0].Username != "alice" {
+		t.Fatalf("Username = %q, want alice", due[0].Username)
+	}
+}

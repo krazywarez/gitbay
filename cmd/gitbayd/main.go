@@ -178,7 +178,7 @@ func serveCmd() *cobra.Command {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
 			}
 			if cfg.Push.Enabled {
-				p, err := push.New(st, cfg.Push, retryBase)
+				p, err := push.New(st, cfg.Push, cfg.Server.SiteURL, retryBase)
 				if err != nil {
 					// Config validation already parsed the key, so this
 					// is not a misconfiguration; fail loudly rather than

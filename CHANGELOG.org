@@ -4,6 +4,17 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.32.1 — 2026-09-20
+
+A push alert names the account it is for (#89).
+
+- The payload carried =path= and nothing else, so a device signed in to
+  more than one account could not tell which instance a notice came
+  from: two instances can hold the same =owner/name=. It now carries
+  =instance=, the instance's =site_url=, and =user=, the recipient's
+  username — together the account's identity.
+- =DuePush= joins =users= for the recipient; no schema change.
+
 * v1.32.0 — 2026-09-20
 
 Push notifications to iOS devices (#89): activity reaches a registered

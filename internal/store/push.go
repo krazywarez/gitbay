@@ -120,6 +120,10 @@ type QueuedPush struct {
 	ID       int64
 	DeviceID int64
 	Token    string
+	// Username is the recipient. One device token is one install, and an
+	// install registers against every account signed in on it, so the
+	// alert has to name which of them it is for.
+	Username string
 	Title    string
 	Body     string
 	Path     string
@@ -145,8 +149,10 @@ func (s *Store) EnqueuePush(userID int64, title, body, path string) error {
 
 func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	rows, err := s.DB.Query(`
-		SELECT q.id, q.device_id, d.token, q.title, q.body, q.path, q.attempts
-		FROM push_queue q JOIN push_devices d ON d.id = q.device_id
+		SELECT q.id, q.device_id, d.token, u.username, q.title, q.body, q.path, q.attempts
+		FROM push_queue q
+		JOIN push_devices d ON d.id = q.device_id
+		JOIN users u ON u.id = d.user_id
 		WHERE q.sent_at IS NULL AND q.failed_at IS NULL
 		  AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= ?)
 		ORDER BY q.id LIMIT ?`, fmtTime(time.Now()), limit)
@@ -157,7 +163,7 @@ func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	var out []QueuedPush
 	for rows.Next() {
 		var p QueuedPush
-		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Title, &p.Body, &p.Path, &p.Attempts); err != nil {
+		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

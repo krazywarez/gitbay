@@ -20,8 +20,8 @@ type Deliverer struct {
 	MaxAttempts int
 }
 
-func New(st *store.Store, cfg config.Push, retryBase time.Duration) (*Deliverer, error) {
-	cl, err := NewClient(cfg)
+func New(st *store.Store, cfg config.Push, siteURL string, retryBase time.Duration) (*Deliverer, error) {
+	cl, err := NewClient(cfg, siteURL)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (d *Deliverer) drain(ctx context.Context) {
 		return
 	}
 	for _, q := range due {
-		res, after, sendErr := d.Cl.Send(ctx, q.Token, q.Title, q.Body, q.Path)
+		res, after, sendErr := d.Cl.Send(ctx, q.Token, q.Username, q.Title, q.Body, q.Path)
 		msg := ""
 		if sendErr != nil {
 			msg = sendErr.Error()

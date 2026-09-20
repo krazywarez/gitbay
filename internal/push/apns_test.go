@@ -24,7 +24,7 @@ func fakeAPNs(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server) {
 	c, err := NewClient(config.Push{
 		Enabled: true, KeyID: "K", TeamID: "T",
 		Topic: "org.gitbay.gitbay", Environment: "production",
-	})
+	}, "https://gitbay.example")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestSendShapesTheRequest(t *testing.T) {
 		json.Unmarshal(raw, &payload)
 		w.WriteHeader(200)
 	})
-	res, _, err := c.Send(context.Background(), "DEVTOKEN", "krz/gitbay", "cmc opened issue #12", "krz/gitbay/issues/12")
+	res, _, err := c.Send(context.Background(), "DEVTOKEN", "cmc", "krz/gitbay", "cmc opened issue #12", "krz/gitbay/issues/12")
 	if err != nil || res != resultSent {
 		t.Fatalf("res = %v, err = %v", res, err)
 	}
@@ -103,7 +103,7 @@ func TestSendMapsResponses(t *testing.T) {
 				w.WriteHeader(tc.status)
 				io.WriteString(w, tc.body)
 			})
-			res, after, err := c.Send(context.Background(), "T", "t", "b", "p")
+			res, after, err := c.Send(context.Background(), "T", "u", "t", "b", "p")
 			// Only a delivered push has no error. Every other result
 			// carries the status and reason, which is what the drainer
 			// records on the queue row.
@@ -134,7 +134,7 @@ func TestSendTruncatesBodyOnRuneBoundary(t *testing.T) {
 	// even offset, so a raw cut at maxBodyBytes is guaranteed to land on
 	// the second byte of one of them rather than a rune boundary.
 	long := "x" + strings.Repeat("é", 2000)
-	res, _, err := c.Send(context.Background(), "T", "t", long, "p")
+	res, _, err := c.Send(context.Background(), "T", "u", "t", long, "p")
 	if err != nil || res != resultSent {
 		t.Fatalf("res = %v, err = %v", res, err)
 	}
@@ -170,5 +170,34 @@ func TestAPNSSchemeDowngradesOnlyOnLoopback(t *testing.T) {
 		if got := apnsScheme(); got != tc.want {
 			t.Errorf("apnsScheme() with host %q = %q, want %q", tc.host, got, tc.want)
 		}
+	}
+}
+
+// The alert names the account it belongs to. One device token is one
+// install, and an install registers against every account signed in on
+// it, so `path` alone cannot say which instance a notice came from — two
+// instances can hold the same owner/name.
+func TestSendNamesTheAccount(t *testing.T) {
+	var payload map[string]any
+	c, _ := fakeAPNs(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		json.Unmarshal(raw, &payload)
+		w.WriteHeader(200)
+	})
+	c.siteURL = "https://gitbay.org"
+
+	if _, _, err := c.Send(context.Background(), "DEVTOKEN", "cmc",
+		"krz/gitbay", "cmc opened issue #12", "krz/gitbay/issues/12"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if payload["instance"] != "https://gitbay.org" {
+		t.Fatalf("instance = %v", payload["instance"])
+	}
+	if payload["user"] != "cmc" {
+		t.Fatalf("user = %v", payload["user"])
+	}
+	// Still carries what it always did.
+	if payload["path"] != "krz/gitbay/issues/12" {
+		t.Fatalf("path = %v", payload["path"])
 	}
 }

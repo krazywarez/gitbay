@@ -40,16 +40,21 @@ type Client struct {
 	host   string
 	scheme string
 	topic  string
+	// siteURL is this instance, as the alert reports it. With the
+	// recipient's username it identifies the account a notice belongs
+	// to, which a device signed in to several cannot otherwise tell.
+	siteURL string
 }
 
-func NewClient(cfg config.Push) (*Client, error) {
+func NewClient(cfg config.Push, siteURL string) (*Client, error) {
 	c := &Client{
 		// stdlib negotiates HTTP/2 over ALPN, which is what APNs
 		// requires; no explicit http2 transport is needed.
-		http:   &http.Client{Timeout: 30 * time.Second},
-		host:   cfg.Host(),
-		scheme: apnsScheme(),
-		topic:  cfg.Topic,
+		http:    &http.Client{Timeout: 30 * time.Second},
+		host:    cfg.Host(),
+		scheme:  apnsScheme(),
+		topic:   cfg.Topic,
+		siteURL: siteURL,
 	}
 	if cfg.KeyFile != "" {
 		key, err := config.LoadAPNSKey(cfg.KeyFile)
@@ -106,7 +111,7 @@ func loopbackHost(hostport string) bool {
 
 // Send delivers one alert. The returned duration is the server's
 // Retry-After when it gave one, zero otherwise.
-func (c *Client) Send(ctx context.Context, token, title, body, path string) (result, time.Duration, error) {
+func (c *Client) Send(ctx context.Context, token, user, title, body, path string) (result, time.Duration, error) {
 	if len(body) > maxBodyBytes {
 		// A raw byte cut can land mid-rune on multi-byte UTF-8 (emoji,
 		// accents, non-Latin usernames). ToValidUTF8 drops the
@@ -121,6 +126,12 @@ func (c *Client) Send(ctx context.Context, token, title, body, path string) (res
 			"thread-id": title,
 		},
 		"path": path,
+		// Which account this is for. A device token is one install, and
+		// an install registers against every account signed in on it, so
+		// path alone is ambiguous — two instances can hold the same
+		// owner/name. Together these are the account's identity.
+		"instance": c.siteURL,
+		"user":     user,
 	})
 	if err != nil {
 		return resultDead, 0, err

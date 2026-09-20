@@ -125,6 +125,14 @@ environment = "production"
 	if got[0]["path"] != "alice/app/issues/1" {
 		t.Fatalf("path = %v", got[0]["path"])
 	}
+	// The account the notice is for. A device signed in to several
+	// accounts cannot tell from the path alone which one this is.
+	if got[0]["user"] != "bob" {
+		t.Fatalf("user = %v", got[0]["user"])
+	}
+	if inst, _ := got[0]["instance"].(string); !strings.HasPrefix(inst, "https://") {
+		t.Fatalf("instance = %v, want this instance's site_url", inst)
+	}
 
 	// Apple retires the token. The next push reaps the device.
 	mu.Lock()
