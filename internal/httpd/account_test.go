@@ -94,9 +94,10 @@ func TestAccountSubmitNotifyPush(t *testing.T) {
 	}
 }
 
-// Removing a device requires the typed confirmation, the same guard
-// key-remove and pgp-remove carry, and then dispatches to notifications
-// device remove, scoped to the caller's own account.
+// Removing a device requires the device id typed back, and then
+// dispatches to notifications device remove, scoped to the caller's own
+// account. The id is what the form dispatches on, so the guard is
+// derived server-side the way key-remove derives its own.
 func TestAccountSubmitDeviceRemove(t *testing.T) {
 	st, err := store.Open(":memory:")
 	if err != nil {
@@ -118,16 +119,15 @@ func TestAccountSubmitDeviceRemove(t *testing.T) {
 	}
 	s := New(config.Default(), st)
 
-	want := prefix8(token)
 	idStr := strconv.FormatInt(id, 10)
 
 	// Without the typed confirmation, the device survives.
-	submitAccountForm(t, s, u, url.Values{"field": {"device-remove"}, "id": {idStr}, "tokenprefix": {want}})
+	submitAccountForm(t, s, u, url.Values{"field": {"device-remove"}, "id": {idStr}})
 	if devices, _ := st.PushDevices(uid); len(devices) != 1 {
 		t.Fatalf("device removed without confirmation: %v", devices)
 	}
 
-	rr := submitAccountForm(t, s, u, url.Values{"field": {"device-remove"}, "id": {idStr}, "tokenprefix": {want}, "confirm": {want}})
+	rr := submitAccountForm(t, s, u, url.Values{"field": {"device-remove"}, "id": {idStr}, "confirm": {idStr}})
 	if rr.Code != http.StatusSeeOther {
 		t.Fatalf("status %d, body %s", rr.Code, rr.Body.String())
 	}
@@ -136,10 +136,10 @@ func TestAccountSubmitDeviceRemove(t *testing.T) {
 	}
 }
 
-// A token at or under the truncation length is masked rather than shown
-// whole, as notifications device list masks it. prefix8 returns anything
-// shorter than nine characters unchanged, and device add enforces no
-// minimum length, so the short token is a value that reaches the page.
+// A short token reaches no part of the page — not the visible column,
+// and not a hidden input, aria-label or placeholder either. Device add
+// enforces no minimum length, so a token this short is a value the store
+// can hold, and it is device-identifying whatever its length.
 func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
 	st, err := store.Open(":memory:")
 	if err != nil {
@@ -153,7 +153,8 @@ func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.AddPushDevice(uid, "abc123", "iphone"); err != nil {
+	id, err := st.AddPushDevice(uid, "abc123", "iphone")
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -161,7 +162,16 @@ func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), store.User{ID: uid, Username: "alice"})
 
-	if strings.Contains(rr.Body.String(), `class="mono">abc123<`) {
-		t.Fatalf("the page printed the short token verbatim:\n%s", rr.Body.String())
+	body := rr.Body.String()
+	if strings.Contains(body, "abc123") {
+		t.Fatalf("the short token reached the page:\n%s", body)
+	}
+	// What the removal asks for has to be on screen to be typed back.
+	idStr := strconv.FormatInt(id, 10)
+	if !strings.Contains(body, `aria-label="Type `+idStr+` to confirm"`) {
+		t.Fatalf("removal does not confirm on the device id:\n%s", body)
+	}
+	if !strings.Contains(body, `<th scope="col">id</th>`) {
+		t.Fatalf("the device table has no id column:\n%s", body)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/control"
@@ -32,16 +33,16 @@ type accountPGP struct {
 }
 
 // accountDevice is one registered APNs device as the settings page shows
-// it. The full token is device-identifying and never reaches the page.
+// it. No form of the token reaches the page but the masked column:
+// removal confirms on the id, which is not device-identifying.
 type accountDevice struct {
 	ID    int64
 	Label string
 	// Token is rendered by control.ShortToken, the same renderer
-	// notifications device list uses: prefix8 returns anything under nine
-	// characters unchanged, and device add enforces no minimum length.
+	// notifications device list uses.
 	Token      string
 	LastSeenAt string
-	Confirm    string // the token's first 8 characters, typed back to confirm removal
+	Confirm    string // the id as text, typed back to confirm removal
 }
 
 // accountForm renders the account's own settings: keys, addresses, and the
@@ -84,7 +85,8 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 	if list, err := s.st.PushDevices(u.ID); err == nil {
 		for _, d := range list {
 			devices = append(devices, accountDevice{ID: d.ID, Label: d.Label,
-				Token: control.ShortToken(d.Token), LastSeenAt: d.LastSeenAt, Confirm: prefix8(d.Token)})
+				Token: control.ShortToken(d.Token), LastSeenAt: d.LastSeenAt,
+				Confirm: strconv.FormatInt(d.ID, 10)})
 		}
 	}
 
@@ -279,12 +281,12 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		back("", "notification preferences saved")
 	case "device-remove":
-		want := r.FormValue("tokenprefix")
-		if ok, msg := confirmed(r, want); !ok {
+		id := r.FormValue("id")
+		if ok, msg := confirmed(r, id); !ok {
 			back(msg, "")
 			return
 		}
-		if _, msg, ok := s.runControl(u, []string{"notifications", "device", "remove", r.FormValue("id")}); !ok {
+		if _, msg, ok := s.runControl(u, []string{"notifications", "device", "remove", id}); !ok {
 			back(msg, "")
 			return
 		}

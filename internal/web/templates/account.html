@@ -153,12 +153,13 @@ account and where notifications go.</p>
 <p class="meta">Notification text is sent in full, including for private repositories, so a repository name and item number reach Apple and appear on a lock screen.</p>
 <h3>Devices</h3>
 {{if .Devices}}<div class="tablewrap"><table class="keys nowrap">
-<tr class="cols"><th scope="col">label</th><th scope="col">token</th><th scope="col">last seen</th><th scope="col"><span class="vh">actions</span></th></tr>
+<tr class="cols"><th scope="col">id</th><th scope="col">label</th><th scope="col">token</th><th scope="col">last seen</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .Devices}}<tr>
+  <td class="mono">{{.ID}}</td>
   <td>{{.Label}}</td>
   <td class="mono">{{.Token}}</td>
   <td>{{if .LastSeenAt}}{{when .LastSeenAt}}{{else}}never{{end}}</td>
-  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="device-remove"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="tokenprefix" value="{{.Confirm}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="device-remove"><input type="hidden" name="id" value="{{.ID}}">{{template "confirmfield" .Confirm}} <button type="submit" class="danger">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">No registered devices.</p>{{end}}
