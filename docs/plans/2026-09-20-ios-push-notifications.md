@@ -105,8 +105,7 @@ func TestPushDevices(t *testing.T) {
 	s := testStore(t)
 	uid := testUser(t, s, "alice")
 
-	id, err := s.AddPushDevice(uid, "tok-a", "iphone")
-	if err != nil {
+	if _, err := s.AddPushDevice(uid, "tok-a", "iphone"); err != nil {
 		t.Fatalf("AddPushDevice: %v", err)
 	}
 	devices, err := s.PushDevices(uid)
@@ -141,7 +140,6 @@ func TestPushDevices(t *testing.T) {
 	if d, _ := s.PushDevices(bob); len(d) != 0 {
 		t.Fatalf("device survived removal: %+v", d)
 	}
-	_ = id
 }
 
 func TestPushEnabledDefaultsOn(t *testing.T) {
@@ -806,7 +804,7 @@ Ref #89"
 - Test: `internal/push/token_test.go`
 
 **Interfaces:**
-- Consumes: `config.Push`, `config.LoadAPNSKey` from Task 3.
+- Consumes: nothing. `token.go` takes a parsed key and two strings; it imports no `config` symbol.
 - Produces:
   - `type tokenSource struct { key *ecdsa.PrivateKey; keyID, teamID string; now func() time.Time; mu sync.Mutex; cached string; issued time.Time }`
   - `func newTokenSource(key *ecdsa.PrivateKey, keyID, teamID string) *tokenSource`
@@ -1146,8 +1144,14 @@ func TestSendMapsResponses(t *testing.T) {
 				io.WriteString(w, tc.body)
 			})
 			res, after, err := c.Send(context.Background(), "T", "t", "b", "p")
-			if err != nil && tc.want != resultDead && tc.want != resultReap {
+			// Only a delivered push has no error. Every other result
+			// carries the status and reason, which is what the drainer
+			// records on the queue row.
+			if tc.want == resultSent && err != nil {
 				t.Fatalf("err = %v", err)
+			}
+			if tc.want != resultSent && err == nil {
+				t.Fatalf("want an error explaining %v, got nil", tc.want)
 			}
 			if res != tc.want {
 				t.Fatalf("res = %v, want %v", res, tc.want)
