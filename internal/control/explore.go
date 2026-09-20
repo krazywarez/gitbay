@@ -3,6 +3,7 @@ package control
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
@@ -53,6 +54,11 @@ func runExplore(c *Ctx, args []string) int {
 	}
 	var ds []out
 	for _, repo := range repos {
+		// A dot-repo is infrastructure, not a project: .gitbay holds an
+		// owner's profile content and has nothing to explore.
+		if strings.HasPrefix(repo.Name, ".") {
+			continue
+		}
 		if p.key != "" && repo.Path() <= p.key {
 			continue
 		}

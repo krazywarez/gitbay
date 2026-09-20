@@ -320,6 +320,11 @@ func runProfileShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, repo := range all {
+		// A dot-repo is infrastructure, not a project: .gitbay holds this
+		// profile's about text and does not belong in its listing.
+		if strings.HasPrefix(repo.Name, ".") {
+			continue
+		}
 		grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)

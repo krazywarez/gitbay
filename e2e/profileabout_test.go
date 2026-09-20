@@ -101,6 +101,43 @@ func TestProfileAboutFormatAndPrivacy(t *testing.T) {
 	}
 }
 
+// A dot-repo is infrastructure: it stays out of explore and off the
+// profile's repository list, and stays in the owner's own inventory.
+func TestDotReposHiddenFromListings(t *testing.T) {
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
+	inst.ssh(t, aliceKey, "", "repo", "create", "alice/.gitbay")
+	inst.ssh(t, aliceKey, "", "repo", "create", "alice/app")
+
+	out, _, _ := inst.ssh(t, aliceKey, "", "explore", "--json")
+	if strings.Contains(out, ".gitbay") {
+		t.Errorf("dot-repo listed in explore: %s", out)
+	}
+	if !strings.Contains(out, "alice/app") {
+		t.Errorf("ordinary repo missing from explore: %s", out)
+	}
+
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if strings.Contains(out, `"path":"alice/.gitbay"`) {
+		t.Errorf("dot-repo listed on the profile: %s", out)
+	}
+	if !strings.Contains(out, `"path":"alice/app"`) {
+		t.Errorf("ordinary repo missing from the profile: %s", out)
+	}
+
+	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "list", "--json")
+	if !strings.Contains(out, "alice/.gitbay") {
+		t.Errorf("dot-repo missing from the owner's own inventory: %s", out)
+	}
+
+	// It is still reachable at its URL.
+	if _, page := inst.get(t, "/alice/.gitbay"); strings.Contains(page, "not found") {
+		t.Error("dot-repo page not reachable")
+	}
+}
+
 // The about is not settable through profile set any more: it is a file.
 func TestProfileSetHasNoAbout(t *testing.T) {
 	inst := startInstance(t)
