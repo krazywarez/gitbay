@@ -11,7 +11,9 @@ func TestOwnerProfiles(t *testing.T) {
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
-	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	// A verified address, because the about text is a commit now.
+	inst.admin(t, "admin", "user", "create", "alice",
+		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
 	inst.admin(t, "admin", "user", "create", "bob", "--key", bobKey+".pub")
 
 	// Self-service user profile; website validated.
@@ -136,30 +138,22 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Fatalf("org profile show: %s", out)
 	}
 
-	// About: long-form markdown, set inline or piped, rendered on the page.
-	if _, errOut, code := inst.ssh(t, aliceKey, "# Hello\n\nI maintain *small tools*.\n",
-		"profile", "set", "--file", "-"); code != 0 {
-		t.Fatalf("about from stdin: %s", errOut)
+	// About: a file in <owner>/.gitbay, rendered on the page. The
+	// extension picks the renderer; there is no stored format.
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/.gitbay"); code != 0 {
+		t.Fatalf("creating alice/.gitbay: %s", errOut)
 	}
-	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
-	if !strings.Contains(out, "I maintain *small tools*.") {
-		t.Fatalf("about not stored: %s", out)
-	}
-	if !strings.Contains(out, "tinkerer") {
-		t.Fatalf("about clobbered the description: %s", out)
-	}
-
-	// Org-mode about: the stored format picks the renderer.
 	if _, errOut, code := inst.ssh(t, aliceKey, "* Tools\n\nI maintain /small tools/.\n",
-		"profile", "set", "--file", "-", "--about-format", "org"); code != 0 {
+		"repo", "commit-file", "alice/.gitbay", "profile/README.org",
+		"--ref", "main", "--file", "-"); code != 0 {
 		t.Fatalf("org about: %s", errOut)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
 	if !strings.Contains(out, `"about_format":"org"`) {
-		t.Fatalf("about format not stored: %s", out)
+		t.Fatalf("about format not read from the extension: %s", out)
 	}
-	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--about-format", "rst"); code != 2 {
-		t.Fatal("unknown about format accepted")
+	if !strings.Contains(out, "tinkerer") {
+		t.Fatalf("about clobbered the description: %s", out)
 	}
 	// Org emphasis parsed, not left as literal slashes the way the
 	// markdown renderer would.
@@ -168,10 +162,15 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Fatalf("org about not rendered as org: %s", body)
 	}
 
-	// Back to markdown for the rest of the checks.
-	if _, _, code := inst.ssh(t, aliceKey, "# Hello\n\nI maintain *small tools*.\n",
-		"profile", "set", "--file", "-", "--about-format", "md"); code != 0 {
-		t.Fatal("markdown about")
+	// Markdown for the rest of the checks: .md wins the resolution order.
+	if _, errOut, code := inst.ssh(t, aliceKey, "# Hello\n\nI maintain *small tools*.\n",
+		"repo", "commit-file", "alice/.gitbay", "profile/README.md",
+		"--ref", "main", "--file", "-"); code != 0 {
+		t.Fatalf("markdown about: %s", errOut)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
+	if !strings.Contains(out, "I maintain *small tools*.") {
+		t.Fatalf("about not read from the repository: %s", out)
 	}
 
 	// Links: free-form, labelled or bare, capped, cleared by an empty one.
@@ -218,16 +217,14 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Error("repositories render above the activity graph")
 	}
 
-	// Clearing works the same way as the other fields.
+	// Clearing works the same way as the other fields. The about is not
+	// among them: it is a file, and it goes the way a file goes.
 	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--link", "''"); code != 0 {
 		t.Fatal("clear links failed")
 	}
-	if _, _, code := inst.ssh(t, aliceKey, "", "profile", "set", "--about", "''"); code != 0 {
-		t.Fatal("clear about failed")
-	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "profile", "show", "alice", "--json")
-	if strings.Contains(out, "fosstodon") || strings.Contains(out, "small tools") {
-		t.Fatalf("about or links not cleared: %s", out)
+	if strings.Contains(out, "fosstodon") {
+		t.Fatalf("links not cleared: %s", out)
 	}
 	status, body = inst.get(t, "/workshop")
 	if status != 200 || !strings.Contains(body, "where things get made") ||

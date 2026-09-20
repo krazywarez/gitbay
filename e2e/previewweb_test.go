@@ -137,14 +137,10 @@ func TestMarkupPreviewWeb(t *testing.T) {
 	})
 	previewed("release edit", b, "<h2", "## release notes")
 
-	// The profile's about text.
-	b = post(inst.base()+"/settings", url.Values{
-		"field": {"profile"}, "about": {"# about me"}, "format": {"md"},
-		"description": {"kept"}, "preview": {"1"},
-	})
-	previewed("profile about", b, "<h1", `value="kept"`)
-	if out, _, _ := inst.ssh(t, aliceKey, "", "profile", "show", "--json"); strings.Contains(out, "about me") {
-		t.Fatalf("preview saved the profile: %s", out)
+	// The profile form takes no markup: the about text is a file, and the
+	// file editor below is what previews it.
+	if _, body := browserGet(t, alice, inst.base()+"/settings"); strings.Contains(body, `name="preview"`) {
+		t.Fatalf("the profile form offers a preview:\n%s", body)
 	}
 
 	// The file editor previews a rendered path and offers nothing on one
