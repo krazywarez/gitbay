@@ -28,8 +28,11 @@ func TestOrgManagementWeb(t *testing.T) {
 
 	// The management sections are admin-only: bob is not even a member.
 	bob := loginBrowser(t, inst, bobKey)
-	if _, body := browserGet(t, bob, inst.base()+"/acme"); strings.Contains(body, `value="member-add"`) {
-		t.Fatal("a non-member sees organization controls")
+	// The people tab is the admin panel, so an outsider gets the 404 a
+	// page nobody has rather than a page with the controls hidden.
+	if status, body := browserGet(t, bob, inst.base()+"/acme/-/people"); status != 404 ||
+		strings.Contains(body, `value="member-add"`) {
+		t.Fatalf("a non-member reaches the organization controls: %d", status)
 	}
 	// And POSTing anyway is refused by the command, not by the template.
 	browserPost(t, bob, inst.base()+"/acme", url.Values{
@@ -39,7 +42,7 @@ func TestOrgManagementWeb(t *testing.T) {
 		t.Fatalf("non-admin added themselves: %v", members)
 	}
 
-	status, body := browserGet(t, alice, inst.base()+"/acme")
+	status, body := browserGet(t, alice, inst.base()+"/acme/-/people")
 	if status != 200 || !strings.Contains(body, `value="member-add"`) {
 		t.Fatalf("admin sees no controls: %d", status)
 	}
@@ -73,8 +76,8 @@ func TestOrgManagementWeb(t *testing.T) {
 		t.Fatalf("team grant did not confer access: %s", errOut)
 	}
 
-	// The page shows what was built.
-	_, body = browserGet(t, alice, inst.base()+"/acme")
+	// The people tab shows what was built.
+	_, body = browserGet(t, alice, inst.base()+"/acme/-/people")
 	for _, want := range []string{"builders", "acme/widget", "1 member"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("org page missing %q", want)
@@ -180,7 +183,7 @@ func TestOrgLifecycleWeb(t *testing.T) {
 	}
 
 	// Rename is offered to its admin, and the org moves.
-	_, body := browserGet(t, alice, inst.base()+"/acmeco")
+	_, body := browserGet(t, alice, inst.base()+"/acmeco/-/people")
 	if !strings.Contains(body, `value="org-rename"`) {
 		t.Fatalf("no rename form for the org admin:\n%s", body)
 	}

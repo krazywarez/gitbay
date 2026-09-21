@@ -39,7 +39,7 @@ func TestProfileAboutFromRepo(t *testing.T) {
 		t.Errorf("about_path missing: %s", out)
 	}
 
-	_, body := inst.get(t, "/alice")
+	_, body := inst.get(t, "/alice/-/about")
 	if !strings.Contains(body, "hello from a file") {
 		t.Error("web profile does not render the about")
 	}
@@ -53,7 +53,7 @@ func TestProfileAboutFromRepo(t *testing.T) {
 		"--ref", "main", "--file", "-"); code != 0 {
 		t.Fatalf("committing bob's org about: %s", errOut)
 	}
-	if _, page := inst.get(t, "/bob"); !strings.Contains(page, "<em>note</em>") {
+	if _, page := inst.get(t, "/bob/-/about"); !strings.Contains(page, "<em>note</em>") {
 		t.Errorf("about did not render as org:\n%s", page)
 	}
 }

@@ -49,7 +49,7 @@ func TestActivityGraph(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/app", "--title", "'x'"); code != 0 {
 		t.Fatal("issue create failed")
 	}
-	status, body := inst.get(t, "/alice")
+	status, body := inst.get(t, "/alice/-/activity")
 	if status != 200 || !strings.Contains(body, `class="actgraph"`) {
 		t.Fatalf("graph missing: %d", status)
 	}
@@ -61,14 +61,14 @@ func TestActivityGraph(t *testing.T) {
 		t.Fatalf("alice total = %d, want >= 2", total)
 	}
 	// bob authored a commit but his email is unverified: zero activity.
-	_, bobBody := inst.get(t, "/bob")
+	_, bobBody := inst.get(t, "/bob/-/activity")
 	if bt := activityTotal(t, bobBody); bt != 0 {
 		t.Fatalf("unverified author got credit: total %d", bt)
 	}
 
 	// Re-pushing the same history (force) does not double-count.
 	mustGit(t, dir, env, "push", "-q", "--force", "origin", "main")
-	_, body2 := inst.get(t, "/alice")
+	_, body2 := inst.get(t, "/alice/-/activity")
 	if body2 != body {
 		// Counts must be identical; compare just the graph cells.
 		if excerpt(body, "actgraph") != excerpt(body2, "actgraph") {
@@ -83,7 +83,7 @@ func TestActivityGraph(t *testing.T) {
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "transfer", "alice/app", "theorg"); code != 0 {
 		t.Fatal("transfer failed")
 	}
-	_, orgBody := inst.get(t, "/theorg")
+	_, orgBody := inst.get(t, "/theorg/-/activity")
 	if !strings.Contains(orgBody, `class="actgraph"`) || strings.Contains(orgBody, "0 in the last year") {
 		t.Fatalf("org graph empty:\n%s", excerpt(orgBody, "activity"))
 	}
