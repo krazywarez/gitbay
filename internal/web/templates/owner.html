@@ -9,29 +9,20 @@
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 {{if and (eq .Kind "org") .Repos}}<p class="meta"><a href="/{{.Owner}}/-/labels">labels</a> · <a href="/{{.Owner}}/-/milestones">milestones</a></p>{{end}}
 </section>
-{{/* The repository list is the bare /{owner}, because a profile's job is
-     to lead to the projects: the About text and the year of squares used
-     to sit above the list and push it below the fold (#242). */}}
+{{/* The profile is sections rather than one stack: a long About used to
+     push the repositories off the bottom of the page (#242). About is
+     the bare /{owner}; the rest hang off /-/. A tab nobody may open is
+     not offered and its URL is a 404. */}}
 <nav class="tabs" aria-label="Profile">
-  <a {{if eq .Tab "repos"}}aria-current="page" {{end}}href="/{{.Owner}}">Repositories{{if .Repos}} <i>{{len .Repos}}</i>{{end}}</a>
-  {{if .AboutHTML}}<a {{if eq .Tab "about"}}aria-current="page" {{end}}href="/{{.Owner}}/-/about">About</a>{{end}}
-  <a {{if eq .Tab "activity"}}aria-current="page" {{end}}href="/{{.Owner}}/-/activity">Activity{{if .ActivityTotal}} <i>{{.ActivityTotal}}</i>{{end}}</a>
-  {{if or .Snippets .Self}}<a href="/{{.Owner}}/-/snippets">Snippets{{if .Snippets}} <i>{{.Snippets}}</i>{{end}}</a>{{end}}
+  <a {{if eq .Tab "about"}}aria-current="page" {{end}}href="/{{.Owner}}">About</a>
+  <a {{if eq .Tab "repos"}}aria-current="page" {{end}}href="/{{.Owner}}/-/repositories">Repositories{{if .Repos}} <i>{{len .Repos}}</i>{{end}}</a>
+  {{if .Self}}<a {{if eq .Tab "bookmarks"}}aria-current="page" {{end}}href="/{{.Owner}}/-/bookmarks">Bookmarks</a>{{end}}
+  {{if and (eq .Kind "user") (or .Snippets .Self)}}<a {{if eq .Tab "snippets"}}aria-current="page" {{end}}href="/{{.Owner}}/-/snippets">Snippets{{if .Snippets}} <i>{{.Snippets}}</i>{{end}}</a>{{end}}
   {{if .CanAdmin}}<a {{if eq .Tab "people"}}aria-current="page" {{end}}href="/{{.Owner}}/-/people">People{{if .Members}} <i>{{len .Members}}</i>{{end}}</a>{{end}}
 </nav>
 
-{{if eq .Tab "repos"}}
-<ul class="repolist">
-{{range .Repos}}{{template "reporow" .}}
-{{else}}<li class="empty">no visible repositories</li>{{end}}
-</ul>
-{{end}}
-
 {{if eq .Tab "about"}}
-<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>
-{{end}}
-
-{{if eq .Tab "activity"}}
+{{if .AboutHTML}}<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>{{end}}
 <section class="activity">
 <h2>activity <span class="count">{{.ActivityTotal}} in the last year</span></h2>
 <div class="actgraph-scroll">
@@ -40,7 +31,54 @@
 </div>
 </div>
 <p class="actlegend"><span>Less</span><span class="actday l0"></span><span class="actday l1"></span><span class="actday l2"></span><span class="actday l3"></span><span class="actday l4"></span><span>More</span></p>
+{{/* The graph is the year at a glance; the log is what happened lately.
+     It is the newest events, not all of them — the atom feed is the one
+     that goes back. */}}
+{{if .Log}}<h3 class="logsub">recent</h3>
+<div class="ownerlog">
+{{range .Log}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
+{{end}}
+</div>
+<p class="meta"><a href="{{.Feed}}">activity feed</a></p>
+{{else}}<p class="none">Nothing yet.</p>{{end}}
 </section>
+{{end}}
+
+{{if eq .Tab "repos"}}
+<ul class="repolist">
+{{range .Repos}}{{template "reporow" .}}
+{{else}}<li class="empty">no visible repositories</li>{{end}}
+</ul>
+{{end}}
+
+{{if eq .Tab "bookmarks"}}
+<p class="meta">Repositories you saved to come back to. A pin is private quick
+  access to your own work; a bookmark is a public vote to save access to another
+  repo.</p>
+<ul class="repolist">
+{{range .Bookmarks}}<li>
+  <p class="title"><a href="/{{.Path}}">{{.Path}}</a>
+    {{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}
+    <span class="count">{{.Bookmarks}}</span></p>
+  {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
+</li>
+{{else}}<li class="empty">nothing bookmarked yet. open a repository and press Bookmark</li>{{end}}
+</ul>
+{{end}}
+
+{{if eq .Tab "snippets"}}
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets/new">new snippet</a> · or <code>gitbay snippet create &lt;file&gt; &lt; file</code></p>{{end}}
+{{if .SnippetRows}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">snippet</th><th scope="col">files</th>{{if .SnippetsAll}}<th scope="col">visibility</th>{{end}}<th scope="col">updated</th></tr>
+{{range .SnippetRows}}<tr>
+  <td><a href="/{{$.Owner}}/-/snippets/{{.PublicID}}">{{if .Description}}{{.Description}}{{else}}{{.PublicID}}{{end}}</a></td>
+  <td><span class="mono">{{.Names}}</span></td>
+  {{if $.SnippetsAll}}<td><span class="chip chip-neutral">{{.Visibility}}</span></td>{{end}}
+  <td>{{when .UpdatedAt}}</td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No snippets yet.</p>{{end}}
 {{end}}
 
 {{if eq .Tab "people"}}{{$org := .Owner}}

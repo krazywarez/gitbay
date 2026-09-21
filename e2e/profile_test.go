@@ -76,7 +76,7 @@ func TestOwnerProfiles(t *testing.T) {
 	}
 	// The owner page renders those rows, having dispatched the same
 	// command rather than assembling them from the store again.
-	status, body := inst.get(t, "/alice")
+	status, body := inst.get(t, "/alice/-/repositories")
 	if status != 200 {
 		t.Fatalf("owner page: %d", status)
 	}
@@ -158,7 +158,7 @@ func TestOwnerProfiles(t *testing.T) {
 	}
 	// Org emphasis parsed, not left as literal slashes the way the
 	// markdown renderer would.
-	_, body = inst.get(t, "/alice/-/about")
+	_, body = inst.get(t, "/alice")
 	if !strings.Contains(body, "<em>small tools</em>") || strings.Contains(body, "/small tools/") {
 		t.Fatalf("org about not rendered as org: %s", body)
 	}
@@ -197,8 +197,9 @@ func TestOwnerProfiles(t *testing.T) {
 		t.Fatal("more than five links accepted")
 	}
 
-	// The bare owner page is the repository list, with the description
-	// and the link chips in the header above the tabs (#242).
+	// The bare owner page is About: the text, the graph and the log,
+	// with the description and the link chips in the header above the
+	// tabs (#242). The repositories are one tab along.
 	status, body = inst.get(t, "/alice")
 	if status != 200 || !strings.Contains(body, "tinkerer") {
 		t.Fatalf("user page profile: %d", status)
@@ -207,19 +208,17 @@ func TestOwnerProfiles(t *testing.T) {
 		!strings.Contains(body, ">Mastodon<") {
 		t.Fatalf("links not rendered: %s", body)
 	}
-	if !strings.Contains(body, `<ul class="repolist"`) {
-		t.Error("the owner page is not the repository list")
+	if !strings.Contains(body, "<em>small tools</em>") {
+		t.Fatalf("about not rendered: %s", body)
 	}
-	if strings.Contains(body, `class="activity"`) || strings.Contains(body, "<em>small tools</em>") {
-		t.Error("the about text or the activity graph still sits on the repository page")
+	if !strings.Contains(body, `class="activity"`) {
+		t.Error("the about tab has no activity graph")
 	}
-	// Each of them is one tab along, and the markdown renders there.
-	_, aboutBody := inst.get(t, "/alice/-/about")
-	if !strings.Contains(aboutBody, "<em>small tools</em>") {
-		t.Fatalf("about not rendered: %s", aboutBody)
+	if strings.Contains(body, `<ul class="repolist"`) {
+		t.Error("the repository list still sits under the about text")
 	}
-	if _, g := inst.get(t, "/alice/-/activity"); !strings.Contains(g, `class="activity"`) {
-		t.Error("the activity tab has no graph")
+	if _, repos := inst.get(t, "/alice/-/repositories"); !strings.Contains(repos, `<ul class="repolist"`) {
+		t.Error("the repositories tab has no repository list")
 	}
 
 	// Clearing works the same way as the other fields. The about is not

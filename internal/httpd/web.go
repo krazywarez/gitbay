@@ -427,23 +427,92 @@ func (p profileRepoRow) Desc() string      { return p.Description }
 // viewer may see, org membership either direction. Owner names are not
 // secret (they are on every commit); repository visibility rules hold.
 // profileTab is which section of a profile a URL asks for. The bare
-// /{owner} is the repository list, because a profile's job is to lead to
-// the projects and the About text used to push them below the fold
-// (#242). The rest hang off the /-/ namespace the labels, milestones and
-// snippet pages already use.
+// /{owner} is About, the first tab; the rest hang off the /-/ namespace
+// the labels and milestones pages already use. What #242 asked for is
+// that the sections be separate pages rather than one stack a long
+// About pushes the repositories off the bottom of — not that any one of
+// them be the landing page.
 func profileTab(path string) string {
 	switch {
-	case strings.HasSuffix(path, "/-/about"):
-		return "about"
-	case strings.HasSuffix(path, "/-/activity"):
-		return "activity"
+	case strings.HasSuffix(path, "/-/repositories"):
+		return "repos"
+	case strings.HasSuffix(path, "/-/bookmarks"):
+		return "bookmarks"
+	case strings.HasSuffix(path, "/-/snippets"):
+		return "snippets"
 	case strings.HasSuffix(path, "/-/people"):
 		return "people"
 	}
-	return "repos"
+	return "about"
 }
 
-func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
+// profileEvents is how many activity lines the About tab lists under the
+// graph. The graph is a year at a glance; the log is what happened
+// lately, and a fixed count keeps the page the same length whatever the
+// account's pace.
+const profileEvents = 30
+
+// ownerFeed is the activity log under the graph on the About tab: the
+// newest of whatever the graph above it counts, on public repositories
+// only. That is the actor's own events for a user and the
+// organization's repositories' events for an org, matching
+// ActivityByDay and OrgActivityByDay respectively — a log that counted
+// something else would contradict the total printed over it. Only the
+// About tab renders it, so no other tab pays for the query.
+func (s *Server) ownerFeed(tab, kind, name string) []feedLine {
+	if tab != "about" {
+		return nil
+	}
+	var events []store.FeedEvent
+	var err error
+	switch kind {
+	case "user":
+		u, uerr := s.st.UserByUsername(name)
+		if uerr != nil {
+			return nil
+		}
+		events, err = s.st.UserPublicEvents(u.ID, profileEvents)
+	case "org":
+		o, oerr := s.st.OrgByName(name)
+		if oerr != nil {
+			return nil
+		}
+		events, err = s.st.OwnerPublicEvents("org", o.ID, profileEvents)
+	}
+	if err != nil {
+		return nil
+	}
+	return feedLines(events)
+}
+
+// ownerPage is what owner.html renders against. It is a named type
+// because the handler and the tests must agree on it field for field,
+// and an anonymous struct in two places drifts.
+type ownerPage struct {
+	basePage
+	Owner         string
+	Kind          string
+	Tab           string
+	Profile       store.Profile
+	AboutHTML     template.HTML
+	Repos         []profileRepoRow
+	Members       []control.ProfileMember
+	Orgs          []control.ProfileMember
+	Activity      []activityWeek
+	ActivityTotal int
+	Log           []feedLine
+	Bookmarks     []control.BookmarkOut
+	SnippetRows   []snippetRow
+	SnippetsAll   bool
+	Teams         []teamView
+	CanAdmin      bool
+	Self          bool
+	Snippets      int
+	Notice        string
+	Feed          string
+}
+
+func (s *Server) ownerProfile(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("owner")
 	var viewer store.User
 	if s.cfg.Web.Mode == "accounts" {
@@ -472,40 +541,52 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	weeks, activityTotal := activityGrid(counts)
 
 	teams, canAdmin := s.orgAdminView(viewer, d.Kind, name)
+	self := d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name)
 	tab := profileTab(r.URL.Path)
-	// Neither tab is offered when there is nothing on it: the people tab
-	// is the organization admin panel, and the About tab is a file the
-	// owner may not have written. Both answer the way a missing page does
-	// rather than rendering empty.
-	if (tab == "people" && !canAdmin) || (tab == "about" && d.About == "") {
+	// A tab nobody may open is not a page: the people tab is the
+	// organization admin panel, bookmarks are the viewer's own and
+	// nobody else's, and only a user has snippets. Each answers the way
+	// a missing page does rather than rendering empty.
+	if (tab == "people" && !canAdmin) || (tab == "bookmarks" && !self) ||
+		(tab == "snippets" && d.Kind != "user") {
 		s.notFound(w, r)
 		return
 	}
-	profile := store.Profile{Description: d.Description, Website: d.Website, Links: d.Links}
-	s.render(w, "owner.html", struct {
-		basePage
-		Owner         string
-		Kind          string
-		Tab           string
-		Profile       store.Profile
-		AboutHTML     template.HTML
-		Repos         []profileRepoRow
-		Members       []control.ProfileMember
-		Orgs          []control.ProfileMember
-		Activity      []activityWeek
-		ActivityTotal int
-		Teams         []teamView
-		CanAdmin      bool
-		Self          bool
-		Snippets      int
-		Notice        string
-		Feed          string
-	}{s.baseFor(viewer), name, d.Kind, tab, profile, aboutHTML(d.About, d.AboutFormat),
-		d.Repos, d.Members, d.Orgs,
-		weeks, activityTotal, teams, canAdmin,
-		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
-		d.Snippets,
-		s.takeFlash(w, r), "/" + name + "/activity.atom"})
+
+	var bookmarks []control.BookmarkOut
+	if tab == "bookmarks" {
+		s.runControlInto(viewer, []string{"repo", "bookmarks"}, &bookmarks)
+	}
+	var snippets []snippetRow
+	if tab == "snippets" {
+		var ok bool
+		if snippets, ok = s.ownerSnippets(w, r, viewer, name); !ok {
+			return
+		}
+	}
+	s.render(w, "owner.html", ownerPage{
+		basePage:      s.baseFor(viewer),
+		Owner:         name,
+		Kind:          d.Kind,
+		Tab:           tab,
+		Profile:       store.Profile{Description: d.Description, Website: d.Website, Links: d.Links},
+		AboutHTML:     aboutHTML(d.About, d.AboutFormat),
+		Repos:         d.Repos,
+		Members:       d.Members,
+		Orgs:          d.Orgs,
+		Activity:      weeks,
+		ActivityTotal: activityTotal,
+		Log:           s.ownerFeed(tab, d.Kind, name),
+		Bookmarks:     bookmarks,
+		SnippetRows:   snippets,
+		SnippetsAll:   self || viewer.IsAdmin,
+		Teams:         teams,
+		CanAdmin:      canAdmin,
+		Self:          self,
+		Snippets:      d.Snippets,
+		Notice:        s.takeFlash(w, r),
+		Feed:          "/" + name + "/activity.atom",
+	})
 }
 
 func (s *Server) repoHome(w http.ResponseWriter, r *http.Request) {

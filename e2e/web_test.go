@@ -201,8 +201,9 @@ func TestWebUI(t *testing.T) {
 		t.Fatalf("txt README not escaped-plaintext:\n%s", body)
 	}
 
-	// Owner page: lists visible repos only; unknown owners 404.
-	status, body = inst.get(t, "/alice")
+	// Owner page: the repositories tab lists visible repos only;
+	// unknown owners 404.
+	status, body = inst.get(t, "/alice/-/repositories")
 	if status != 200 || !strings.Contains(body, ">site<") || !strings.Contains(body, "user") {
 		t.Fatalf("owner page: %d", status)
 	}

@@ -262,14 +262,11 @@ func (s *Server) bookmarkToggle(w http.ResponseWriter, r *http.Request, u store.
 }
 
 // bookmarksPage lists what the viewer has saved.
+// bookmarksPage keeps /bookmarks working: the list is a tab on the
+// viewer's own profile now, so there is one page of it rather than two
+// showing the same rows.
 func (s *Server) bookmarksPage(w http.ResponseWriter, r *http.Request, u store.User) {
-	var rows []control.BookmarkOut
-	s.runControlInto(u, []string{"repo", "bookmarks"}, &rows)
-	s.render(w, "bookmarks.html", struct {
-		basePage
-		Tab       string
-		Bookmarks []control.BookmarkOut
-	}{s.baseFor(u), "bookmarks", rows})
+	http.Redirect(w, r, "/"+u.Username+"/-/bookmarks", http.StatusSeeOther)
 }
 
 // renderFork draws the fork form: where the copy lands and what it is

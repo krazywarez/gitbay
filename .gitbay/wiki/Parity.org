@@ -180,6 +180,7 @@ sit inside the diff, where a page-level preview has nowhere to go.
 | pin                         | yes | yes | yes |
 | bookmark                    | yes | yes | yes |
 | bookmark list               | yes | yes | yes |
+| bookmarks on your profile   | n/a | yes | no  |
 | watch, unwatch              | yes | yes | yes |
 | mute                        | yes | no  | yes |
 | settings, protection        | yes | yes | yes |
@@ -310,12 +311,17 @@ it as =about=, =about_format= and =about_path=. It reads with the
 repository's own access, so a private =.gitbay= is a profile with no
 about text to anyone but its owner and the admins. A repository whose
 name starts with a dot stays out of =explore= and off the profile's
-repository list. On the web the about text is its own tab: =/<owner>=
-is the repository list, =/<owner>/-/about= the text, =/<owner>/-/activity=
-the year of squares, and =/<owner>/-/people= an organization's members
-and teams. A tab with nothing on it is not offered and its URL is a
-404. The CLI's =profile show= is unchanged and still returns all of it
-at once. The iOS client decodes and renders both formats,
+repository list. On the web a profile is tabs: =/<owner>= is About —
+the text, the year of squares and a log of the newest thirty events —
+then =/<owner>/-/repositories=, =/<owner>/-/bookmarks=,
+=/<owner>/-/snippets=, and =/<owner>/-/people= for an organization's
+members and teams. A tab nobody may open is not offered and its URL is
+a 404: bookmarks are the viewer's own, only a user has snippets, and
+people is the org admin panel. The log counts what the graph over it
+counts — a user's own events, an organization's repositories' — on
+public repositories only; =activity.atom= is the feed that goes back
+further. The CLI's =profile show= is unchanged and still returns all of
+it at once. The iOS client decodes and renders both formats,
 through the same OrgSwift path a README takes.
 
 =help= lists the command registry. Bare it is an index, one line per

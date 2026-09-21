@@ -12,12 +12,13 @@ import (
 
 func TestProfileTabFromPath(t *testing.T) {
 	for path, want := range map[string]string{
-		"/cmc":            "repos",
-		"/cmc/-/about":    "about",
-		"/cmc/-/activity": "activity",
-		"/cmc/-/people":   "people",
-		"/krz":            "repos",
-		"/cmc/-/snippets": "repos",
+		"/cmc":                 "about",
+		"/cmc/-/repositories":  "repos",
+		"/cmc/-/bookmarks":     "bookmarks",
+		"/cmc/-/snippets":      "snippets",
+		"/cmc/-/people":        "people",
+		"/krz":                 "about",
+		"/cmc/-/snippets/abcd": "about",
 	} {
 		if got := profileTab(path); got != want {
 			t.Errorf("profileTab(%q) = %q, want %q", path, got, want)
@@ -25,48 +26,94 @@ func TestProfileTabFromPath(t *testing.T) {
 	}
 }
 
-// The About text and the year of squares sat above the repository list
-// and pushed it below the fold (#242). Repositories are the bare
-// /{owner} now and the rest are tabs beside them.
-func TestOwnerPageLeadsWithRepositories(t *testing.T) {
-	out := renderOwner(t, "repos", ownerFixture())
-	if !strings.Contains(out, "reminiscecleberg.com") {
-		t.Errorf("the repository list is not on the default tab:\n%s", out)
+// The profile is sections rather than one stack (#242): the bar reads
+// About, Repositories, Bookmarks, Snippets, and each holds one thing.
+func TestOwnerPageTabOrder(t *testing.T) {
+	d := ownerFixture()
+	d.Self, d.Snippets = true, 2
+	out := renderOwner(t, "about", d)
+	order := []string{
+		`href="/cmc">About`,
+		`href="/cmc/-/repositories">Repositories`,
+		`href="/cmc/-/bookmarks">Bookmarks`,
+		`href="/cmc/-/snippets">Snippets`,
 	}
-	for _, unwanted := range []string{"actgraph", "Christian Cleberg"} {
-		if strings.Contains(out, unwanted) {
-			t.Errorf("the default tab still carries %q:\n%s", unwanted, out)
+	at := -1
+	for _, want := range order {
+		i := strings.Index(out, want)
+		if i < 0 {
+			t.Fatalf("tab bar missing %q:\n%s", want, out)
 		}
-	}
-	for _, want := range []string{
-		`aria-current="page" href="/cmc"`,
-		`href="/cmc/-/about"`,
-		`href="/cmc/-/activity"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("tab bar missing %q:\n%s", want, out)
+		if i < at {
+			t.Errorf("tab %q is out of order", want)
 		}
-	}
-	// Nobody administers this profile, so it offers no people tab.
-	if strings.Contains(out, "/-/people") {
-		t.Errorf("a profile nobody admins offers a people tab:\n%s", out)
+		at = i
 	}
 }
 
-func TestOwnerPageTabsCarryOneSectionEach(t *testing.T) {
-	if out := renderOwner(t, "about", ownerFixture()); !strings.Contains(out, "Christian Cleberg") ||
-		strings.Contains(out, "actgraph") || strings.Contains(out, "reminiscecleberg.com") {
-		t.Errorf("about tab is not the About file alone:\n%s", out)
-	}
-	if out := renderOwner(t, "activity", ownerFixture()); !strings.Contains(out, "actgraph") ||
-		strings.Contains(out, "reminiscecleberg.com") {
-		t.Errorf("activity tab is not the graph alone:\n%s", out)
-	}
-	// A profile with no About file does not offer the tab.
+// The graph moved inside About, with a log of the newest events under
+// it — not the whole history, which is what the atom feed is for.
+func TestOwnerPageAboutCarriesTheGraphAndLog(t *testing.T) {
 	d := ownerFixture()
+	d.Log = []feedLine{{Actor: "cmc", Verb: "opened issue", Ref: "#12", Repo: "krz/gitbay", URL: "/krz/gitbay/issues/12"}}
+	out := renderOwner(t, "about", d)
+	for _, want := range []string{"Christian Cleberg", "actgraph", "opened issue", "#12", "/cmc/activity.atom"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("about tab missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "reminiscecleberg.com") {
+		t.Errorf("the about tab carries the repository list:\n%s", out)
+	}
+	// A profile with no About file still has the graph, so the tab is
+	// never empty and never a 404.
 	d.AboutHTML = ""
-	if out := renderOwner(t, "repos", d); strings.Contains(out, "/-/about") {
-		t.Errorf("a profile with no About file offers the tab:\n%s", out)
+	if out := renderOwner(t, "about", d); !strings.Contains(out, "actgraph") {
+		t.Errorf("a profile with no About file loses its graph:\n%s", out)
+	}
+	// Nothing to log reads as nothing, not as an empty block.
+	d.Log = nil
+	if out := renderOwner(t, "about", d); !strings.Contains(out, "Nothing yet.") {
+		t.Errorf("an empty log says nothing:\n%s", out)
+	}
+}
+
+func TestOwnerPageSectionsAreSeparate(t *testing.T) {
+	d := ownerFixture()
+	d.Self, d.Snippets = true, 1
+	d.Bookmarks = []control.BookmarkOut{{Path: "krz/hutch", Description: "a SourceHut client", Visibility: "public"}}
+	d.SnippetRows = []snippetRow{{store.Snippet{PublicID: "ab12", Description: "a shell one-liner", Visibility: "public"}, "run.sh"}}
+
+	repos := renderOwner(t, "repos", d)
+	if !strings.Contains(repos, "reminiscecleberg.com") || strings.Contains(repos, "actgraph") {
+		t.Errorf("repos tab is not the repository list alone:\n%s", repos)
+	}
+	marks := renderOwner(t, "bookmarks", d)
+	if !strings.Contains(marks, "krz/hutch") || strings.Contains(marks, "reminiscecleberg.com") {
+		t.Errorf("bookmarks tab is not the bookmark list alone:\n%s", marks)
+	}
+	// The snippet list renders here rather than on a page of its own.
+	snips := renderOwner(t, "snippets", d)
+	for _, want := range []string{"a shell one-liner", "run.sh", `href="/cmc/-/snippets/ab12"`, "new snippet"} {
+		if !strings.Contains(snips, want) {
+			t.Errorf("snippets tab missing %q:\n%s", want, snips)
+		}
+	}
+	if !strings.Contains(snips, `href="/cmc/-/repositories">Repositories`) {
+		t.Errorf("the snippets tab lost the profile's tab bar:\n%s", snips)
+	}
+}
+
+// Bookmarks are the viewer's own: repo bookmarks takes no owner and
+// lists the caller's. The tab is not offered on anyone else's profile.
+func TestOwnerPageBookmarksTabIsSelfOnly(t *testing.T) {
+	if out := renderOwner(t, "about", ownerFixture()); strings.Contains(out, "/-/bookmarks") {
+		t.Errorf("a stranger's profile offers a bookmarks tab:\n%s", out)
+	}
+	d := ownerFixture()
+	d.Self = true
+	if out := renderOwner(t, "about", d); !strings.Contains(out, "/-/bookmarks") {
+		t.Errorf("own profile has no bookmarks tab:\n%s", out)
 	}
 }
 
@@ -76,12 +123,16 @@ func TestOwnerPagePeopleTabHoldsTheAdminPanel(t *testing.T) {
 	d.CanAdmin = true
 	d.Members = []control.ProfileMember{{Name: "cmc", Role: "admin"}}
 
-	repos := renderOwner(t, "repos", d)
-	if !strings.Contains(repos, `href="/cmc/-/people"`) {
-		t.Errorf("an admin gets no people tab:\n%s", repos)
+	about := renderOwner(t, "about", d)
+	if !strings.Contains(about, `href="/cmc/-/people"`) {
+		t.Errorf("an admin gets no people tab:\n%s", about)
 	}
-	if strings.Contains(repos, "Create a team") {
-		t.Errorf("the admin forms still sit under the repository list:\n%s", repos)
+	if strings.Contains(about, "Create a team") {
+		t.Errorf("the admin forms still sit on another tab:\n%s", about)
+	}
+	// An org has no snippets, so it is not offered the tab.
+	if strings.Contains(about, "/-/snippets") {
+		t.Errorf("an org offers a snippets tab:\n%s", about)
 	}
 	people := renderOwner(t, "people", d)
 	for _, want := range []string{"Create a team", "member-add", "org-rename"} {
@@ -92,10 +143,15 @@ func TestOwnerPagePeopleTabHoldsTheAdminPanel(t *testing.T) {
 }
 
 type ownerFixtureData struct {
-	Kind      string
-	AboutHTML template.HTML
-	CanAdmin  bool
-	Members   []control.ProfileMember
+	Kind        string
+	AboutHTML   template.HTML
+	CanAdmin    bool
+	Self        bool
+	Snippets    int
+	Members     []control.ProfileMember
+	Log         []feedLine
+	Bookmarks   []control.BookmarkOut
+	SnippetRows []snippetRow
 }
 
 func ownerFixture() ownerFixtureData {
@@ -108,31 +164,24 @@ func ownerFixture() ownerFixtureData {
 func renderOwner(t *testing.T, tab string, d ownerFixtureData) string {
 	t.Helper()
 	var sb strings.Builder
-	err := web.Render(&sb, "owner.html", struct {
-		basePage
-		Owner         string
-		Kind          string
-		Tab           string
-		Profile       store.Profile
-		AboutHTML     template.HTML
-		Repos         []profileRepoRow
-		Members       []control.ProfileMember
-		Orgs          []control.ProfileMember
-		Activity      []activityWeek
-		ActivityTotal int
-		Teams         []teamView
-		CanAdmin      bool
-		Self          bool
-		Snippets      int
-		Notice        string
-		Feed          string
-	}{
-		basePage{Site: "gitbay"}, "cmc", d.Kind, tab,
-		store.Profile{Description: "Org-Mode · Self-Hosting · Privacy"}, d.AboutHTML,
-		[]profileRepoRow{{control.ProfileRepo{Path: "cmc/reminiscecleberg.com", Description: "Personal placeholder site."}}},
-		d.Members, nil,
-		[]activityWeek{{Month: "Sep", Days: []activityDay{{Date: "2026-09-20", Count: 3, Level: 2}}}}, 6088,
-		nil, d.CanAdmin, false, 0, "", "/cmc/activity.atom",
+	err := web.Render(&sb, "owner.html", ownerPage{
+		basePage:      basePage{Site: "gitbay"},
+		Owner:         "cmc",
+		Kind:          d.Kind,
+		Tab:           tab,
+		Profile:       store.Profile{Description: "Org-Mode · Self-Hosting · Privacy"},
+		AboutHTML:     d.AboutHTML,
+		Repos:         []profileRepoRow{{control.ProfileRepo{Path: "cmc/reminiscecleberg.com", Description: "Personal placeholder site."}}},
+		Members:       d.Members,
+		Activity:      []activityWeek{{Month: "Sep", Days: []activityDay{{Date: "2026-09-20", Count: 3, Level: 2}}}},
+		ActivityTotal: 6088,
+		Log:           d.Log,
+		Bookmarks:     d.Bookmarks,
+		SnippetRows:   d.SnippetRows,
+		CanAdmin:      d.CanAdmin,
+		Self:          d.Self,
+		Snippets:      d.Snippets,
+		Feed:          "/cmc/activity.atom",
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)

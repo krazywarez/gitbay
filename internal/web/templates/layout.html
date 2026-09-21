@@ -22,7 +22,7 @@
     <li class="railopt">{{template "raillink" dict "Href" "/explore" "Icon" "compass" "Name" "Explore" "Current" (eq (str . "Tab") "explore")}}</li>
     <li>{{template "raillink" dict "Href" "/search" "Icon" "search" "Name" "Search" "Current" (eq (str . "Tab") "sitesearch")}}</li>
     {{if .Viewer}}<li>{{template "raillink" dict "Href" "/notifications" "Icon" "bell" "Name" "Notifications" "Current" (eq (str . "Tab") "notifications") "Count" .Rail.Unread}}</li>
-    <li class="railopt">{{template "raillink" dict "Href" "/bookmarks" "Icon" "bookmark" "Name" "Bookmarks" "Current" (eq (str . "Tab") "bookmarks")}}</li>
+    <li class="railopt">{{template "raillink" dict "Href" (printf "/%s/-/bookmarks" .Viewer) "Icon" "bookmark" "Name" "Bookmarks" "Current" (eq (str . "Tab") "bookmarks")}}</li>
     <li class="railopt">{{template "raillink" dict "Href" (printf "/%s/-/snippets" .Viewer) "Icon" "snippet" "Name" "Snippets" "Current" (eq (str . "Tab") "snippets")}}</li>
     <li class="railopt">{{template "raillink" dict "Href" "/new" "Icon" "plus" "Name" "New repository"}}</li>{{end}}
   </ul>
@@ -36,7 +36,7 @@
       <summary class="railicon" aria-label="More" title="More">{{template "icon" "ellipsis"}}<span class="vh">More</span></summary>
       <div class="raildrop">
         <a href="/explore">{{template "icon" "compass"}} Explore</a>
-        <a href="/bookmarks">{{template "icon" "bookmark"}} Bookmarks</a>
+        <a href="/{{.Viewer}}/-/bookmarks">{{template "icon" "bookmark"}} Bookmarks</a>
         <a href="/{{.Viewer}}/-/snippets">{{template "icon" "snippet"}} Snippets</a>
         <a href="/new">{{template "icon" "plus"}} New repository</a>
         <a href="/settings">{{template "icon" "gear"}} Settings</a>

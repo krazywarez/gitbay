@@ -30,19 +30,21 @@ type snippetRow struct {
 	Names string
 }
 
-func (s *Server) snippetsPage(w http.ResponseWriter, r *http.Request) {
-	viewer := s.viewer(r)
-	owner, err := s.st.UserByUsername(r.PathValue("owner"))
+// ownerSnippets lists an owner's snippets for the profile's Snippets
+// tab. The list is a section of the profile like the repositories are,
+// not a page of its own (a snippet itself still is). A private snippet
+// is in the list only for its owner and the admins.
+func (s *Server) ownerSnippets(w http.ResponseWriter, r *http.Request, viewer store.User, name string) ([]snippetRow, bool) {
+	owner, err := s.st.UserByUsername(name)
 	if err != nil {
 		s.notFound(w, r)
-		return
+		return nil, false
 	}
-	self := viewer.ID != 0 && viewer.ID == owner.ID
-	all := self || viewer.IsAdmin
+	all := viewer.IsAdmin || (viewer.ID != 0 && viewer.ID == owner.ID)
 	list, err := s.st.ListSnippets(owner.ID, all, 0, 0)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return nil, false
 	}
 	rows := make([]snippetRow, 0, len(list))
 	for _, sn := range list {
@@ -55,14 +57,7 @@ func (s *Server) snippetsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, snippetRow{sn, names.String()})
 	}
-	s.render(w, "snippets.html", struct {
-		basePage
-		Owner    string
-		Self     bool
-		All      bool
-		Snippets []snippetRow
-		Notice   string
-	}{s.baseFor(viewer), owner.Username, self, all, rows, s.takeFlash(w, r)})
+	return rows, true
 }
 
 type snippetFileView struct {

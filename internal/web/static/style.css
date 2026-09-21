@@ -1677,6 +1677,10 @@ h2 .count { background: none; color: var(--muted); font-weight: 400; font-size: 
 .actlegend { display: flex; align-items: center; gap: 3px; margin-top: var(--sp-2); font-size: var(--fs-0); color: var(--muted); }
 .actlegend span:first-child { margin-right: var(--sp-1); }
 .actlegend span:last-child { margin-left: var(--sp-1); }
+/* the activity log under the graph: the newest events, not the year */
+.logsub { margin: var(--sp-5) 0 var(--sp-2); font-size: var(--fs-2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ownerlog .feedline { font-size: var(--fs-2); }
+.ownerlog .feedline .none { font-size: var(--fs-1); }
 
 /* ---- wiki ---- */
 .wikilayout { display: flex; gap: var(--sp-5); align-items: flex-start; }

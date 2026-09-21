@@ -4,6 +4,27 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* Unreleased
+
+The profile's tabs, reworked.
+
+- The bar reads About, Repositories, Bookmarks, Snippets, and People
+  for an organization's admins. =/{owner}= is About; the rest hang off
+  =/-/=. A tab nobody may open is not offered and its URL is a 404.
+- The activity graph moved inside About, with a log of the newest
+  thirty events under it. The log counts what the graph over it counts:
+  =UserPublicEvents= keys on the actor for a user, matching
+  =ActivityByDay=, while an organization keeps =OwnerPublicEvents=. Both
+  are public repositories only. =activity.atom= is still the feed that
+  goes back further.
+- Bookmarks are a tab on your own profile. =repo bookmarks= takes no
+  owner and lists the caller's, so the tab is not offered on anyone
+  else's and its URL is a 404 there. =/bookmarks= redirects to it, and
+  the rail points at the tab.
+- The snippet list renders inside the profile rather than on a page of
+  its own, so it carries the header and the tab bar like every other
+  section. A snippet itself is still its own page.
+
 * v1.33.0 — 2026-09-21
 
 Five findings from the outside review of the web UI (#241–#245).
