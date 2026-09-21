@@ -4,6 +4,42 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.33.0 — 2026-09-21
+
+Five findings from the outside review of the web UI (#241–#245).
+
+- A run row on the builds page led with a ten-character sha, so
+  recognising a build meant opening the commit or already knowing the
+  sha (#241). =build list= resolves each distinct commit's subject in
+  one =git log= and returns it as =subject= on every build, so the CLI,
+  the API and the web all name the commit. The row leads with the
+  subject and the sha follows as metadata; a build whose commit is gone
+  falls back to the sha.
+- =build list= takes =--limit <n>= and =--cursor <c>=, the keyset
+  cursor =issue list=, =mr list=, =repo list= and =feed= already have
+  (#244). Without the flags it returns the newest fifty matching builds
+  as before, so existing scripts are unchanged — the cursor is what
+  reaches past that window. The page asks for thirty, offers "older"
+  carrying every filter, and says its count is this page's when there
+  is another. Before, filtering to a sparse status reached much further
+  back within the same cap and appeared to raise the run count.
+- The profile is sections rather than one stack (#242). =/{owner}= is
+  the repository list; About, Activity and an organization's People are
+  tabs beside it at =/{owner}/-/about=, =/-/activity= and =/-/people=.
+  A tab with nothing on it is not offered and its URL is a 404. The
+  About text and the year of activity squares used to sit above the
+  repository list and push it below the fold. =profile show= is
+  unchanged.
+- Explore names its filter: the number of repositories, the active
+  query and a link that clears it, the line the builds page already
+  carried (#243). An empty filtered list says nothing matched rather
+  than that the instance has no public repositories.
+- The landing page's picture was !315, closed without merging, with an
+  empty review panel and alt text promising reviewers that were not
+  there (#245). It is !450: merged, two CI checks reporting success
+  with how long each ran, and an approval. The picture is a figure with
+  a caption saying what it shows.
+
 * v1.32.1 — 2026-09-20
 
 A push alert names the account it is for (#89).
