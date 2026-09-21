@@ -128,7 +128,8 @@ func distinctRefs(builds []control.BuildOut, current string) []string {
 
 // buildRun is one commit's builds, grouped for display: the builds tab
 // reads by commit, not by job, so a push that runs three jobs shows as one
-// row with three chips rather than three unrelated rows (#224).
+// row with three chips rather than three unrelated rows (#224). A run is
+// one queueing of a commit, not the commit — see groupRuns (#240).
 type buildRun struct {
 	SHA       string
 	Ref       string
@@ -174,13 +175,22 @@ func worstStatus(statuses []string) string {
 	return "success"
 }
 
-// groupRuns folds consecutive builds of the same commit into one run.
-// build list orders builds newest first, so one push's jobs are adjacent;
-// this does not sort or otherwise assume anything beyond that adjacency.
+// groupRuns folds consecutive builds of the same commit and the same
+// created_at into one run. build list orders builds newest first, so one
+// push's jobs are adjacent; this does not sort or otherwise assume anything
+// beyond that adjacency.
+//
+// The commit alone is not the run. A scheduled job fires against the same
+// sha every tick for as long as the branch tip does not move, so keying on
+// the sha collapsed a week of daily runs into one row carrying the newest
+// timestamp and status (#240). What separates them is when they were
+// queued: a push's jobs are queued in one loop and share a created_at to
+// the second, a schedule's are hours or days apart. A queue loop that
+// straddles a second boundary shows as two rows for one push.
 func groupRuns(builds []control.BuildOut) []buildRun {
 	var runs []buildRun
 	for _, b := range builds {
-		if n := len(runs); n > 0 && runs[n-1].SHA == b.SHA {
+		if n := len(runs); n > 0 && runs[n-1].SHA == b.SHA && runs[n-1].CreatedAt == b.CreatedAt {
 			runs[n-1].Builds = append(runs[n-1].Builds, b)
 			continue
 		}

@@ -208,3 +208,33 @@ func TestBuildFacetsCapsBranches(t *testing.T) {
 		t.Errorf("active ref past the cap: %+v", branches)
 	}
 }
+
+// A scheduled job runs against the same sha every tick for as long as the
+// branch tip does not move, so the sha alone is not the run (#240). Three
+// daily runs of "instances" on one commit are three rows, each with its own
+// timestamp and status; the push that set the tip queued lint and unit
+// together, so those stay one row.
+func TestGroupRunsSeparatesRepeatedSchedule(t *testing.T) {
+	builds := []control.BuildOut{
+		{Number: 5, Job: "instances", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "t5"},
+		{Number: 4, Job: "instances", Status: "failure", SHA: "aaa", Ref: "main", CreatedAt: "t4"},
+		{Number: 3, Job: "instances", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "t3"},
+		{Number: 2, Job: "lint", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "t2"},
+		{Number: 1, Job: "unit", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "t2"},
+	}
+	runs := groupRuns(builds)
+	if len(runs) != 4 {
+		t.Fatalf("groupRuns returned %d runs, want 4: %+v", len(runs), runs)
+	}
+	for i, want := range []struct {
+		when   string
+		status string
+		jobs   int
+	}{{"t5", "success", 1}, {"t4", "failure", 1}, {"t3", "success", 1}, {"t2", "success", 2}} {
+		got := runs[i]
+		if got.CreatedAt != want.when || got.Status != want.status || len(got.Builds) != want.jobs {
+			t.Errorf("run %d: %+v, want CreatedAt %q status %q with %d builds",
+				i, got, want.when, want.status, want.jobs)
+		}
+	}
+}

@@ -91,3 +91,36 @@ func TestBuildPageRendersCommandOutput(t *testing.T) {
 		t.Error("build.html offers cancel on a finished build")
 	}
 }
+
+// The count under the heading said "15 runs" while listing 23 builds
+// (#240). It names both numbers now, so neither is mistaken for the other.
+func TestBuildsPageCountsBuildsAndRuns(t *testing.T) {
+	builds := []control.BuildOut{
+		{Number: 4, Job: "instances", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "2026-09-20T06:00:00Z"},
+		{Number: 3, Job: "instances", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "2026-09-19T06:00:00Z"},
+		{Number: 2, Job: "lint", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "2026-09-12T11:20:03Z"},
+		{Number: 1, Job: "unit", Status: "success", SHA: "aaa", Ref: "main", CreatedAt: "2026-09-12T11:20:03Z"},
+	}
+	var sb strings.Builder
+	filter := buildFilter{}
+	err := web.Render(&sb, "builds.html", struct {
+		repoPage
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		CanWrite bool
+		Notice   string
+	}{
+		testRepoPage(), builds, nil, groupRuns(builds), filter, nil,
+		distinctRefs(builds, filter.Ref), true, "",
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "4 builds in 3 runs") {
+		t.Errorf("builds.html count line: %q", sb.String())
+	}
+}

@@ -3,6 +3,7 @@ package httpd
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,6 +29,13 @@ type feedLine struct {
 // Build events on the same commit, adjacent in the input, fold into one
 // "run" line (D04): its State is the worst of the folded jobs' outcomes,
 // via worstStatus — the same rule the builds tab uses for a run's status.
+// A repeated job name ends the line and starts the next, so a scheduled
+// job firing daily on an unchanged tip reads as one line a day rather than
+// "ran 9 jobs on" one commit (#240). groupRuns separates its runs by
+// created_at instead; these events are recorded when a build finishes, one
+// per job, so there is no queue moment here to key on. The cost is that
+// the oldest scheduled line on a commit folds in the push's jobs, which
+// have not been seen yet on that line.
 func feedLines(events []store.FeedEvent) []feedLine {
 	out := make([]feedLine, 0, len(events))
 	statuses := make([][]string, 0, len(events))
@@ -42,7 +50,8 @@ func feedLines(events []store.FeedEvent) []feedLine {
 		kind, rest, _ := strings.Cut(e.Kind, ".")
 
 		if kind == "build" && d.SHA != "" {
-			if n := len(out); n > 0 && out[n-1].sha == d.SHA && out[n-1].Repo == e.RepoPath {
+			if n := len(out); n > 0 && out[n-1].sha == d.SHA && out[n-1].Repo == e.RepoPath &&
+				!slices.Contains(out[n-1].Jobs, d.Job) {
 				i := n - 1
 				out[i].Jobs = append(out[i].Jobs, d.Job)
 				statuses[i] = append(statuses[i], rest)

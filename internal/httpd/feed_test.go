@@ -1,6 +1,8 @@
 package httpd
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -121,8 +123,9 @@ func TestFeedLinesRunStatePrecedence(t *testing.T) {
 	for _, tc := range cases {
 		events := make([]store.FeedEvent, len(tc.statuses))
 		for i, s := range tc.statuses {
+			// Distinct job names: a repeat would split the line (#240).
 			events[i] = store.FeedEvent{RepoPath: "alice/app", Actor: "alice", Kind: "build." + s,
-				Data: `{"number":1,"job":"j","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`}
+				Data: fmt.Sprintf(`{"number":1,"job":"j%d","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, i)}
 		}
 		lines := feedLines(events)
 		if len(lines) != 1 || lines[0].State != tc.want {
@@ -152,5 +155,50 @@ func TestFeedLinesParsesWhenT(t *testing.T) {
 	// When is preserved for anything that still reads the raw string.
 	if lines[0].When != "2026-09-10T12:00:00Z" {
 		t.Errorf("When = %q", lines[0].When)
+	}
+}
+
+// A scheduled job firing daily on an unchanged tip is a separate event
+// each tick, not another job of one run (#240): a repeated job name starts
+// a new line, so three days read as three lines rather than "ran 3 jobs on"
+// one commit.
+func TestFeedLinesSplitsRepeatedJob(t *testing.T) {
+	const sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	var events []store.FeedEvent
+	for _, status := range []string{"success", "failure", "success"} {
+		events = append(events, store.FeedEvent{RepoPath: "alice/app", Actor: "alice",
+			Kind: "build." + status, Data: `{"number":1,"job":"instances","sha":"` + sha + `"}`})
+	}
+	lines := feedLines(events)
+	if len(lines) != 3 {
+		t.Fatalf("feedLines returned %d lines, want 3: %+v", len(lines), lines)
+	}
+	for i, want := range []string{"success", "failure", "success"} {
+		if lines[i].Verb != "build "+want || lines[i].Ref != "instances" {
+			t.Errorf("line %d: %+v, want Verb %q on job instances", i, lines[i], "build "+want)
+		}
+	}
+}
+
+// What the job-name rule cannot do, documented so the limit is not
+// rediscovered as a bug: these events are recorded per job at finish time,
+// so the oldest scheduled line on a commit folds in the push's jobs. The
+// builds tab does not have this problem — groupRuns has created_at.
+func TestFeedLinesScheduleAbsorbsPushJobs(t *testing.T) {
+	const sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	events := []store.FeedEvent{
+		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
+			Data: `{"number":3,"job":"instances","sha":"` + sha + `"}`},
+		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
+			Data: `{"number":2,"job":"instances","sha":"` + sha + `"}`},
+		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
+			Data: `{"number":1,"job":"lint","sha":"` + sha + `"}`},
+	}
+	lines := feedLines(events)
+	if len(lines) != 2 {
+		t.Fatalf("feedLines returned %d lines, want 2: %+v", len(lines), lines)
+	}
+	if !reflect.DeepEqual(lines[1].Jobs, []string{"instances", "lint"}) {
+		t.Errorf("second line jobs: %+v, want the schedule and the push folded", lines[1].Jobs)
 	}
 }

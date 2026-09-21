@@ -38,7 +38,7 @@
 <pre class="code" tabindex="0">[![build](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/badge/build.svg)](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds)</pre>
 <p class="meta">Add <code>?job=name</code> for one job.</p>
 </details>
-<p class="meta">{{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}}{{if or .Filter.Ref .Filter.Status .Filter.Job}}, <a href="?">clear filters</a>{{end}}</p>
+<p class="meta">{{len .Builds}} build{{if ne (len .Builds) 1}}s{{end}} in {{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}}{{if or .Filter.Ref .Filter.Status .Filter.Job}}, <a href="?">clear filters</a>{{end}}</p>
 <ul class="loglist rows">
 {{range .Runs}}<li>
   <div class="commitmain">
