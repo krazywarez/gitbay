@@ -10,17 +10,6 @@ import (
 	"testing"
 )
 
-func buildGitbayCLI(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "gitbay")
-	cmd := exec.Command("go", "build", "-o", bin, "gitbay.org/gitbay/cmd/gitbay")
-	cmd.Dir = ".."
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build gitbay: %v\n%s", err, out)
-	}
-	return bin
-}
-
 // cli runs the forge binary with an isolated config home.
 type cli struct {
 	bin       string

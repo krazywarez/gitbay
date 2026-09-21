@@ -11,17 +11,6 @@ import (
 	"time"
 )
 
-func buildRunner(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "gitbay-runner")
-	cmd := exec.Command("go", "build", "-o", bin, "gitbay.org/gitbay/cmd/gitbay-runner")
-	cmd.Dir = ".."
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build gitbay-runner: %v\n%s", err, out)
-	}
-	return bin
-}
-
 // runnerOnce processes at most one pending build with the given key.
 func (i *instance) runnerOnce(t *testing.T, key string, extra ...string) string {
 	t.Helper()

@@ -24,17 +24,6 @@ type instance struct {
 	sshDir   string // per-user client keys live here
 }
 
-func buildGitbayd(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "gitbayd")
-	cmd := exec.Command("go", "build", "-o", bin, "gitbay.org/gitbay/cmd/gitbayd")
-	cmd.Dir = ".."
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build gitbayd: %v\n%s", err, out)
-	}
-	return bin
-}
-
 // freePorts reserves n distinct ports. A port is chosen by binding :0 and
 // reading back what the kernel assigned, so every listener has to stay open
 // until all of them are picked — closing one before picking the next lets
