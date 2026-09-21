@@ -12,9 +12,10 @@
 </form>
 <span class="spacer"></span>
 </div>
+<p class="meta">{{len .Repos}} repositor{{if eq (len .Repos) 1}}y{{else}}ies{{end}}{{if .Query}} matching <strong>{{.Query}}</strong>, <a href="/explore">clear filter</a>{{end}}</p>
 <ul class="repolist rows">
 {{range .Repos}}{{template "reporow" .}}
-{{else}}<li class="empty">no public repositories yet</li>{{end}}
+{{else}}<li class="empty">{{if .Query}}nothing matches that filter{{else}}no public repositories yet{{end}}</li>{{end}}
 </ul>
 </div>
 </div>
