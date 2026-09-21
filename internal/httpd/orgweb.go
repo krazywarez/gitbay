@@ -43,9 +43,11 @@ func (s *Server) orgAdminView(viewer store.User, kind, name string) (teams []tea
 // entries stay in one implementation.
 func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	owner := r.PathValue("owner")
+	// The member and team forms live on the profile's people tab (#242),
+	// which is where a result has to land for its flash to render.
 	back := func(msg string) {
 		s.setFlash(w, msg)
-		http.Redirect(w, r, "/"+owner, http.StatusSeeOther)
+		http.Redirect(w, r, "/"+owner+"/-/people", http.StatusSeeOther)
 	}
 	field := r.FormValue("field")
 	team := strings.TrimSpace(r.FormValue("team"))

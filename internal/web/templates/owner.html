@@ -9,7 +9,29 @@
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 {{if and (eq .Kind "org") .Repos}}<p class="meta"><a href="/{{.Owner}}/-/labels">labels</a> · <a href="/{{.Owner}}/-/milestones">milestones</a></p>{{end}}
 </section>
-{{if .AboutHTML}}<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>{{end}}
+{{/* The repository list is the bare /{owner}, because a profile's job is
+     to lead to the projects: the About text and the year of squares used
+     to sit above the list and push it below the fold (#242). */}}
+<nav class="tabs" aria-label="Profile">
+  <a {{if eq .Tab "repos"}}aria-current="page" {{end}}href="/{{.Owner}}">Repositories{{if .Repos}} <i>{{len .Repos}}</i>{{end}}</a>
+  {{if .AboutHTML}}<a {{if eq .Tab "about"}}aria-current="page" {{end}}href="/{{.Owner}}/-/about">About</a>{{end}}
+  <a {{if eq .Tab "activity"}}aria-current="page" {{end}}href="/{{.Owner}}/-/activity">Activity{{if .ActivityTotal}} <i>{{.ActivityTotal}}</i>{{end}}</a>
+  {{if or .Snippets .Self}}<a href="/{{.Owner}}/-/snippets">Snippets{{if .Snippets}} <i>{{.Snippets}}</i>{{end}}</a>{{end}}
+  {{if .CanAdmin}}<a {{if eq .Tab "people"}}aria-current="page" {{end}}href="/{{.Owner}}/-/people">People{{if .Members}} <i>{{len .Members}}</i>{{end}}</a>{{end}}
+</nav>
+
+{{if eq .Tab "repos"}}
+<ul class="repolist">
+{{range .Repos}}{{template "reporow" .}}
+{{else}}<li class="empty">no visible repositories</li>{{end}}
+</ul>
+{{end}}
+
+{{if eq .Tab "about"}}
+<section class="readme"><div class="rendered">{{.AboutHTML}}</div></section>
+{{end}}
+
+{{if eq .Tab "activity"}}
 <section class="activity">
 <h2>activity <span class="count">{{.ActivityTotal}} in the last year</span></h2>
 <div class="actgraph-scroll">
@@ -19,14 +41,9 @@
 </div>
 <p class="actlegend"><span>Less</span><span class="actday l0"></span><span class="actday l1"></span><span class="actday l2"></span><span class="actday l3"></span><span class="actday l4"></span><span>More</span></p>
 </section>
-<h2>repositories <span class="count">{{len .Repos}}</span></h2>
-<ul class="repolist">
-{{range .Repos}}{{template "reporow" .}}
-{{else}}<li class="empty">no visible repositories</li>{{end}}
-</ul>
-{{if or .Snippets .Self}}<p class="meta"><a href="/{{.Owner}}/-/snippets">snippets{{if .Snippets}} <span class="count">{{.Snippets}}</span>{{end}}</a></p>{{end}}
+{{end}}
 
-{{if .CanAdmin}}{{$org := .Owner}}
+{{if eq .Tab "people"}}{{$org := .Owner}}
 <h2>people <span class="count">{{len .Members}}</span></h2>
 {{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 <div class="tablewrap"><table class="keys">

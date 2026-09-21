@@ -200,6 +200,7 @@ sit inside the diff, where a page-level preview has nowhere to go.
 | release create, edit        | yes | yes | yes |
 | preview release notes       | n/a | yes | no  |
 | build list                  | yes | yes | yes |
+| build list paging (limit, cursor) | yes | yes | yes |
 | build list filters (ref, status, job) | yes | yes | yes |
 | build show (one build)      | yes | yes | yes |
 | build log                   | yes | yes | yes |
@@ -286,6 +287,7 @@ now render the way the reference does. go-org is not yet on the corpus.
 | search issues and merge requests | yes | yes | yes |
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
+| profile sections as tabs         | n/a | yes | n/a |
 | profile about and links          | yes | yes | yes |
 | profile about as a file          | yes | yes | yes |
 | activity feed                    | yes | yes | yes |
@@ -308,7 +310,12 @@ it as =about=, =about_format= and =about_path=. It reads with the
 repository's own access, so a private =.gitbay= is a profile with no
 about text to anyone but its owner and the admins. A repository whose
 name starts with a dot stays out of =explore= and off the profile's
-repository list. The iOS client decodes and renders both formats,
+repository list. On the web the about text is its own tab: =/<owner>=
+is the repository list, =/<owner>/-/about= the text, =/<owner>/-/activity=
+the year of squares, and =/<owner>/-/people= an organization's members
+and teams. A tab with nothing on it is not offered and its URL is a
+404. The CLI's =profile show= is unchanged and still returns all of it
+at once. The iOS client decodes and renders both formats,
 through the same OrgSwift path a README takes.
 
 =help= lists the command registry. Bare it is an index, one line per
@@ -428,11 +435,13 @@ key, the other cannot be undone.
 
 * Pagination
 
-=issue list=, =mr list=, =repo list=, and =feed= take =--limit <n>=
-and =--cursor <c>=. Cursors are opaque; each page carries the next
-one. Without the flags a list stays complete, so existing scripts are
-unchanged. The web pages the issue and merge request lists at fifty
-with the same cursors; iOS pages with them too.
+=issue list=, =mr list=, =repo list=, =feed= and =build list= take
+=--limit <n>= and =--cursor <c>=. Cursors are opaque; each page carries
+the next one. Without the flags a list stays as it was, so existing
+scripts are unchanged — for =build list= that means the newest fifty
+matching builds, which is what the cursor now reaches past. The web
+pages the issue and merge request lists at fifty and the builds list at
+thirty with the same cursors; iOS pages with them too.
 
 * CLI only, for now
 

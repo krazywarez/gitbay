@@ -426,6 +426,23 @@ func (p profileRepoRow) Desc() string      { return p.Description }
 // ownerPage renders /{owner} for users and orgs: the repositories the
 // viewer may see, org membership either direction. Owner names are not
 // secret (they are on every commit); repository visibility rules hold.
+// profileTab is which section of a profile a URL asks for. The bare
+// /{owner} is the repository list, because a profile's job is to lead to
+// the projects and the About text used to push them below the fold
+// (#242). The rest hang off the /-/ namespace the labels, milestones and
+// snippet pages already use.
+func profileTab(path string) string {
+	switch {
+	case strings.HasSuffix(path, "/-/about"):
+		return "about"
+	case strings.HasSuffix(path, "/-/activity"):
+		return "activity"
+	case strings.HasSuffix(path, "/-/people"):
+		return "people"
+	}
+	return "repos"
+}
+
 func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("owner")
 	var viewer store.User
@@ -455,11 +472,21 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 	weeks, activityTotal := activityGrid(counts)
 
 	teams, canAdmin := s.orgAdminView(viewer, d.Kind, name)
+	tab := profileTab(r.URL.Path)
+	// Neither tab is offered when there is nothing on it: the people tab
+	// is the organization admin panel, and the About tab is a file the
+	// owner may not have written. Both answer the way a missing page does
+	// rather than rendering empty.
+	if (tab == "people" && !canAdmin) || (tab == "about" && d.About == "") {
+		s.notFound(w, r)
+		return
+	}
 	profile := store.Profile{Description: d.Description, Website: d.Website, Links: d.Links}
 	s.render(w, "owner.html", struct {
 		basePage
 		Owner         string
 		Kind          string
+		Tab           string
 		Profile       store.Profile
 		AboutHTML     template.HTML
 		Repos         []profileRepoRow
@@ -473,7 +500,7 @@ func (s *Server) ownerPage(w http.ResponseWriter, r *http.Request) {
 		Snippets      int
 		Notice        string
 		Feed          string
-	}{s.baseFor(viewer), name, d.Kind, profile, aboutHTML(d.About, d.AboutFormat),
+	}{s.baseFor(viewer), name, d.Kind, tab, profile, aboutHTML(d.About, d.AboutFormat),
 		d.Repos, d.Members, d.Orgs,
 		weeks, activityTotal, teams, canAdmin,
 		d.Kind == "user" && viewer.ID != 0 && strings.EqualFold(viewer.Username, name),
