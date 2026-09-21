@@ -11,6 +11,7 @@ import (
 // commit in one repository closes an issue in another; the org pages
 // answer members and outsiders as their access allows.
 func TestOrgLabelsMilestonesAndCrossRepoCloses(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	carolKey := inst.newKey(t, "carol")

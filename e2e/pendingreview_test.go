@@ -12,6 +12,7 @@ import (
 // review and submits it as a unit, instead of every comment landing in
 // the author's inbox the moment it is typed.
 func TestPendingReviewBatch(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	authorKey := inst.newKey(t, "author")
 	reviewerKey := inst.newKey(t, "reviewer")

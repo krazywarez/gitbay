@@ -11,6 +11,7 @@ import (
 // A doc-only push queues nothing; a push touching the named path queues
 // the job, same as before path filters existed.
 func TestCIPaths(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -68,6 +69,7 @@ func TestCIPaths(t *testing.T) {
 // that first push is always a new branch. Without a merge-base fallback,
 // a docs-only branch queues the full suite anyway (#171).
 func TestCIPathsNewBranch(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

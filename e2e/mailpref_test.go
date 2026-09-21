@@ -12,6 +12,7 @@ import (
 // mail; on brings it back. The account page carries the same switch
 // (#194).
 func TestMailPreference(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n[web]\nmode = \"accounts\"\n", smtp.addr))

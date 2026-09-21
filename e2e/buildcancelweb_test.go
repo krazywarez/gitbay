@@ -14,6 +14,7 @@ import (
 // real, so a stale or repeated post against a build that is no longer
 // cancellable shows the refusal rather than a broken page.
 func TestBuildCancelWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

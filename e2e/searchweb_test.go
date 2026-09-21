@@ -9,6 +9,7 @@ import (
 // TestGlobalSearchAndNotificationsWeb covers the two web surfaces #118
 // still lacked: /search across the instance, and the notification inbox.
 func TestGlobalSearchAndNotificationsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

@@ -64,6 +64,7 @@ func (i *instance) httpURL(repo string) string {
 }
 
 func TestHTTPTransport(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := setupPublicRepo(t, inst, "alice/pub")
 
@@ -127,6 +128,7 @@ func TestHTTPTransport(t *testing.T) {
 }
 
 func TestGitDaemon(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := setupPublicRepo(t, inst, "alice/pub")
 	gitURL := func(repo string) string {

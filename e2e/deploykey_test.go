@@ -9,6 +9,7 @@ import (
 )
 
 func TestDeployKeys(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

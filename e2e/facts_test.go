@@ -12,6 +12,7 @@ import (
 // TestRepoFacts covers the repository summary: counts, license, languages,
 // and contributors resolved to accounts where the email is verified.
 func TestRepoFacts(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -102,6 +103,7 @@ WITH REGARD TO THIS SOFTWARE.
 // account has verified here. Addresses with neither stay distinct, even
 // when they carry the same name.
 func TestContributorIdentity(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

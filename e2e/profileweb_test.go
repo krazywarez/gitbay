@@ -11,6 +11,7 @@ import (
 // emptying a field actually clears it rather than being skipped. The about
 // text is not on this form — it is a file, covered below.
 func TestProfileSettingsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -98,6 +99,7 @@ func TestProfileSettingsWeb(t *testing.T) {
 // The settings page does not edit the about text; it creates the
 // repository that holds it and points at the file editor.
 func TestProfileAboutRepoFromWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

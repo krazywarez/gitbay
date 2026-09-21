@@ -11,6 +11,7 @@ import (
 // the setting off. Nothing was ever going to report, so the gate has
 // nothing to wait for.
 func TestRequireChecksWithoutCIConfigMerges(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",

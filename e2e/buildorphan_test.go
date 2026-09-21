@@ -13,6 +13,7 @@ import (
 // looking like a real failure; it is cancelled when a runner claims it, and
 // the runner gets the real build behind it instead, in the same poll.
 func TestBuildOrphanedByForcePushCancelledAtClaim(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

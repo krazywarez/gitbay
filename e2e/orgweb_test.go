@@ -12,6 +12,7 @@ import (
 // membership and teams, admin-gated, dispatched through the same commands
 // the CLI uses.
 func TestOrgManagementWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -157,6 +158,7 @@ func orgMembers(t *testing.T, inst *instance, key string) []string {
 // rename from the org's. Delete stays on the CLI, where a typed
 // confirmation is the norm (#167).
 func TestOrgLifecycleWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

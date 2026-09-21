@@ -12,6 +12,7 @@ import (
 )
 
 func TestReadmeRelativeLinks(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -177,6 +178,7 @@ func TestReadmeRelativeLinks(t *testing.T) {
 
 // TestLandingRoutes checks the landing page's copy and the two routes.
 func TestLandingRoutes(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[registration]\nmode = \"open\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -204,6 +206,7 @@ func TestLandingRoutes(t *testing.T) {
 }
 
 func TestWebInteractions(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
@@ -271,6 +274,7 @@ func TestWebInteractions(t *testing.T) {
 }
 
 func TestCommitParentLinks(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -305,6 +309,7 @@ func TestCommitParentLinks(t *testing.T) {
 // verified here displays the account's name rather than whatever git
 // config carried, and that an unknown address keeps its own name.
 func TestAuthorNamesResolve(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -365,6 +370,7 @@ func TestAuthorNamesResolve(t *testing.T) {
 // TestTreeSearchCodeAndClone: the overview links "Search code", not
 // "Find file", and shows two labelled clone blocks after the file table.
 func TestTreeSearchCodeAndClone(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")

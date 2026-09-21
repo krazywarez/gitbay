@@ -27,6 +27,7 @@ func (i *instance) get(t *testing.T, path string) (int, string) {
 }
 
 func TestWebUI(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

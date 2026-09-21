@@ -11,6 +11,7 @@ import (
 // store holds: the primary stays until another is primary, and the last
 // verified address stays (#181).
 func TestEmailRemoveAndPrimary(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

@@ -8,6 +8,7 @@ import (
 )
 
 func TestAccountMigration(t *testing.T) {
+	t.Parallel()
 	src := startInstance(t)
 	dst := startInstance(t)
 	key := src.newKey(t, "alice") // one identity, both instances

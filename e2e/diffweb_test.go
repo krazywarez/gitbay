@@ -11,6 +11,7 @@ import (
 // line-number gutters, syntax highlighting, and binary files declared
 // rather than dumped.
 func TestDiffRendering(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

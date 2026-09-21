@@ -10,6 +10,7 @@ import (
 // the browser. Each action runs the issue command the CLI runs, so the
 // CLI is the check that they took effect.
 func TestIssueWebTriage(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

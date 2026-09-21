@@ -14,6 +14,7 @@ import (
 // Cancelling a duplicate of a commit that already passed puts that
 // result back on the commit.
 func TestBuildCancel(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")
@@ -91,6 +92,7 @@ func TestBuildCancel(t *testing.T) {
 // server closes the log session, the runner kills the step, and its late
 // report lands on a row that already says cancelled.
 func TestBuildCancelRunning(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

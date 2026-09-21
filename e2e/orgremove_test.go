@@ -11,6 +11,7 @@ import (
 // teams (#196). Before the fix, team_members rows survived removal, so a
 // former member kept pushing.
 func TestOrgMemberRemovalEndsTeamAccess(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

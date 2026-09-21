@@ -10,6 +10,7 @@ import (
 // listener checked the flag and disabling deleted sessions but not tokens
 // (#95).
 func TestDisabledAccountAPI(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[api]\nenabled = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

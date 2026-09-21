@@ -9,6 +9,7 @@ import (
 // visible without reading the journal. It is admin-only: the exact build a
 // host runs narrows down which known issues apply to it.
 func TestDashboardReportsTheServerBuild(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	adminKey := inst.newKey(t, "root")

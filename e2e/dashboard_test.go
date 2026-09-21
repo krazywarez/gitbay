@@ -9,6 +9,7 @@ import (
 )
 
 func TestDashboard(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -136,6 +137,7 @@ func TestDashboard(t *testing.T) {
 // dashboard — review queue, assigned/open work, pins, and activity — in
 // one read. Builds remain for clients that already consume them.
 func TestDashboardCommand(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -286,6 +288,7 @@ func TestDashboardCommand(t *testing.T) {
 // TestDashboardQueues covers the parts of the dashboard that answer "what
 // needs me": the review queue, assigned issues, and the activity feed.
 func TestDashboardQueues(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -361,6 +364,7 @@ func TestDashboardQueues(t *testing.T) {
 // folded line's state is the worse of the two, which the feed no longer
 // draws; TestFeedLinesFoldsBuildRun covers that rule.
 func TestDashboardFeedFoldsBuildRun(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

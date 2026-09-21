@@ -9,6 +9,7 @@ import (
 // says "unknown" before any build exists, and 404s for a private repo so
 // it cannot be used to probe for one.
 func TestBuildBadge(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

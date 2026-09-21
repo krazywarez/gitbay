@@ -153,6 +153,7 @@ func (i *instance) repoLog(t *testing.T, key, repo string) map[string]logEntry {
 }
 
 func TestSignatureVerification(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

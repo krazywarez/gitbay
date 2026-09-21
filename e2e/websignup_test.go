@@ -9,6 +9,7 @@ import (
 )
 
 func TestWebSignup(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[registration]\nmode = \"invite\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -73,6 +74,7 @@ func TestWebSignup(t *testing.T) {
 }
 
 func TestWebSignupClosedInstance(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	// Closed registration: no signup route at all, and no landing hint.
 	if status, _ := inst.get(t, "/register"); status != 404 {

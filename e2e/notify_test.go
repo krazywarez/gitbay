@@ -39,6 +39,7 @@ func (f *fakeSMTP) waitFor(t *testing.T, recipient, substr string) string {
 }
 
 func TestActivityNotifications(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

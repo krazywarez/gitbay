@@ -37,6 +37,7 @@ func (i *instance) login(t *testing.T, key string) *http.Client {
 // browser. Every action runs the same control command the CLI runs, so the
 // test also proves the merge gates apply to web merges.
 func TestMRWebReviewLoop(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -182,6 +183,7 @@ func TestMRWebReviewLoop(t *testing.T) {
 // TestMRWebCreate opens a merge request from the browser and checks the
 // form survives a refusal with the draft intact.
 func TestMRWebCreate(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -241,6 +243,7 @@ func TestMRWebCreate(t *testing.T) {
 // TestMRListRows checks that the merge request list shows each row's
 // combined check state and comment count (#230).
 func TestMRListRows(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -292,6 +295,7 @@ func TestMRListRows(t *testing.T) {
 // proves the page dispatched mr diff-comment rather than writing its own
 // rows.
 func TestMRWebDiffThreads(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -406,6 +410,7 @@ func (i *instance) mrThreads(t *testing.T, key, repo, n string) []mrThread {
 // TestMRDiffEmptyExplained: a merge request whose head was fast-forwarded
 // into the target outside the request shows why its diff is empty.
 func TestMRDiffEmptyExplained(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub", "--email", "alice@example.test", "--verified")
@@ -442,6 +447,7 @@ func TestMRDiffEmptyExplained(t *testing.T) {
 // web form, and checks both pages say so; clearing it over ssh removes
 // both lines again (#223).
 func TestMRSupersedes(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -507,6 +513,7 @@ func TestMRSupersedes(t *testing.T) {
 // list by it (#231). The CLI is the check that the page dispatched
 // mr label rather than writing its own rows.
 func TestMRWebLabels(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

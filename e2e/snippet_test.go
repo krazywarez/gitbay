@@ -10,6 +10,7 @@ import (
 // Snippets over SSH: create from stdin, read back, list by visibility,
 // edit files and metadata, and the not-found rule for private ones.
 func TestSnippets(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[limits]\nmax_snippets_per_user = 3\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

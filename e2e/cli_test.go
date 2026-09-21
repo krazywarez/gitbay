@@ -55,6 +55,7 @@ func (c *cli) must(t *testing.T, dir, stdin string, args ...string) string {
 }
 
 func TestCLI(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

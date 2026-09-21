@@ -15,6 +15,7 @@ import (
 // tree, cat, grep, blame and the web blob page. Nothing in the suite
 // covered a non-ASCII path before (#129).
 func TestNonASCIIPaths(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -62,6 +63,7 @@ func TestNonASCIIPaths(t *testing.T) {
 // land: the receive hooks, the post-receive work and the store take
 // them concurrently without losing one (#129).
 func TestConcurrentPushes(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

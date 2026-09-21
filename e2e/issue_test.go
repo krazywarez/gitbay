@@ -24,6 +24,7 @@ func golden(t *testing.T, raw string) string {
 }
 
 func TestIssueLifecycleOverBareSSH(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

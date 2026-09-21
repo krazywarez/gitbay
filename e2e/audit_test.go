@@ -9,6 +9,7 @@ import (
 )
 
 func TestAuditAndHardening(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[limits]\nssh_auth_rate = 3\nmax_pack_bytes = 2000\n")
 	adminKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")

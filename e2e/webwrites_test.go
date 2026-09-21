@@ -12,6 +12,7 @@ import (
 // store directly and skip the per-account quota; issue comments skipped
 // the archived check (#93).
 func TestWebWritesGoThroughRegistry(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n[limits]\nmax_repos_per_user = 1\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

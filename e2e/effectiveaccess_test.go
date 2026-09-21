@@ -9,6 +9,7 @@ import (
 // outsider gets one answer about an org: it exists and has members;
 // its teams are not theirs to see (#200).
 func TestEffectiveAccessAndOutsiders(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	keys := map[string]string{}
 	for _, u := range []string{"alice", "bob", "carol", "dave", "eve"} {

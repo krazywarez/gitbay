@@ -78,6 +78,7 @@ func (h *hookReceiver) waitN(t *testing.T, n int) []capturedHook {
 }
 
 func TestWebhooks(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n")
 	// Restart the daemon with a fast retry base for the failure tests.
 	inst.proc.Process.Kill()
@@ -260,6 +261,7 @@ func TestWebhooks(t *testing.T) {
 // asserts each reaches a subscriber. Half the forge's mutations recorded
 // nothing, so a webhook could be subscribed to them and never fire.
 func TestWebhookEventCoverage(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

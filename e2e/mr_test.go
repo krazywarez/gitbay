@@ -46,6 +46,7 @@ func (i *instance) mrShow(t *testing.T, key, repo, n string) mrShow {
 }
 
 func TestMergeRequests(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

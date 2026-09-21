@@ -46,6 +46,7 @@ func havePodman(t *testing.T) bool {
 // the runner refuses to start rather than running a build on the host.
 // This one needs no podman, so it runs everywhere.
 func TestRunnerRefusesToStartWithoutPodman(t *testing.T) {
+	t.Parallel()
 	bin := buildRunner(t)
 	cmd := exec.Command(bin, "-once", "-remote", "git@127.0.0.1",
 		"-isolation", "podman", "-image", "localhost/whatever:1", "-workdir", t.TempDir())
@@ -66,6 +67,7 @@ func TestRunnerRefusesToStartWithoutPodman(t *testing.T) {
 
 // An unknown mode is refused rather than guessed at.
 func TestRunnerRefusesUnknownIsolation(t *testing.T) {
+	t.Parallel()
 	bin := buildRunner(t)
 	cmd := exec.Command(bin, "-once", "-remote", "git@127.0.0.1",
 		"-isolation", "chroot", "-workdir", t.TempDir())
@@ -81,6 +83,7 @@ func TestRunnerRefusesUnknownIsolation(t *testing.T) {
 // With podman, a step runs in a container: it cannot read the runner's
 // SSH key, and it does not see the runner's home.
 func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
+	t.Parallel()
 	if !havePodman(t) {
 		t.Skip("no podman")
 	}
@@ -131,6 +134,7 @@ func TestPodmanStepCannotReachTheRunnersKey(t *testing.T) {
 // An image this runner does not have fails the build and says an
 // operator must provision it, rather than pulling it.
 func TestPodmanMissingImageFailsTheBuild(t *testing.T) {
+	t.Parallel()
 	if !havePodman(t) {
 		t.Skip("no podman")
 	}
@@ -192,6 +196,7 @@ func runnerPodmanOnce(t *testing.T, inst *instance, key string) {
 // guessing one: with --pull=never an image the host does not have fails
 // every job that names none.
 func TestRunnerRefusesPodmanWithoutAnImage(t *testing.T) {
+	t.Parallel()
 	bin := buildRunner(t)
 	cmd := exec.Command(bin, "-once", "-remote", "git@127.0.0.1",
 		"-isolation", "podman", "-workdir", t.TempDir())

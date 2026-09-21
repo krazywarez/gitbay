@@ -39,6 +39,7 @@ func (i *instance) runnerOnce(t *testing.T, key string, extra ...string) string 
 // A failed build mails the repo owner with the log tail; green builds
 // stay silent.
 func TestBuildFailureMail(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))
@@ -80,6 +81,7 @@ func TestBuildFailureMail(t *testing.T) {
 }
 
 func TestCI(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")
@@ -307,6 +309,7 @@ func (i *instance) runnerJobs(t *testing.T, key, repo string, jobs int) string {
 // transaction that selects and updates, so several workers claiming
 // together is safe; the runner simply never used more than one (#115).
 func TestRunnerConcurrentJobs(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

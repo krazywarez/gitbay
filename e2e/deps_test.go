@@ -20,6 +20,7 @@ type depsStatus struct {
 // can turn it on: the check tells a public registry what the repository
 // depends on.
 func TestDepsEnableDisable(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",

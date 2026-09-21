@@ -14,6 +14,7 @@ import (
 // wrote. The runner builds their push and leaves a fork's merge request
 // head alone until started with -untrusted.
 func TestAttachedRunnerBuildsOwnRepo(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

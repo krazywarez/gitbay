@@ -4,11 +4,13 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -24,29 +26,44 @@ type instance struct {
 	sshDir   string // per-user client keys live here
 }
 
-// freePorts reserves n distinct ports. A port is chosen by binding :0 and
-// reading back what the kernel assigned, so every listener has to stay open
-// until all of them are picked — closing one before picking the next lets
-// the kernel hand out the same port again, and the instance that asked for
-// three then fails to bind its second listener.
+// nextPort hands out candidate ports. Seeded randomly so two test processes
+// on one machine — `go test ./...` runs packages concurrently — start in
+// different places.
+var nextPort = func() *atomic.Int32 {
+	var n atomic.Int32
+	n.Store(int32(20000 + rand.IntN(20000)))
+	return &n
+}()
+
+// freePorts reserves n distinct ports, counting up rather than asking the
+// kernel for :0.
 //
-// Still a narrowing rather than a guarantee: another process can take a port
-// between the close here and the bind in gitbayd. Distinctness within one
-// instance is the part that is ours.
+// :0 cannot be made safe once tests run in parallel. A port is picked by
+// binding, reading the number back and closing, and between that close and
+// the bind inside gitbayd the kernel is free to hand the same port to
+// another instance picking at that moment. The loser does not fail
+// cleanly: waitForPort only asks whether something is listening, so a test
+// whose port was taken talks to a different test's server and reports
+// whatever that one says.
+//
+// A counter cannot collide within a process, whatever the interleaving.
+// Each candidate is still bind-tested, which skips ports other programs
+// hold. An outside process taking one in the close-to-bind window remains
+// possible, as it was before; that race is not ours to close.
 func freePorts(t *testing.T, n int) []int {
 	t.Helper()
-	lns := make([]net.Listener, 0, n)
 	ports := make([]int, 0, n)
-	for i := 0; i < n; i++ {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatal(err)
+	for len(ports) < n {
+		p := int(nextPort.Add(1))
+		if p > 60000 {
+			t.Fatal("ran out of ports")
 		}
-		lns = append(lns, ln)
-		ports = append(ports, ln.Addr().(*net.TCPAddr).Port)
-	}
-	for _, ln := range lns {
+		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+		if err != nil {
+			continue // somebody else has it
+		}
 		ln.Close()
+		ports = append(ports, p)
 	}
 	return ports
 }
@@ -173,6 +190,7 @@ func (i *instance) ssh(t *testing.T, key string, stdin string, args ...string) (
 }
 
 func TestControlPlaneOverBareSSH(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")
@@ -267,6 +285,7 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 // a row and then fails to bind its second listener, which surfaces as an
 // unrelated test timing out on "gitbayd did not start listening".
 func TestFreePortsAreDistinct(t *testing.T) {
+	t.Parallel()
 	for round := 0; round < 50; round++ {
 		seen := map[int]bool{}
 		for _, p := range freePorts(t, 8) {

@@ -12,6 +12,7 @@ import (
 // an MR into a repository with a CI config queued nothing, while pushing
 // the identical commit ran the whole config.
 func TestMergeQueuesBuildsAndRecordsPush(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",

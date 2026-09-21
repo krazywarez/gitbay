@@ -10,6 +10,7 @@ import (
 // issue list and mr list narrow by label, assignee, author and
 // milestone, and the web lists take the same names as query parameters.
 func TestListFilters(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

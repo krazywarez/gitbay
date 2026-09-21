@@ -10,6 +10,7 @@ import (
 // The settings page attaches and detaches runners through the same
 // commands the CLI uses, and lists what is attached.
 func TestRunnerSettingsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

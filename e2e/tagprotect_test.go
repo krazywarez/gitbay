@@ -10,6 +10,7 @@ import (
 // Protected-tag globs refuse moving and deleting matching tags; a tag a
 // release is anchored to refuses both on its own (#201).
 func TestTagProtection(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

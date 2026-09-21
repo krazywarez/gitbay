@@ -9,6 +9,7 @@ import (
 // the caller can read it, what the repository was forked from — so a
 // client draws the real state without a second read per screen (#178).
 func TestRepoShowCarriesViewerState(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

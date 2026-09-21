@@ -10,6 +10,7 @@ import (
 // A browser session can be listed and ended from SSH, one at a time or
 // all at once, and only its owner sees it.
 func TestWebSessionsListRevoke(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

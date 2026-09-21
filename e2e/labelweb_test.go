@@ -9,6 +9,7 @@ import (
 // The label set itself is managed from the browser: create, recolour and
 // remove, each through the label command the CLI runs (#163).
 func TestLabelsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

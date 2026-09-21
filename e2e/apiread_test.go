@@ -14,6 +14,7 @@ import (
 // before: no command returned file contents, and the web's raw route
 // authenticates by session cookie, not bearer token.
 func TestRepoTreeAndCat(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

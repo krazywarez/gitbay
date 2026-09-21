@@ -17,6 +17,7 @@ type adminUserRow struct {
 }
 
 func TestAdminUserListAndShow(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	adminKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -171,6 +172,7 @@ func TestAdminUserListAndShow(t *testing.T) {
 }
 
 func TestAdminPromoteDemote(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -226,6 +228,7 @@ func TestAdminPromoteDemote(t *testing.T) {
 }
 
 func TestAdminRepoModeration(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -337,6 +340,7 @@ func TestAdminRepoModeration(t *testing.T) {
 // commands work in an admin's SSH session and audit rows say which path
 // ran them.
 func TestAdminHostAndSSHAreOneSurface(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -402,6 +406,7 @@ func TestAdminHostAndSSHAreOneSurface(t *testing.T) {
 }
 
 func TestAuditFilters(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -454,6 +459,7 @@ func TestAuditFilters(t *testing.T) {
 }
 
 func TestAdminQueuesDashboard(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n[webhooks]\nallow_local = true\n")
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -568,6 +574,7 @@ func TestAdminQueuesDashboard(t *testing.T) {
 }
 
 func TestAdminConfigShow(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[mail]\nsmtp_host = \"127.0.0.1:1\"\nfrom = \"forge@example.test\"\nsmtp_pass = \"hunter2\"\n")
 	out := inst.admin(t, "admin", "config", "show")
 	for _, want := range []string{"[server]", "site_url", "ssh_auth_rate = 10", "pull_interval_minutes = 15", "[mail]", `smtp_pass = "<redacted>"`} {

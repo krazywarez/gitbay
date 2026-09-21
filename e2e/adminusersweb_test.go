@@ -10,6 +10,7 @@ import (
 // web can reach now that nothing is held back from it (#234). Demote
 // and disable carry the typed-name check.
 func TestAdminUsersWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")

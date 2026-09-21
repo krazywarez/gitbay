@@ -16,6 +16,7 @@ import (
 // merge request unbuildable and, under require-checks, unmergeable (#98).
 // A head from another repository runs without the target's secrets.
 func TestForkMRHeadIsBuilt(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

@@ -10,6 +10,7 @@ import (
 // without a format is markdown, which is what everything written before the
 // format existed carries.
 func TestOrgBodies(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

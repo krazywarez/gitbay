@@ -72,6 +72,7 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 }
 
 func TestGitHubIssueImport(t *testing.T) {
+	t.Parallel()
 	// allow_local lets --api-base reach the loopback fake; a default
 	// instance refuses it (see the SSRF check at the end).
 	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n")
@@ -143,6 +144,7 @@ func TestGitHubIssueImport(t *testing.T) {
 }
 
 func TestGitHubImportSSRFGuard(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t) // allow_local off: default posture
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -219,6 +221,7 @@ func fakeForgejo(t *testing.T) *httptest.Server {
 }
 
 func TestForgejoIssueImport(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

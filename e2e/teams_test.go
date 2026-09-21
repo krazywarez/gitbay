@@ -6,6 +6,7 @@ import (
 )
 
 func TestOrgTeams(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	adminKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

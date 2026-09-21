@@ -15,6 +15,7 @@ import (
 // server is never asked to vouch for a commit it did not receive already
 // signed (#175).
 func TestCLIMRRebase(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -84,6 +85,7 @@ func TestCLIMRRebase(t *testing.T) {
 
 // The guards: a dirty tree, and a source in a fork this clone cannot push.
 func TestCLIMRRebaseRefusals(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

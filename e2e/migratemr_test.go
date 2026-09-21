@@ -17,6 +17,7 @@ import (
 // diff resolves through it and an empty head_sha is invisible — the first
 // version of this test made that mistake and passed without the fix.
 func TestMigratedMRHasADiff(t *testing.T) {
+	t.Parallel()
 	src := startInstance(t)
 	dst := startInstance(t)
 	key := src.newKey(t, "alice")

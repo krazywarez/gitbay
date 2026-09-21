@@ -10,6 +10,7 @@ import (
 // rate-limited; this path was not, so an authenticated account could
 // enqueue mail without bound (#136).
 func TestEmailAddThrottled(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

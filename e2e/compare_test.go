@@ -10,6 +10,7 @@ import (
 // The compare view shows what a branch adds on top of another from their
 // merge base, and repo diff is the same range over ssh (#118).
 func TestCompareView(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

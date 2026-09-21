@@ -28,6 +28,7 @@ func decodePage[T any](t *testing.T, out string) ([]T, string) {
 // Cursor pagination on the list commands: opaque cursors, stable pages,
 // and the bare-array shape untouched when the flags are absent.
 func TestCursorPagination(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

@@ -186,6 +186,7 @@ func TestMirrors(t *testing.T) {
 }
 
 func TestMirrorSSRFGuard(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t) // default posture: allow_local off
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

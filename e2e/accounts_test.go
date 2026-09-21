@@ -49,6 +49,7 @@ func browserPost(t *testing.T, c *http.Client, u string, form url.Values) (int, 
 }
 
 func TestWebAccounts(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 
 	aliceKey := inst.newKey(t, "alice")
@@ -246,6 +247,7 @@ func TestWebAccounts(t *testing.T) {
 // TestViewOnlyHasNoLoginOnTheWire is the M8 negative: in view_only mode the
 // login route does not exist and web login over ssh is refused.
 func TestViewOnlyHasNoLoginOnTheWire(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t) // default: view_only
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -263,6 +265,7 @@ func TestViewOnlyHasNoLoginOnTheWire(t *testing.T) {
 // and its hostname: the login page prints a command to paste into a terminal,
 // so it must name the host even when the operator has set a display title.
 func TestTitleIsNotAHostname(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\ntitle = \"GitBay\"\n")
 
 	status, body := inst.get(t, "/login")

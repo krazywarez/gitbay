@@ -12,6 +12,7 @@ import (
 // it onto the merged target with its reviews intact; a squash under a
 // stack is refused.
 func TestStackedMergeRequests(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

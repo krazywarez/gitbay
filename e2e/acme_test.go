@@ -18,6 +18,7 @@ import (
 // name, which a test cannot have; what matters here is that the plumbing is
 // correct and failure to issue does not kill the daemon.
 func TestACMEServe(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "") // helper for binary + keys; killed below
 	inst.proc.Process.Kill()
 	inst.proc.Wait()

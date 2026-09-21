@@ -11,6 +11,7 @@ import (
 // unmet gate at once, and mr review says when a verdict is advisory
 // (#199).
 func TestMergeGatesVisible(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

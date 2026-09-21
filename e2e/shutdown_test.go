@@ -15,6 +15,7 @@ import (
 // kill: no listener closed, no request or push allowed to finish. The
 // daemon now stops its listeners, drains, and exits 0 (#105).
 func TestServeStopsOnSIGTERM(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	if resp, err := http.Get(inst.base() + "/healthz"); err != nil || resp.StatusCode != 200 {
 		t.Fatalf("healthz before shutdown: %v", err)
@@ -41,6 +42,7 @@ func TestServeStopsOnSIGTERM(t *testing.T) {
 // idle connection is closed at once rather than holding the drain for its
 // full 30 s; only a session mid-command is waited for (#141).
 func TestShutdownClosesIdleConnections(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

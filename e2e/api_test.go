@@ -40,6 +40,7 @@ func (i *instance) apiCall(t *testing.T, token string, argv []string, stdin stri
 }
 
 func TestJSONAPI(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[api]\nenabled = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -202,6 +203,7 @@ func TestJSONAPI(t *testing.T) {
 // metered separately from reads, and one caller cannot spend another's
 // budget.
 func TestAPIRateLimit(t *testing.T) {
+	t.Parallel()
 	// 6/minute sustained, so the read burst is 6 and the write burst 0.6 —
 	// the first write is allowed and the second is not.
 	inst := startInstanceWith(t, "[api]\nenabled = true\n[limits]\napi_rate = 6\n")
@@ -309,6 +311,7 @@ func (i *instance) apiGet(t *testing.T, token string, argv []string, ifNoneMatch
 // with an ETag, 304 on revalidation, writes refused, and one caller's ETag
 // never matching another's.
 func TestAPIReadGET(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[api]\nenabled = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

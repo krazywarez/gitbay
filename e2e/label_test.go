@@ -8,6 +8,7 @@ import (
 // Labels get colours: set from the CLI, listed with their use, painted
 // on the web, and removed from every issue at once.
 func TestLabelColors(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

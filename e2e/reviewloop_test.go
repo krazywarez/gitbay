@@ -20,6 +20,7 @@ import (
 // exercised the loop end to end at all — every feature had its own test
 // and none of them met.
 func TestTwoAccountReviewLoop(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	authorKey := inst.newKey(t, "author")
 	reviewerKey := inst.newKey(t, "reviewer")

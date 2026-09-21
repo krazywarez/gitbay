@@ -11,6 +11,7 @@ import (
 // TestMRDraft covers the first stage of #111: a merge request opened to
 // show work rather than to ask for a merge.
 func TestMRDraft(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

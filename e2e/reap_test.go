@@ -88,6 +88,7 @@ func TestStaleBuildReapedWithoutRunner(t *testing.T) {
 }
 
 func TestAdminRunners(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	rootKey := inst.newKey(t, "root")
 	aliceKey := inst.newKey(t, "alice")
@@ -152,6 +153,7 @@ func TestAdminRunners(t *testing.T) {
 
 // /healthz is unauthenticated, cache-free, and says which build serves.
 func TestHealthz(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	status, body := inst.get(t, "/healthz")
 	if status != 200 || !strings.Contains(body, `"ok":true`) || !strings.Contains(body, `"commit":"`) {
@@ -166,6 +168,7 @@ func TestHealthz(t *testing.T) {
 // gc --lfs removes objects no pointer names, keeps referenced ones, and
 // leaves anything young enough to be an upload ahead of its push.
 func TestGCLFSOrphans(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -216,6 +219,7 @@ func TestGCLFSOrphans(t *testing.T) {
 // backup --verify reads an archive back and says whether a restore would
 // have what the database expects.
 func TestBackupVerify(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

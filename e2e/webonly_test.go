@@ -11,6 +11,7 @@ import (
 // ref, an archive, and the public listing. Each existed as a web route
 // whose handler went around the registry, so no other surface had them.
 func TestWebOnlyReadsAreCommands(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

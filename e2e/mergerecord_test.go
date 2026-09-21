@@ -12,6 +12,7 @@ import (
 // or a merge moved the ref and then failed to record itself. Either way
 // refusing left the merge request open for good (#108).
 func TestMergeRecordedWhenTargetContainsHead(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

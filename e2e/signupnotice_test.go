@@ -11,6 +11,7 @@ import (
 // becomes active. An open-mode signup counts at verification, not when
 // the row is created, so an unverified attempt is silent (#234).
 func TestSignupNotifiesAdmins(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[registration]\nmode = \"open\"\nnotify_admin = true\n"+
@@ -45,6 +46,7 @@ func TestSignupNotifiesAdmins(t *testing.T) {
 // With notify_admin off, the default, the same signup mails no one but
 // the person registering.
 func TestSignupNoticeOffByDefault(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[registration]\nmode = \"open\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

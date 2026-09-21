@@ -11,6 +11,7 @@ import (
 // A person with no SSH key can still get into the web UI: they ask for a
 // link by username or verified address and it arrives by mail (#155).
 func TestEmailLogin(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -71,6 +72,7 @@ func TestEmailLogin(t *testing.T) {
 // A verified secondary address stands in for an unverified primary:
 // resolution by username must not stop at the primary (#158).
 func TestEmailLoginResolvesVerifiedSecondary(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -108,6 +110,7 @@ func TestEmailLoginResolvesVerifiedSecondary(t *testing.T) {
 // The response must not say whether an account exists. A different status,
 // body, or destination answers "is this person here?" to anyone who asks.
 func TestEmailLoginDoesNotEnumerate(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -175,6 +178,7 @@ func TestEmailLoginDoesNotEnumerate(t *testing.T) {
 // An anonymous endpoint that sends mail needs a durable per-account bound,
 // the same one email verification has (#136).
 func TestEmailLoginThrottled(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -220,6 +224,7 @@ func TestEmailLoginThrottled(t *testing.T) {
 // itself a link. It must not get a session out of it: read access to the
 // private repos it is a member of is what suspension takes away.
 func TestEmailLoginRefusesDisabledAccount(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",
@@ -256,6 +261,7 @@ func TestEmailLoginRefusesDisabledAccount(t *testing.T) {
 // login tokens, and login() refuses a disabled account after consuming one,
 // so neither the window nor a token that somehow survives it opens a session.
 func TestEmailLoginRefusesLinkMintedBeforeSuspension(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[web]\nmode = \"accounts\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n",

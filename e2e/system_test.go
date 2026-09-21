@@ -15,6 +15,7 @@ import (
 // TestSystemSSHMode runs the M1/M2 scenarios against a real host sshd using
 // AuthorizedKeysCommand + forced command instead of the embedded listener.
 func TestSystemSSHMode(t *testing.T) {
+	t.Parallel()
 	sshdBin := "/usr/sbin/sshd"
 	if _, err := os.Stat(sshdBin); err != nil {
 		t.Skipf("no host sshd at %s", sshdBin)

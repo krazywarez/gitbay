@@ -9,6 +9,7 @@ import (
 // web theme set fixes the colour scheme the layout stamps on <html>; the
 // account page shows the same setting and changes it (#232).
 func TestWebTheme(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")

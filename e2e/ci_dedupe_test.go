@@ -10,6 +10,7 @@ import (
 // A fast-forward lands the exact commit that was already built on its
 // branch; that commit is not built again. A commit whose build failed is.
 func TestFastForwardMergeSkipsBuiltCommit(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

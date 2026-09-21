@@ -11,6 +11,7 @@ import (
 // TestReleaseAndBuildWeb creates and edits a release and triggers a build
 // from the browser, each through the command the CLI runs.
 func TestReleaseAndBuildWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

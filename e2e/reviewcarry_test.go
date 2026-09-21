@@ -10,6 +10,7 @@ import (
 // A rebase that leaves the merge request's diff unchanged keeps its
 // fresh approvals; a push that changes the diff stales them (#198).
 func TestApprovalsSurviveSameDiffRebase(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

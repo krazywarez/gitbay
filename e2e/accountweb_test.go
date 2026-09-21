@@ -13,6 +13,7 @@ import (
 // browser session. Public keys are the only credential-shaped input the web
 // accepts; secrets and token minting stay on SSH.
 func TestAccountSettingsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

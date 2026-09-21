@@ -111,6 +111,7 @@ func extractCode(t *testing.T, mail string) string {
 }
 
 func TestOpenRegistration(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[registration]\nmode = \"open\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))
@@ -195,6 +196,7 @@ func TestOpenRegistration(t *testing.T) {
 }
 
 func TestInviteRegistration(t *testing.T) {
+	t.Parallel()
 	smtp := startFakeSMTP(t)
 	inst := startInstanceWith(t, fmt.Sprintf(
 		"[registration]\nmode = \"invite\"\n[mail]\nsmtp_host = %q\nfrom = \"noreply@gitbay.test\"\n", smtp.addr))

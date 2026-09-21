@@ -11,6 +11,7 @@ import (
 // Atom feeds for releases, commits and an owner's public activity, read
 // with no session; private repositories stay out of them (#192).
 func TestAtomFeeds(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

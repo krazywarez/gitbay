@@ -12,6 +12,7 @@ import (
 // the source picker offers the branches of a fork they can push to, and
 // the merge request opens against the parent (#168).
 func TestMRFromForkWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

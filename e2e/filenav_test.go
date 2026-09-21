@@ -10,6 +10,7 @@ import (
 // A file page lists its directory beside the file, marks the file, and
 // links up (desktop layout spec).
 func TestFileNavigator(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")

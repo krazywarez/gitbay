@@ -10,6 +10,7 @@ import (
 // repo rename moves the directory and the row together; what hangs off
 // the repository by id (issues here) follows it (#190).
 func TestRepoRename(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

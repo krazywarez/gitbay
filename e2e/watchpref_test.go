@@ -11,6 +11,7 @@ import (
 // read access is not enough, and off returns it to the default. The
 // account page carries the same switch (#194).
 func TestWatchPreference(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

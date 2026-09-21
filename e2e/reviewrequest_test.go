@@ -13,6 +13,7 @@ import (
 // and --remove takes them out outright. A separate, private repository
 // checks that requesting someone who cannot read it is refused.
 func TestMRReviewRequest(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

@@ -12,6 +12,7 @@ import (
 // request create forms (#160). Neither form offered --format before; a
 // browser session could only ever write markdown.
 func TestIssueMRWebFormat(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

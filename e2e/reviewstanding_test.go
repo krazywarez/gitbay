@@ -20,6 +20,7 @@ import (
 // Reviewing stays open to everyone: an outside opinion on a public change
 // is worth having. It just does not decide the gate.
 func TestReviewsCountOnlyFromWriters(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	ownerKey := inst.newKey(t, "owner")
 	writerKey := inst.newKey(t, "writer")

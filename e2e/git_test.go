@@ -55,6 +55,7 @@ func mustGit(t *testing.T, dir string, env []string, args ...string) string {
 }
 
 func TestGitOverSSH(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

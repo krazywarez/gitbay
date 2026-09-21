@@ -12,6 +12,7 @@ import (
 // SSH and from the browser. Retargeting changes which diff a review was
 // of, so the existing approvals have to go stale with it.
 func TestMRRetarget(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

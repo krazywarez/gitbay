@@ -10,6 +10,7 @@ import (
 // mute holds, and someone who cannot read the repository is not reached
 // (#202).
 func TestMentionsNotify(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	keys := map[string]string{}
 	for _, u := range []string{"alice", "bob", "carol", "eve"} {

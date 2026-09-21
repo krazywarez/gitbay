@@ -8,6 +8,7 @@ import (
 // The about text is a file in <owner>/.gitbay, read on every surface with
 // the reader's own access.
 func TestProfileAboutFromRepo(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -61,6 +62,7 @@ func TestProfileAboutFromRepo(t *testing.T) {
 // The extension picks the format, .md wins the resolution order, and a
 // private .gitbay keeps the about to the people who can read it.
 func TestProfileAboutFormatAndPrivacy(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -104,6 +106,7 @@ func TestProfileAboutFormatAndPrivacy(t *testing.T) {
 // A dot-repo is infrastructure: it stays out of explore and off the
 // profile's repository list, and stays in the owner's own inventory.
 func TestDotReposHiddenFromListings(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
@@ -140,6 +143,7 @@ func TestDotReposHiddenFromListings(t *testing.T) {
 
 // The about is not settable through profile set any more: it is a file.
 func TestProfileSetHasNoAbout(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

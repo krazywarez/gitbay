@@ -6,6 +6,7 @@ import (
 )
 
 func TestGoImportVanity(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[go_import]\n\"127.0.0.1/tool\" = \"alice/tool\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

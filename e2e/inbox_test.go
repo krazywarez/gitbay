@@ -41,6 +41,7 @@ func notices(t *testing.T, inst *instance, key string, args ...string) []struct 
 }
 
 func TestNotificationInbox(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 
 	aliceKey := inst.newKey(t, "alice")

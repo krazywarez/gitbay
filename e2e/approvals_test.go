@@ -10,6 +10,7 @@ import (
 )
 
 func TestMergeRequirements(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -147,6 +148,7 @@ func TestMergeRequirements(t *testing.T) {
 // merges. When it is on, it gates independently of require_approvals —
 // the coupling that left owners unenforced under default settings (#99).
 func TestCodeownersToggle(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	carolKey := inst.newKey(t, "carol")

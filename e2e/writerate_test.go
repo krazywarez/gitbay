@@ -11,6 +11,7 @@ import (
 // budget is the same one whichever surface spends it. Reads are not
 // charged (#148).
 func TestWriteRateLimit(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[limits]\nwrite_rate = 4\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -48,6 +49,7 @@ func TestWriteRateLimit(t *testing.T) {
 // The runner protocol is exempt: a build streams its log in many small
 // writes, and throttling those would throttle CI itself.
 func TestWriteRateLimitSparesTheRunner(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[limits]\nwrite_rate = 2\n")
 	inst.runner = buildRunner(t)
 	aliceKey := inst.newKey(t, "alice")

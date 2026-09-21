@@ -19,6 +19,7 @@ import (
 // of surfaces is the thing under test, so adding a route without adding
 // it here is the omission that shows up.
 func TestPrivateRepoIsInvisible(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	ownerKey := inst.newKey(t, "owner")
 	strangerKey := inst.newKey(t, "stranger")

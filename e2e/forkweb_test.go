@@ -12,6 +12,7 @@ import (
 // file in the fork, open the merge request against the parent, without a
 // terminal at any step (#174).
 func TestForkWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

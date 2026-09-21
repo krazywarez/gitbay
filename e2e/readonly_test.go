@@ -26,6 +26,7 @@ import (
 // Every ReadOnly command needs an entry in readArgs; a new one without
 // arguments here fails the test rather than going untested.
 func TestReadOnlyCommandsWriteNothing(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n[webhooks]\nallow_local = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub",

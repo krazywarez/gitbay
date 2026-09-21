@@ -9,6 +9,7 @@ import (
 // TestRepoSettingsWeb drives the settings page: each control runs the
 // command the CLI runs, so repo show and settings show are the check.
 func TestRepoSettingsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

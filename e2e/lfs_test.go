@@ -34,6 +34,7 @@ func waitForPort(t *testing.T, port int) {
 }
 
 func TestLFS(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git-lfs"); err != nil {
 		t.Skip("git-lfs client not installed")
 	}

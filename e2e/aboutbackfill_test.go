@@ -11,6 +11,7 @@ import (
 // The about text parked by migration 0058 becomes a file in the owner's
 // .gitbay repository. Running it twice writes nothing the second time.
 func TestMigrateProfileAbout(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

@@ -79,6 +79,7 @@ func (i *instance) buildStatus(t *testing.T, key string) string {
 }
 
 func TestRunnerDrainsOnSIGTERM(t *testing.T) {
+	t.Parallel()
 	inst, key := stopFixture(t)
 	cmd := exec.Command(inst.runner, inst.runnerArgs(t, key)...)
 	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
@@ -137,6 +138,7 @@ func dropInValue(conf, key string) string {
 // The unit must let the drain happen: the stop signal reaches the runner
 // alone, and the stop timeout outlasts a build plus the report retries.
 func TestRunnerDropInLetsTheDrainHappen(t *testing.T) {
+	t.Parallel()
 	conf := runnerDropIn(t)
 	if mode := dropInValue(conf, "KillMode"); mode != "mixed" {
 		t.Fatalf("KillMode=%q, want mixed: control-group signals the step and the log session with the runner", mode)
@@ -173,6 +175,7 @@ func haveUserSystemd(t *testing.T) bool {
 // KillMode the build in flight is reported a success; under systemd's
 // default it is not, which is the failure that shipped once.
 func TestRunnerDrainUnderSystemd(t *testing.T) {
+	t.Parallel()
 	if !haveUserSystemd(t) {
 		t.Skip("no systemd user manager")
 	}

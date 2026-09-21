@@ -24,6 +24,7 @@ func snippetIDFrom(t *testing.T, out string) string {
 // Snippet pages: the owner's list, one snippet with highlighted files, the
 // raw route, the owner-page link, and 404 for what the viewer may not see.
 func TestSnippetsWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

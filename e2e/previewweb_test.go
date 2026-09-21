@@ -13,6 +13,7 @@ import (
 // create, their edit and comment boxes, release create and edit, the
 // profile about text, and the file editor on a path the forge renders.
 func TestMarkupPreviewWeb(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",

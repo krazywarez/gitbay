@@ -12,6 +12,7 @@ import (
 // are something you do to someone else's repository, and the count is a
 // signal of what people found worth returning to (#146).
 func TestBookmarks(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
@@ -89,6 +90,7 @@ func TestBookmarks(t *testing.T) {
 // A repository bookmarked while public and since made private drops out
 // of the listing rather than leaking its existence.
 func TestBookmarkOfRepoGonePrivate(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

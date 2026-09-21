@@ -13,6 +13,7 @@ import (
 // that should only build one project ends up executing every repository's
 // steps — including those of a repository it has nothing to do with.
 func TestRunnerNextScopedToRepos(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
@@ -65,6 +66,7 @@ func TestRunnerNextScopedToRepos(t *testing.T) {
 // same account's full key nor the runner key reaches the wrong side, so a
 // key stolen from a build step cannot administer the instance (#92).
 func TestRunnerScopedKey(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")

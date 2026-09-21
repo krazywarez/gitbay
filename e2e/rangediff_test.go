@@ -12,6 +12,7 @@ import (
 // nothing said what had changed between the two heads. A plain diff of
 // the heads cannot answer that — it shows the whole branch again.
 func TestMRRangeDiff(t *testing.T) {
+	t.Parallel()
 	inst := startInstance(t)
 	key := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub")

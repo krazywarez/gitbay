@@ -11,6 +11,7 @@ import (
 // A first push of a branch other than main moves the unborn HEAD to it,
 // and repo settings default-branch moves it later (#189).
 func TestDefaultBranch(t *testing.T) {
+	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")
