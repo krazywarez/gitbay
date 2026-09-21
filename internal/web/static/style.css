@@ -1643,6 +1643,13 @@ details.refmenu .refdrop a.allrefs {
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
 .shot img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; object-position: top; }
+.shot figcaption {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-1);
+}
 .facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); margin: var(--sp-5) 0; }
 .facets h2 { font-size: var(--fs-3); margin: 0 0 var(--sp-1); }
 .facets p { color: var(--muted); font-size: var(--fs-2); margin: 0; }
