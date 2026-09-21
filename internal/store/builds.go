@@ -275,10 +275,13 @@ func (s *Store) BuildByNumber(repoID, number int64) (Build, error) {
 }
 
 // BuildFilter narrows ListBuilds to builds matching every non-empty field.
+// Before is the keyset cursor: only builds numbered below it, which with
+// the newest-first order is the page after the one that ended there.
 type BuildFilter struct {
 	Ref    string
 	Status string
 	Job    string
+	Before int64
 }
 
 func (s *Store) ListBuilds(repoID int64, f BuildFilter, limit int) ([]Build, error) {
@@ -295,6 +298,10 @@ func (s *Store) ListBuilds(repoID int64, f BuildFilter, limit int) ([]Build, err
 	if f.Job != "" {
 		q += " AND job = ?"
 		args = append(args, f.Job)
+	}
+	if f.Before > 0 {
+		q += " AND number < ?"
+		args = append(args, f.Before)
 	}
 	q += " ORDER BY number DESC LIMIT ?"
 	args = append(args, limit)

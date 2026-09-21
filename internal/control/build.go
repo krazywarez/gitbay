@@ -22,7 +22,7 @@ import (
 func init() {
 	register(Command{Path: []string{"build", "list"},
 		Summary: "list recent builds",
-		Usage:   "build list <owner/name> [--ref <branch>] [--status <state>] [--job <name>]", ReadOnly: true, Run: runBuildList})
+		Usage:   "build list <owner/name> [--ref <branch>] [--status <state>] [--job <name>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runBuildList})
 	register(Command{Path: []string{"build", "show"},
 		Summary: "show one build",
 		Usage:   "build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
@@ -78,10 +78,15 @@ type BuildOut struct {
 	Ref        string `json:"ref"`
 	CreatedAt  string `json:"created_at"`
 	FinishedAt string `json:"finished_at,omitempty"`
+	// Subject is the first line of the commit's message, so a build
+	// names what it ran on rather than only its sha (#241). It is empty
+	// when the commit is no longer in the repository.
+	Subject string `json:"subject,omitempty"`
 }
 
 func buildToOut(b store.Build) BuildOut {
-	return BuildOut{b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt}
+	return BuildOut{Number: b.Number, Job: b.Job, Status: b.Status, SHA: b.SHA,
+		Ref: b.Ref, CreatedAt: b.CreatedAt, FinishedAt: b.FinishedAt}
 }
 
 func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
@@ -107,7 +112,16 @@ func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
 // is told to pick from.
 var buildStatuses = []string{"pending", "running", "success", "failure", "cancelled"}
 
+// buildPage is how many builds one page of build list returns when no
+// --limit is given. The cap has always been there; what it is now
+// reachable past, with --cursor (#244).
+const buildPage = 50
+
 func runBuildList(c *Ctx, args []string) int {
+	args, p, code := parsePageFlags(c, args, "build", true)
+	if code >= 0 {
+		return code
+	}
 	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--status", "--job"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -124,19 +138,46 @@ func runBuildList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	builds, err := c.Store.ListBuilds(repo.ID, store.BuildFilter{Ref: f.Value("--ref"), Status: status, Job: f.Value("--job")}, 50)
+	limit := p.queryLimit()
+	if limit == 0 {
+		limit = buildPage
+	}
+	filter := store.BuildFilter{Ref: f.Value("--ref"), Status: status, Job: f.Value("--job"), Before: p.keyInt()}
+	builds, err := c.Store.ListBuilds(repo.ID, filter, limit)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	builds, next := trimPage(p, builds, "build", func(b store.Build) string {
+		return strconv.FormatInt(b.Number, 10)
+	})
 	var ds []BuildOut
 	for _, b := range builds {
 		ds = append(ds, buildToOut(b))
 	}
-	return c.emit(ds, func(w io.Writer) {
+	subjects := buildSubjects(c, repo, ds)
+	for i := range ds {
+		ds[i].Subject = subjects[ds[i].SHA]
+	}
+	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%.10s\t%s\n", d.Number, d.Job, d.Status, d.SHA, d.Ref)
+			fmt.Fprintf(w, "%d\t%s\t%s\t%.10s\t%s\t%s\n", d.Number, d.Job, d.Status, d.SHA, d.Ref, d.Subject)
 		}
 	})
+}
+
+// buildSubjects reads the commit subject of each distinct sha on a page
+// of builds. Several jobs of one push share a commit, so the set is
+// usually far smaller than the page.
+func buildSubjects(c *Ctx, repo store.Repo, ds []BuildOut) map[string]string {
+	seen := map[string]bool{}
+	var shas []string
+	for _, d := range ds {
+		if d.SHA != "" && !seen[d.SHA] {
+			seen[d.SHA] = true
+			shas = append(shas, d.SHA)
+		}
+	}
+	return gitutil.Subjects(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name), shas)
 }
 
 func runBuildShow(c *Ctx, args []string) int {

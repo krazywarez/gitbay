@@ -38,12 +38,12 @@
 <pre class="code" tabindex="0">[![build](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/badge/build.svg)](https://{{.Host}}/{{.Repo.OwnerName}}/{{.Repo.Name}}/builds)</pre>
 <p class="meta">Add <code>?job=name</code> for one job.</p>
 </details>
-<p class="meta">{{len .Builds}} build{{if ne (len .Builds) 1}}s{{end}} in {{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}}{{if or .Filter.Ref .Filter.Status .Filter.Job}}, <a href="?">clear filters</a>{{end}}</p>
+<p class="meta">{{len .Builds}} build{{if ne (len .Builds) 1}}s{{end}} in {{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}}{{if .Older}} on this page{{end}}{{if or .Filter.Ref .Filter.Status .Filter.Job}}, <a href="?">clear filters</a>{{end}}</p>
 <ul class="loglist rows">
 {{range .Runs}}<li>
   <div class="commitmain">
-    <p class="subject"><code><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{printf "%.10s" .SHA}}</a></code></p>
-    <p class="meta">{{.Ref}} · {{when .CreatedAt}}</p>
+    <p class="subject"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/commit/{{.SHA}}">{{if .Subject}}{{.Subject}}{{else}}{{printf "%.10s" .SHA}}{{end}}</a></p>
+    <p class="meta">{{if .Subject}}<code>{{printf "%.10s" .SHA}}</code> · {{end}}{{.Ref}} · {{when .CreatedAt}}</p>
   </div>
   <div class="commitside">
     <span class="badge check-{{.Status}}">{{.Status}}</span>
@@ -52,6 +52,7 @@
 </li>
 {{else}}<li class="empty">no builds — push a commit with a <code>.gitbay/ci.yml</code></li>{{end}}
 </ul>
+{{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 </div>
 </div>
 {{end}}

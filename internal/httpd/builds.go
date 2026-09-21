@@ -132,6 +132,7 @@ func distinctRefs(builds []control.BuildOut, current string) []string {
 // one queueing of a commit, not the commit — see groupRuns (#240).
 type buildRun struct {
 	SHA       string
+	Subject   string
 	Ref       string
 	CreatedAt string
 	Status    string
@@ -194,12 +195,33 @@ func groupRuns(builds []control.BuildOut) []buildRun {
 			runs[n-1].Builds = append(runs[n-1].Builds, b)
 			continue
 		}
-		runs = append(runs, buildRun{SHA: b.SHA, Ref: b.Ref, CreatedAt: b.CreatedAt, Builds: []control.BuildOut{b}})
+		runs = append(runs, buildRun{SHA: b.SHA, Subject: b.Subject, Ref: b.Ref, CreatedAt: b.CreatedAt, Builds: []control.BuildOut{b}})
 	}
 	for i := range runs {
 		runs[i].Status = combinedStatus(runs[i].Builds)
 	}
 	return runs
+}
+
+// buildsPerPage is how many builds one page of the builds tab asks for.
+// Fewer than the command's own default, because the page folds them into
+// runs and a run is several builds tall (#244).
+const buildsPerPage = 30
+
+// olderBuilds is the link to the page after this one: the command's own
+// keyset cursor with the three filters carried along, so paging never
+// drops a filter and a filter never lands on page two.
+func olderBuilds(f buildFilter, next string) string {
+	if next == "" {
+		return ""
+	}
+	q := url.Values{"cursor": {next}}
+	for k, v := range map[string]string{"ref": f.Ref, "status": f.Status, "job": f.Job} {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	return "?" + q.Encode()
 }
 
 func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +234,7 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 
 	qv := r.URL.Query()
 	filter := buildFilter{Ref: qv.Get("ref"), Status: qv.Get("status"), Job: qv.Get("job")}
-	argv := []string{"build", "list", p.Repo.Path()}
+	argv := []string{"build", "list", p.Repo.Path(), "--limit", strconv.Itoa(buildsPerPage)}
 	if filter.Ref != "" {
 		argv = append(argv, "--ref", filter.Ref)
 	}
@@ -222,9 +244,16 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 	if filter.Job != "" {
 		argv = append(argv, "--job", filter.Job)
 	}
+	if cursor := qv.Get("cursor"); cursor != "" {
+		argv = append(argv, "--cursor", cursor)
+	}
 
-	var builds []control.BuildOut
-	s.runControlInto(viewer, argv, &builds)
+	var page struct {
+		Items []control.BuildOut `json:"items"`
+		Next  string             `json:"next"`
+	}
+	s.runControlInto(viewer, argv, &page)
+	builds := page.Items
 
 	// The jobs a trigger can name. A repo without a CI config has none;
 	// that is not an error for this page.
@@ -241,10 +270,11 @@ func (s *Server) builds(w http.ResponseWriter, r *http.Request) {
 		Filter   buildFilter
 		Facets   []facetGroup
 		Refs     []string
+		Older    string
 		CanWrite bool
 		Notice   string
 	}{p, builds, jobs, groupRuns(builds), filter, buildFacets(filter, jobs, refs), refs,
-		s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
+		olderBuilds(filter, page.Next), s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 
 func (s *Server) build(w http.ResponseWriter, r *http.Request) {

@@ -109,3 +109,28 @@ func RevListMessages(dir, old, new string, max int) ([]CommitMsg, error) {
 	}
 	return msgs, nil
 }
+
+// Subjects returns the first line of each named commit's message, keyed
+// by sha. One git log for the whole set rather than one per sha: a page
+// of builds names a handful of distinct commits and a subprocess each
+// would show. --ignore-missing keeps a sha git cannot resolve from
+// failing the rest, because a build outlives the commit it ran on once a
+// branch is force-pushed; such a sha is simply absent from the map.
+func Subjects(dir string, shas []string) map[string]string {
+	if len(shas) == 0 {
+		return nil
+	}
+	args := append([]string{"-C", dir, "log", "--no-walk=unsorted", "--ignore-missing", "--format=%H%x00%s"}, shas...)
+	args = append(args, "--")
+	out, err := exec.Command(toolpath.Look("git"), args...).Output()
+	if err != nil {
+		return nil
+	}
+	subjects := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if sha, subject, ok := strings.Cut(line, "\x00"); ok {
+			subjects[sha] = subject
+		}
+	}
+	return subjects
+}
