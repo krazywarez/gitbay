@@ -40,7 +40,9 @@
 </li>
 {{end}}
 </ul>
-{{else}}<p class="empty-note">no matches for “{{.Query}}”</p>{{end}}
+{{/* The count line above already says nothing matched, so this one
+     carries the way out instead of repeating it. */}}
+{{else}}<p class="empty-note">Try fewer words{{if .Kind}}, <a href="?q={{.Query}}">search everything</a>,{{end}} or <a href="/explore">browse the repositories</a>.</p>{{end}}
 {{else}}
 <p class="empty-note">Repository names, descriptions and topics, and the title and body of every issue and merge request you can read. File contents are searched per repository, from a repository's Code tab.</p>
 {{end}}

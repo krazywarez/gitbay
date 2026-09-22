@@ -56,6 +56,17 @@ func TestGlobalSearchAndNotificationsWeb(t *testing.T) {
 		t.Fatal("short query not refused")
 	}
 
+	// A query that matches nothing says what to do next instead of
+	// repeating the count line's "no matches" under it (#248).
+	_, body = inst.get(t, "/search?q=zzznothing&kind=issue")
+	if !strings.Contains(body, "0 results") || !strings.Contains(body, "Try fewer words") ||
+		!strings.Contains(body, "search everything") {
+		t.Fatalf("empty search lacks its recovery line:\n%s", body)
+	}
+	if strings.Contains(body, "no matches") {
+		t.Fatalf("empty search repeats the count line:\n%s", body)
+	}
+
 	// Alice sees her private repository and its issue in the same page.
 	browser := inst.login(t, aliceKey)
 	status, body = browserGet(t, browser, inst.base()+"/search?q=widget")
