@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.34.1 — 2026-09-21
+
+Three findings from an external review of the web UI (#248).
+
+- Explore is a rail square at every width. It was =.railopt=, so it
+  dropped below 34rem into the More menu, which exists only for a
+  signed-in viewer: a signed-out phone had no route to the listing from
+  any page. Six squares and the mark are 308px, inside a 320px phone.
+- =/register= answers "no key yet?" in place, with the =ssh-keygen= and
+  =cat= lines behind a disclosure, instead of linking out to the wiki
+  over a half-filled form. The link also hardcoded =gitbay.org=.
+- An empty =/search= says what to do next — fewer words, the same query
+  across every kind, or the listing — rather than repeating the count
+  line's "no matches".
+
 * v1.34.0 — 2026-09-21
 
 The profile's tabs, reworked.
