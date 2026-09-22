@@ -200,8 +200,11 @@ func TestLandingRoutes(t *testing.T) {
 		t.Error("landing still calls repo create the whole onboarding")
 	}
 	_, reg := inst.get(t, "/register")
-	if !strings.Contains(reg, "Paste the contents of your public key file") || !strings.Contains(reg, "/krz/gitbay/wiki/SSH-keys") {
-		t.Error("register page lacks the key hint or the wiki link")
+	if !strings.Contains(reg, "Paste the contents of your public key file") || !strings.Contains(reg, "ssh-keygen -t ed25519") {
+		t.Error("register page lacks the key hint or the disclosure that makes a key")
+	}
+	if strings.Contains(reg, "gitbay.org/krz/gitbay/wiki") {
+		t.Error("register page links out to this instance's wiki")
 	}
 }
 
