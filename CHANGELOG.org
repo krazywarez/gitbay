@@ -48,7 +48,12 @@ Eleven web findings, mostly alignment and affordance (#247).
   active, rather than leaving the cell short, and the page is wide. At
   48rem the Actions cell clipped the second form's button, which left
   its confirm field looking like it belonged to the button before it —
-  an active row read as though Promote wanted the name typed.
+  an active row read as though Promote wanted the name typed. The cell
+  is now two fixed slots, each right-aligned, so the role button, the
+  confirm field and the access button each hold one column whichever
+  controls a row carries: an admin's row has a field on both forms, a
+  disabled account's enable form has none. The field is 14rem, which
+  fits "type <name> to confirm" for a name of ordinary length.
 - The profile's inactive tabs draw their underline in =--line=, so the
   strip reads as a track the current tab is marked in.
 - =.listhead= sheds its children's block margins, which is what kept a

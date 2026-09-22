@@ -25,7 +25,7 @@
   <td><span class="chip {{if eq .State "active"}}chip-open{{else if eq .State "disabled"}}chip-closed{{else}}chip-neutral{{end}}">{{.State}}</span></td>
   <td>{{when .CreatedAt}}</td>
   <td>{{if .LastSeen}}{{when .LastSeen}}{{else}}never{{end}}</td>
-  <td>
+  <td class="acts">
     {{if .Admin}}
     <form method="post" action="/admin/users" class="actions">
       <input type="hidden" name="field" value="demote">
@@ -42,10 +42,11 @@
     </form>
     {{else}}
     {{/* An account that is not active cannot be promoted, but the row
-         still draws the control so every Actions cell is the same
-         shape. Both parts are disabled, so the form never posts. */}}
+         still draws the button so the cell keeps its shape. It carries
+         no confirm field: nothing is confirmed, and a second field with
+         the same placeholder as the disable form's reads as a duplicate
+         of it. Disabled, so the form never posts. */}}
     <form method="post" action="/admin/users" class="actions" title="Only an active account can be promoted">
-      <input type="text" name="confirm" aria-label="Type {{.Username}} to confirm" placeholder="type {{.Username}} to confirm" size="{{len .Username}}" autocomplete="off" disabled>
       <button type="submit" class="btn" disabled>Promote</button>
     </form>
     {{end}}
