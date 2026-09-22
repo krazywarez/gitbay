@@ -19,7 +19,7 @@
        are kept in step by hand: add a square there and add it here. */}}
   <ul class="raillist">
     {{if .Viewer}}<li>{{template "raillink" dict "Href" "/" "Icon" "home" "Name" "Dashboard" "Current" (eq (str . "Tab") "dashboard")}}</li>{{end}}
-    <li class="railopt">{{template "raillink" dict "Href" "/explore" "Icon" "compass" "Name" "Explore" "Current" (eq (str . "Tab") "explore")}}</li>
+    <li>{{template "raillink" dict "Href" "/explore" "Icon" "compass" "Name" "Explore" "Current" (eq (str . "Tab") "explore")}}</li>
     <li>{{template "raillink" dict "Href" "/search" "Icon" "search" "Name" "Search" "Current" (eq (str . "Tab") "sitesearch")}}</li>
     {{if .Viewer}}<li>{{template "raillink" dict "Href" "/notifications" "Icon" "bell" "Name" "Notifications" "Current" (eq (str . "Tab") "notifications") "Count" .Rail.Unread}}</li>
     <li class="railopt">{{template "raillink" dict "Href" "/new" "Icon" "plus" "Name" "New repository"}}</li>{{end}}
@@ -33,7 +33,6 @@
     {{if .Viewer}}<details class="railmore">
       <summary class="railicon" aria-label="More" title="More">{{template "icon" "ellipsis"}}<span class="vh">More</span></summary>
       <div class="raildrop">
-        <a href="/explore">{{template "icon" "compass"}} Explore</a>
         <a href="/new">{{template "icon" "plus"}} New repository</a>
         <a href="/settings">{{template "icon" "gear"}} Settings</a>
         {{if .Admin}}<a href="/admin">{{template "icon" "shield"}} Admin</a>{{end}}

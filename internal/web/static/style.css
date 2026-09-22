@@ -1861,10 +1861,13 @@ svg.icon { vertical-align: -0.125em; }
 }
 
 /* Nine 44px squares and the mark are 440px, so below 34rem the rail
-   keeps five — dashboard, search, notifications, More, your avatar — and
-   the More menu holds the rest. Shrinking the squares instead is what
-   this replaces: 32px was under the target every phone guideline asks
-   for, and the count only grows. */
+   keeps six — dashboard, explore, search, notifications, More, your
+   avatar — and the More menu holds the rest. Seven squares at 44px are
+   308px, inside a 320px phone. Explore is one of the six because the
+   More menu only exists for a signed-in viewer: dropping it left a
+   signed-out phone with no route to the listing at all. Shrinking the
+   squares instead is what this replaces: 32px was under the target
+   every phone guideline asks for, and the count only grows. */
 @media (max-width: 34rem) {
   .railopt { display: none; }
   .railmore { display: block; }
