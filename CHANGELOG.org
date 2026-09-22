@@ -4,7 +4,7 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.34.0 — 2026-09-21
 
 The profile's tabs, reworked.
 
@@ -60,6 +60,22 @@ Eleven web findings, mostly alignment and affordance (#247).
   =p.meta= from sitting level with the heading beside it.
 - =nav.tabs= has a bottom margin.
 - The footer links the iOS client.
+
+The e2e suite runs in parallel (#246).
+
+- =startInstance= linked a byte-identical 35MB gitbayd for each of the
+  207 tests, about 0.8s apiece: go's build cache covers the compile,
+  not the link. Each binary is now built once per process, lazily, so
+  a =-run= of one test links only what it needs.
+- 202 of the 207 tests take =t.Parallel=; the five calling =t.Setenv=
+  stay serial. =freePorts= allocates from an atomic counter instead of
+  binding =:0= and closing it, which raced once tests overlapped —
+  =waitForPort= only asks whether something is listening, so the loser
+  talked to another test's server.
+- Locally on 12 cores the suite goes from 637s to two or three minutes.
+  The =-timeout= floor the harness enforced (#143) is gone with the
+  reason for it; =make test= and =.gitbay/ci.yml= still pass their own
+  as a ceiling for a real hang.
 
 * v1.33.0 — 2026-09-21
 
