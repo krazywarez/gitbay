@@ -158,6 +158,10 @@ The row is =n/a= on the CLI: a terminal has no form to preview, and
 =issue show= already renders. Diff-line comments are left out — they
 sit inside the diff, where a page-level preview has nowhere to go.
 
+The iOS client resolves no autolinks: =#N= and =owner/name#N= render as
+text in its threads, so a preview there will show the app's rendering
+rather than the one the web page shows.
+
 * Repositories
 
 | capability                  | cli | web | ios |
@@ -201,7 +205,8 @@ sit inside the diff, where a page-level preview has nowhere to go.
 | release create, edit        | yes | yes | yes |
 | preview release notes       | n/a | yes | no  |
 | build list                  | yes | yes | yes |
-| build list paging (limit, cursor) | yes | yes | yes |
+| build list paging (limit, cursor) | yes | yes | no  |
+| build row names its commit  | yes | yes | no  |
 | build list filters (ref, status, job) | yes | yes | yes |
 | build show (one build)      | yes | yes | yes |
 | build log                   | yes | yes | yes |
