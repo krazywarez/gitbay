@@ -79,7 +79,7 @@
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-approvals">
   <div><label for="approvals">Approvals</label><p class="hint">Approvals from anyone with write access. Zero means none required.</p></div>
-  <div><input type="number" id="approvals" name="approvals" min="0" max="10" value="{{.Repo.Settings.RequireApprovals}}"></div>
+  <div class="num"><input type="number" id="approvals" name="approvals" min="0" max="10" value="{{.Repo.Settings.RequireApprovals}}"></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
 <form method="post" action="{{$base}}" class="setform">

@@ -133,21 +133,21 @@ account and where notifications go.</p>
 <form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-mail">
   <label for="notify-mail">Activity by mail</label>
-  <input type="checkbox" id="notify-mail" name="mail" value="on"{{if .MailOn}} checked{{end}}>
+  <div class="check"><input type="checkbox" id="notify-mail" name="mail" value="on"{{if .MailOn}} checked{{end}}></div>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Enable to receive activity alerts by email. Login links will arrive regardless of this setting.</p>
 <form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-watch">
   <label for="notify-watch">Watch repositories you can write to</label>
-  <input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}>
+  <div class="check"><input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}></div>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Alerts for every issue and merge request on those repositories. A watch or mute on a repository has priority over this setting.</p>
 <form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-push">
   <label for="notify-push">Activity on your registered devices</label>
-  <input type="checkbox" id="notify-push" name="push" value="on"{{if .PushOn}} checked{{end}}>
+  <div class="check"><input type="checkbox" id="notify-push" name="push" value="on"{{if .PushOn}} checked{{end}}></div>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Notification text is sent in full, including for private repositories, so a repository name and item number reach Apple and appear on a lock screen.</p>

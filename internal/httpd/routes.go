@@ -117,6 +117,7 @@ func (s *Server) Routes() []Route {
 			Route{Method: "GET", Pattern: "/login", Handler: s.login, Mutating: true}, // consumes a one-time token
 			Route{Method: "POST", Pattern: "/login", Mutating: true,
 				Handler: s.checkOrigin(s.loginSubmit)},
+			Route{Method: "GET", Pattern: "/logout", Handler: s.requireUser(s.logoutForm)},
 			Route{Method: "POST", Pattern: "/logout", Mutating: true,
 				Handler: s.checkOrigin(s.logout)},
 			Route{Method: "GET", Pattern: "/new", Handler: s.requireUser(s.newRepoForm)},

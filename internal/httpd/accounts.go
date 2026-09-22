@@ -167,6 +167,15 @@ func (s *Server) sessionCookieFor(tok string) *http.Cookie {
 	}
 }
 
+// logoutForm is GET /logout: the confirmation the rail's signout square
+// and the More menu link to, so the session does not end on one stray
+// click. The button posts to the same path.
+func (s *Server) logoutForm(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.render(w, "logout.html", struct {
+		basePage
+	}{s.baseFor(u)})
+}
+
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if ck, err := r.Cookie(sessionCookie); err == nil {
 		s.st.DeleteWebSession(store.HashToken(ck.Value))

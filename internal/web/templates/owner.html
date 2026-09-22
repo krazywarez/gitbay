@@ -13,7 +13,7 @@
      push the repositories off the bottom of the page (#242). About is
      the bare /{owner}; the rest hang off /-/. A tab nobody may open is
      not offered and its URL is a 404. */}}
-<nav class="tabs" aria-label="Profile">
+<nav class="tabs profiletabs" aria-label="Profile">
   <a {{if eq .Tab "about"}}aria-current="page" {{end}}href="/{{.Owner}}">About</a>
   <a {{if eq .Tab "repos"}}aria-current="page" {{end}}href="/{{.Owner}}/-/repositories">Repositories{{if .Repos}} <i>{{len .Repos}}</i>{{end}}</a>
   {{if .Self}}<a {{if eq .Tab "bookmarks"}}aria-current="page" {{end}}href="/{{.Owner}}/-/bookmarks">Bookmarks</a>{{end}}

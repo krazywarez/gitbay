@@ -31,8 +31,11 @@
 {{range .Results}}<li>
   <div class="issuemain">
     <p class="title"><a href="{{.Href}}">{{if .Number}}{{.Title}}{{else}}{{.Repo}}{{end}}</a></p>
-    <p class="meta">{{if .Number}}<a href="/{{.Repo}}">{{.Repo}}</a>{{.Marker}}{{.Number}} opened by <a href="/{{.Author}}">{{.Author}}</a>{{else if .Title}}{{.Title}}{{else}}repository{{end}}</p>
+    <p class="meta">{{if .Number}}<a href="/{{.Repo}}">{{.Repo}}</a>{{.Marker}}{{.Number}} opened by <a href="/{{.Author}}">{{.Author}}</a>{{else if .Title}}{{.Title}}{{end}}</p>
   </div>
+  {{/* the kind in the words the CLI prints, so a hit reads the same in
+       both places; it is why the meta no longer says "repository" */}}
+  <span class="chip chip-neutral">{{.Kind}}</span>
   {{if .State}}<span class="chip chip-{{.State}}">{{.State}}</span>{{end}}
 </li>
 {{end}}

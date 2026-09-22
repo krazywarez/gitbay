@@ -480,6 +480,7 @@ nav.tabs {
   display: flex;
   gap: var(--sp-1);
   margin-top: var(--sp-3);
+  margin-bottom: var(--sp-4);
   overflow-x: auto;
   /* with overflow-y left visible the browser computes it to auto, which
      is a vertical drag on touch; the strip scrolls sideways only */
@@ -500,6 +501,12 @@ nav.tabs a {
 }
 nav.tabs a:hover { color: var(--fg); text-decoration: none; }
 nav.tabs a[aria-current] { color: var(--fg); font-weight: 600; border-bottom-color: var(--mark); }
+/* the profile strip draws its unlit tabs, so the underline reads as the
+   control rather than appearing only on the one you are already on.
+   --line, not --faint: the track has to be visible to be a track, and
+   at 2px --faint disappears into the canvas in both schemes. */
+nav.tabs.profiletabs a { border-bottom-color: var(--line); }
+nav.tabs.profiletabs a[aria-current] { border-bottom-color: var(--mark); }
 /* a count in a tab is plain metadata, not a badge */
 nav.tabs a i { font-style: normal; color: var(--muted); margin-left: 4px; }
 
@@ -511,7 +518,10 @@ nav.tabs a i { font-style: normal; color: var(--muted); margin-left: 4px; }
   flex-wrap: wrap;
   margin-bottom: var(--sp-5);
 }
+/* every child sheds its block margins, or a p.meta beside an h1 centres
+   its text inside a box the margins made taller than the heading's */
 .pagehead h1, .listhead h1, .headrow h1, .listhead h2, .headrow h2 { margin: 0; }
+.pagehead > p, .listhead > p, .headrow > p { margin: 0; }
 .pagehead .grow, .listhead .spacer, .headrow .spacer { flex: 1; }
 .issuetitle { margin: 0 0 var(--sp-2); font-size: var(--fs-5); }
 .issuenumber { color: var(--muted); font-weight: 400; }
@@ -758,10 +768,15 @@ details.editbox[open] > summary { margin-bottom: var(--sp-2); }
 details.editbox input[type="text"] { width: 100%; }
 
 /* ---- settings: one row per control, label then input then its own
-   button. The name stays setform because the templates carry it. ---- */
+   button. The name stays setform because the templates carry it.
+   The label column takes the slack, so the control and the button ride
+   the right edge: a checkbox, a number and a full-width text input all
+   end on the same rule instead of the narrow ones stranding left. Its
+   14rem floor is what keeps a hint from wrapping a word to a line once
+   the control column claims its 28rem. ---- */
 form.setform {
   display: grid;
-  grid-template-columns: 14rem minmax(0, 28rem) auto;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 28rem) auto;
   gap: var(--sp-4);
   align-items: start;
   padding: var(--sp-3) 0;
@@ -769,7 +784,12 @@ form.setform {
 }
 form.setform label { margin-top: 6px; }
 form.setform .hint { margin: 2px 0 0; }
-form.setform input[type="text"], form.setform input[type="number"], form.setform select { width: 100%; }
+form.setform input[type="text"], form.setform select { width: 100%; }
+/* a control narrower than its column is pushed to the column's end,
+   which is where a full-width input's own right edge lands */
+form.setform .check { justify-content: flex-end; }
+form.setform .num { text-align: right; }
+form.setform .num input[type="number"] { width: auto; }
 /* the third column takes the leftover width; the button keeps its own */
 form.setform > button, form.setform > .btngroup { justify-self: start; }
 form.setform.stack { grid-template-columns: 1fr; }
@@ -786,6 +806,9 @@ ul.protlist li:last-child { border-bottom: 0; }
 ul.protlist form { margin-left: auto; }
 ul.plain { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
 ul.plain li { padding: var(--sp-1) 0; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+/* the email list: address and badges read left, the controls sit right,
+   so the buttons line up down the list however long an address is */
+ul.plain li > form:first-of-type { margin-left: auto; }
 
 /* ---- messages: .error and .notice are one family. The names stay
    because e2e tests match class="error". ---- */
@@ -863,6 +886,9 @@ td.name a { color: var(--fg); }
 td.name a:hover { color: var(--link); }
 table.tree td.name { width: 25%; white-space: nowrap; }
 table.tree td.name.dir a { color: var(--link); }
+/* the glyph stays muted in both rows: it is a shape cue, and colour here
+   goes on carrying what it already carries */
+table.tree td.name svg { color: var(--muted); vertical-align: -0.125em; margin-right: var(--sp-2); }
 table.tree th.lastcommit, table.tree td.lastcommit { width: 55%; }
 table.tree td.lastcommit {
   max-width: 0;
@@ -1800,7 +1826,7 @@ svg.icon { vertical-align: -0.125em; }
   ul.loglist .commitside { width: 100%; justify-content: flex-start; }
 }
 
-/* Eleven 44px squares and the mark are 524px, so below 34rem the rail
+/* Nine 44px squares and the mark are 440px, so below 34rem the rail
    keeps five — dashboard, search, notifications, More, your avatar — and
    the More menu holds the rest. Shrinking the squares instead is what
    this replaces: 32px was under the target every phone guideline asks

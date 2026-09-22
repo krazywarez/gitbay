@@ -235,6 +235,16 @@ func TestWebAccounts(t *testing.T) {
 		t.Fatalf("cross-origin POST: %d, want 403", resp.StatusCode)
 	}
 
+	// Logging out is confirmed first: the GET renders the page and leaves
+	// the session alone, and only the POST ends it.
+	status, body = browserGet(t, browser, inst.base()+"/logout")
+	if status != 200 || !strings.Contains(body, `action="/logout"`) {
+		t.Fatalf("logout confirmation: %d\n%s", status, body)
+	}
+	if status, _ = browserGet(t, browser, inst.base()+"/alice/webborn"); status != 200 {
+		t.Fatalf("GET /logout ended the session: %d", status)
+	}
+
 	// Logout kills the session.
 	if status, _ = browserPost(t, browser, inst.base()+"/logout", url.Values{}); status != 200 {
 		t.Fatalf("logout: %d", status)

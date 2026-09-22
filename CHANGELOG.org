@@ -19,11 +19,39 @@ The profile's tabs, reworked.
   goes back further.
 - Bookmarks are a tab on your own profile. =repo bookmarks= takes no
   owner and lists the caller's, so the tab is not offered on anyone
-  else's and its URL is a 404 there. =/bookmarks= redirects to it, and
-  the rail points at the tab.
+  else's and its URL is a 404 there. =/bookmarks= redirects to it.
 - The snippet list renders inside the profile rather than on a page of
   its own, so it carries the header and the tab bar like every other
   section. A snippet itself is still its own page.
+
+Eleven web findings, mostly alignment and affordance (#247).
+
+- Logging out asks first. =GET /logout= is the confirmation page the
+  rail's signout square and the More menu link to; the button on it
+  posts to the same path, which is still what ends the session.
+- Bookmarks and Snippets are gone from the rail and the More menu. Both
+  land on the profile, where they are tabs, and every square left in
+  the rail is an instance-level destination.
+- A repository tree marks a directory with a folder glyph and a file
+  with a file glyph. The trailing slash still says it in text and the
+  glyphs are =aria-hidden=, so the cue no longer rests on the link
+  colour alone. Per-filetype icons are deliberately not done.
+- A =/search= hit carries its kind in a chip, in the words =search=
+  prints, so the meta line no longer has to say "repository".
+- A settings row lines its control up on the right: a checkbox, a
+  number and a full-width text input all end on the same rule, with
+  Save in its own column. The label column keeps a 14rem floor so a
+  hint does not wrap a word to a line.
+- The email rows on =/settings= put their buttons and confirm field on
+  the right, so they line up however long an address is.
+- =/admin/users= draws a disabled Promote on an account that is not
+  active, rather than leaving the cell short.
+- The profile's inactive tabs draw their underline in =--line=, so the
+  strip reads as a track the current tab is marked in.
+- =.listhead= sheds its children's block margins, which is what kept a
+  =p.meta= from sitting level with the heading beside it.
+- =nav.tabs= has a bottom margin.
+- The footer links the iOS client.
 
 * v1.33.0 — 2026-09-21
 

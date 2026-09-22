@@ -22,8 +22,6 @@
     <li class="railopt">{{template "raillink" dict "Href" "/explore" "Icon" "compass" "Name" "Explore" "Current" (eq (str . "Tab") "explore")}}</li>
     <li>{{template "raillink" dict "Href" "/search" "Icon" "search" "Name" "Search" "Current" (eq (str . "Tab") "sitesearch")}}</li>
     {{if .Viewer}}<li>{{template "raillink" dict "Href" "/notifications" "Icon" "bell" "Name" "Notifications" "Current" (eq (str . "Tab") "notifications") "Count" .Rail.Unread}}</li>
-    <li class="railopt">{{template "raillink" dict "Href" (printf "/%s/-/bookmarks" .Viewer) "Icon" "bookmark" "Name" "Bookmarks" "Current" (eq (str . "Tab") "bookmarks")}}</li>
-    <li class="railopt">{{template "raillink" dict "Href" (printf "/%s/-/snippets" .Viewer) "Icon" "snippet" "Name" "Snippets" "Current" (eq (str . "Tab") "snippets")}}</li>
     <li class="railopt">{{template "raillink" dict "Href" "/new" "Icon" "plus" "Name" "New repository"}}</li>{{end}}
   </ul>
   <span class="railgap"></span>
@@ -36,16 +34,14 @@
       <summary class="railicon" aria-label="More" title="More">{{template "icon" "ellipsis"}}<span class="vh">More</span></summary>
       <div class="raildrop">
         <a href="/explore">{{template "icon" "compass"}} Explore</a>
-        <a href="/{{.Viewer}}/-/bookmarks">{{template "icon" "bookmark"}} Bookmarks</a>
-        <a href="/{{.Viewer}}/-/snippets">{{template "icon" "snippet"}} Snippets</a>
         <a href="/new">{{template "icon" "plus"}} New repository</a>
         <a href="/settings">{{template "icon" "gear"}} Settings</a>
         {{if .Admin}}<a href="/admin">{{template "icon" "shield"}} Admin</a>{{end}}
-        <form method="post" action="/logout"><button type="submit">{{template "icon" "signout"}} Log out</button></form>
+        <a href="/logout">{{template "icon" "signout"}} Log out</a>
       </div>
     </details>
     <a class="railuser" href="/{{.Viewer}}" aria-label="Your profile" title="{{.Viewer}}"><span class="avatar">{{initial .Viewer}}</span></a>
-    <form class="railopt" method="post" action="/logout"><button type="submit" class="railicon" aria-label="Log out" title="Log out">{{template "icon" "signout"}}<span class="vh">Log out</span></button></form>
+    <a class="railopt railicon" href="/logout" aria-label="Log out" title="Log out">{{template "icon" "signout"}}<span class="vh">Log out</span></a>
     {{else}}<a class="railicon" href="/login" aria-label="Sign in" title="Sign in">{{template "icon" "person"}}<span class="vh">Sign in</span></a>{{end}}
   </div>
 </nav>
@@ -88,7 +84,7 @@
 </main>
 
 <footer>
-  <p>Powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="/privacy">Privacy</a></p>
+  <p>Powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="https://gitbay.org/krz/gitbay-ios">iOS app</a> · <a href="/privacy">Privacy</a></p>
 </footer>
 </div>
 </div>
@@ -112,6 +108,8 @@
 {{- else if eq . "ellipsis"}}<circle cx="3.25" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.75" cy="8" r="1.1" fill="currentColor" stroke="none"/>
 {{- else if eq . "snippet"}}<path d="M3.25 2.75h6L12.75 6v7.25a.5.5 0 0 1-.5.5H3.75a.5.5 0 0 1-.5-.5Z"/><path d="M9 2.75V6h3.75"/><path d="m6.75 8.75-1.5 1.5 1.5 1.5M9.75 8.75l1.5 1.5-1.5 1.5"/>
 {{- else if eq . "person"}}<circle cx="8" cy="5.5" r="2.75"/><path d="M2.75 14a5.25 5.25 0 0 1 10.5 0"/>
+{{- else if eq . "folder"}}<path d="M1.75 3.25h4l1.5 1.75h6.5v7.5a.5.5 0 0 1-.5.5H2.25a.5.5 0 0 1-.5-.5Z"/>
+{{- else if eq . "file"}}<path d="M3.25 2.75h6L12.75 6v7.25a.5.5 0 0 1-.5.5H3.75a.5.5 0 0 1-.5-.5Z"/><path d="M9 2.75V6h3.75"/>
 {{- end}}</svg>{{end}}
 
 {{/* raillink draws one square in the rail: the icon, the name for a

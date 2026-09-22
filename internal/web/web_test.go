@@ -90,7 +90,7 @@ func TestWhenNamesTheZone(t *testing.T) {
 // a per-view define instead of a fixed one.
 func TestMainWidthClass(t *testing.T) {
 	wide := map[string]bool{"tree.html": true, "blob.html": true, "blame.html": true, "log.html": true, "commit.html": true, "compare.html": true, "builds.html": true, "build.html": true, "search.html": true, "globalsearch.html": true, "edit.html": true, "dashboard.html": true, "issues.html": true, "mrs.html": true, "explore.html": true, "notifications.html": true, "settings.html": true, "account.html": true, "admin.html": true}
-	bounded := map[string]bool{"landing.html": true, "fork.html": true, "login.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "adminusers.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
+	bounded := map[string]bool{"landing.html": true, "fork.html": true, "login.html": true, "logout.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "adminusers.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
 	perView := map[string]string{"mr.html": `{{define "width"}}{{if eq .View "diff"}}wide{{else}}reading{{end}}{{end}}`}
 	for _, name := range Pages() {
 		src, err := TemplateSource(name)
@@ -160,7 +160,13 @@ func TestRailIconsAreLabelled(t *testing.T) {
 		}
 	}
 
-	tagRe := regexp.MustCompile(`(?s)<a class="railicon".*?</a>|<summary class="railicon".*?</summary>|<button [^>]*class="railicon".*?</button>`)
+	// Every railicon control in the file, wherever it sits and whatever
+	// else its class carries — the strip, the More summary, and the
+	// foot's Log out and Sign in. Log out used to be a button and had a
+	// check of its own here; it is a link to the confirmation page now,
+	// and this loop covers the foot either way. The More menu's own rows
+	// are not icon controls — their visible text is their name.
+	tagRe := regexp.MustCompile(`(?s)<a [^>]*class="[^"]*railicon.*?</a>|<summary [^>]*class="[^"]*railicon.*?</summary>|<button [^>]*class="[^"]*railicon.*?</button>`)
 	controls := tagRe.FindAllString(src, -1)
 	if len(controls) < 3 {
 		t.Fatalf("found %d railicon controls in layout.html, want the rail's full set", len(controls))
@@ -176,24 +182,13 @@ func TestRailIconsAreLabelled(t *testing.T) {
 		}
 	}
 
-	// An icon button in the rail's foot is under the same rule: Log out
-	// is the only one today. The More menu's own rows are not icon
-	// buttons — their visible text is their name.
+	// The foot holds controls of its own rather than raillink squares, so
+	// check it is in what tagRe just scanned: a foot written with none
+	// would pass the loop above by being empty.
 	foot := src[strings.Index(src, `<div class="railfoot">`):]
 	foot = foot[:strings.Index(foot, "</nav>")]
-	buttons := regexp.MustCompile(`(?s)<button [^>]*class="railicon".*?</button>`).FindAllString(foot, -1)
-	if len(buttons) == 0 {
-		t.Fatal("no icon button in the rail foot")
-	}
-	for _, b := range buttons {
-		for _, want := range []string{`aria-label="`, `<span class="vh">`} {
-			if !strings.Contains(b, want) {
-				t.Errorf("rail foot button missing %s: %.80s", want, b)
-			}
-		}
-		if !glyph(b) {
-			t.Errorf("rail foot button draws no glyph: %.80s", b)
-		}
+	if len(tagRe.FindAllString(foot, -1)) == 0 {
+		t.Error("no railicon control in the rail foot")
 	}
 
 	// No decorative graphic anywhere in the layout is exposed, the brand

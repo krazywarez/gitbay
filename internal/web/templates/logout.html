@@ -1,0 +1,9 @@
+{{define "width"}}bounded{{end}}
+{{define "title"}}log out · {{.Site}}{{end}}
+{{define "content"}}
+<h1>Log out</h1>
+<p class="meta">Ends this browser's session as <a href="/{{.Viewer}}">{{.Viewer}}</a>. Keys and tokens are untouched, and signing back in is a mailed link.</p>
+<form method="post" action="/logout">
+<p><button type="submit">Log out</button> <a href="/">Cancel</a></p>
+</form>
+{{end}}

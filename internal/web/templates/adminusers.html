@@ -36,6 +36,14 @@
       <input type="hidden" name="state" value="{{$.State}}">
       <button type="submit" class="btn">Promote</button>
     </form>
+    {{else}}
+    {{/* An account that is not active cannot be promoted, but the row
+         still draws the control so every Actions cell is the same
+         shape. Both parts are disabled, so the form never posts. */}}
+    <form method="post" action="/admin/users" class="actions" title="Only an active account can be promoted">
+      <input type="text" name="confirm" aria-label="Type {{.Username}} to confirm" placeholder="type {{.Username}} to confirm" size="{{len .Username}}" autocomplete="off" disabled>
+      <button type="submit" class="btn" disabled>Promote</button>
+    </form>
     {{end}}
     {{if eq .State "disabled"}}
     <form method="post" action="/admin/users" class="actions">
