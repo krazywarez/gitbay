@@ -1,4 +1,8 @@
-{{define "width"}}bounded{{end}}
+{{/* wide, because the Actions cell carries up to two forms, each an
+     11rem confirm field and a button: about 1100px of row, which 48rem
+     clipped. What it clipped was the second form's button, leaving its
+     confirm field looking like it belonged to the button before it. */}}
+{{define "width"}}wide{{end}}
 {{define "title"}}accounts · admin · {{.Site}}{{end}}
 {{define "content"}}
 <h1>Accounts</h1>

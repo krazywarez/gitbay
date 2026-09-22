@@ -606,6 +606,9 @@ button.danger, .button.danger {
 button.danger:hover, .button.danger:hover { background: var(--bad); color: var(--canvas); filter: none; }
 button:disabled { opacity: 0.55; cursor: default; filter: none; }
 .btngroup { display: inline-flex; gap: var(--sp-2); flex-wrap: wrap; }
+/* a destructive button holds the way out at arm's length: 8px puts the
+   cancel's underline against the button's border */
+.btngroup:has(> button.danger) { gap: var(--sp-4); }
 form.inline { display: inline; }
 .act { text-align: right; }
 

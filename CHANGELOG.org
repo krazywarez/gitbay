@@ -45,7 +45,10 @@ Eleven web findings, mostly alignment and affordance (#247).
 - The email rows on =/settings= put their buttons and confirm field on
   the right, so they line up however long an address is.
 - =/admin/users= draws a disabled Promote on an account that is not
-  active, rather than leaving the cell short.
+  active, rather than leaving the cell short, and the page is wide. At
+  48rem the Actions cell clipped the second form's button, which left
+  its confirm field looking like it belonged to the button before it —
+  an active row read as though Promote wanted the name typed.
 - The profile's inactive tabs draw their underline in =--line=, so the
   strip reads as a track the current tab is marked in.
 - =.listhead= sheds its children's block margins, which is what kept a

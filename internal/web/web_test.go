@@ -89,8 +89,8 @@ func TestWhenNamesTheZone(t *testing.T) {
 // none. The merge request page picks wide for its diff view, so it gets
 // a per-view define instead of a fixed one.
 func TestMainWidthClass(t *testing.T) {
-	wide := map[string]bool{"tree.html": true, "blob.html": true, "blame.html": true, "log.html": true, "commit.html": true, "compare.html": true, "builds.html": true, "build.html": true, "search.html": true, "globalsearch.html": true, "edit.html": true, "dashboard.html": true, "issues.html": true, "mrs.html": true, "explore.html": true, "notifications.html": true, "settings.html": true, "account.html": true, "admin.html": true}
-	bounded := map[string]bool{"landing.html": true, "fork.html": true, "login.html": true, "logout.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "adminusers.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
+	wide := map[string]bool{"tree.html": true, "blob.html": true, "blame.html": true, "log.html": true, "commit.html": true, "compare.html": true, "builds.html": true, "build.html": true, "search.html": true, "globalsearch.html": true, "edit.html": true, "dashboard.html": true, "issues.html": true, "mrs.html": true, "explore.html": true, "notifications.html": true, "settings.html": true, "account.html": true, "admin.html": true, "adminusers.html": true}
+	bounded := map[string]bool{"landing.html": true, "fork.html": true, "login.html": true, "logout.html": true, "register.html": true, "registered.html": true, "new.html": true, "issuenew.html": true, "mrnew.html": true, "snippetnew.html": true, "privacy.html": true, "404.html": true}
 	perView := map[string]string{"mr.html": `{{define "width"}}{{if eq .View "diff"}}wide{{else}}reading{{end}}{{end}}`}
 	for _, name := range Pages() {
 		src, err := TemplateSource(name)
