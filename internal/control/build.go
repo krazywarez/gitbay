@@ -27,8 +27,8 @@ func init() {
 		Summary: "show one build",
 		Usage:   "build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
 	register(Command{Path: []string{"build", "log"},
-		Summary: "print a build's log",
-		Usage:   "build log <owner/name> <n>", ReadOnly: true, Run: runBuildLog})
+		Summary: "print a build's log, or follow it until the build ends",
+		Usage:   "build log <owner/name> <n> [--follow]", ReadOnly: true, Run: runBuildLog})
 
 	register(Command{Path: []string{"build", "jobs"},
 		Summary: "list the jobs a trigger can name",
@@ -196,9 +196,16 @@ func runBuildShow(c *Ctx, args []string) int {
 }
 
 func runBuildLog(c *Ctx, args []string) int {
-	_, b, code := buildRef(c, args)
+	f, err := parseFlags(args, flagSpec{Bools: []string{"--follow"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	_, b, code := buildRef(c, f.Pos)
 	if code >= 0 {
 		return code
+	}
+	if f.Has("--follow") {
+		return followBuildLog(c, b)
 	}
 	log, err := c.Store.BuildLog(b.ID)
 	if err != nil {

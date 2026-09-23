@@ -48,7 +48,7 @@ func newRoot() *cobra.Command {
 		group("build", "CI builds",
 			pass("list", "recent builds: <owner/name>", passOpts{server: []string{"build", "list"}, needsRepo: true}),
 			pass("show", "one build: <owner/name> <n>", passOpts{server: []string{"build", "show"}, needsRepo: true}),
-			pass("log", "a build's log: <owner/name> <n>", passOpts{server: []string{"build", "log"}, needsRepo: true}),
+			pass("log", "a build's log: <owner/name> <n> [--follow]", passOpts{server: []string{"build", "log"}, needsRepo: true}),
 			pass("jobs", "list the jobs a trigger can name", passOpts{server: []string{"build", "jobs"}, needsRepo: true}),
 			pass("trigger", "queue a job now: <job>", passOpts{server: []string{"build", "trigger"}, needsRepo: true}),
 			pass("cancel", "withdraw a queued build: <n>", passOpts{server: []string{"build", "cancel"}, needsRepo: true}),

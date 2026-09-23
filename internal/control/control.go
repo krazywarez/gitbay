@@ -40,6 +40,10 @@ type Ctx struct {
 	// Cmd is the command being run, set by Dispatch, so a usage error can
 	// print the registered usage rather than a copy of it.
 	Cmd Command
+	// Done, when the surface has one, closes when nobody is reading any
+	// more: the SSH channel closed or the HTTP request ended. A command
+	// that runs until something happens (build log --follow) stops on it.
+	Done <-chan struct{}
 }
 
 // usage reports a bad invocation with the command's registered usage,

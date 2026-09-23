@@ -42,9 +42,13 @@ func gitRunner(t *testing.T) func(dir string, args ...string) string {
 
 // newQueueTestRepo returns a store with one public repo (default branch
 // "main", matching the schema default) and the uid to queue builds as.
+//
+// A real file, not ":memory:": ":memory:" gives each connection its own
+// database, so a goroutine querying while another writes (build log
+// --follow) sees an empty schema (see internal/store/contention_test.go).
 func newQueueTestRepo(t *testing.T) (*store.Store, store.Repo, int64) {
 	t.Helper()
-	st, err := store.Open(":memory:")
+	st, err := store.Open(filepath.Join(t.TempDir(), "gitbay.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
