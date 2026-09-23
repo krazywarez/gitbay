@@ -4,6 +4,45 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.35.0 — 2026-09-23
+
+Following a running build (#250, #251), and the web interface
+guidelines review (#249).
+
+- =build log <owner/name> <n> --follow= prints the stored log, then
+  output as the runner sends it, then =build <n> <status>= on stderr
+  once the build ends; the exit code is 0 whatever the outcome. The
+  build page does the same without JavaScript while a build is queued
+  or running: the log streams into the page and ends with "build
+  finished: <status>". =?follow=0= and HEAD render it once.
+- A follow ends when its reader leaves: a closed SSH channel (Ctrl-C
+  over the CLI's shared connection included) or a closed page. A
+  follow of a build still queued after ten minutes ends and says so,
+  since nothing reaps a queued build. An account holds eight follows
+  at once; signed-out viewers share one account's eight.
+- A follow re-checks read access every two seconds by repository id,
+  reloading the account: a repository made private or an account
+  disabled ends it as not found; a rename does not.
+- A restart ends open follows before the drain, with "gitbay is
+  restarting; follow the build again in a moment" on every surface,
+  instead of holding the drain for 30 s. Other requests, git transport
+  included, drain as before.
+- Over the JSON API the command answers when the build ends, with the
+  whole log.
+- Typed-name confirmation on removing an org member, removing a team
+  member, revoking a team's repository grant, and promoting an account
+  to admin. The team forms are split so the confirm field sits beside
+  the removal only.
+- Registration's email field is an email input; email, username,
+  one-time-code, SSH key and identifier fields carry =autocomplete=,
+  =autocapitalize= and =spellcheck= as fits. The merge request close
+  field accepts the =!12= its placeholder shows.
+- The refs page's compare inputs are named by their visible labels;
+  the line-comment link names its line. =theme-color= matches the rail.
+- Behind a reverse proxy, turn response buffering off for the build
+  page (=X-Accel-Buffering: no= covers nginx), or the live log arrives
+  only when the build ends.
+
 * v1.34.1 — 2026-09-21
 
 Three findings from an external review of the web UI (#248).
