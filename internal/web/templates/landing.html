@@ -4,7 +4,7 @@
 <div class="landing">
 <h1>{{template "mark"}}{{.Site}}</h1>
 <p class="lede">A git forge you drive from the terminal. Repositories, issues, merge requests and CI over SSH, with a fast, readable web view of the same state.</p>
-<pre class="quickstart" tabindex="0">ssh git@{{.Host}} help                        # every command, no client to install
+<pre class="quickstart" tabindex="0">ssh git@{{.Host}} help
 git clone ssh://git@{{.Host}}/owner/repo.git</pre>
 <div class="routes"><a class="button primary" href="/explore">Explore repositories</a>{{if .Signup}}<a class="button btn" href="/register">Create an account</a>{{end}}</div>
 <figure class="shot"><video autoplay muted loop playsinline controls width="1248" height="688" aria-describedby="demo-caption">
@@ -12,12 +12,6 @@ git clone ssh://git@{{.Host}}/owner/repo.git</pre>
   <source src="/static/img/demo.mp4" type="video/mp4">
 </video>
 <figcaption id="demo-caption">Signup to release on gitbay.org from a terminal: register an SSH key, verify the mailed code, create a repository and push, file an issue, open and merge a request that closes it, then tag and publish a release.</figcaption>
-</figure>
-<figure class="shot"><picture>
-  <source srcset="/static/img/mr-dark.png" media="(prefers-color-scheme: dark)">
-  <img src="/static/img/mr-light.png" width="1280" height="900" alt="A merged merge request: the description on the left, and on the right two CI checks reporting success with how long each ran, an approval, and the source and target branches.">
-</picture>
-<figcaption>A merged merge request on this instance. The description is on the left; the column beside it carries the CI checks, the approval that let it merge, and the branches it went between.</figcaption>
 </figure>
 <div class="facets">
   <section><h2>Read</h2><p>Browse and clone any public repository over HTTPS or <code>git://</code>, no account. Every commit shows whether its signature verified.</p></section>

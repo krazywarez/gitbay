@@ -1703,7 +1703,6 @@ details.refmenu .refdrop a.allrefs {
 .lede { font-size: var(--fs-4); color: var(--muted); line-height: 1.5; max-width: 40rem; margin: 0 0 var(--sp-5); }
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
-.shot img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; object-position: top; }
 .shot video { display: block; width: 100%; height: auto; }
 .shot figcaption {
   border-top: 1px solid var(--line);

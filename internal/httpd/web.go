@@ -118,14 +118,13 @@ func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 }
 
 var staticTypes = map[string]string{
-	".png":  "image/png",
 	".gif":  "image/gif",
 	".webm": "video/webm",
 	".mp4":  "video/mp4",
 }
 
-// image serves the embedded landing pictures and recording with the font
-// cache policy. ServeContent answers Range, which Safari needs to play video.
+// image serves the embedded landing recording with the font cache policy.
+// ServeContent answers Range, which Safari needs to play video.
 func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 	name := "static" + r.URL.Path[len("/static"):]
 	data, err := web.ImageFS.ReadFile(name)

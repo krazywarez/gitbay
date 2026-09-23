@@ -29,7 +29,7 @@ var FaviconSVG []byte
 //go:embed static/fonts/*.woff2
 var FontFS embed.FS
 
-//go:embed static/img/*.png static/img/*.gif static/img/*.webm static/img/*.mp4
+//go:embed static/img/*.gif static/img/*.webm static/img/*.mp4
 var ImageFS embed.FS
 
 // version returns the short VCS revision baked into the binary, or "" when
