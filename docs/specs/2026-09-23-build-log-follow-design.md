@@ -62,10 +62,14 @@ and the wait still wakes the loop.
 `Ctx` gains `Done <-chan struct{}`, nil when the surface has none. The
 embedded sshd closes it when the session's channel closes (the CLI's
 shared connection outlives a Ctrl-C, the channel does not); `gitbayd
-shell` passes nil, since its process ends with the session. httpd sets
-it from `r.Context()` on the web and both API endpoints. A write
-error also ends the loop. On `Done` the command returns
-`protocol.ExitFailure` with no message; nobody is reading.
+shell` still passes nil, but its process does not end with the
+session: OpenSSH closes the child's pipes and sends no signal to a
+session with no pty, so a follow there ends at its next write, at the
+build's outcome, or at the queued limit below; the per-account cap is
+per process in that mode. httpd sets it from `r.Context()` on the web
+and both API endpoints. A write error also ends the loop. On `Done`
+the command returns `protocol.ExitFailure` with no message; nobody is
+reading.
 
 At most 8 follows per account run at once (a counter in `control`,
 decremented on return). The ninth exits 4: "8 follows are already open
@@ -73,13 +77,23 @@ for this account; close one and retry". Signed-out web viewers are
 account 0 and share the 8; the ninth gets the stored log once with the
 refusal under it.
 
+Nothing reaps a queued build (`ReapStaleBuilds` only reaps `running`
+builds), and a running one is already bounded by the reaper's
+deadline, so a follow of a build that stays `pending` ends on its own
+after `followQueued` (10 minutes), writing to stderr `build <n> is
+still queued; nothing claimed it in 10m0s. Follow again once a runner
+has.` and exiting `protocol.ExitFailure`. The clock runs only while the
+follow has seen the build `pending`; once it sees `running` or a
+terminal status the limit no longer applies.
+
 The CLI's `pass("log", …)` help in `cmd/gitbay/main.go` names
 `--follow`.
 
 ## Web
 
 `GET /{owner}/{repo}/builds/{n}` streams when the build is `pending` or
-`running` and the query has no `follow=0`. Otherwise it renders as now.
+`running`, the query has no `follow=0`, and the method is `GET`. A HEAD
+request (the route also matches it) renders once, like `?follow=0`.
 
 Streaming:
 
@@ -89,10 +103,17 @@ Streaming:
 3. Dispatch `build log <repo> <n> --follow` with `Stdout` an escaping
    writer (`template.HTMLEscape` per chunk, then flush through
    `http.ResponseController`) and `Done` from the request context.
-4. After the command returns, read the build and write
-   `<p class="notice" role="status">build finished: <status></p>` after
-   the `</pre>` that begins the tail, then the rest of the tail. A
-   dropped connection writes nothing more.
+4. If the request context is done (the client left), write nothing
+   more. Otherwise write the `</pre>` that begins the tail, then, by
+   the command's exit code: `ExitOK` reads the build and writes
+   `<p class="notice" role="status">build finished: <status></p>`;
+   `ExitDenied` (the follow cap) writes the stored log once above the
+   `</pre>` and an error paragraph with the refusal, except a
+   signed-out viewer (`viewer.ID == 0`) gets "Too many signed-out
+   viewers are watching live builds. This is the log so far; reload to
+   try again, or sign in." instead of the command's account-scoped
+   wording; `ExitFailure` with a message (the queued limit) writes it
+   as a `<p class="notice" role="status">`. Then the rest of the tail.
 
 `build.html`, when `Live`, puts a line above the log: the log streams
 until the build ends; a stream that stops with no "build finished" line

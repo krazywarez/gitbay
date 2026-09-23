@@ -41,11 +41,13 @@ a matching tag push and nothing else.
 A running build is followed with =build log <owner/name> <n> --follow=:
 the stored log, then output as the runner sends it, then the outcome
 as =build <n> <status>= on stderr once the build ends. The exit code is
-0 whatever the outcome. The build page does the same without
-JavaScript while a build is queued or running; =?follow=0= renders it
-once. An account holds at most eight follows open, and signed-out
-viewers share one account's eight. Over the JSON API the command
-answers when the build ends, with the whole log.
+0 whatever the outcome. A follow of a build still queued after ten
+minutes ends on its own and says so on stderr, since nothing reaps a
+queued build. The build page does the same without JavaScript while a
+build is queued or running; =?follow=0= renders it once. An account
+holds at most eight follows open, and signed-out viewers share one
+account's eight. Over the JSON API the command answers when the build
+ends, with the whole log.
 
 * The table
 

@@ -81,6 +81,10 @@ rate limiting, to the last =X-Forwarded-For= hop that is not itself a
 trusted proxy; from anyone else the header is ignored. Empty, the
 default, is right when gitbayd terminates TLS itself.
 
+A reverse proxy in front of gitbay must not buffer responses, or the
+build page's live log arrives only when the build ends;
+=X-Accel-Buffering: no= covers nginx.
+
 ** [web]
 - =mode= — =view_only= (default) | =accounts=. In view_only the mutating
   web routes are never registered; in accounts, browser sessions are
