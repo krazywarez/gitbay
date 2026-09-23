@@ -238,7 +238,17 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 				continue
 			}
 			req.Reply(true, nil)
-			code := s.runExec(sconn, ch, payload.Command)
+			// x/crypto closes reqs when the client closes the channel. That
+			// is how a follow learns nobody is reading: the CLI's shared
+			// connection outlives a Ctrl-C, the channel does not.
+			done := make(chan struct{})
+			go func() {
+				for r := range reqs {
+					r.Reply(false, nil)
+				}
+				close(done)
+			}()
+			code := s.runExec(sconn, ch, payload.Command, done)
 			sendExit(ch, code)
 			return
 		case "shell":
@@ -260,7 +270,7 @@ func sendExit(ch ssh.Channel, code int) {
 	ch.SendRequest("exit-status", false, ssh.Marshal(&msg))
 }
 
-func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) int {
+func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string, done <-chan struct{}) int {
 	ext := sconn.Permissions.Extensions
 	if blob := ext["anon-key"]; blob != "" {
 		return s.runAnonymous(ch, blob, cmdline)
@@ -273,7 +283,7 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string) 
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr())
+	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr(), done)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -304,7 +314,7 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell).
 func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cmdline string,
-	stdin io.Reader, stdout, stderr io.Writer) int {
+	stdin io.Reader, stdout, stderr io.Writer, done <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
 		return protocol.ExitDenied
@@ -341,6 +351,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cm
 		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: stderr,
+		Done:   done,
 	}
 	return control.Dispatch(ctx, argv)
 }
