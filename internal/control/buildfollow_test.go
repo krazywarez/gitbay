@@ -46,6 +46,20 @@ func follow(t *testing.T, st *store.Store, uid int64, repo store.Repo, done <-ch
 	return &out, &errOut, res
 }
 
+// waitOutput waits until the follower has written want, which is how a
+// test knows the follow is past its first read.
+func waitOutput(t *testing.T, out *syncBuffer, want string) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for !strings.Contains(out.String(), want) {
+		select {
+		case <-deadline:
+			t.Fatalf("follow never wrote %q", want)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
 func waitExit(t *testing.T, res chan int) int {
 	t.Helper()
 	select {
@@ -58,9 +72,9 @@ func waitExit(t *testing.T, res chan int) int {
 }
 
 func shortFollowTimers(t *testing.T) {
-	settle, poll, queued := followSettle, followPoll, followQueued
-	followSettle, followPoll = 200*time.Millisecond, 50*time.Millisecond
-	t.Cleanup(func() { followSettle, followPoll, followQueued = settle, poll, queued })
+	settle, poll, queued, coalesce := followSettle, followPoll, followQueued, followCoalesce
+	followSettle, followPoll, followCoalesce = 200*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond
+	t.Cleanup(func() { followSettle, followPoll, followQueued, followCoalesce = settle, poll, queued, coalesce })
 }
 
 // The follow prints the stored log, then what arrives, and ends with the
@@ -134,14 +148,7 @@ func TestBuildLogFollowDone(t *testing.T) {
 	done := make(chan struct{})
 	out, _, res := follow(t, st, uid, repo, done)
 
-	deadline := time.After(2 * time.Second)
-	for !strings.Contains(out.String(), "step one") {
-		select {
-		case <-deadline:
-			t.Fatal("follow never read the appended line")
-		case <-time.After(10 * time.Millisecond):
-		}
-	}
+	waitOutput(t, out, "step one")
 	close(done)
 	if code := waitExit(t, res); code != protocol.ExitFailure {
 		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
@@ -162,6 +169,33 @@ func TestBuildLogFollowQueued(t *testing.T) {
 		t.Fatalf("exit %d, want %d: %s", code, protocol.ExitFailure, errOut)
 	}
 	if !strings.Contains(errOut.String(), "still queued") {
+		t.Errorf("stderr %q", errOut)
+	}
+}
+
+// A follower who loses read access mid-follow is ended with the answer
+// a new request would get: the repository is not found.
+func TestBuildLogFollowLosesAccess(t *testing.T) {
+	shortFollowTimers(t)
+	st, repo, _ := newQueueTestRepo(t)
+	bob, err := st.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := st.CreateBuild(repo.ID, "unit", "abc", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.AppendBuildLog(id, []byte("step one\n"))
+	out, errOut, res := follow(t, st, bob, repo, nil)
+	waitOutput(t, out, "step one")
+	if err := st.SetRepoVisibility(repo.ID, "private"); err != nil {
+		t.Fatal(err)
+	}
+	if code := waitExit(t, res); code != protocol.ExitNotFound {
+		t.Fatalf("exit %d, want %d: %s", code, protocol.ExitNotFound, errOut)
+	}
+	if !strings.Contains(errOut.String(), "repository "+repo.Path()+" not found") {
 		t.Errorf("stderr %q", errOut)
 	}
 }

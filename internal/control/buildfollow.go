@@ -1,10 +1,12 @@
 package control
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -28,6 +30,11 @@ var (
 	// reaper's deadline, so a follow needs its own limit for the queued
 	// case or it never ends.
 	followQueued = 10 * time.Minute
+	// followCoalesce is the pause between a wake and the read it causes.
+	// A runner appends a chunk per read of its output, often a line, and
+	// each read loads the whole stored log; one read after a short pause
+	// takes a burst of appends together.
+	followCoalesce = 200 * time.Millisecond
 )
 
 var (
@@ -53,10 +60,30 @@ func dropFollow(uid int64) {
 	}
 }
 
+// mayStillRead reports whether the follower can still read the build's
+// repository. It looks the repository up by id, so a rename mid-follow
+// does not end the follow.
+func mayStillRead(c *Ctx, repoID int64) (bool, error) {
+	repo, err := c.Store.RepoByID(repoID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return false, err
+	}
+	return policy.CanRead(c.User, repo, grant), nil
+}
+
 // followBuildLog writes the build's log as it grows and returns once the
 // build has an outcome and its last bytes are written. The outcome goes
-// to stderr, so stdout is the log byte for byte.
-func followBuildLog(c *Ctx, b store.Build) int {
+// to stderr, so stdout is the log byte for byte. Read access is checked
+// again every followPoll: a repository made private, or a grant revoked,
+// ends the follow with the answer a new request would get.
+func followBuildLog(c *Ctx, repo store.Repo, b store.Build) int {
 	if !takeFollow(c.User.ID) {
 		return c.fail(protocol.ExitDenied, "%d follows are already open for this account; close one and retry", maxFollows)
 	}
@@ -65,7 +92,18 @@ func followBuildLog(c *Ctx, b store.Build) int {
 	var off int64
 	var settleBy time.Time
 	var queuedSince time.Time
+	checked := time.Now()
 	for {
+		if time.Since(checked) >= followPoll {
+			ok, err := mayStillRead(c, b.RepoID)
+			if err != nil {
+				return c.fail(protocol.ExitFailure, "%v", err)
+			}
+			if !ok {
+				return c.fail(protocol.ExitNotFound, "repository %s not found", repo.Path())
+			}
+			checked = time.Now()
+		}
 		wake := c.Store.BuildLogWait(b.ID)
 		status, chunk, err := c.Store.BuildLogFrom(b.ID, off)
 		if err != nil {
@@ -107,6 +145,13 @@ func followBuildLog(c *Ctx, b store.Build) int {
 		t := time.NewTimer(wait)
 		select {
 		case <-wake:
+			t.Reset(followCoalesce)
+			select {
+			case <-t.C:
+			case <-c.Done:
+				t.Stop()
+				return protocol.ExitFailure
+			}
 		case <-t.C:
 		case <-c.Done:
 			t.Stop()

@@ -200,12 +200,12 @@ func runBuildLog(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	_, b, code := buildRef(c, f.Pos)
+	repo, b, code := buildRef(c, f.Pos)
 	if code >= 0 {
 		return code
 	}
 	if f.Has("--follow") {
-		return followBuildLog(c, b)
+		return followBuildLog(c, repo, b)
 	}
 	log, err := c.Store.BuildLog(b.ID)
 	if err != nil {
