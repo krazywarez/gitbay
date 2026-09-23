@@ -47,7 +47,10 @@ queued build. The build page does the same without JavaScript while a
 build is queued or running; =?follow=0= renders it once. An account
 holds at most eight follows open, and signed-out viewers share one
 account's eight. Over the JSON API the command answers when the build
-ends, with the whole log.
+ends, with the whole log. Read access is checked again every two
+seconds: a follower who loses it is told the repository is not found.
+A restart ends every open follow with a message saying so, rather
+than holding the drain; follow again once the daemon is back.
 
 * The table
 
