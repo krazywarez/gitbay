@@ -4,6 +4,19 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.35.1 — 2026-09-23
+
+The landing page's recording (#253).
+
+- The landing page plays a recording of signup to release from a
+  terminal on gitbay.org, muted with controls, in place of the merged
+  merge request picture. The quickstart block drops its comment. The
+  tapes and the render script are in =docs/demo/=.
+- =/static/img/= serves gif, webm and mp4 with their own types and
+  answers Range requests, which Safari needs to play video.
+- The Quickstart wiki page shows the recording as a gif.
+- The footer's iOS link goes to the App Store listing.
+
 * v1.35.0 — 2026-09-23
 
 Following a running build (#250, #251), and the web interface
