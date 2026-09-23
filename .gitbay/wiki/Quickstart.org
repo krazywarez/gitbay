@@ -17,3 +17,7 @@
 4. =gitbay issue create --title "first"= from inside the clone
 
 Everything works from stock OpenSSH too: =ssh git@gitbay.org help=.
+
+#+CAPTION: Signup to release from a terminal. The tapes are in =docs/demo/=.
+#+ATTR_HTML: :alt A terminal registering an SSH key, verifying the mailed code, creating a repository, pushing, filing an issue, merging a request that closes it, and publishing a release.
+[[https://gitbay.org/static/img/demo.gif]]
