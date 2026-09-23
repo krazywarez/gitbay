@@ -26,7 +26,7 @@ type Server struct {
 	cfg      config.Config
 	st       *store.Store
 	apiLimit *apiLimiter
-	proxies  []*net.IPNet // http.trusted_proxies, parsed once
+	proxies  []*net.IPNet  // http.trusted_proxies, parsed once
 	stopping chan struct{} // closed by Stop
 	stopOnce sync.Once
 }
@@ -56,15 +56,6 @@ func (s *Server) until(r *http.Request) <-chan struct{} {
 		close(done)
 	}()
 	return done
-}
-
-func (s *Server) stopped() bool {
-	select {
-	case <-s.stopping:
-		return true
-	default:
-		return false
-	}
 }
 
 // receivePackRefusal exists only to fail legibly if a client POSTs without

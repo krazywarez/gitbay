@@ -44,6 +44,10 @@ type Ctx struct {
 	// more: the SSH channel closed or the HTTP request ended. A command
 	// that runs until something happens (build log --follow) stops on it.
 	Done <-chan struct{}
+	// Stopping, when the surface has one, closes when the daemon is
+	// restarting. It closes Done too; a command that ends on Done checks
+	// it to say why.
+	Stopping <-chan struct{}
 }
 
 // usage reports a bad invocation with the command's registered usage,

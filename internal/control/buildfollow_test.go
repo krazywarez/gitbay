@@ -34,13 +34,20 @@ func (b *syncBuffer) String() string {
 // buffers and a channel carrying the exit code.
 func follow(t *testing.T, st *store.Store, uid int64, repo store.Repo, done <-chan struct{}) (*syncBuffer, *syncBuffer, chan int) {
 	t.Helper()
+	return followStopping(t, st, uid, repo, done, nil)
+}
+
+// followStopping is follow on a surface that is being restarted when
+// stopping closes.
+func followStopping(t *testing.T, st *store.Store, uid int64, repo store.Repo, done, stopping <-chan struct{}) (*syncBuffer, *syncBuffer, chan int) {
+	t.Helper()
 	u, err := st.UserByID(uid)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var out, errOut syncBuffer
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdin: strings.NewReader(""),
-		Stdout: &out, Stderr: &errOut, Done: done}
+		Stdout: &out, Stderr: &errOut, Done: done, Stopping: stopping}
 	res := make(chan int, 1)
 	go func() { res <- Dispatch(c, []string{"build", "log", repo.Path(), "1", "--follow"}) }()
 	return &out, &errOut, res
@@ -146,12 +153,61 @@ func TestBuildLogFollowDone(t *testing.T) {
 	}
 	st.AppendBuildLog(id, []byte("step one\n"))
 	done := make(chan struct{})
-	out, _, res := follow(t, st, uid, repo, done)
+	out, errOut, res := follow(t, st, uid, repo, done)
 
 	waitOutput(t, out, "step one")
 	close(done)
 	if code := waitExit(t, res); code != protocol.ExitFailure {
 		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
+	}
+	if errOut.String() != "" {
+		t.Errorf("a follow whose reader left wrote %q", errOut)
+	}
+}
+
+// A restart ends a follow and says so, so the reader knows to follow
+// again.
+func TestBuildLogFollowRestart(t *testing.T) {
+	shortFollowTimers(t)
+	st, repo, uid := newQueueTestRepo(t)
+	id, err := st.CreateBuild(repo.ID, "unit", "abc", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.AppendBuildLog(id, []byte("step one\n"))
+	stopping := make(chan struct{})
+	out, errOut, res := followStopping(t, st, uid, repo, stopping, stopping)
+	waitOutput(t, out, "step one")
+	close(stopping)
+	if code := waitExit(t, res); code != protocol.ExitFailure {
+		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
+	}
+	if got := strings.TrimSpace(errOut.String()); got != "gitbay is restarting; follow the build again in a moment" {
+		t.Errorf("stderr %q", got)
+	}
+}
+
+// A follower whose account is disabled mid-follow is ended, even on a
+// public repository.
+func TestBuildLogFollowDisabled(t *testing.T) {
+	shortFollowTimers(t)
+	st, repo, _ := newQueueTestRepo(t)
+	bob, err := st.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := st.CreateBuild(repo.ID, "unit", "abc", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.AppendBuildLog(id, []byte("step one\n"))
+	out, errOut, res := follow(t, st, bob, repo, nil)
+	waitOutput(t, out, "step one")
+	if err := st.SetUserDisabled(bob, true); err != nil {
+		t.Fatal(err)
+	}
+	if code := waitExit(t, res); code != protocol.ExitNotFound {
+		t.Fatalf("exit %d, want %d: %s", code, protocol.ExitNotFound, errOut)
 	}
 }
 

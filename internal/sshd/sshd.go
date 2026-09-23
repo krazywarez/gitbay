@@ -268,13 +268,6 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 				close(done)
 			}()
 			code := s.runExec(sconn, ch, payload.Command, done)
-			select {
-			case <-s.stopping:
-				if code != protocol.ExitOK {
-					fmt.Fprintln(ch.Stderr(), "gitbay is restarting; run the command again in a moment")
-				}
-			default:
-			}
 			sendExit(ch, code)
 			return
 		case "shell":
@@ -309,7 +302,7 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string, 
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr(), done)
+	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr(), done, s.stopping)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -340,7 +333,7 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell).
 func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cmdline string,
-	stdin io.Reader, stdout, stderr io.Writer, done <-chan struct{}) int {
+	stdin io.Reader, stdout, stderr io.Writer, done, stopping <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
 		return protocol.ExitDenied
@@ -369,15 +362,16 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cm
 		}
 	}
 	ctx := &control.Ctx{
-		User:   user,
-		Scope:  scope,
-		Source: source,
-		Store:  st,
-		Cfg:    cfg,
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-		Done:   done,
+		User:     user,
+		Scope:    scope,
+		Source:   source,
+		Store:    st,
+		Cfg:      cfg,
+		Stdin:    stdin,
+		Stdout:   stdout,
+		Stderr:   stderr,
+		Done:     done,
+		Stopping: stopping,
 	}
 	return control.Dispatch(ctx, argv)
 }

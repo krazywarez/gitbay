@@ -57,16 +57,17 @@ func (s *Server) runControlCode(u store.User, argv []string) (out string, msg st
 func (s *Server) runControlStream(u store.User, argv []string, out io.Writer, done <-chan struct{}) (msg string, code int) {
 	var stderr bytes.Buffer
 	ctx := &control.Ctx{
-		User:   u,
-		Source: "web",
-		Scope:  "full",
-		Store:  s.st,
-		Cfg:    s.cfg,
-		Stdin:  strings.NewReader(""),
-		Stdout: out,
-		Stderr: &stderr,
-		ViaAPI: true,
-		Done:   done,
+		User:     u,
+		Source:   "web",
+		Scope:    "full",
+		Store:    s.st,
+		Cfg:      s.cfg,
+		Stdin:    strings.NewReader(""),
+		Stdout:   out,
+		Stderr:   &stderr,
+		ViaAPI:   true,
+		Done:     done,
+		Stopping: s.stopping,
 	}
 	code = control.Dispatch(ctx, argv)
 	return strings.TrimSpace(stderr.String()), code

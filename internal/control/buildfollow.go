@@ -62,7 +62,8 @@ func dropFollow(uid int64) {
 
 // mayStillRead reports whether the follower can still read the build's
 // repository. It looks the repository up by id, so a rename mid-follow
-// does not end the follow.
+// does not end the follow, and reloads the account, so disabling it
+// does.
 func mayStillRead(c *Ctx, repoID int64) (bool, error) {
 	repo, err := c.Store.RepoByID(repoID)
 	if errors.Is(err, store.ErrNotFound) {
@@ -71,11 +72,36 @@ func mayStillRead(c *Ctx, repoID int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	u := c.User
+	if u.ID != 0 {
+		u, err = c.Store.UserByID(u.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if u.Disabled {
+			return false, nil
+		}
+	}
+	grant, err := c.Store.AccessRole(repo.ID, u.ID)
 	if err != nil {
 		return false, err
 	}
-	return policy.CanRead(c.User, repo, grant), nil
+	return policy.CanRead(u, repo, grant), nil
+}
+
+// ended is what a follow returns when its Done closes. A restart says
+// so, whatever the surface, so the reader knows to follow again; a
+// reader who left hears nothing.
+func ended(c *Ctx) int {
+	select {
+	case <-c.Stopping:
+		fmt.Fprintln(c.Stderr, "gitbay is restarting; follow the build again in a moment")
+	default:
+	}
+	return protocol.ExitFailure
 }
 
 // followBuildLog writes the build's log as it grows and returns once the
@@ -150,12 +176,12 @@ func followBuildLog(c *Ctx, repo store.Repo, b store.Build) int {
 			case <-t.C:
 			case <-c.Done:
 				t.Stop()
-				return protocol.ExitFailure
+				return ended(c)
 			}
 		case <-t.C:
 		case <-c.Done:
 			t.Stop()
-			return protocol.ExitFailure
+			return ended(c)
 		}
 		t.Stop()
 	}

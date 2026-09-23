@@ -134,7 +134,7 @@ func TestShutdownEndsFollows(t *testing.T) {
 	if err := inst.proc.Process.Signal(syscall.SIGTERM); err != nil {
 		t.Fatal(err)
 	}
-	web.waitFor(t, "gitbay is restarting; reload in a moment")
+	web.waitFor(t, `<p class="notice" role="status">gitbay is restarting`)
 	web.waitFor(t, "</html>")
 	var exit *exec.ExitError
 	if err := cmd.Wait(); !errors.As(err, &exit) || exit.ExitCode() != 1 {

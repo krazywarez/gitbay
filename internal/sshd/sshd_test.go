@@ -153,6 +153,27 @@ func TestFollowEndsWhenChannelCloses(t *testing.T) {
 	}
 }
 
+// A command that fails on its own while the server is stopping says
+// nothing about a restart: only a follow that Stop ended does.
+func TestStopLeavesOtherFailuresAlone(t *testing.T) {
+	srv, client := followServer(t)
+	srv.Stop()
+	sess, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sess.Close()
+	var stderr bytes.Buffer
+	sess.Stderr = &stderr
+	var exit *ssh.ExitError
+	if err := sess.Run("repo show nosuch/repo"); !errors.As(err, &exit) || exit.ExitStatus() != 3 {
+		t.Fatalf("repo show of a missing repository: %v, want exit 3", err)
+	}
+	if strings.Contains(stderr.String(), "restarting") {
+		t.Errorf("stderr %q", stderr.String())
+	}
+}
+
 // Stop ends a follow with exit 1 and says why, without closing the
 // connection.
 func TestStopEndsFollow(t *testing.T) {
