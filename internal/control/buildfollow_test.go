@@ -3,6 +3,7 @@ package control
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,15 +11,34 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
+// syncBuffer is a bytes.Buffer guarded by a mutex, safe for a test to poll
+// while the follow goroutine is still writing to it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // follow starts build log --follow on build 1 of repo and returns the
 // buffers and a channel carrying the exit code.
-func follow(t *testing.T, st *store.Store, uid int64, repo store.Repo, done <-chan struct{}) (*bytes.Buffer, *bytes.Buffer, chan int) {
+func follow(t *testing.T, st *store.Store, uid int64, repo store.Repo, done <-chan struct{}) (*syncBuffer, *syncBuffer, chan int) {
 	t.Helper()
 	u, err := st.UserByID(uid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out, errOut bytes.Buffer
+	var out, errOut syncBuffer
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdin: strings.NewReader(""),
 		Stdout: &out, Stderr: &errOut, Done: done}
 	res := make(chan int, 1)
@@ -38,9 +58,9 @@ func waitExit(t *testing.T, res chan int) int {
 }
 
 func shortFollowTimers(t *testing.T) {
-	settle, poll := followSettle, followPoll
+	settle, poll, queued := followSettle, followPoll, followQueued
 	followSettle, followPoll = 200*time.Millisecond, 50*time.Millisecond
-	t.Cleanup(func() { followSettle, followPoll = settle, poll })
+	t.Cleanup(func() { followSettle, followPoll, followQueued = settle, poll, queued })
 }
 
 // The follow prints the stored log, then what arrives, and ends with the
@@ -99,18 +119,50 @@ func TestBuildLogFollowCancel(t *testing.T) {
 	}
 }
 
-// Closing Done ends a follow of a build that is still running.
+// Closing Done ends a follow of a build that is still running, even while
+// it is blocked waiting for the next change: the build gets a line, the
+// follower is confirmed to have read it (so it is back in its wait), then
+// Done closes.
 func TestBuildLogFollowDone(t *testing.T) {
 	shortFollowTimers(t)
+	st, repo, uid := newQueueTestRepo(t)
+	id, err := st.CreateBuild(repo.ID, "unit", "abc", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.AppendBuildLog(id, []byte("step one\n"))
+	done := make(chan struct{})
+	out, _, res := follow(t, st, uid, repo, done)
+
+	deadline := time.After(2 * time.Second)
+	for !strings.Contains(out.String(), "step one") {
+		select {
+		case <-deadline:
+			t.Fatal("follow never read the appended line")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	close(done)
+	if code := waitExit(t, res); code != protocol.ExitFailure {
+		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
+	}
+}
+
+// A build that stays pending ends its own follow: nothing reaps a queued
+// build, so the follow must give up on its own.
+func TestBuildLogFollowQueued(t *testing.T) {
+	shortFollowTimers(t)
+	followQueued = 150 * time.Millisecond
 	st, repo, uid := newQueueTestRepo(t)
 	if _, err := st.CreateBuild(repo.ID, "unit", "abc", "main", `["true"]`, "", "", true); err != nil {
 		t.Fatal(err)
 	}
-	done := make(chan struct{})
-	_, _, res := follow(t, st, uid, repo, done)
-	close(done)
+	_, errOut, res := follow(t, st, uid, repo, nil)
 	if code := waitExit(t, res); code != protocol.ExitFailure {
-		t.Fatalf("exit %d, want %d", code, protocol.ExitFailure)
+		t.Fatalf("exit %d, want %d: %s", code, protocol.ExitFailure, errOut)
+	}
+	if !strings.Contains(errOut.String(), "still queued") {
+		t.Errorf("stderr %q", errOut)
 	}
 }
 

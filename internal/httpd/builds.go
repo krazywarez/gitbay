@@ -304,7 +304,7 @@ func (s *Server) build(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := buildView{repoPage: p, Build: b, CanWrite: s.canWriteRepo(r, p.Repo), Notice: s.takeFlash(w, r)}
-	if (b.Status == "pending" || b.Status == "running") && r.URL.Query().Get("follow") != "0" {
+	if (b.Status == "pending" || b.Status == "running") && r.URL.Query().Get("follow") != "0" && r.Method == http.MethodGet {
 		s.streamBuild(w, r, v, viewer, n)
 		return
 	}
@@ -354,6 +354,10 @@ func (s *Server) streamBuild(w http.ResponseWriter, r *http.Request, v buildView
 	path := v.Repo.Path()
 	msg, code := s.runControlStream(viewer, []string{"build", "log", path, n, "--follow"},
 		htmlStream{w: w, rc: rc}, r.Context().Done())
+	if r.Context().Err() != nil {
+		// The client left; nothing more to write.
+		return
+	}
 	if code == protocol.ExitDenied {
 		// The follow cap: the stored log once, and why it is not live.
 		log, _, _ := s.runControl(viewer, []string{"build", "log", path, n})
@@ -367,7 +371,12 @@ func (s *Server) streamBuild(w http.ResponseWriter, r *http.Request, v buildView
 			fmt.Fprintf(w, `<p class="notice" role="status">build finished: %s</p>`, template.HTMLEscapeString(b.Status))
 		}
 	case code == protocol.ExitDenied:
+		if viewer.ID == 0 {
+			msg = "Too many signed-out viewers are watching live builds. This is the log so far; reload to try again, or sign in."
+		}
 		fmt.Fprintf(w, `<p class="error" role="alert">%s</p>`, template.HTMLEscapeString(msg))
+	case code == protocol.ExitFailure && msg != "":
+		fmt.Fprintf(w, `<p class="notice" role="status">%s</p>`, template.HTMLEscapeString(msg))
 	}
 	io.WriteString(w, tail)
 }
@@ -380,7 +389,11 @@ type htmlStream struct {
 }
 
 func (h htmlStream) Write(p []byte) (int, error) {
-	template.HTMLEscape(h.w, p)
+	var buf bytes.Buffer
+	template.HTMLEscape(&buf, p)
+	if _, err := h.w.Write(buf.Bytes()); err != nil {
+		return 0, err
+	}
 	if err := h.rc.Flush(); err != nil {
 		return 0, err
 	}

@@ -22,6 +22,12 @@ var (
 	// an outcome: a cancel appends its line after the status changes, and
 	// a cancelled runner's stream runs on until its next check.
 	followSettle = time.Second
+	// followQueued bounds how long a follow waits on a build that stays
+	// pending: nothing reaps a queued build (ReapStaleBuilds only reaps
+	// running builds), and a running one is already bounded by the
+	// reaper's deadline, so a follow needs its own limit for the queued
+	// case or it never ends.
+	followQueued = 10 * time.Minute
 )
 
 var (
@@ -58,6 +64,7 @@ func followBuildLog(c *Ctx, b store.Build) int {
 
 	var off int64
 	var settleBy time.Time
+	var queuedSince time.Time
 	for {
 		wake := c.Store.BuildLogWait(b.ID)
 		status, chunk, err := c.Store.BuildLogFrom(b.ID, off)
@@ -70,7 +77,22 @@ func followBuildLog(c *Ctx, b store.Build) int {
 			}
 			off += int64(len(chunk))
 		}
+		if status == "pending" {
+			if queuedSince.IsZero() {
+				queuedSince = time.Now()
+			}
+		} else {
+			queuedSince = time.Time{}
+		}
 		wait := followPoll
+		if status == "pending" {
+			left := queuedSince.Add(followQueued).Sub(time.Now())
+			if left <= 0 {
+				fmt.Fprintf(c.Stderr, "build %d is still queued; nothing claimed it in %v. Follow again once a runner has.\n", b.Number, followQueued)
+				return protocol.ExitFailure
+			}
+			wait = min(wait, left)
+		}
 		if status != "pending" && status != "running" {
 			if settleBy.IsZero() {
 				settleBy = time.Now().Add(followSettle)

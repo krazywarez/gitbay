@@ -87,13 +87,23 @@ func (g *gzipWriter) Close() {
 // Flush sends what the gzip stream holds, then flushes the connection, so
 // a streamed page reaches the browser as it is written.
 func (g *gzipWriter) Flush() {
+	g.FlushError()
+}
+
+// FlushError is Flush with the error a failed flush produces.
+// http.ResponseController.Flush prefers this over Flush when both are
+// implemented, so a write that fails partway through a stream is reported
+// instead of silently dropped.
+func (g *gzipWriter) FlushError() error {
 	if !g.decided {
 		g.decide(http.StatusOK)
 	}
 	if g.gz != nil {
-		g.gz.Flush()
+		if err := g.gz.Flush(); err != nil {
+			return err
+		}
 	}
-	http.NewResponseController(g.ResponseWriter).Flush()
+	return http.NewResponseController(g.ResponseWriter).Flush()
 }
 
 func (g *gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
