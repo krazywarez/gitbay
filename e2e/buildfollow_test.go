@@ -102,6 +102,15 @@ func TestBuildLogFollow(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
+	// If the test fails before the final cmd.Wait below, kill the follow
+	// instead of leaving it running. Once that Wait has run,
+	// cmd.ProcessState is set and this is a no-op.
+	defer func() {
+		if cmd.ProcessState == nil {
+			cmd.Process.Kill()
+			cmd.Wait()
+		}
+	}()
 	follow := newStreamReader(stdout)
 
 	page, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/alice/app/builds/1", inst.httpPort))
