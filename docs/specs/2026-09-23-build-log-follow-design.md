@@ -35,8 +35,10 @@ the web a way to follow.
 
 gitbayd is one process and its SSH and HTTP servers share one
 `*store.Store`, so an in-memory table reaches every follower. Writers in
-another process (`gitbayd admin` subcommands) do not wake anyone; the
-follow loop also re-reads every 10 seconds, which bounds that case.
+another process do not wake anyone: `gitbayd admin` subcommands, and
+every session under the system-sshd forced command (`gitbayd shell`),
+where each session is its own process. The follow loop also re-reads
+every 2 seconds, which bounds that case.
 
 ## Command
 
@@ -50,21 +52,26 @@ With `--follow`:
 2. Loop: take a wait channel, read from the offset, write any new bytes.
    If the status is no longer `pending` or `running` and the read
    returned nothing new, stop. Otherwise wait on the channel, the
-   10-second timer, or `Ctx.Done`.
+   2-second timer, or `Ctx.Done`.
 3. Write `build <n> <status>` to stderr and exit 0, whatever the
    outcome. Stdout stays the log, byte for byte.
 
 The wait channel is taken before the read, so a change between the read
 and the wait still wakes the loop.
 
-`Ctx` gains `Done <-chan struct{}`, nil when the surface has none. sshd
-sets it from the session's context and httpd from `r.Context()`. A write
+`Ctx` gains `Done <-chan struct{}`, nil when the surface has none. The
+embedded sshd closes it when the session's channel closes (the CLI's
+shared connection outlives a Ctrl-C, the channel does not); `gitbayd
+shell` passes nil, since its process ends with the session. httpd sets
+it from `r.Context()` on the web and both API endpoints. A write
 error also ends the loop. On `Done` the command returns
 `protocol.ExitFailure` with no message; nobody is reading.
 
 At most 8 follows per account run at once (a counter in `control`,
 decremented on return). The ninth exits 4: "8 follows are already open
-for this account; close one and retry".
+for this account; close one and retry". Signed-out web viewers are
+account 0 and share the 8; the ninth gets the stored log once with the
+refusal under it.
 
 The CLI's `pass("log", …)` help in `cmd/gitbay/main.go` names
 `--follow`.
