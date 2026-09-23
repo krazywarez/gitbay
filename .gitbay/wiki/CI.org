@@ -38,6 +38,15 @@ Scheduled jobs run on their cron against the default branch, never on
 push; a default-branch push registers or updates them. Tag jobs run on
 a matching tag push and nothing else.
 
+A running build is followed with =build log <owner/name> <n> --follow=:
+the stored log, then output as the runner sends it, then the outcome
+as =build <n> <status>= on stderr once the build ends. The exit code is
+0 whatever the outcome. The build page does the same without
+JavaScript while a build is queued or running; =?follow=0= renders it
+once. An account holds at most eight follows open, and signed-out
+viewers share one account's eight. Over the JSON API the command
+answers when the build ends, with the whole log.
+
 * The table
 
 One =ci.yml= with five jobs, each isolating one rule:
