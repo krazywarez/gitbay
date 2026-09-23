@@ -117,16 +117,25 @@ func (s *Server) font(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// image serves the embedded landing pictures with the font cache policy.
+var staticTypes = map[string]string{
+	".png":  "image/png",
+	".gif":  "image/gif",
+	".webm": "video/webm",
+	".mp4":  "video/mp4",
+}
+
+// image serves the embedded landing pictures and recording with the font
+// cache policy. ServeContent answers Range, which Safari needs to play video.
 func (s *Server) image(w http.ResponseWriter, r *http.Request) {
-	data, err := web.ImageFS.ReadFile("static" + r.URL.Path[len("/static"):])
+	name := "static" + r.URL.Path[len("/static"):]
+	data, err := web.ImageFS.ReadFile(name)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", staticTypes[path.Ext(name)])
 	w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
-	w.Write(data)
+	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(data))
 }
 
 // notFound renders the designed 404 page with a 404 status. Falls back to

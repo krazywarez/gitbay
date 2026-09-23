@@ -7,6 +7,12 @@
 <pre class="quickstart" tabindex="0">ssh git@{{.Host}} help                        # every command, no client to install
 git clone ssh://git@{{.Host}}/owner/repo.git</pre>
 <div class="routes"><a class="button primary" href="/explore">Explore repositories</a>{{if .Signup}}<a class="button btn" href="/register">Create an account</a>{{end}}</div>
+<figure class="shot"><video autoplay muted loop playsinline controls width="1248" height="688" aria-describedby="demo-caption">
+  <source src="/static/img/demo.webm" type="video/webm">
+  <source src="/static/img/demo.mp4" type="video/mp4">
+</video>
+<figcaption id="demo-caption">Signup to release on gitbay.org from a terminal: register an SSH key, verify the mailed code, create a repository and push, file an issue, open and merge a request that closes it, then tag and publish a release.</figcaption>
+</figure>
 <figure class="shot"><picture>
   <source srcset="/static/img/mr-dark.png" media="(prefers-color-scheme: dark)">
   <img src="/static/img/mr-light.png" width="1280" height="900" alt="A merged merge request: the description on the left, and on the right two CI checks reporting success with how long each ran, an approval, and the source and target branches.">

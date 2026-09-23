@@ -1704,6 +1704,7 @@ details.refmenu .refdrop a.allrefs {
 pre.quickstart { margin: 0 0 var(--sp-4); }
 .shot { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin: var(--sp-5) 0; }
 .shot img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: cover; object-position: top; }
+.shot video { display: block; width: 100%; height: auto; }
 .shot figcaption {
   border-top: 1px solid var(--line);
   background: var(--surface);

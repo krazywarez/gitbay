@@ -47,7 +47,7 @@ func TestStylesheetFontsAreServed(t *testing.T) {
 }
 
 // TestLandingImagesAreServed: every file under static/img has a route
-// that answers 200 with an image type and the stylesheet's cache policy.
+// that answers 200 with an image or video type, and a video answers Range.
 func TestLandingImagesAreServed(t *testing.T) {
 	s := New(config.Default(), nil)
 	byPattern := map[string]http.HandlerFunc{}
@@ -72,8 +72,18 @@ func TestLandingImagesAreServed(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		h(rec, httptest.NewRequest("GET", u, nil))
-		if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/") {
-			t.Errorf("%s: %d %s", e.Name(), rec.Code, rec.Header().Get("Content-Type"))
+		ct := rec.Header().Get("Content-Type")
+		if rec.Code != http.StatusOK || !(strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "video/")) {
+			t.Errorf("%s: %d %q", e.Name(), rec.Code, ct)
+		}
+		if strings.HasPrefix(ct, "video/") {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", u, nil)
+			req.Header.Set("Range", "bytes=0-1")
+			h(rec, req)
+			if rec.Code != http.StatusPartialContent || rec.Body.Len() != 2 {
+				t.Errorf("%s: Range answered %d with %d bytes", e.Name(), rec.Code, rec.Body.Len())
+			}
 		}
 	}
 }
