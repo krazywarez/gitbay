@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"modernc.org/sqlite"
 )
@@ -21,6 +22,11 @@ var migrationFS embed.FS
 
 type Store struct {
 	DB *sql.DB
+
+	// logWait holds one channel per build someone is following, closed
+	// by the next change to that build's row (BuildLogWait).
+	logMu   sync.Mutex
+	logWait map[int64]chan struct{}
 }
 
 // Open opens (creating if needed) the database at path with WAL mode and

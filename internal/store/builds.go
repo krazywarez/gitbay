@@ -233,6 +233,7 @@ func (s *Store) AppendBuildLog(id int64, chunk []byte) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
+		s.wakeBuild(id)
 		return nil
 	}
 	// Over the cap. The bounds match exactly once: appending the notice puts
@@ -241,6 +242,9 @@ func (s *Store) AppendBuildLog(id int64, chunk []byte) error {
 		UPDATE builds SET log = log || ?
 		WHERE id = ? AND length(log) >= ? AND length(log) < ?`,
 		truncNotice, id, MaxBuildLog, MaxBuildLog+len(truncNotice))
+	if err == nil {
+		s.wakeBuild(id)
+	}
 	return err
 }
 
@@ -255,6 +259,7 @@ func (s *Store) FinishBuild(id int64, status string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	s.wakeBuild(id)
 	return nil
 }
 
@@ -331,6 +336,48 @@ func (s *Store) BuildLog(id int64) ([]byte, error) {
 	return log, err
 }
 
+// BuildLogWait returns a channel closed by the next append to, finish of
+// or cancel of the build. Take it before reading, so a change between the
+// read and the wait still wakes the reader. Only this process's writes
+// wake it.
+func (s *Store) BuildLogWait(id int64) <-chan struct{} {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	if s.logWait == nil {
+		s.logWait = map[int64]chan struct{}{}
+	}
+	ch, ok := s.logWait[id]
+	if !ok {
+		ch = make(chan struct{})
+		s.logWait[id] = ch
+	}
+	return ch
+}
+
+func (s *Store) wakeBuild(id int64) {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	if ch, ok := s.logWait[id]; ok {
+		close(ch)
+		delete(s.logWait, id)
+	}
+}
+
+// BuildLogFrom returns the build's status and its log past offset bytes,
+// read together so a terminal status comes with every byte before it.
+// The cast matters: || stores the log as text, and substr on text counts
+// characters.
+func (s *Store) BuildLogFrom(id, offset int64) (string, []byte, error) {
+	var status string
+	var chunk []byte
+	err := s.DB.QueryRow(`SELECT status, substr(CAST(log AS BLOB), ?) FROM builds WHERE id = ?`,
+		offset+1, id).Scan(&status, &chunk)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil, ErrNotFound
+	}
+	return status, chunk, err
+}
+
 // LatestBuild returns the newest build for a repo, optionally narrowed to
 // one job. It is what a status badge reports.
 func (s *Store) LatestBuild(repoID int64, job string) (Build, error) {
@@ -399,6 +446,7 @@ func (s *Store) CancelBuild(id int64) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	s.wakeBuild(id)
 	return nil
 }
 

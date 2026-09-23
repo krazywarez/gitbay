@@ -426,3 +426,104 @@ func TestClaimBuildSkipsUntrustedUnlessAsked(t *testing.T) {
 		t.Fatalf("untrusted claim: err=%v ok=%v number=%d, want %d", err, ok, b.Number, forkBuild)
 	}
 }
+
+// A follower's channel closes on each kind of change to its build, and
+// only its build.
+func TestBuildLogWaitWakes(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
+		t.Fatal(err)
+	}
+	newBuild := func() int64 {
+		t.Helper()
+		id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	closed := func(ch <-chan struct{}) bool {
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}
+
+	a, b := newBuild(), newBuild()
+	wa, wb := s.BuildLogWait(a), s.BuildLogWait(b)
+	if err := s.AppendBuildLog(a, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if !closed(wa) {
+		t.Error("append did not wake its build")
+	}
+	if closed(wb) {
+		t.Error("append woke another build")
+	}
+
+	mustClaim(t, s, 1) // claims a, the oldest
+	wa = s.BuildLogWait(a)
+	if err := s.FinishBuild(a, "success"); err != nil {
+		t.Fatal(err)
+	}
+	if !closed(wa) {
+		t.Error("finish did not wake")
+	}
+
+	if err := s.CancelBuild(b); err != nil {
+		t.Fatal(err)
+	}
+	if !closed(wb) {
+		t.Error("cancel did not wake")
+	}
+}
+
+// Offsets are bytes, not characters: || stores the log as text, and a
+// multibyte character must not shift where the next read starts.
+func TestBuildLogFrom(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRepo("user", uid, "orgo", "public"); err != nil {
+		t.Fatal(err)
+	}
+	id, err := s.CreateBuild(1, "test", "abc123", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := "héllo — ok\n"
+	for _, c := range []string{first, "wörld\n"} {
+		if err := s.AppendBuildLog(id, []byte(c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status, all, err := s.BuildLogFrom(id, 0)
+	if err != nil || status != "pending" || string(all) != first+"wörld\n" {
+		t.Fatalf("from 0: %q %q %v", status, all, err)
+	}
+	_, rest, err := s.BuildLogFrom(id, int64(len(first)))
+	if err != nil || string(rest) != "wörld\n" {
+		t.Fatalf("from %d: %q %v", len(first), rest, err)
+	}
+	_, none, err := s.BuildLogFrom(id, int64(len(all)))
+	if err != nil || len(none) != 0 {
+		t.Fatalf("from the end: %q %v", none, err)
+	}
+	if _, _, err := s.BuildLogFrom(9999, 0); err != ErrNotFound {
+		t.Fatalf("missing build: %v", err)
+	}
+}
