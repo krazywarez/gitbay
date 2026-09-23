@@ -160,9 +160,9 @@ func (i *instance) newKey(t *testing.T, name string) string {
 	return priv
 }
 
-// ssh runs the real OpenSSH client against the instance with the given key.
-func (i *instance) ssh(t *testing.T, key string, stdin string, args ...string) (string, string, int) {
-	t.Helper()
+// sshCmd is the ssh invocation ssh runs, for a test that reads the output
+// as it arrives.
+func (i *instance) sshCmd(key string, args ...string) *exec.Cmd {
 	base := []string{
 		"-p", fmt.Sprint(i.port),
 		"-i", key,
@@ -172,7 +172,13 @@ func (i *instance) ssh(t *testing.T, key string, stdin string, args ...string) (
 		"-o", "BatchMode=yes",
 		"git@127.0.0.1",
 	}
-	cmd := exec.Command("ssh", append(base, args...)...)
+	return exec.Command("ssh", append(base, args...)...)
+}
+
+// ssh runs the real OpenSSH client against the instance with the given key.
+func (i *instance) ssh(t *testing.T, key string, stdin string, args ...string) (string, string, int) {
+	t.Helper()
+	cmd := i.sshCmd(key, args...)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
