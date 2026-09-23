@@ -39,6 +39,8 @@ type Server struct {
 	sessions    sync.WaitGroup // accepted connections still being served
 	mu          sync.Mutex
 	conns       map[*conn]struct{}
+	stopping    chan struct{} // closed by Stop
+	stopOnce    sync.Once
 }
 
 // conn is one accepted connection and how many sessions it is running.
@@ -51,7 +53,7 @@ type conn struct {
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
-	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}}
+	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}, stopping: make(chan struct{})}
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
@@ -177,10 +179,18 @@ func (s *Server) Serve(ln net.Listener) error {
 	}
 }
 
+// Stop ends the commands that run until something happens (build log
+// --follow), so a shutdown drain waits only for work that finishes. It
+// does not close connections; Shutdown does.
+func (s *Server) Stop() {
+	s.stopOnce.Do(func() { close(s.stopping) })
+}
+
 // Shutdown closes every idle connection, then waits for the ones with a
 // session running, or for ctx. The caller closes the listener first; a
 // push in flight completes rather than being cut mid-pack.
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.Stop()
 	s.mu.Lock()
 	for c := range s.conns {
 		if c.active.Load() == 0 {
@@ -240,15 +250,31 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 			req.Reply(true, nil)
 			// x/crypto closes reqs when the client closes the channel. That
 			// is how a follow learns nobody is reading: the CLI's shared
-			// connection outlives a Ctrl-C, the channel does not.
-			done := make(chan struct{})
+			// connection outlives a Ctrl-C, the channel does not. Stop
+			// ends it too, for a restart.
+			closed := make(chan struct{})
 			go func() {
 				for r := range reqs {
 					r.Reply(false, nil)
 				}
+				close(closed)
+			}()
+			done := make(chan struct{})
+			go func() {
+				select {
+				case <-closed:
+				case <-s.stopping:
+				}
 				close(done)
 			}()
 			code := s.runExec(sconn, ch, payload.Command, done)
+			select {
+			case <-s.stopping:
+				if code != protocol.ExitOK {
+					fmt.Fprintln(ch.Stderr(), "gitbay is restarting; run the command again in a moment")
+				}
+			default:
+			}
 			sendExit(ch, code)
 			return
 		case "shell":
