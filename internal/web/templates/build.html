@@ -12,5 +12,7 @@
 {{end}}
 </div>
 <p class="meta">{{.Build.Job}} on {{.Build.Ref}} · <code><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/commit/{{.Build.SHA}}">{{printf "%.10s" .Build.SHA}}</a></code> · queued {{when .Build.CreatedAt}}{{if .Build.FinishedAt}} · finished {{when .Build.FinishedAt}}{{end}}</p>
-{{if .Log}}<pre class="code buildlog" tabindex="0">{{.Log}}</pre>{{else}}<p class="empty-note">no log yet</p>{{end}}
+{{if .Live}}<p class="meta">Live: the log streams here until the build ends. If it stops without a “build finished” line, reload to pick it up again. <a href="?follow=0">Show it without updates</a></p>
+<pre class="code buildlog" tabindex="0">{{.Log}}</pre>
+{{else if .Log}}<pre class="code buildlog" tabindex="0">{{.Log}}</pre>{{else}}<p class="empty-note">no log yet</p>{{end}}
 {{end}}

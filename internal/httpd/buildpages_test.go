@@ -59,21 +59,15 @@ func TestBuildsPageRendersCommandOutput(t *testing.T) {
 
 func TestBuildPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
-	err := web.Render(&sb, "build.html", struct {
-		repoPage
-		Build    control.BuildOut
-		Log      string
-		CanWrite bool
-		Notice   string
-	}{
-		testRepoPage(),
-		control.BuildOut{
+	err := web.Render(&sb, "build.html", buildView{
+		repoPage: testRepoPage(),
+		Build: control.BuildOut{
 			Number: 60, Job: "build", Status: "success",
 			SHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b", Ref: "cli-coverage",
 			CreatedAt: "2026-08-28T04:42:54Z", FinishedAt: "2026-08-28T04:43:06Z",
 		},
-		"step 1 ok",
-		true, "",
+		Log:      "step 1 ok",
+		CanWrite: true,
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)

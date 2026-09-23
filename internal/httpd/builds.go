@@ -1,12 +1,20 @@
 package httpd
 
 import (
+	"bytes"
+	"fmt"
+	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/web"
 )
 
 // buildFilter is the builds page's GET filter: branch, status and job,
@@ -295,13 +303,86 @@ func (s *Server) build(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	log, _, _ := s.runControl(viewer, []string{"build", "log", p.Repo.Path(), n})
+	v := buildView{repoPage: p, Build: b, CanWrite: s.canWriteRepo(r, p.Repo), Notice: s.takeFlash(w, r)}
+	if (b.Status == "pending" || b.Status == "running") && r.URL.Query().Get("follow") != "0" {
+		s.streamBuild(w, r, v, viewer, n)
+		return
+	}
+	v.Log, _, _ = s.runControl(viewer, []string{"build", "log", p.Repo.Path(), n})
+	s.render(w, "build.html", v)
+}
 
-	s.render(w, "build.html", struct {
-		repoPage
-		Build    control.BuildOut
-		Log      string
-		CanWrite bool
-		Notice   string
-	}{p, b, log, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
+type buildView struct {
+	repoPage
+	Build    control.BuildOut
+	Log      string
+	Live     bool
+	CanWrite bool
+	Notice   string
+}
+
+// liveLogMarker stands in for the log when build.html is rendered for a
+// live build; streamBuild splits the page there and streams the log into
+// the gap. Git refs, paths and job names cannot hold the control byte.
+const liveLogMarker = "\x1elive-log\x1e"
+
+// streamBuild writes the build page with the log following the build:
+// the page up to the log, then build log --follow escaped and flushed as
+// it arrives, then the outcome and the rest of the page.
+func (s *Server) streamBuild(w http.ResponseWriter, r *http.Request, v buildView, viewer store.User, n string) {
+	v.Live, v.Log = true, liveLogMarker
+	var buf bytes.Buffer
+	if err := web.Render(&buf, "build.html", v); err != nil {
+		http.Error(w, "template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	head, tail, ok := strings.Cut(buf.String(), liveLogMarker)
+	if !ok || !strings.HasPrefix(tail, "</pre>") {
+		http.Error(w, "template error: build.html has no live log slot", http.StatusInternalServerError)
+		return
+	}
+	tail = strings.TrimPrefix(tail, "</pre>")
+
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Accel-Buffering", "no")
+	rc := http.NewResponseController(w)
+	io.WriteString(w, head)
+	rc.Flush()
+
+	path := v.Repo.Path()
+	msg, code := s.runControlStream(viewer, []string{"build", "log", path, n, "--follow"},
+		htmlStream{w: w, rc: rc}, r.Context().Done())
+	if code == protocol.ExitDenied {
+		// The follow cap: the stored log once, and why it is not live.
+		log, _, _ := s.runControl(viewer, []string{"build", "log", path, n})
+		template.HTMLEscape(w, []byte(log))
+	}
+	io.WriteString(w, "</pre>")
+	switch {
+	case code == protocol.ExitOK:
+		var b control.BuildOut
+		if _, ok := s.runControlInto(viewer, []string{"build", "show", path, n}, &b); ok {
+			fmt.Fprintf(w, `<p class="notice" role="status">build finished: %s</p>`, template.HTMLEscapeString(b.Status))
+		}
+	case code == protocol.ExitDenied:
+		fmt.Fprintf(w, `<p class="error" role="alert">%s</p>`, template.HTMLEscapeString(msg))
+	}
+	io.WriteString(w, tail)
+}
+
+// htmlStream escapes each chunk of a streamed log into the page and
+// flushes it, so the browser draws it as it arrives.
+type htmlStream struct {
+	w  io.Writer
+	rc *http.ResponseController
+}
+
+func (h htmlStream) Write(p []byte) (int, error) {
+	template.HTMLEscape(h.w, p)
+	if err := h.rc.Flush(); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }

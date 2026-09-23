@@ -3,6 +3,7 @@ package httpd
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -48,6 +49,27 @@ func (s *Server) runControlCode(u store.User, argv []string) (out string, msg st
 		m = strings.TrimSpace(stdout.String())
 	}
 	return stdout.String(), m, code
+}
+
+// runControlStream runs a command whose output is written as it is
+// produced: stdout goes to out, and done ends the command when the
+// request does. msg is stderr.
+func (s *Server) runControlStream(u store.User, argv []string, out io.Writer, done <-chan struct{}) (msg string, code int) {
+	var stderr bytes.Buffer
+	ctx := &control.Ctx{
+		User:   u,
+		Source: "web",
+		Scope:  "full",
+		Store:  s.st,
+		Cfg:    s.cfg,
+		Stdin:  strings.NewReader(""),
+		Stdout: out,
+		Stderr: &stderr,
+		ViaAPI: true,
+		Done:   done,
+	}
+	code = control.Dispatch(ctx, argv)
+	return strings.TrimSpace(stderr.String()), code
 }
 
 // done finishes a form action by exit code: back to the page on success,
