@@ -83,3 +83,17 @@ func (g *gzipWriter) Close() {
 		g.gz.Close()
 	}
 }
+
+// Flush sends what the gzip stream holds, then flushes the connection, so
+// a streamed page reaches the browser as it is written.
+func (g *gzipWriter) Flush() {
+	if !g.decided {
+		g.decide(http.StatusOK)
+	}
+	if g.gz != nil {
+		g.gz.Flush()
+	}
+	http.NewResponseController(g.ResponseWriter).Flush()
+}
+
+func (g *gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }

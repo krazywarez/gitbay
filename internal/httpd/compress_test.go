@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
@@ -78,4 +79,32 @@ func TestBinaryResponsesPassThrough(t *testing.T) {
 	if rec.Header().Get("Content-Encoding") != "" || rec.Body.String() != "0000" {
 		t.Fatalf("git transport touched: %q %q", rec.Header().Get("Content-Encoding"), rec.Body.String())
 	}
+}
+
+// A flush mid-response reaches the connection with what was written so
+// far decodable, which is what lets a page stream through gzip.
+func TestGzipWriterFlushes(t *testing.T) {
+	rec := httptest.NewRecorder()
+	h := compressed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		io.WriteString(w, "<p>first</p>")
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			t.Fatalf("flush: %v", err)
+		}
+		if !rec.Flushed {
+			t.Fatal("the flush did not reach the connection")
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(rec.Body.Bytes()))
+		if err != nil {
+			t.Fatalf("gzip header: %v", err)
+		}
+		got, _ := io.ReadAll(zr) // no trailer yet: ends in ErrUnexpectedEOF
+		if !strings.Contains(string(got), "<p>first</p>") {
+			t.Fatalf("flushed body decodes to %q", got)
+		}
+		io.WriteString(w, "<p>second</p>")
+	}))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	h.ServeHTTP(rec, req)
 }
