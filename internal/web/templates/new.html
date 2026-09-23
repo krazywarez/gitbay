@@ -9,7 +9,7 @@
   <option value="{{.Viewer}}">{{.Viewer}}</option>
   {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
 </select></label>
-<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="namehint"></label>
+<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="namehint" autocomplete="off" spellcheck="false"></label>
 <span class="hint" id="namehint">Lowercase letters, digits, dot, dash and underscore; must start with a letter or digit; up to 63 characters.</span></p>
 <fieldset class="segmented">
   <legend>Visibility</legend>
@@ -26,7 +26,7 @@
 grants access through teams. You are its first admin.</p>
 <form method="post" action="/new">
 <input type="hidden" name="field" value="org-create">
-<p><label>Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="orghint"></label>
+<p><label>Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" aria-describedby="orghint" autocomplete="off" spellcheck="false"></label>
 <span class="hint" id="orghint">The same rules as a repository name, and it becomes a top-level path.</span></p>
 <p><button type="submit">Create organization</button></p>
 </form>

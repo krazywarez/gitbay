@@ -57,6 +57,10 @@ func TestAdminUsersWeb(t *testing.T) {
 	}
 	post(url.Values{"field": {"enable"}, "user": {"alice"}})
 	post(url.Values{"field": {"promote"}, "user": {"alice"}})
+	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "user", "show", "alice", "--json"); strings.Contains(out, `"admin":true`) {
+		t.Fatalf("promote without a confirm took: %s", out)
+	}
+	post(url.Values{"field": {"promote"}, "user": {"alice"}, "confirm": {"alice"}})
 	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "user", "show", "alice", "--json"); !strings.Contains(out, `"admin":true`) {
 		t.Fatalf("promote did not take: %s", out)
 	}

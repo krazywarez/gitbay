@@ -523,7 +523,7 @@ nav.tabs a i { font-style: normal; color: var(--muted); margin-left: 4px; }
 .pagehead h1, .listhead h1, .headrow h1, .listhead h2, .headrow h2 { margin: 0; }
 .pagehead > p, .listhead > p, .headrow > p { margin: 0; }
 .pagehead .grow, .listhead .spacer, .headrow .spacer { flex: 1; }
-.issuetitle { margin: 0 0 var(--sp-2); font-size: var(--fs-5); }
+.issuetitle { margin: 0 0 var(--sp-2); font-size: var(--fs-5); text-wrap: balance; }
 .issuenumber { color: var(--muted); font-weight: 400; }
 .issuemeta { color: var(--muted); font-size: var(--fs-2); margin: 0 0 var(--sp-4); }
 .commithead p { margin: var(--sp-1) 0; }
@@ -905,7 +905,7 @@ table.tree td.lastcommit a {
 table.tree td.lastcommit a:hover { color: var(--link); }
 table.tree th.age, table.tree td.age { width: 20%; }
 td.age, th.age { text-align: right; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
-td.size, td.mode { color: var(--muted); white-space: nowrap; }
+td.size, td.mode { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 table.tree th.size, table.tree td.size { text-align: right; }
 table.refs td.name { width: 100%; }
 table.refs td.sha, td.sha { color: var(--muted); }
@@ -928,8 +928,8 @@ table.keys.nowrap th, table.keys.nowrap td { white-space: nowrap; }
    The cell is two fixed slots, each right-aligned. A form cannot span
    table cells, so one column per control — which would let the table
    align them — is out without form="" plumbing, and the forms hold
-   different numbers of controls: only an admin's role form has a
-   confirm field, and the enable form has none. Sizing the slot instead
+   different numbers of controls: the enable form and the disabled
+   row's Promote have no confirm field. Sizing the slot instead
    of the form is what puts every button in one column and every field
    in another; right-aligning the cell alone left the disabled row's
    Promote where other rows keep their field. A slot is a field, a gap
@@ -1486,7 +1486,7 @@ a.memberchip {
 a.memberchip:hover { text-decoration: none; border-color: var(--link); color: var(--link); }
 a.memberchip .role { color: var(--muted); }
 
-.pathbar { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); margin: 0 0 var(--sp-3); flex-wrap: wrap; font-size: var(--fs-2); }
+.pathbar { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); margin: 0 0 var(--sp-3); flex-wrap: wrap; font-size: var(--fs-2); overflow-wrap: anywhere; }
 .pathbar .spacer { flex: 1; }
 .pathbar .actions { display: flex; align-items: center; gap: var(--sp-2); }
 /* history · blame · raw were 21px tall and "raw" 22px wide (#232) */
@@ -1608,6 +1608,7 @@ details.refmenu .refdrop {
   min-width: 12rem;
   max-height: 20rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--canvas);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
@@ -1849,7 +1850,6 @@ svg.icon { vertical-align: -0.125em; }
      cell padding and the card clipped the age; a long name wraps (#232) */
   table.tree td.name { white-space: normal; overflow-wrap: anywhere; }
   .clone pre { white-space: pre-wrap; word-break: break-all; }
-  .pathbar { overflow-wrap: anywhere; }
   .readme .cardbody, .code { padding: var(--sp-3); }
   .thread { margin-left: var(--sp-3); }
   .blamehunk { flex-direction: column; gap: 0; }

@@ -89,7 +89,7 @@
 {{range .Members}}<tr>
   <td><a href="/{{.Name}}">{{.Name}}</a></td>
   <td>{{.Role}}</td>
-  <td class="act"><form method="post" action="/{{$org}}"><input type="hidden" name="field" value="member-remove"><input type="hidden" name="user" value="{{.Name}}"><button type="submit" class="linklike">Remove</button></form></td>
+  <td class="act"><form method="post" action="/{{$org}}"><input type="hidden" name="field" value="member-remove"><input type="hidden" name="user" value="{{.Name}}">{{template "confirmfield" .Name}} <button type="submit" class="linklike">Remove</button></form></td>
 </tr>
 {{end}}</table></div>
 <details class="editbox">
@@ -97,7 +97,7 @@
   <form method="post" action="/{{$org}}" class="setform stack">
     <input type="hidden" name="field" value="member-add">
     <label for="member">Username</label>
-    <input type="text" id="member" name="user" required>
+    <input type="text" id="member" name="user" required autocomplete="off" spellcheck="false">
     <label class="none" for="memberrole">Role</label>
     <select id="memberrole" name="role">
       <option value="member">member</option>
@@ -118,25 +118,41 @@ of a team get its role on every repository it is granted.</p>
     <p class="meta">members: {{range .Members}}<a class="memberchip" href="/{{.}}">{{.}}</a> {{else}}<span class="none">none yet</span>{{end}}</p>
     <p class="meta">repositories: {{range .Grants}}<span class="memberchip"><a href="/{{.RepoPath}}">{{.RepoPath}}</a> <span class="role">{{.Role}}</span></span> {{else}}<span class="none">none yet</span>{{end}}</p>
     <form method="post" action="/{{$org}}" class="setform stack">
+      <input type="hidden" name="field" value="team-add">
       <input type="hidden" name="team" value="{{.Name}}">
-      <label class="none" for="tm-{{.Name}}">Members</label>
-      <input type="text" id="tm-{{.Name}}" name="user" placeholder="usernames, space-separated">
-      <button type="submit" name="field" value="team-add" class="btn">Add</button>
-      <button type="submit" name="field" value="team-remove" class="btn">Remove</button>
+      <label class="none" for="tm-{{.Name}}">Add members</label>
+      <input type="text" id="tm-{{.Name}}" name="user" placeholder="usernames, space-separated" autocomplete="off" spellcheck="false">
+      <button type="submit" class="btn">Add</button>
     </form>
-    <form method="post" action="/{{$org}}" class="setform stack">
+    {{if .Members}}<form method="post" action="/{{$org}}" class="setform stack">
+      <input type="hidden" name="field" value="team-remove">
       <input type="hidden" name="team" value="{{.Name}}">
-      <label class="none" for="tr-{{.Name}}">Repository</label>
-      <input type="text" id="tr-{{.Name}}" name="repo" placeholder="owner/name">
+      <label class="none" for="tmr-{{.Name}}">Remove members</label>
+      <input type="text" id="tmr-{{.Name}}" name="user" placeholder="usernames, space-separated" autocomplete="off" spellcheck="false">
+      {{template "confirmfield" .Name}}
+      <button type="submit" class="btn">Remove</button>
+    </form>{{end}}
+    <form method="post" action="/{{$org}}" class="setform stack">
+      <input type="hidden" name="field" value="team-grant">
+      <input type="hidden" name="team" value="{{.Name}}">
+      <label class="none" for="tr-{{.Name}}">Grant a repository</label>
+      <input type="text" id="tr-{{.Name}}" name="repo" placeholder="owner/name" autocomplete="off" spellcheck="false">
       <label class="none" for="trr-{{.Name}}">Role</label>
       <select id="trr-{{.Name}}" name="role">
         <option value="read">read</option>
         <option value="write">write</option>
         <option value="admin">admin</option>
       </select>
-      <button type="submit" name="field" value="team-grant" class="btn">Grant</button>
-      <button type="submit" name="field" value="team-revoke" class="btn">Revoke</button>
+      <button type="submit" class="btn">Grant</button>
     </form>
+    {{if .Grants}}<form method="post" action="/{{$org}}" class="setform stack">
+      <input type="hidden" name="field" value="team-revoke">
+      <input type="hidden" name="team" value="{{.Name}}">
+      <label class="none" for="trv-{{.Name}}">Revoke a repository</label>
+      <input type="text" id="trv-{{.Name}}" name="repo" placeholder="owner/name" autocomplete="off" spellcheck="false">
+      {{template "confirmfield" .Name}}
+      <button type="submit" class="btn">Revoke</button>
+    </form>{{end}}
     <form method="post" action="/{{$org}}" class="setform">
       <input type="hidden" name="field" value="team-delete">
       <input type="hidden" name="team" value="{{.Name}}">
@@ -162,7 +178,7 @@ of a team get its role on every repository it is granted.</p>
   <form method="post" action="/{{$org}}" class="setform">
     <input type="hidden" name="field" value="org-rename">
     <label for="orgrename">New name</label>
-    <input type="text" id="orgrename" name="name" value="{{$org}}" required>
+    <input type="text" id="orgrename" name="name" value="{{$org}}" required autocomplete="off" spellcheck="false">
     <button type="submit" class="btn">Rename</button>
   </form>
   <p class="meta">Every clone URL under this organization changes with the name.</p>

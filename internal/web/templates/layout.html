@@ -6,6 +6,7 @@
 <title>{{template "title" .}}</title>
 <link rel="stylesheet" href="/static/style.css?v={{styleVersion}}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#000000">
 {{with field . "Feed"}}<link rel="alternate" type="application/atom+xml" href="{{.}}">
 {{end}}</head>
 <body>
@@ -223,7 +224,7 @@
 
 {{/* cmtln turns a line number into the link that opens the comment form
      on that line. No JavaScript: the anchor travels in the query. */}}
-{{define "cmtln"}}{{if and .Viewer .Base}}<a class="cmt" title="Comment on this line" href="{{.Base}}?view=diff&amp;cpath={{.Path}}&amp;cline={{.N}}&amp;cside={{.Side}}#compose">{{.N}}</a>{{else}}{{.N}}{{end}}{{end}}
+{{define "cmtln"}}{{if and .Viewer .Base}}<a class="cmt" aria-label="Comment on line {{.N}}" title="Comment on this line" href="{{.Base}}?view=diff&amp;cpath={{.Path}}&amp;cline={{.N}}&amp;cside={{.Side}}#compose">{{.N}}</a>{{else}}{{.N}}{{end}}{{end}}
 
 {{/* thread renders one review thread with its reply and resolve controls.
      Class carries "stale" for threads whose anchor is gone. */}}

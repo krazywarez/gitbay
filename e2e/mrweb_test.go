@@ -483,7 +483,8 @@ func TestMRSupersedes(t *testing.T) {
 	}
 
 	alice := inst.login(t, aliceKey)
-	if status, body := browserPost(t, alice, inst.base()+"/alice/app/mrs/1/close", url.Values{"by": {"2"}}); status != 200 {
+	// The field's placeholder is "!N", so the "!" is accepted.
+	if status, body := browserPost(t, alice, inst.base()+"/alice/app/mrs/1/close", url.Values{"by": {"!2"}}); status != 200 {
 		t.Fatalf("close post: %d\n%s", status, body)
 	}
 

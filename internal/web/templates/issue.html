@@ -55,8 +55,8 @@
     {{else}}<p class="none">none yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/label" class="actions">
-      <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
-      <input type="text" name="remove" aria-label="Remove labels" placeholder="remove">
+      <input type="text" name="add" aria-label="Add labels" autocomplete="off" spellcheck="false" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove labels" autocomplete="off" spellcheck="false" placeholder="remove">
       <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
@@ -67,8 +67,8 @@
     {{else}}<p class="none">nobody yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/assign" class="actions">
-      <input type="text" name="add" aria-label="Add assignees" placeholder="add, space-separated">
-      <input type="text" name="remove" aria-label="Remove assignees" placeholder="remove">
+      <input type="text" name="add" aria-label="Add assignees" autocomplete="off" spellcheck="false" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove assignees" autocomplete="off" spellcheck="false" placeholder="remove">
       <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}

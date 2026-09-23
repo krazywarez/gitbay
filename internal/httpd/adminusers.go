@@ -105,7 +105,7 @@ func (s *Server) adminUsersSubmit(w http.ResponseWriter, r *http.Request, viewer
 		back("unknown action")
 		return
 	}
-	if verb == "demote" || verb == "disable" {
+	if verb == "promote" || verb == "demote" || verb == "disable" {
 		if ok, msg := confirmed(r, name); !ok {
 			back(msg)
 			return

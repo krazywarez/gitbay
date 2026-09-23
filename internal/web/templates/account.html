@@ -32,7 +32,7 @@
   <label for="p-website">Website</label>
   <input type="text" id="p-website" name="website" value="{{.Profile.Website}}" placeholder="https://example.org">
   <label for="p-links">Links</label>
-  <textarea id="p-links" name="links" rows="3" placeholder="one per line: label|https://... or a bare https://... (at most 5)">{{.LinksText}}</textarea>
+  <textarea id="p-links" name="links" rows="3" placeholder="one per line: label|https://… or a bare https://… (at most 5)">{{.LinksText}}</textarea>
   <span class="btngroup"><button type="submit" class="btn">Save profile</button></span>
 </form>
 <h3>About</h3>
@@ -65,7 +65,7 @@ commands and push; a <code>git</code> key can only move git data (e.g., CI).</p>
   <form method="post" action="/settings" class="setform stack">
     <input type="hidden" name="field" value="key-add">
     <label for="key">Public key</label>
-    <textarea id="key" name="key" rows="3" required placeholder="ssh-ed25519 AAAA... you@machine"></textarea>
+    <textarea id="key" name="key" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAA… you@machine"></textarea>
     <label for="key-label">Label</label>
     <input id="key-label" name="label" maxlength="64" placeholder="defaults to the key's comment">
     <label for="scope">Scope</label>
@@ -94,13 +94,13 @@ account and where notifications go.</p>
   <form method="post" action="/settings" class="setform">
     <input type="hidden" name="field" value="email-add">
     <label for="address">Address</label>
-    <input type="email" id="address" name="address" required placeholder="you@example.org">
+    <input type="email" id="address" name="address" required autocomplete="email" placeholder="you@example.org">
     <button type="submit" class="btn">Send code</button>
   </form>
   <form method="post" action="/settings" class="setform">
     <input type="hidden" name="field" value="email-verify">
     <label for="code">Verification code</label>
-    <input type="text" id="code" name="code" required placeholder="from the mail">
+    <input type="text" id="code" name="code" required autocomplete="one-time-code" autocapitalize="none" spellcheck="false" placeholder="from the mail">
     <button type="submit" class="btn">Verify</button>
   </form>
 </details>

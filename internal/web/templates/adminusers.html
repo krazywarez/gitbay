@@ -38,7 +38,7 @@
       <input type="hidden" name="field" value="promote">
       <input type="hidden" name="user" value="{{.Username}}">
       <input type="hidden" name="state" value="{{$.State}}">
-      <button type="submit" class="btn">Promote</button>
+      {{template "confirmfield" .Username}} <button type="submit" class="btn">Promote</button>
     </form>
     {{else}}
     {{/* An account that is not active cannot be promoted, but the row

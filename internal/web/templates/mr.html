@@ -107,7 +107,7 @@
     </form>
     <form method="post" action="{{$base}}/close" class="actions">
       <label class="vh" for="by">Closed in favour of</label>
-      <input type="text" id="by" name="by" inputmode="numeric" size="4" placeholder="!N">
+      <input type="text" id="by" name="by" size="4" autocomplete="off" placeholder="!N">
       <button type="submit" class="danger">Close without merging</button>
     </form>
     <form method="post" action="{{$base}}/draft" class="actions">
@@ -143,8 +143,8 @@
     {{else}}<p class="none">nobody yet</p>{{end}}
     {{if and .CanWrite (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
     <form method="post" action="{{$base}}/review-request" class="actions">
-      <input type="text" name="add" aria-label="Add reviewers" placeholder="add, space-separated">
-      <input type="text" name="remove" aria-label="Remove reviewers" placeholder="remove">
+      <input type="text" name="add" aria-label="Add reviewers" autocomplete="off" spellcheck="false" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove reviewers" autocomplete="off" spellcheck="false" placeholder="remove">
       <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}
@@ -174,8 +174,8 @@
     {{else}}<p class="none">none yet</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/label" class="actions">
-      <input type="text" name="add" aria-label="Add labels" placeholder="add, space-separated">
-      <input type="text" name="remove" aria-label="Remove labels" placeholder="remove">
+      <input type="text" name="add" aria-label="Add labels" autocomplete="off" spellcheck="false" placeholder="add, space-separated">
+      <input type="text" name="remove" aria-label="Remove labels" autocomplete="off" spellcheck="false" placeholder="remove">
       <button type="submit" class="btn">Apply</button>
     </form>
     {{end}}

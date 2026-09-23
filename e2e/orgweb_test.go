@@ -85,10 +85,32 @@ func TestOrgManagementWeb(t *testing.T) {
 		}
 	}
 
-	// Revoking and removing work the same way round.
+	// Revoking and removing need the team's name typed; a bare post
+	// changes nothing.
 	browserPost(t, alice, inst.base()+"/acme", url.Values{
 		"field": {"team-revoke"}, "team": {"builders"}, "repo": {"acme/widget"},
 	})
+	if out, _, _ := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); !strings.Contains(out, `"acme/widget"`) {
+		t.Fatalf("unconfirmed revoke dropped the grant: %s", out)
+	}
+	browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"team-revoke"}, "team": {"builders"}, "repo": {"acme/widget"}, "confirm": {"builders"},
+	})
+	if out, _, _ := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); strings.Contains(out, `"acme/widget"`) {
+		t.Fatalf("confirmed revoke left the grant: %s", out)
+	}
+	browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"team-remove"}, "team": {"builders"}, "user": {"bob"},
+	})
+	if out, _, _ := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); !strings.Contains(out, `"bob"`) {
+		t.Fatalf("unconfirmed team remove took bob out: %s", out)
+	}
+	browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"team-remove"}, "team": {"builders"}, "user": {"bob"}, "confirm": {"builders"},
+	})
+	if out, _, _ := inst.ssh(t, aliceKey, "", "org", "team", "show", "acme", "builders", "--json"); strings.Contains(out, `"bob"`) {
+		t.Fatalf("confirmed team remove left bob in: %s", out)
+	}
 
 	// Deleting the team needs its name typed; a bare post is refused and
 	// the team stays.
@@ -108,8 +130,17 @@ func TestOrgManagementWeb(t *testing.T) {
 		t.Fatalf("team not deleted: exit %d", code)
 	}
 
-	browserPost(t, alice, inst.base()+"/acme", url.Values{
+	_, body = browserPost(t, alice, inst.base()+"/acme", url.Values{
 		"field": {"member-remove"}, "user": {"bob"},
+	})
+	if !strings.Contains(body, "type bob to confirm") {
+		t.Fatalf("unconfirmed member remove was not refused:\n%s", body)
+	}
+	if members := orgMembers(t, inst, aliceKey); len(members) != 2 {
+		t.Fatalf("member removed without confirmation: %v", members)
+	}
+	browserPost(t, alice, inst.base()+"/acme", url.Values{
+		"field": {"member-remove"}, "user": {"bob"}, "confirm": {"bob"},
 	})
 	if members := orgMembers(t, inst, aliceKey); len(members) != 1 {
 		t.Fatalf("member not removed: %v", members)

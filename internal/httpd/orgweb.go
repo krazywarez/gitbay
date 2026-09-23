@@ -78,6 +78,10 @@ func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 			argv = append(argv, "--role", role)
 		}
 	case "member-remove":
+		if ok, msg := confirmed(r, user); !ok {
+			back(msg)
+			return
+		}
 		argv = []string{"org", "members", "remove", owner, user}
 	case "team-create":
 		argv = []string{"org", "team", "create", owner, team}
@@ -90,11 +94,19 @@ func (s *Server) orgSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 	case "team-add":
 		argv = append([]string{"org", "team", "add", owner, team}, strings.Fields(user)...)
 	case "team-remove":
+		if ok, msg := confirmed(r, team); !ok {
+			back(msg)
+			return
+		}
 		argv = append([]string{"org", "team", "remove", owner, team}, strings.Fields(user)...)
 	case "team-grant":
 		argv = []string{"org", "team", "grant", owner, team,
 			strings.TrimSpace(r.FormValue("repo")), r.FormValue("role")}
 	case "team-revoke":
+		if ok, msg := confirmed(r, team); !ok {
+			back(msg)
+			return
+		}
 		argv = []string{"org", "team", "revoke", owner, team, strings.TrimSpace(r.FormValue("repo"))}
 	default:
 		back("unknown form")

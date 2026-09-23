@@ -11,7 +11,7 @@
   </div>{{end}}{{end}}
   <form method="get" class="searchform compact">
     <label for="ref" class="colhead">Branch</label>
-    <input type="text" id="ref" name="ref" value="{{.Filter.Ref}}" list="buildrefs">
+    <input type="text" id="ref" name="ref" value="{{.Filter.Ref}}" list="buildrefs" spellcheck="false">
     <datalist id="buildrefs">{{range .Refs}}<option value="{{.}}">{{end}}</datalist>
     <input type="hidden" name="status" value="{{.Filter.Status}}">
     <input type="hidden" name="job" value="{{.Filter.Job}}">

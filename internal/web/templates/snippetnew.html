@@ -4,7 +4,7 @@
 <h1>New snippet</h1>
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/{{.Owner}}/-/snippets/new" class="commentform">
-<p><input type="text" name="name" aria-label="File name" placeholder="filename" value="{{.Name}}" required></p>
+<p><input type="text" name="name" aria-label="File name" placeholder="filename" value="{{.Name}}" required autocomplete="off" spellcheck="false"></p>
 <p><input type="text" name="description" aria-label="Description" placeholder="description" value="{{.Description}}"></p>
 <p><select name="visibility" aria-label="Visibility">
 <option value="unlisted"{{if or (eq .Visibility "unlisted") (eq .Visibility "")}} selected{{end}}>unlisted</option>

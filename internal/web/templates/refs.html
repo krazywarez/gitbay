@@ -2,8 +2,8 @@
 {{define "content"}}
 <h1>Refs</h1>
 <form method="get" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/compare" class="compareform">
-  <label>Compare <input name="base" value="{{.Repo.DefaultBranch}}" size="14" aria-label="base ref"></label>
-  <label>with <input name="head" size="14" placeholder="branch, tag or sha" aria-label="head ref"></label>
+  <label>Compare <input name="base" value="{{.Repo.DefaultBranch}}" size="14" aria-label="Compare base ref" autocomplete="off" spellcheck="false"></label>
+  <label>with <input name="head" size="14" placeholder="branch, tag or sha" aria-label="with head ref" autocomplete="off" spellcheck="false"></label>
   <button type="submit" class="btn">Compare</button>
 </form>
 <h2>Branches</h2>

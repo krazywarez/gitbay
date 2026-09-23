@@ -29,7 +29,7 @@
 {{if .CanWrite}}
 <details class="editbox"><summary>add a file</summary>
 <form method="post" action="/{{.Owner}}/-/snippets/{{.Snippet.PublicID}}/file" class="commentform">
-<p><input type="text" name="name" aria-label="File name" placeholder="filename" required></p>
+<p><input type="text" name="name" aria-label="File name" placeholder="filename" required autocomplete="off" spellcheck="false"></p>
 <p><textarea name="content" aria-label="Content" rows="12" required></textarea></p>
 <p><button type="submit" class="btn">Add file</button></p>
 </form></details>

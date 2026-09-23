@@ -11,7 +11,7 @@ own.</p>
   <option value="{{.Viewer}}">{{.Viewer}}</option>
   {{range .Orgs}}<option value="{{.}}"{{if eq . $.Owner}} selected{{end}}>{{.}}</option>{{end}}
 </select></label>
-<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" value="{{.Name}}" aria-describedby="forkhint"></label>
+<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" value="{{.Name}}" aria-describedby="forkhint" autocomplete="off" spellcheck="false"></label>
 <span class="hint" id="forkhint">Defaults to the source name; change it to fork twice into the same owner.</span></p>
 <p><button type="submit">Create fork</button></p>
 </form>
