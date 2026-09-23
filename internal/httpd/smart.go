@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
@@ -26,11 +27,44 @@ type Server struct {
 	st       *store.Store
 	apiLimit *apiLimiter
 	proxies  []*net.IPNet // http.trusted_proxies, parsed once
+	stopping chan struct{} // closed by Stop
+	stopOnce sync.Once
 }
 
 func New(cfg config.Config, st *store.Store) *Server {
 	proxies, _ := cfg.HTTP.TrustedProxyNets() // validated at config load
-	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate), proxies: proxies}
+	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate), proxies: proxies,
+		stopping: make(chan struct{})}
+}
+
+// Stop ends the requests running a command that lasts until something
+// happens (build log --follow), so a shutdown drain waits only for work
+// that finishes. Other requests, git transport included, run on.
+func (s *Server) Stop() {
+	s.stopOnce.Do(func() { close(s.stopping) })
+}
+
+// until is closed when the request ends or the server stops, whichever
+// comes first: the Done a following command runs under.
+func (s *Server) until(r *http.Request) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-r.Context().Done():
+		case <-s.stopping:
+		}
+		close(done)
+	}()
+	return done
+}
+
+func (s *Server) stopped() bool {
+	select {
+	case <-s.stopping:
+		return true
+	default:
+		return false
+	}
 }
 
 // receivePackRefusal exists only to fail legibly if a client POSTs without

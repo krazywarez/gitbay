@@ -62,7 +62,7 @@ func (s *Server) apiRead(w http.ResponseWriter, r *http.Request) {
 		JSON:     true,
 		ViaAPI:   true,
 		ReadOnly: true,
-		Done:     r.Context().Done(),
+		Done:     s.until(r),
 	}
 	code := control.Dispatch(ctx, argv)
 

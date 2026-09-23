@@ -73,7 +73,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 		JSON:     true,
 		ViaAPI:   true,
 		ReadOnly: scope == "read",
-		Done:     r.Context().Done(),
+		Done:     s.until(r),
 	}
 	code := control.Dispatch(ctx, req.Argv)
 

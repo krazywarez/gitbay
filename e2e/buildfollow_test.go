@@ -54,15 +54,10 @@ func (s *streamReader) waitFor(t *testing.T, want string) string {
 	return s.buf.String()
 }
 
-// A running build is followed over ssh and on its page: output the runner
-// sends arrives while the build runs, and both end with the outcome.
-func TestBuildLogFollow(t *testing.T) {
-	t.Parallel()
-	inst := startInstance(t)
-	aliceKey := inst.newKey(t, "alice")
-	runnerKey := inst.newKey(t, "ci")
-	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
-	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+// queueBuild creates alice/app with one CI job and pushes it, which
+// queues build 1. No runner is attached, so it stays queued.
+func queueBuild(t *testing.T, inst *instance, aliceKey string) {
+	t.Helper()
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
 		t.Fatal("repo create failed")
 	}
@@ -76,8 +71,12 @@ func TestBuildLogFollow(t *testing.T) {
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "ci")
 	mustGit(t, dir, env, "push", "-q", "origin", "main")
+}
 
-	// Claim build 1 by hand, so the test decides when output arrives.
+// claimBuild claims the oldest pending build with an admin key, as a
+// runner would, and returns its id for runner log and runner done.
+func claimBuild(t *testing.T, inst *instance, runnerKey string) string {
+	t.Helper()
 	out, errOut, code := inst.ssh(t, runnerKey, "", "runner", "next", "--json")
 	if code != 0 {
 		t.Fatalf("runner next: %s", errOut)
@@ -90,7 +89,22 @@ func TestBuildLogFollow(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &claim); err != nil || claim.Data.ID == 0 {
 		t.Fatalf("runner next output %q: %v", out, err)
 	}
-	id := fmt.Sprint(claim.Data.ID)
+	return fmt.Sprint(claim.Data.ID)
+}
+
+// A running build is followed over ssh and on its page: output the runner
+// sends arrives while the build runs, and both end with the outcome.
+func TestBuildLogFollow(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	runnerKey := inst.newKey(t, "ci")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+	queueBuild(t, inst, aliceKey)
+
+	// Claim build 1 by hand, so the test decides when output arrives.
+	id := claimBuild(t, inst, runnerKey)
 
 	cmd := inst.sshCmd(aliceKey, "build", "log", "alice/app", "1", "--follow")
 	stdout, err := cmd.StdoutPipe()

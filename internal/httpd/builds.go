@@ -353,9 +353,14 @@ func (s *Server) streamBuild(w http.ResponseWriter, r *http.Request, v buildView
 
 	path := v.Repo.Path()
 	msg, code := s.runControlStream(viewer, []string{"build", "log", path, n, "--follow"},
-		htmlStream{w: w, rc: rc}, r.Context().Done())
+		htmlStream{w: w, rc: rc}, s.until(r))
 	if r.Context().Err() != nil {
 		// The client left; nothing more to write.
+		return
+	}
+	if code != protocol.ExitOK && s.stopped() {
+		io.WriteString(w, `</pre><p class="notice" role="status">gitbay is restarting; reload in a moment to pick the log up again.</p>`)
+		io.WriteString(w, tail)
 		return
 	}
 	if code == protocol.ExitDenied {

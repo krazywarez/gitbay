@@ -325,6 +325,12 @@ func serveCmd() *cobra.Command {
 					ln.Close()
 				}
 			}
+			// Follows run until a build ends; end them first so the drain
+			// waits only for work that finishes.
+			web.Stop()
+			if sshSrv != nil {
+				sshSrv.Stop()
+			}
 			drain, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := hs.Shutdown(drain); err != nil {

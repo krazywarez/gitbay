@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -81,5 +82,78 @@ func TestShutdownClosesIdleConnections(t *testing.T) {
 	}
 	if took := time.Since(start); took > 5*time.Second {
 		t.Fatalf("shutdown took %s with only an idle connection open", took)
+	}
+}
+
+// A deploy restarts the daemon while someone follows a build. The follows
+// end at once with a message saying so, rather than holding the drain for
+// its full 30 s and then being cut off mid-page.
+func TestShutdownEndsFollows(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	runnerKey := inst.newKey(t, "ci")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	inst.admin(t, "admin", "user", "create", "ci", "--key", runnerKey+".pub", "--admin")
+	queueBuild(t, inst, aliceKey)
+	// A line in the log is how the test knows both follows are streaming
+	// before the signal; a follow still connecting is an idle connection,
+	// which shutdown closes without a word.
+	id := claimBuild(t, inst, runnerKey)
+	if _, errOut, code := inst.ssh(t, runnerKey, "started\n", "runner", "log", id); code != 0 {
+		t.Fatalf("runner log: %s", errOut)
+	}
+
+	cmd := inst.sshCmd(aliceKey, "build", "log", "alice/app", "1", "--follow")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if cmd.ProcessState == nil {
+			cmd.Process.Kill()
+			cmd.Wait()
+		}
+	}()
+
+	page, err := http.Get(inst.base() + "/alice/app/builds/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer page.Body.Close()
+	web := newStreamReader(page.Body)
+	web.waitFor(t, "started")
+	newStreamReader(stdout).waitFor(t, "started")
+
+	start := time.Now()
+	if err := inst.proc.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	web.waitFor(t, "gitbay is restarting; reload in a moment")
+	web.waitFor(t, "</html>")
+	var exit *exec.ExitError
+	if err := cmd.Wait(); !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		t.Fatalf("follow ended with %v, want exit 1\n%s", err, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "gitbay is restarting") {
+		t.Errorf("follow stderr %q", stderr.String())
+	}
+	done := make(chan error, 1)
+	go func() { done <- inst.proc.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("daemon did not exit cleanly: %v", err)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("daemon still running 20s after SIGTERM")
+	}
+	if took := time.Since(start); took > 5*time.Second {
+		t.Fatalf("shutdown took %s with two follows open", took)
 	}
 }
