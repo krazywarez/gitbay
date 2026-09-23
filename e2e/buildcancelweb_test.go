@@ -46,13 +46,13 @@ func TestBuildCancelWeb(t *testing.T) {
 	build1 := inst.base() + "/alice/app/builds/1"
 
 	// Build 1 is queued: the control is on the page, for someone with
-	// write access.
-	_, body := browserGet(t, alice, build1)
+	// write access. follow=0: a live build's page streams until it ends.
+	_, body := browserGet(t, alice, build1+"?follow=0")
 	if !strings.Contains(body, `action="/alice/app/builds/1/cancel"`) {
 		t.Fatalf("no cancel control on a queued build:\n%s", body)
 	}
 	// A reader gets no control.
-	_, anon := browserGet(t, newBrowser(t), build1)
+	_, anon := browserGet(t, newBrowser(t), build1+"?follow=0")
 	if strings.Contains(anon, "/cancel") {
 		t.Fatal("anonymous visitor sees the cancel control")
 	}
@@ -78,7 +78,7 @@ func TestBuildCancelWeb(t *testing.T) {
 		t.Fatalf("runner claim: %s", out)
 	}
 	build2 := inst.base() + "/alice/app/builds/2"
-	_, body = browserGet(t, alice, build2)
+	_, body = browserGet(t, alice, build2+"?follow=0")
 	if !strings.Contains(body, "running") {
 		t.Fatalf("build 2 not running:\n%s", body)
 	}
