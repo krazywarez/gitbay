@@ -97,18 +97,29 @@ func runSearch(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(results, func(w io.Writer) {
-		tb := c.table(w, "KIND", "REF", "STATE", "TITLE")
-		for _, r := range results {
-			switch r.Kind {
-			case "repo":
+	return c.emit(results, func(w io.Writer) { writeSearchTable(c, w, results) })
+}
+
+// writeSearchTable renders search results: a repo hit has no ref number or
+// state, an issue/mr hit has both. Plain output keeps a repo row at 3
+// cells, matching what it always printed. At a terminal the header still
+// reserves a STATE column, so a repo row gets an empty state cell there —
+// otherwise its title would render under STATE instead of TITLE.
+func writeSearchTable(c *Ctx, w io.Writer, results []SearchResult) {
+	tb := c.table(w, "KIND", "REF", "STATE", "TITLE")
+	for _, r := range results {
+		switch r.Kind {
+		case "repo":
+			if c.Term.Cols > 0 {
+				tb.row(cText("repo"), cRef(r.Repo), cState(""), cFlex(r.Title))
+			} else {
 				tb.row(cText("repo"), cRef(r.Repo), cFlex(r.Title))
-			default:
-				tb.row(cText(r.Kind), cRef(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number)), cState(r.State), cFlex(r.Title))
 			}
+		default:
+			tb.row(cText(r.Kind), cRef(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number)), cState(r.State), cFlex(r.Title))
 		}
-		tb.flush()
-	})
+	}
+	tb.flush()
 }
 
 // SearchMarker is the sigil a result's number carries, shared with the web
