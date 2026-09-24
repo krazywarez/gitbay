@@ -226,23 +226,36 @@ func runIssueShow(c *Ctx, args []string) int {
 	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
+		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind})
 	}
 	d := IssueShow{issueOut: issueToOut(issue, true), Comments: cs}
-	_ = repo
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "#%d %s [%s] by %s\n", d.Number, d.Title, d.State, d.Author)
-		if len(d.Labels) > 0 {
-			fmt.Fprintf(w, "labels: %s\n", strings.Join(d.Labels, ", "))
-		}
-		if len(d.Assignees) > 0 {
-			fmt.Fprintf(w, "assignees: %s\n", strings.Join(d.Assignees, ", "))
-		}
-		if d.Body != "" {
-			fmt.Fprintf(w, "\n%s\n", d.Body)
+		v := c.view(w)
+		v.title(fmt.Sprintf("#%d", d.Number), d.Title, d.State)
+		v.fields(
+			"author", d.Author+", "+c.when(d.CreatedAt),
+			"assignees", strings.Join(d.Assignees, ", "),
+			"labels", strings.Join(d.Labels, ", "),
+			"milestone", d.Milestone,
+			"url", c.siteURL(repo.Path(), "issues", strconv.FormatInt(d.Number, 10)),
+		)
+		v.body(d.Body, d.BodyFormat)
+		events := false
+		for _, cm := range cs {
+			if cm.Kind != "system" {
+				continue
+			}
+			if !events {
+				io.WriteString(w, "\n")
+				events = true
+			}
+			v.event(cm.Body, cm.BodyFormat, cm.CreatedAt)
 		}
 		for _, cm := range cs {
-			fmt.Fprintf(w, "\n--- %s at %s\n%s\n", cm.Author, cm.CreatedAt, cm.Body)
+			if cm.Kind == "system" {
+				continue
+			}
+			v.comment(cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
 		}
 	})
 }

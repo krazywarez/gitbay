@@ -558,7 +558,7 @@ func runMRShow(c *Ctx, args []string) int {
 	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt})
+		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind})
 	}
 	var rs []ReviewOut
 	counts := ReviewersWhoCount(c.Store, repo, reviews)

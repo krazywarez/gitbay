@@ -54,6 +54,7 @@ type commentOut struct {
 	Body       string `json:"body"`
 	BodyFormat string `json:"body_format,omitempty"`
 	CreatedAt  string `json:"created_at"`
+	Kind       string `json:"-"` // "comment" or "system"; not part of the wire shape
 }
 
 // thread is what a comment command needs to know about its noun.
