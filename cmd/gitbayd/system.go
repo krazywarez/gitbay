@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/sshd"
 )
@@ -93,7 +94,7 @@ func shellCmd() *cobra.Command {
 				fmt.Fprintf(os.Stderr, "gitbay control plane: interactive shells are not available.\nTry: ssh <host> help\n")
 				os.Exit(protocol.ExitUsage)
 			}
-			code := sshd.Exec(cfg, st, user, key.Scope, key.Fingerprint, cmdline, os.Stdin, os.Stdout, os.Stderr, nil, nil)
+			code := sshd.Exec(cfg, st, user, key.Scope, key.Fingerprint, control.ParseTerm(os.Getenv("GITBAY_TERM")), cmdline, os.Stdin, os.Stdout, os.Stderr, nil, nil)
 			st.Close()
 			os.Exit(code)
 			return nil

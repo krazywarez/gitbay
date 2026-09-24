@@ -29,7 +29,7 @@ type Ctx struct {
 	JSON   bool
 	// Term is the client's terminal, from GITBAY_TERM. The zero value
 	// is plain output.
-	Term   Term
+	Term Term
 	// ViaAPI marks requests arriving over HTTP, from the token API or
 	// the web. Every command runs there; nothing is held back for SSH
 	// any more (#234). The flag stays because the rate limiter and the
@@ -107,6 +107,21 @@ func Dispatch(c *Ctx, argv []string) int {
 	if len(argv) == 0 {
 		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
 	}
+	// A leading --term=<v> selects terminal output for this session, the
+	// same as GITBAY_TERM. It must come off before Lookup: Lookup matches
+	// argv against a command's Path, and a --term= in front would never
+	// match one.
+	for len(argv) > 0 {
+		v, ok := strings.CutPrefix(argv[0], "--term=")
+		if !ok {
+			break
+		}
+		c.Term = ParseTerm(v)
+		argv = argv[1:]
+	}
+	if len(argv) == 0 {
+		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
+	}
 	cmd, rest, ok := Lookup(argv)
 	c.Cmd = cmd
 	if !ok {
@@ -119,6 +134,10 @@ func Dispatch(c *Ctx, argv []string) int {
 	for _, a := range rest {
 		if a == "--json" {
 			c.JSON = true
+			continue
+		}
+		if v, ok := strings.CutPrefix(a, "--term="); ok {
+			c.Term = ParseTerm(v)
 			continue
 		}
 		args = append(args, a)

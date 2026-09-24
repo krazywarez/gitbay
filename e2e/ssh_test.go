@@ -195,6 +195,30 @@ func (i *instance) ssh(t *testing.T, key string, stdin string, args ...string) (
 	return out.String(), errOut.String(), code
 }
 
+// sshTerm is ssh with a leading --term=<v> on the command line, as the
+// CLI sends it at a terminal: OpenSSH's ControlMaster does not forward a
+// new session's SetEnv, so the term travels in argv instead. An empty
+// term sends nothing.
+func (i *instance) sshTerm(t *testing.T, key, term string, args ...string) (string, string, int) {
+	t.Helper()
+	if term != "" {
+		// "--" stops the local ssh client from parsing --term=... as one of
+		// its own options; it is not part of the remote command line.
+		args = append([]string{"--", "--term=" + term}, args...)
+	}
+	cmd := i.sshCmd(key, args...)
+	var out, errOut strings.Builder
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	err := cmd.Run()
+	code := 0
+	if ee, ok := err.(*exec.ExitError); ok {
+		code = ee.ExitCode()
+	} else if err != nil {
+		t.Fatalf("ssh: %v", err)
+	}
+	return out.String(), errOut.String(), code
+}
+
 func TestControlPlaneOverBareSSH(t *testing.T) {
 	t.Parallel()
 	inst := startInstance(t)

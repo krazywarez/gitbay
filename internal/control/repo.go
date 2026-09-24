@@ -276,13 +276,15 @@ func runRepoList(c *Ctx, args []string) int {
 		ds = append(ds, out{r.Path(), r.Visibility, desc, r.Settings.Archived})
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
-			mark := ""
+			cells := []cell{cRef(d.Path), cState(d.Visibility), cFlex(d.Description)}
 			if d.Archived {
-				mark = "\t[archived]"
+				cells = append(cells, cText("[archived]"))
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s%s\n", d.Path, d.Visibility, d.Description, mark)
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 

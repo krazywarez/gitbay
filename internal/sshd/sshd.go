@@ -239,6 +239,7 @@ func (s *Server) handleConn(c *conn) {
 
 func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 	defer ch.Close()
+	var term control.Term
 	for req := range reqs {
 		switch req.Type {
 		case "exec":
@@ -267,7 +268,7 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 				}
 				close(done)
 			}()
-			code := s.runExec(sconn, ch, payload.Command, done)
+			code := s.runExec(sconn, ch, term, payload.Command, done)
 			sendExit(ch, code)
 			return
 		case "shell":
@@ -275,7 +276,13 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 			fmt.Fprintf(ch, "gitbay control plane: interactive shells are not available.\nTry: ssh %s help\n", s.cfg.Server.SiteURL)
 			sendExit(ch, protocol.ExitUsage)
 			return
-		case "pty-req", "env":
+		case "env":
+			var kv struct{ Name, Value string }
+			if ssh.Unmarshal(req.Payload, &kv) == nil && kv.Name == "GITBAY_TERM" {
+				term = control.ParseTerm(kv.Value)
+			}
+			req.Reply(true, nil)
+		case "pty-req":
 			// Harmless; accept and ignore.
 			req.Reply(true, nil)
 		default:
@@ -289,7 +296,7 @@ func sendExit(ch ssh.Channel, code int) {
 	ch.SendRequest("exit-status", false, ssh.Marshal(&msg))
 }
 
-func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string, done <-chan struct{}) int {
+func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, term control.Term, cmdline string, done <-chan struct{}) int {
 	ext := sconn.Permissions.Extensions
 	if blob := ext["anon-key"]; blob != "" {
 		return s.runAnonymous(ch, blob, cmdline)
@@ -302,7 +309,7 @@ func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, cmdline string, 
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], cmdline, ch, ch, ch.Stderr(), done, s.stopping)
+	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], term, cmdline, ch, ch, ch.Stderr(), done, s.stopping)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -332,7 +339,7 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell).
-func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cmdline string,
+func Exec(cfg config.Config, st *store.Store, user store.User, scope, source string, term control.Term, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
@@ -365,6 +372,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source, cm
 		User:     user,
 		Scope:    scope,
 		Source:   source,
+		Term:     term,
 		Store:    st,
 		Cfg:      cfg,
 		Stdin:    stdin,
