@@ -1,0 +1,79 @@
+package control
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+	"time"
+)
+
+func fixtureTable(c *Ctx, w *bytes.Buffer) {
+	tb := c.table(w, "#", "STATE", "TITLE", "AUTHOR")
+	tb.row(cRef("#252"), cState("open"), cFlex("Dependency updates available for every module"), cText("gitbay-bot"))
+	tb.row(cRef("#12"), cState("closed"), cFlex("Android app"), cText("cmc"))
+	tb.flush()
+}
+
+func TestTablePlainIsTabs(t *testing.T) {
+	var b bytes.Buffer
+	fixtureTable(&Ctx{}, &b)
+	want := "#252\topen\tDependency updates available for every module\tgitbay-bot\n" +
+		"#12\tclosed\tAndroid app\tcmc\n"
+	if b.String() != want {
+		t.Errorf("plain:\n%q\nwant\n%q", b.String(), want)
+	}
+}
+
+func TestTableTerminalFits(t *testing.T) {
+	var b bytes.Buffer
+	fixtureTable(&Ctx{Term: Term{Cols: 40}}, &b)
+	want := "#     STATE   TITLE           AUTHOR\n" +
+		"#252  open    Dependency up…  gitbay-bot\n" +
+		"#12   closed  Android app     cmc\n"
+	if b.String() != want {
+		t.Errorf("terminal:\n%s\nwant\n%s", b.String(), want)
+	}
+}
+
+func TestTableColourOnlyAddsSGR(t *testing.T) {
+	var mono, colour bytes.Buffer
+	fixtureTable(&Ctx{Term: Term{Cols: 40}}, &mono)
+	fixtureTable(&Ctx{Term: Term{Cols: 40, Color: true}}, &colour)
+	if !strings.Contains(colour.String(), sgrGreen+"open"+sgrReset) {
+		t.Errorf("open not green: %q", colour.String())
+	}
+	if !strings.HasPrefix(colour.String(), sgrDim) {
+		t.Errorf("header not dim: %q", colour.String())
+	}
+	if stripSGR(colour.String()) != mono.String() {
+		t.Errorf("colour changed the layout:\n%s\nvs\n%s", stripSGR(colour.String()), mono.String())
+	}
+}
+
+func TestTableAgesAndPlainStamps(t *testing.T) {
+	termNow = func() time.Time { return time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC) }
+	t.Cleanup(func() { termNow = time.Now })
+	var plain, term bytes.Buffer
+	for _, c := range []struct {
+		ctx *Ctx
+		w   *bytes.Buffer
+	}{{&Ctx{}, &plain}, {&Ctx{Term: Term{Cols: 80}}, &term}} {
+		tb := c.ctx.table(c.w, "#", "UPDATED")
+		tb.row(cRef("#1"), cAge("2026-09-23T10:00:00.123Z"))
+		tb.flush()
+	}
+	if plain.String() != "#1\t2026-09-23T10:00:00Z\n" {
+		t.Errorf("plain = %q", plain.String())
+	}
+	if term.String() != "#   UPDATED\n#1  2h ago\n" {
+		t.Errorf("term = %q", term.String())
+	}
+}
+
+func TestTableEmptyPrintsNothing(t *testing.T) {
+	var b bytes.Buffer
+	(&Ctx{Term: Term{Cols: 80}}).table(&b, "#").flush()
+	if b.Len() != 0 {
+		t.Errorf("empty table printed %q", b.String())
+	}
+}

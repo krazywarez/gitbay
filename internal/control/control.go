@@ -27,6 +27,9 @@ type Ctx struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	JSON   bool
+	// Term is the client's terminal, from GITBAY_TERM. The zero value
+	// is plain output.
+	Term   Term
 	// ViaAPI marks requests arriving over HTTP, from the token API or
 	// the web. Every command runs there; nothing is held back for SSH
 	// any more (#234). The flag stays because the rate limiter and the
