@@ -51,7 +51,7 @@ func TestTableColourOnlyAddsSGR(t *testing.T) {
 }
 
 func TestTableAgesAndPlainStamps(t *testing.T) {
-	termNow = func() time.Time { return time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC) }
+	termNow = func() time.Time { return time.Date(2026, 9, 23, 12, 0, 1, 0, time.UTC) }
 	t.Cleanup(func() { termNow = time.Now })
 	var plain, term bytes.Buffer
 	for _, c := range []struct {
