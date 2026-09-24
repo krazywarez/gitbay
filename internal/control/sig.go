@@ -18,14 +18,18 @@ import (
 
 func init() {
 	register(Command{Path: []string{"pgp", "add"},
-		Summary: "register an OpenPGP public key (armored)",
-		Usage:   "pgp add < key.asc", ReadsStdin: true, Run: runPGPAdd})
+		Summary:    "register an OpenPGP public key (armored)",
+		Usage:      "pgp add < key.asc",
+		Examples:   []string{"pgp add < key.asc"},
+		ReadsStdin: true, Run: runPGPAdd})
 	register(Command{Path: []string{"pgp", "list"},
-		Summary: "list registered OpenPGP keys",
-		Usage:   "pgp list", ReadOnly: true, Run: runPGPList})
+		Summary:  "list registered OpenPGP keys",
+		Usage:    "pgp list",
+		Examples: []string{"pgp list"}, ReadOnly: true, Run: runPGPList})
 	register(Command{Path: []string{"pgp", "remove"},
-		Summary: "remove an OpenPGP key by fingerprint",
-		Usage:   "pgp remove <fingerprint>", Run: runPGPRemove})
+		Summary:  "remove an OpenPGP key by fingerprint",
+		Usage:    "pgp remove <fingerprint>",
+		Examples: []string{"pgp remove ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234"}, Run: runPGPRemove})
 	register(Command{Path: []string{"repo", "commit"},
 		Summary:  "show one commit with its patch",
 		Usage:    "repo commit <owner/name> <sha>",

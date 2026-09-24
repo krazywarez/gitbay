@@ -12,8 +12,15 @@ import (
 
 func init() {
 	register(Command{Path: []string{"audit"},
-		Summary:  "instance audit log (admins)",
-		Usage:    "audit [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]",
+		Summary: "instance audit log (admins)",
+		Usage:   "audit [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]",
+		Flags: []Flag{
+			{"--actor", "<user>|-", "only entries by this user", ""},
+			{"--action", "<prefix>", "only actions starting with this", ""},
+			{"--since", "<duration|date>", "only entries after this", ""},
+			{"--limit", "<n>", "rows to show", "100"},
+		},
+		Examples: []string{"audit --actor alice --since 24h"},
 		ReadOnly: true, Run: runAudit})
 }
 

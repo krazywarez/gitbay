@@ -330,6 +330,7 @@ func init() {
 		Path:     []string{"help"},
 		Summary:  "list available commands",
 		Usage:    "help [<prefix>...]",
+		Examples: []string{"help", "help repo"},
 		ReadOnly: true,
 		Run:      runHelp,
 	})

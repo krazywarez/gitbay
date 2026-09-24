@@ -15,38 +15,63 @@ import (
 
 func init() {
 	register(Command{Path: []string{"notifications", "list"},
-		Summary:  "your notification inbox, newest first",
-		Usage:    "notifications list [--all] [--limit <n>] [--cursor <c>]",
+		Summary: "your notification inbox, newest first",
+		Usage:   "notifications list [--all] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--all", "", "include already-read notifications", ""},
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"notifications list", "notifications list --all --limit 50"},
 		ReadOnly: true, Run: runNotificationsList})
 	register(Command{Path: []string{"notifications", "read"},
 		Summary: "mark notifications read",
-		Usage:   "notifications read <id>... | --all", Run: runNotificationsRead})
+		Usage:   "notifications read <id>... | --all",
+		Flags: []Flag{
+			{"--all", "", "mark every unread notification read", ""},
+		},
+		Examples: []string{"notifications read 12 13", "notifications read --all"},
+		Run:      runNotificationsRead})
 	register(Command{Path: []string{"notifications", "settings", "show"},
 		Summary:  "your notification preferences",
 		Usage:    "notifications settings show",
+		Examples: []string{"notifications settings show"},
 		ReadOnly: true, Run: runNotificationsSettingsShow})
 	register(Command{Path: []string{"notifications", "settings", "mail"},
-		Summary: "activity by mail as well as the inbox (login links are unaffected)",
-		Usage:   "notifications settings mail on|off", Run: runNotificationsSettingsMail})
+		Summary:  "activity by mail as well as the inbox (login links are unaffected)",
+		Usage:    "notifications settings mail on|off",
+		Examples: []string{"notifications settings mail on"},
+		Run:      runNotificationsSettingsMail})
 	register(Command{Path: []string{"notifications", "settings", "watch"},
-		Summary: "every issue and merge request on repositories you can write to",
-		Usage:   "notifications settings watch on|off", Run: runNotificationsSettingsWatch})
+		Summary:  "every issue and merge request on repositories you can write to",
+		Usage:    "notifications settings watch on|off",
+		Examples: []string{"notifications settings watch on"},
+		Run:      runNotificationsSettingsWatch})
 	register(Command{Path: []string{"notifications", "device", "add"},
 		Summary: "register an Apple device for push, token on stdin",
 		Usage:   "notifications device add [--label <name>] < token",
+		Flags: []Flag{
+			{"--label", "<name>", "a name for the device", ""},
+		},
+		Examples: []string{"notifications device add --label iphone < token"},
 		// Mandatory: without it control.go swaps in an empty reader and
 		// this command stores an empty token without erroring.
 		ReadsStdin: true, Run: runNotificationsDeviceAdd})
 	register(Command{Path: []string{"notifications", "device", "list"},
 		Summary:  "your registered devices",
 		Usage:    "notifications device list",
+		Examples: []string{"notifications device list"},
 		ReadOnly: true, Run: runNotificationsDeviceList})
 	register(Command{Path: []string{"notifications", "device", "remove"},
-		Summary: "deregister a device",
-		Usage:   "notifications device remove <id>", Run: runNotificationsDeviceRemove})
+		Summary:  "deregister a device",
+		Usage:    "notifications device remove <id>",
+		Examples: []string{"notifications device remove 4"},
+		Run:      runNotificationsDeviceRemove})
 	register(Command{Path: []string{"notifications", "settings", "push"},
-		Summary: "activity on your registered devices as well as the inbox",
-		Usage:   "notifications settings push on|off", Run: runNotificationsSettingsPush})
+		Summary:  "activity on your registered devices as well as the inbox",
+		Usage:    "notifications settings push on|off",
+		Examples: []string{"notifications settings push on"},
+		Run:      runNotificationsSettingsPush})
 	register(Command{Path: []string{"repo", "watch"},
 		Summary:  "hear about all activity on a repository",
 		Usage:    "repo watch <owner/name>",

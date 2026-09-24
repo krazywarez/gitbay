@@ -14,29 +14,43 @@ import (
 
 func init() {
 	register(Command{Path: []string{"org", "create"},
-		Summary: "create an organization (you become its first admin)",
-		Usage:   "org create <name>", Run: runOrgCreate})
+		Summary:  "create an organization (you become its first admin)",
+		Usage:    "org create <name>",
+		Examples: []string{"org create krz"}, Run: runOrgCreate})
 	register(Command{Path: []string{"org", "list"},
-		Summary: "list organizations you belong to",
-		Usage:   "org list", ReadOnly: true, Run: runOrgList})
+		Summary:  "list organizations you belong to",
+		Usage:    "org list",
+		Examples: []string{"org list"}, ReadOnly: true, Run: runOrgList})
 	register(Command{Path: []string{"org", "show"},
-		Summary: "show an organization and its members",
-		Usage:   "org show <name>", ReadOnly: true, Run: runOrgShow})
+		Summary:  "show an organization and its members",
+		Usage:    "org show <name>",
+		Examples: []string{"org show krz"}, ReadOnly: true, Run: runOrgShow})
 	register(Command{Path: []string{"org", "rename"},
-		Summary: "rename an organization",
-		Usage:   "org rename <old> <new> (clone URLs change)", Run: runOrgRename})
+		Summary:  "rename an organization",
+		Usage:    "org rename <old> <new> (clone URLs change)",
+		Examples: []string{"org rename krz krazywarez"}, Run: runOrgRename})
 	register(Command{Path: []string{"org", "delete"},
 		Summary: "delete an empty organization",
-		Usage:   "org delete <name> --yes", Run: runOrgDelete})
+		Usage:   "org delete <name> --yes",
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent delete", ""},
+		},
+		Examples: []string{"org delete krz --yes"}, Run: runOrgDelete})
 	register(Command{Path: []string{"org", "members", "add"},
 		Summary: "add or update a member",
-		Usage:   "org members add <org> <user> [--role member|admin]", Run: runOrgMembersAdd})
+		Usage:   "org members add <org> <user> [--role member|admin]",
+		Flags: []Flag{
+			{"--role", "member|admin", "the member's role", "member"},
+		},
+		Examples: []string{"org members add krz cmc --role admin"}, Run: runOrgMembersAdd})
 	register(Command{Path: []string{"org", "members", "remove"},
-		Summary: "remove a member",
-		Usage:   "org members remove <org> <user>", Run: runOrgMembersRemove})
+		Summary:  "remove a member",
+		Usage:    "org members remove <org> <user>",
+		Examples: []string{"org members remove krz cmc"}, Run: runOrgMembersRemove})
 	register(Command{Path: []string{"org", "members", "list"},
-		Summary: "list members",
-		Usage:   "org members list <org>", ReadOnly: true, Run: runOrgMembersList})
+		Summary:  "list members",
+		Usage:    "org members list <org>",
+		Examples: []string{"org members list krz"}, ReadOnly: true, Run: runOrgMembersList})
 }
 
 // orgAdmin loads an org and requires the caller to be one of its admins.

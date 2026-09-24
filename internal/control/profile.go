@@ -16,14 +16,27 @@ import (
 
 func init() {
 	register(Command{Path: []string{"profile", "show"},
-		Summary: "show a user's or org's profile",
-		Usage:   "profile show [name]", ReadOnly: true, Run: runProfileShow})
+		Summary:  "show a user's or org's profile",
+		Usage:    "profile show [name]",
+		Examples: []string{"profile show cmc"}, ReadOnly: true, Run: runProfileShow})
 	register(Command{Path: []string{"profile", "set"},
 		Summary: "set your profile",
-		Usage:   "profile set [--description <d>] [--website <url>] [--link <label|url>]... ('' clears)", Run: runProfileSet})
+		Usage:   "profile set [--description <d>] [--website <url>] [--link <label|url>]... ('' clears)",
+		Flags: []Flag{
+			{"--description", "<d>", "one line about you", ""},
+			{"--website", "<url>", "your website", ""},
+			{"--link", "<label|url>", "a profile link, may repeat", ""},
+		},
+		Examples: []string{`profile set --description "gitbay's author" --website https://cleberg.net`}, Run: runProfileSet})
 	register(Command{Path: []string{"org", "profile"},
 		Summary: "show or set an org's profile",
-		Usage:   "org profile <org> [--description <d>] [--website <url>] [--link <label|url>]...", Run: runOrgProfile})
+		Usage:   "org profile <org> [--description <d>] [--website <url>] [--link <label|url>]...",
+		Flags: []Flag{
+			{"--description", "<d>", "one line about the org", ""},
+			{"--website", "<url>", "the org's website", ""},
+			{"--link", "<label|url>", "a profile link, may repeat", ""},
+		},
+		Examples: []string{"org profile krz", `org profile krz --description "a self-hosted forge"`}, Run: runOrgProfile})
 }
 
 // maxProfileLinks caps the free-form link list. A profile is a header,

@@ -16,14 +16,22 @@ func init() {
 	register(Command{Path: []string{"token", "create"},
 		Summary: "mint an API token (shown once)",
 		Usage:   "token create --name <n> [--scope full|read] [--ttl 30d|720h]",
-		Run:     runTokenCreate})
+		Flags: []Flag{
+			{"--name", "<n>", "the token's name", ""},
+			{"--scope", "full|read", "what the token may do", "full"},
+			{"--ttl", "30d|720h", "how long the token is valid", "never expires"},
+		},
+		Examples: []string{"token create --name laptop --scope read --ttl 30d"},
+		Run:      runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
-		Summary: "list API tokens",
-		Usage:   "token list", ReadOnly: true, Run: runTokenList})
+		Summary:  "list API tokens",
+		Usage:    "token list",
+		Examples: []string{"token list"}, ReadOnly: true, Run: runTokenList})
 	register(Command{Path: []string{"token", "revoke"},
-		Summary: "revoke an API token by name",
-		Usage:   "token revoke <name>",
-		Run:     runTokenRevoke})
+		Summary:  "revoke an API token by name",
+		Usage:    "token revoke <name>",
+		Examples: []string{"token revoke laptop"},
+		Run:      runTokenRevoke})
 }
 
 // parseTTL accepts Go durations plus a day suffix ("30d").

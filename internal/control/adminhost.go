@@ -22,32 +22,51 @@ import (
 
 func init() {
 	register(Command{Path: []string{"admin", "user", "create"},
-		Summary:    "create an account, optionally with a key and a verified address (instance admins)",
-		Usage:      "admin user create <username> [--admin] [--email <address> [--verified]] [--key -] < key.pub",
+		Summary: "create an account, optionally with a key and a verified address (instance admins)",
+		Usage:   "admin user create <username> [--admin] [--email <address> [--verified]] [--key -] < key.pub",
+		Flags: []Flag{
+			{"--admin", "", "make the account an instance admin", ""},
+			{"--email", "<address>", "an address to add", ""},
+			{"--verified", "", "mark that address verified", ""},
+			{"--key", "-", "read a public key from stdin", ""},
+		},
+		Examples:   []string{"admin user create alice --email alice@example.org --key - < key.pub"},
 		ReadsStdin: true, Run: runAdminUserCreate})
 	register(Command{Path: []string{"admin", "user", "disable"},
-		Summary: "suspend an account: SSH, web sessions and API tokens refused until re-enabled",
-		Usage:   "admin user disable <username>",
-		Run:     runAdminUserDisable})
+		Summary:  "suspend an account: SSH, web sessions and API tokens refused until re-enabled",
+		Usage:    "admin user disable <username>",
+		Examples: []string{"admin user disable alice"},
+		Run:      runAdminUserDisable})
 	register(Command{Path: []string{"admin", "user", "enable"},
-		Summary: "restore a suspended account",
-		Usage:   "admin user enable <username>",
-		Run:     runAdminUserEnable})
+		Summary:  "restore a suspended account",
+		Usage:    "admin user enable <username>",
+		Examples: []string{"admin user enable alice"},
+		Run:      runAdminUserEnable})
 	register(Command{Path: []string{"admin", "user", "delete"},
 		Summary: "delete an account that anchors nothing (keys, emails and sessions go with it)",
 		Usage:   "admin user delete <username> --yes",
-		Run:     runAdminUserDelete})
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent delete", ""},
+		},
+		Examples: []string{"admin user delete alice --yes"},
+		Run:      runAdminUserDelete})
 	register(Command{Path: []string{"admin", "email", "verify"},
-		Summary: "mark an address verified by admin assertion",
-		Usage:   "admin email verify <username> <address>",
-		Run:     runAdminEmailVerify})
+		Summary:  "mark an address verified by admin assertion",
+		Usage:    "admin email verify <username> <address>",
+		Examples: []string{"admin email verify alice alice@example.org"},
+		Run:      runAdminEmailVerify})
 	register(Command{Path: []string{"admin", "invite"},
 		Summary: "issue a registration invite and mail its code",
 		Usage:   "admin invite --email <address>",
-		Run:     runAdminInvite})
+		Flags: []Flag{
+			{"--email", "<address>", "who the invite is for", ""},
+		},
+		Examples: []string{"admin invite --email alice@example.org"},
+		Run:      runAdminInvite})
 	register(Command{Path: []string{"admin", "stats"},
 		Summary:  "instance statistics: counts and per-repository disk usage",
 		Usage:    "admin stats",
+		Examples: []string{"admin stats"},
 		ReadOnly: true, Run: runAdminStats})
 }
 

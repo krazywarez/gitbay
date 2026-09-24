@@ -11,10 +11,12 @@ func init() {
 	register(Command{Path: []string{"web", "theme", "show"},
 		Summary:  "the colour scheme the web UI uses for you",
 		Usage:    "web theme show",
+		Examples: []string{"web theme show"},
 		ReadOnly: true, Run: runWebThemeShow})
 	register(Command{Path: []string{"web", "theme", "set"},
-		Summary: "follow the browser's scheme, or force light or dark",
-		Usage:   "web theme set system|light|dark", Run: runWebThemeSet})
+		Summary:  "follow the browser's scheme, or force light or dark",
+		Usage:    "web theme set system|light|dark",
+		Examples: []string{"web theme set dark"}, Run: runWebThemeSet})
 }
 
 // themes are the values the layout knows how to stamp. system is the

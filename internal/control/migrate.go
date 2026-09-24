@@ -16,10 +16,15 @@ func init() {
 	register(Command{Path: []string{"account", "export"},
 		Summary:  "write your account bundle (profile, repos, issues, MRs) as JSON",
 		Usage:    "account export > bundle.json",
+		Examples: []string{"account export > bundle.json"},
 		ReadOnly: true, Run: runAccountExport})
 	register(Command{Path: []string{"account", "import-bundle"},
-		Summary:    "replay an account bundle (see gitbay migrate)",
-		Usage:      "account import-bundle [--source <host>] < bundle.json",
+		Summary: "replay an account bundle (see gitbay migrate)",
+		Usage:   "account import-bundle [--source <host>] < bundle.json",
+		Flags: []Flag{
+			{"--source", "<host>", "the previous instance, for attribution", ""},
+		},
+		Examples:   []string{"account import-bundle --source old.example.org < bundle.json"},
 		ReadsStdin: true, Run: runAccountImportBundle})
 }
 

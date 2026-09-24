@@ -16,59 +16,89 @@ import (
 
 func init() {
 	register(Command{Path: []string{"admin", "user", "list"},
-		Summary:  "list accounts (instance admins)",
-		Usage:    "admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]",
+		Summary: "list accounts (instance admins)",
+		Usage:   "admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--state", "active|pending|disabled|admin", "which accounts", ""},
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"admin user list --state pending"},
 		ReadOnly: true, Run: runAdminUserList})
 	register(Command{Path: []string{"admin", "user", "show"},
 		Summary:  "show an account: keys, emails, orgs, tokens, sessions (instance admins)",
 		Usage:    "admin user show <username>",
+		Examples: []string{"admin user show alice"},
 		ReadOnly: true, Run: runAdminUserShow})
 	register(Command{Path: []string{"admin", "user", "promote"},
-		Summary: "make an account an instance admin",
-		Usage:   "admin user promote <username>",
-		Run:     runAdminUserPromote})
+		Summary:  "make an account an instance admin",
+		Usage:    "admin user promote <username>",
+		Examples: []string{"admin user promote alice"},
+		Run:      runAdminUserPromote})
 	register(Command{Path: []string{"admin", "user", "demote"},
-		Summary: "remove instance admin from an account (never the last one)",
-		Usage:   "admin user demote <username>",
-		Run:     runAdminUserDemote})
+		Summary:  "remove instance admin from an account (never the last one)",
+		Usage:    "admin user demote <username>",
+		Examples: []string{"admin user demote alice"},
+		Run:      runAdminUserDemote})
 	register(Command{Path: []string{"admin", "runners"},
 		Summary:  "the build queue and runner accounts: last poll, scope, the build each holds (instance admins)",
 		Usage:    "admin runners",
+		Examples: []string{"admin runners"},
 		ReadOnly: true, Run: runAdminRunners})
 	register(Command{Path: []string{"admin", "runners", "remove"},
-		Summary: "drop a key's runner heartbeat row, e.g. one that polled once by mistake (instance admins)",
-		Usage:   "admin runners remove <fingerprint>",
-		Run:     runAdminRunnersForget})
+		Summary:  "drop a key's runner heartbeat row, e.g. one that polled once by mistake (instance admins)",
+		Usage:    "admin runners remove <fingerprint>",
+		Examples: []string{"admin runners remove SHA256:abcd1234"},
+		Run:      runAdminRunnersForget})
 	// forget is the name this shipped under in v1.18; remove is the verb
 	// every other noun uses. Both stay for one release.
 	register(Command{Path: []string{"admin", "runners", "forget"},
-		Summary: "alias of admin runners remove",
-		Usage:   "admin runners forget <fingerprint>",
-		Run:     runAdminRunnersForget})
+		Summary:  "alias of admin runners remove",
+		Usage:    "admin runners forget <fingerprint>",
+		Examples: []string{"admin runners forget SHA256:abcd1234"},
+		Run:      runAdminRunnersForget})
 	register(Command{Path: []string{"admin", "repo", "list"},
-		Summary:  "list every repository with size and last push (instance admins)",
-		Usage:    "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
+		Summary: "list every repository with size and last push (instance admins)",
+		Usage:   "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--owner", "<name>", "only this owner's repositories", ""},
+			{"--visibility", "public|private", "which repositories", ""},
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"admin repo list --owner alice"},
 		ReadOnly: true, Run: runAdminRepoList})
 	register(Command{Path: []string{"admin", "repo", "archive"},
-		Summary: "archive any repository (instance admins; audited)",
-		Usage:   "admin repo archive <owner/name>",
-		Run:     runAdminRepoArchive})
+		Summary:  "archive any repository (instance admins; audited)",
+		Usage:    "admin repo archive <owner/name>",
+		Examples: []string{"admin repo archive alice/old-project"},
+		Run:      runAdminRepoArchive})
 	register(Command{Path: []string{"admin", "repo", "unarchive"},
-		Summary: "unarchive any repository (instance admins; audited)",
-		Usage:   "admin repo unarchive <owner/name>",
-		Run:     runAdminRepoUnarchive})
+		Summary:  "unarchive any repository (instance admins; audited)",
+		Usage:    "admin repo unarchive <owner/name>",
+		Examples: []string{"admin repo unarchive alice/old-project"},
+		Run:      runAdminRepoUnarchive})
 	register(Command{Path: []string{"admin", "repo", "visibility"},
-		Summary: "set any repository's visibility (instance admins; audited)",
-		Usage:   "admin repo visibility <owner/name> public|private",
-		Run:     runAdminRepoVisibility})
+		Summary:  "set any repository's visibility (instance admins; audited)",
+		Usage:    "admin repo visibility <owner/name> public|private",
+		Examples: []string{"admin repo visibility alice/secret private"},
+		Run:      runAdminRepoVisibility})
 	register(Command{Path: []string{"admin", "repo", "delete"},
 		Summary: "delete any repository (instance admins; audited)",
 		Usage:   "admin repo delete <owner/name> --yes",
-		Run:     runAdminRepoDelete})
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent delete", ""},
+		},
+		Examples: []string{"admin repo delete alice/spam --yes"},
+		Run:      runAdminRepoDelete})
 	register(Command{Path: []string{"admin", "mr", "prune"},
 		Summary: "drop merged or closed MRs' head refs and the objects only they kept, e.g. after a history rewrite (instance admins; audited)",
 		Usage:   "admin mr prune <owner/name> <n> [<n>...] --yes",
-		Run:     runAdminMRPrune})
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent prune", ""},
+		},
+		Examples: []string{"admin mr prune krz/gitbay 12 13 --yes"},
+		Run:      runAdminMRPrune})
 }
 
 // requireInstanceAdmin gates the admin noun. -1 means proceed.

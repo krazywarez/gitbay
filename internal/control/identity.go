@@ -18,6 +18,7 @@ func init() {
 		Path:     []string{"whoami"},
 		Summary:  "show the authenticated account",
 		Usage:    "whoami",
+		Examples: []string{"whoami"},
 		ReadOnly: true,
 		Run:      runWhoami,
 	})
@@ -25,27 +26,35 @@ func init() {
 		Path:     []string{"keys", "list"},
 		Summary:  "list registered SSH keys",
 		Usage:    "keys list",
+		Examples: []string{"keys list"},
 		ReadOnly: true,
 		Run:      runKeysList,
 	})
 	register(Command{
-		Path:       []string{"keys", "add"},
-		Summary:    "register an SSH public key (authorized_keys format)",
-		Usage:      "keys add [--scope full|git|runner] [--label <text>] < key.pub",
+		Path:    []string{"keys", "add"},
+		Summary: "register an SSH public key (authorized_keys format)",
+		Usage:   "keys add [--scope full|git|runner] [--label <text>] < key.pub",
+		Flags: []Flag{
+			{"--scope", "full|git|runner", "what the key may do", "full"},
+			{"--label", "<text>", "a name for the key", ""},
+		},
+		Examples:   []string{"keys add --label laptop < key.pub"},
 		ReadsStdin: true,
 		Run:        runKeysAdd,
 	})
 	register(Command{
-		Path:    []string{"keys", "label"},
-		Summary: "name a key; an empty label clears it",
-		Usage:   "keys label <fingerprint> [<text>]",
-		Run:     runKeysLabel,
+		Path:     []string{"keys", "label"},
+		Summary:  "name a key; an empty label clears it",
+		Usage:    "keys label <fingerprint> [<text>]",
+		Examples: []string{`keys label SHA256:abcd1234 "work laptop"`},
+		Run:      runKeysLabel,
 	})
 	register(Command{
-		Path:    []string{"keys", "remove"},
-		Summary: "remove an SSH key by fingerprint",
-		Usage:   "keys remove <fingerprint>",
-		Run:     runKeysRemove,
+		Path:     []string{"keys", "remove"},
+		Summary:  "remove an SSH key by fingerprint",
+		Usage:    "keys remove <fingerprint>",
+		Examples: []string{"keys remove SHA256:abcd1234"},
+		Run:      runKeysRemove,
 	})
 }
 

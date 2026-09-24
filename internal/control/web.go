@@ -14,14 +14,20 @@ func newStoredToken() (token, hash string, err error) { return store.NewToken() 
 
 func init() {
 	register(Command{Path: []string{"web", "login"},
-		Summary: "mint a one-time browser login URL",
-		Usage:   "web login", Run: runWebLogin})
+		Summary:  "mint a one-time browser login URL",
+		Usage:    "web login",
+		Examples: []string{"web login"}, Run: runWebLogin})
 	register(Command{Path: []string{"web", "sessions", "list"},
-		Summary: "list your browser sessions",
-		Usage:   "web sessions list", ReadOnly: true, Run: runWebSessionsList})
+		Summary:  "list your browser sessions",
+		Usage:    "web sessions list",
+		Examples: []string{"web sessions list"}, ReadOnly: true, Run: runWebSessionsList})
 	register(Command{Path: []string{"web", "sessions", "revoke"},
 		Summary: "end a browser session, or all of them",
-		Usage:   "web sessions revoke <id>|--all", Run: runWebSessionsRevoke})
+		Usage:   "web sessions revoke <id>|--all",
+		Flags: []Flag{
+			{"--all", "", "revoke every browser session", ""},
+		},
+		Examples: []string{"web sessions revoke --all"}, Run: runWebSessionsRevoke})
 }
 
 func runWebSessionsList(c *Ctx, args []string) int {

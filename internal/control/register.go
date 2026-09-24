@@ -20,27 +20,38 @@ func init() {
 	register(Command{Path: []string{"register"},
 		Summary: "create an account (only meaningful for unregistered keys)",
 		Usage:   "register --username <name> [--email <address> | --invite <code>]",
+		Flags: []Flag{
+			{"--username", "<name>", "the account's username", ""},
+			{"--email", "<address>", "for open registration", ""},
+			{"--invite", "<code>", "for invite-only registration", ""},
+		},
+		Examples: []string{"register --username cmc --email cmc@example.org"},
 		Run: func(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitUsage,
 				"this SSH key already belongs to %s. To register a new account, connect with the key it should use:\n  ssh -F /dev/null -i <newkey> git@<host> register ...",
 				c.User.Username)
 		}})
 	register(Command{Path: []string{"email", "add"},
-		Summary: "add an address and mail a verification code",
-		Usage:   "email add <address>", Run: runEmailAdd})
+		Summary:  "add an address and mail a verification code",
+		Usage:    "email add <address>",
+		Examples: []string{"email add cmc@example.org"}, Run: runEmailAdd})
 	register(Command{Path: []string{"email", "verify"},
-		Summary: "confirm a verification code",
-		Usage:   "email verify <code>", Run: runEmailVerify})
+		Summary:  "confirm a verification code",
+		Usage:    "email verify <code>",
+		Examples: []string{"email verify abc123"}, Run: runEmailVerify})
 	register(Command{Path: []string{"email", "list"},
 		Summary:  "list the addresses on your account",
 		Usage:    "email list",
+		Examples: []string{"email list"},
 		ReadOnly: true, Run: runEmailList})
 	register(Command{Path: []string{"email", "remove"},
-		Summary: "remove an address; not the primary, nor the last verified one",
-		Usage:   "email remove <address>", Run: runEmailRemove})
+		Summary:  "remove an address; not the primary, nor the last verified one",
+		Usage:    "email remove <address>",
+		Examples: []string{"email remove old@example.org"}, Run: runEmailRemove})
 	register(Command{Path: []string{"email", "primary"},
-		Summary: "make a verified address the primary",
-		Usage:   "email primary <address>", Run: runEmailPrimary})
+		Summary:  "make a verified address the primary",
+		Usage:    "email primary <address>",
+		Examples: []string{"email primary cmc@example.org"}, Run: runEmailPrimary})
 }
 
 func runEmailList(c *Ctx, args []string) int {

@@ -17,35 +17,11 @@ var usageFlag = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 // is not something the command's own tokenizer parses.
 var trailingRedirect = regexp.MustCompile(`^(.*?)\s+[<>]\s*\S+$`)
 
-// helpCovered restricts TestHelpIsComplete to the path prefixes whose help
-// text this commit filled in. Task 4.3 fills the rest and removes this set.
-// "org label" and "org milestone" name the two prefixes under "org" this
-// commit covers; the rest of "org" (teams, members, profile) is not.
-// widened to every command in the next commit
-var helpCovered = []string{
-	"issue", "mr", "build", "release", "milestone", "label", "search",
-	"dashboard", "feed", "status", "wiki", "snippet", "repo",
-	"org label", "org milestone",
-}
-
-func isHelpCovered(path []string) bool {
-	joined := strings.Join(path, " ")
-	for _, prefix := range helpCovered {
-		if joined == prefix || strings.HasPrefix(joined, prefix+" ") {
-			return true
-		}
-	}
-	return false
-}
-
 // Help is written once, in the registry. Every flag in a usage line has
 // a description, every description names a flag in the usage line, and
 // every command has an example that runs it.
 func TestHelpIsComplete(t *testing.T) {
 	for _, cmd := range Commands() {
-		if !isHelpCovered(cmd.Path) {
-			continue
-		}
 		path := strings.Join(cmd.Path, " ")
 		inUsage := map[string]bool{}
 		for _, f := range usageFlag.FindAllString(cmd.Usage, -1) {

@@ -15,19 +15,33 @@ import (
 func init() {
 	register(Command{Path: []string{"webhook", "add"},
 		Summary: "add a webhook",
-		Usage:   "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]", Run: runWebhookAdd})
+		Usage:   "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]",
+		Flags: []Flag{
+			{"--secret", "<s>", "signs deliveries so the receiver can verify them", ""},
+			{"--events", "push,issue.created|*", "which events to send", "*"},
+		},
+		Examples: []string{"webhook add krz/gitbay https://ci.example.org/hook --events push"},
+		Run:      runWebhookAdd})
 	register(Command{Path: []string{"webhook", "list"},
-		Summary: "list webhooks",
-		Usage:   "webhook list <owner/name>", ReadOnly: true, Run: runWebhookList})
+		Summary:  "list webhooks",
+		Usage:    "webhook list <owner/name>",
+		Examples: []string{"webhook list krz/gitbay"}, ReadOnly: true, Run: runWebhookList})
 	register(Command{Path: []string{"webhook", "remove"},
-		Summary: "remove a webhook",
-		Usage:   "webhook remove <owner/name> <id>", Run: runWebhookRemove})
+		Summary:  "remove a webhook",
+		Usage:    "webhook remove <owner/name> <id>",
+		Examples: []string{"webhook remove krz/gitbay 3"}, Run: runWebhookRemove})
 	register(Command{Path: []string{"webhook", "deliveries"},
 		Summary: "recent deliveries",
-		Usage:   "webhook deliveries <owner/name> [--limit n]", ReadOnly: true, Run: runWebhookDeliveries})
+		Usage:   "webhook deliveries <owner/name> [--limit n]",
+		Flags: []Flag{
+			{"--limit", "n", "rows to show", "20"},
+		},
+		Examples: []string{"webhook deliveries krz/gitbay --limit 50"},
+		ReadOnly: true, Run: runWebhookDeliveries})
 	register(Command{Path: []string{"webhook", "redeliver"},
-		Summary: "queue a delivery again",
-		Usage:   "webhook redeliver <owner/name> <delivery-id>", Run: runWebhookRedeliver})
+		Summary:  "queue a delivery again",
+		Usage:    "webhook redeliver <owner/name> <delivery-id>",
+		Examples: []string{"webhook redeliver krz/gitbay 42"}, Run: runWebhookRedeliver})
 }
 
 func runWebhookAdd(c *Ctx, args []string) int {
