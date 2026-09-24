@@ -109,6 +109,7 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 		runners = []store.RepoRunner{}
 	}
 	return c.emit(runners, func(w io.Writer) {
+		tb := c.table(w, "FINGERPRINT", "ALGO", "USER", "SEEN", "HELD")
 		for _, r := range runners {
 			seen := r.LastSeen
 			if seen == "" {
@@ -118,8 +119,9 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 			if r.BuildNumber != 0 {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Fingerprint, r.Algo, r.Username, seen, held)
+			tb.row(cRef(r.Fingerprint), cText(r.Algo), cText(r.Username), cAge(seen), cText(held))
 		}
+		tb.flush()
 	})
 }
 

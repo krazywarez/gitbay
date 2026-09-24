@@ -80,9 +80,11 @@ func runPGPList(c *Ctx, args []string) int {
 		ds = append(ds, out{k.Fingerprint, k.UIDsJSON, k.ExpiresAt, k.RevokedAt})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "FINGERPRINT", "EMAILS")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\n", d.Fingerprint, d.Emails)
+			tb.row(cRef(d.Fingerprint), cText(d.Emails))
 		}
+		tb.flush()
 	})
 }
 
@@ -211,9 +213,12 @@ func runRepoLog(c *Ctx, args []string) int {
 		ds = append(ds, d)
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "SHA", "STATE", "SUBJECT", "AUTHOR")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%.10s  %-22s %s (%s <%s>)\n", d.SHA, d.Signature.State, d.Subject, d.AuthorName, d.AuthorEmail)
+			tb.row(cRef(fmt.Sprintf("%.10s", d.SHA)), cState(d.Signature.State), cFlex(d.Subject),
+				cText(fmt.Sprintf("(%s <%s>)", d.AuthorName, d.AuthorEmail)))
 		}
+		tb.flush()
 	})
 }
 

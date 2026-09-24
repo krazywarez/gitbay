@@ -613,9 +613,11 @@ func runAccessList(c *Ctx, args []string) int {
 		ds = append(ds, out{e.Username, e.Role, e.Source})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "USER", "ROLE", "SOURCE")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\tvia %s\n", d.User, d.Role, d.Source)
+			tb.row(cRef(d.User), cState(d.Role), cText("via "+d.Source))
 		}
+		tb.flush()
 	})
 }
 
@@ -801,9 +803,11 @@ func runTopicsList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(topics, func(w io.Writer) {
+		tb := c.table(w, "TOPIC")
 		for _, t := range topics {
-			fmt.Fprintln(w, t)
+			tb.row(cRef(t))
 		}
+		tb.flush()
 	})
 }
 
@@ -858,9 +862,11 @@ func editTopics(c *Ctx, args []string, add bool) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(now, func(w io.Writer) {
+		tb := c.table(w, "TOPIC")
 		for _, t := range now {
-			fmt.Fprintln(w, t)
+			tb.row(cRef(t))
 		}
+		tb.flush()
 	})
 }
 
@@ -904,9 +910,11 @@ func runRepoSearch(c *Ctx, args []string) int {
 		ds = append(ds, out{r.Path(), r.Visibility, desc, topics})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Path, d.Visibility, d.Description)
+			tb.row(cRef(d.Path), cState(d.Visibility), cFlex(d.Description))
 		}
+		tb.flush()
 	})
 }
 
@@ -1072,9 +1080,11 @@ func runRepoBookmarks(c *Ctx, args []string) int {
 		})
 	}
 	return c.emit(out, func(w io.Writer) {
+		tb := c.table(w, "PATH", "COUNT", "DESCRIPTION")
 		for _, b := range out {
-			fmt.Fprintf(w, "%s\t%d\t%s\n", b.Path, b.Bookmarks, b.Description)
+			tb.row(cRef(b.Path), cNum(int64(b.Bookmarks)), cFlex(b.Description))
 		}
+		tb.flush()
 	})
 }
 

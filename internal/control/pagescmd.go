@@ -213,8 +213,10 @@ func runDomainList(c *Ctx, args []string) int {
 		list = append(list, out{d.Domain, state, d.VerifiedAt})
 	}
 	return c.emit(list, func(w io.Writer) {
+		tb := c.table(w, "DOMAIN", "STATE")
 		for _, d := range list {
-			fmt.Fprintf(w, "%s\t%s\n", d.Domain, d.State)
+			tb.row(cRef(d.Domain), cState(d.State))
 		}
+		tb.flush()
 	})
 }

@@ -118,10 +118,12 @@ func runStatusList(c *Ctx, args []string) int {
 		Statuses []out  `json:"statuses"`
 	}{full, combinedOf(statuses), ds}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "combined\t%s\t%.10s\n", orNone(d.Combined), d.SHA)
+		tb := c.table(w, "CONTEXT", "STATE", "DESCRIPTION")
+		tb.row(cText("combined"), cState(orNone(d.Combined)), cText(fmt.Sprintf("%.10s", d.SHA)))
 		for _, x := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", x.Context, x.State, x.Description)
+			tb.row(cText(x.Context), cState(x.State), cFlex(x.Description))
 		}
+		tb.flush()
 	})
 }
 

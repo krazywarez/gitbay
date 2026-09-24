@@ -79,12 +79,14 @@ func runRepoRefs(c *Ctx, args []string) int {
 		d.Tags = append(d.Tags, refOut{Name: ref.Name, SHA: ref.SHA})
 	}
 	return c.emit(d, func(w io.Writer) {
+		tb := c.table(w, "KIND", "NAME", "SHA")
 		for _, ref := range d.Branches {
-			fmt.Fprintf(w, "branch\t%s\t%.10s\n", ref.Name, ref.SHA)
+			tb.row(cText("branch"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
 		}
 		for _, ref := range d.Tags {
-			fmt.Fprintf(w, "tag\t%s\t%.10s\n", ref.Name, ref.SHA)
+			tb.row(cText("tag"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
 		}
+		tb.flush()
 	})
 }
 
@@ -283,13 +285,15 @@ func runRepoTree(c *Ctx, args []string) int {
 		d.Entries = append(d.Entries, eo)
 	}
 	return c.emit(d, func(w io.Writer) {
+		tb := c.table(w, "SHA", "SIZE", "NAME")
 		for _, e := range d.Entries {
 			name := e.Name
 			if e.Type == "tree" {
 				name += "/"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\n", e.SHA[:min(10, len(e.SHA))], sizeCol(e), name)
+			tb.row(cRef(e.SHA[:min(10, len(e.SHA))]), cText(sizeCol(e)), cFlex(name))
 		}
+		tb.flush()
 	})
 }
 

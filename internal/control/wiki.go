@@ -96,9 +96,11 @@ func runWikiList(c *Ctx, args []string) int {
 		d.Pages = []string{}
 	}
 	return c.emit(d, func(w io.Writer) {
+		tb := c.table(w, "PAGE")
 		for _, p := range d.Pages {
-			fmt.Fprintln(w, p)
+			tb.row(cRef(p))
 		}
+		tb.flush()
 	})
 }
 

@@ -90,9 +90,11 @@ func runWebhookList(c *Ctx, args []string) int {
 		ds = append(ds, out{h.ID, h.URL, h.Events, h.Active, h.Secret != ""})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "ID", "URL", "EVENTS")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%d\t%s\t%s\n", d.ID, d.URL, d.Events)
+			tb.row(cRef(fmt.Sprintf("%d", d.ID)), cText(d.URL), cText(d.Events))
 		}
+		tb.flush()
 	})
 }
 
@@ -157,13 +159,16 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 		rows = append(rows, out{d.ID, d.URL, d.EventKind, d.Status, d.Attempts, d.LastStatus, d.LastError})
 	}
 	return c.emit(rows, func(w io.Writer) {
+		tb := c.table(w, "ID", "EVENT", "URL", "STATUS")
 		for _, d := range rows {
-			extra := ""
+			cells := []cell{cRef(fmt.Sprintf("%d", d.ID)), cText(d.Event), cText(d.URL),
+				cState(fmt.Sprintf("%s (%d attempts)", d.Status, d.Attempts))}
 			if d.LastError != "" {
-				extra = "\t" + d.LastError
+				cells = append(cells, cText(d.LastError))
 			}
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s (%d attempts)%s\n", d.ID, d.Event, d.URL, d.Status, d.Attempts, extra)
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 

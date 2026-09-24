@@ -101,6 +101,7 @@ func runMirrorList(c *Ctx, args []string) int {
 		ds = append(ds, out{m.ID, m.Direction, m.URL, m.Username, m.Dirty, m.LastSync, m.LastError})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "ID", "DIRECTION", "URL", "LAST", "STATUS")
 		for _, d := range ds {
 			status := "ok"
 			if d.Pending {
@@ -109,8 +110,9 @@ func runMirrorList(c *Ctx, args []string) int {
 			if d.LastError != "" {
 				status = "error: " + d.LastError
 			}
-			fmt.Fprintf(w, "%d\t%s\t%s\tlast %s\t%s\n", d.ID, d.Direction, d.URL, orDash(d.LastSync), status)
+			tb.row(cRef(fmt.Sprintf("%d", d.ID)), cText(d.Direction), cText(d.URL), cText("last "+orDash(d.LastSync)), cState(status))
 		}
+		tb.flush()
 	})
 }
 
