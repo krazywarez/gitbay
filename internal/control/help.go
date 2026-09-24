@@ -112,7 +112,8 @@ func runHelp(c *Ctx, args []string) int {
 }
 
 // program is how help spells the command it documents: the CLI at a
-// terminal (only the CLI sends GITBAY_TERM), ssh otherwise.
+// terminal (only the CLI or a caller passing --term sets one), ssh
+// otherwise.
 func (c *Ctx) program() string {
 	if c.Term.Cols > 0 {
 		return "gitbay"

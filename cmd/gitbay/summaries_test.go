@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/format"
 	"os"
 	"slices"
 	"strings"
@@ -25,11 +26,15 @@ func TestSummariesAreCurrent(t *testing.T) {
 	slices.Sort(lines)
 	b.WriteString(strings.Join(lines, ""))
 	b.WriteString("}\n")
+	want, err := format.Source([]byte(b.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if *updateSummaries {
-		os.WriteFile("summaries_gen.go", []byte(b.String()), 0o644)
+		os.WriteFile("summaries_gen.go", want, 0o644)
 	}
 	got, _ := os.ReadFile("summaries_gen.go")
-	if string(got) != b.String() {
+	if string(got) != string(want) {
 		t.Fatal("summaries_gen.go is stale: go test ./cmd/gitbay -run TestSummariesAreCurrent -update")
 	}
 }

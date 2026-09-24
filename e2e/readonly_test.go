@@ -232,8 +232,10 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	}
 }
 
+var sgrRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
 func stripSGRe2e(s string) string {
-	return regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(s, "")
+	return sgrRe.ReplaceAllString(s, "")
 }
 
 func displayCells(s string) int {

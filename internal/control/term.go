@@ -37,13 +37,12 @@ func ParseTerm(v string) Term {
 }
 
 const (
-	sgrReset     = "\x1b[0m"
-	sgrBold      = "\x1b[1m"
-	sgrDim       = "\x1b[2m"
-	sgrUnderline = "\x1b[4m"
-	sgrRed       = "\x1b[31m"
-	sgrGreen     = "\x1b[32m"
-	sgrMagenta   = "\x1b[35m"
+	sgrReset   = "\x1b[0m"
+	sgrBold    = "\x1b[1m"
+	sgrDim     = "\x1b[2m"
+	sgrRed     = "\x1b[31m"
+	sgrGreen   = "\x1b[32m"
+	sgrMagenta = "\x1b[35m"
 )
 
 // termSafe replaces the bytes a terminal would act on — ESC, the C0

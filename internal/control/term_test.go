@@ -26,12 +26,12 @@ func TestParseTerm(t *testing.T) {
 
 func TestCells(t *testing.T) {
 	cases := map[string]int{
-		"abc":                   3,
-		"日本":                    4,
-		"é":                     1,
-		"é":               1,
-		"\x1b[32mopen\x1b[0m":   4,
-		"":                      0,
+		"abc":                 3,
+		"日本":                  4,
+		"é":                   1,
+		"é":                  1,
+		"\x1b[32mopen\x1b[0m": 4,
+		"":                    0,
 	}
 	for in, want := range cases {
 		if got := cells(in); got != want {
