@@ -4,6 +4,36 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.36.0 — 2026-09-23
+
+Terminal output for the CLI (#254).
+
+- At a terminal, lists print under a header, fitted to the width, with
+  states in colour and relative ages; the next page is a command on
+  stderr. Piped output keeps the same tab-separated rows, with
+  timestamps as RFC3339 to the second; =repo log= rows are
+  tab-separated (were fixed-width) and =repo settings show= keys print
+  as fields (=require mr=, not =require_mr:=).
+- =show= commands print a title line, aligned fields, the body
+  rendered from markdown or org, events one per line and comments
+  under a rule, through a pager when longer than the screen.
+- Help describes every flag, with defaults and examples, and
+  =gitbay --help= groups the commands under WORK, REPOSITORIES, YOU
+  and INSTANCE. =help --json= adds =flags= and =examples=.
+- =release list= takes =--limit= and =--cursor=, and leaves the title
+  empty when it repeats the tag. =mr revisions='s one-revision note
+  moved to stderr. =notifications device add= prints =registered
+  device <n>=. =dashboard= prints =none= under an empty section.
+
+The CLI sends a leading =--term=<cols>[,color]= argument on the SSH
+command line, since OpenSSH's multiplexed sessions do not forward a
+session's =SetEnv=; the server strips it wherever it appears. Stock
+ssh opts in with =ssh git@gitbay.org --term=120,color issue list
+krz/gitbay= or =-o SetEnv=GITBAY_TERM=120,color=. Operators running
+the system-sshd forced command add =AcceptEnv GITBAY_TERM= to
+=sshd_config= for the =SetEnv= form; the =--term= argument needs no
+sshd configuration.
+
 * v1.35.1 — 2026-09-23
 
 The landing page's recording (#253).

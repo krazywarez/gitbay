@@ -39,6 +39,10 @@ the unit's =AmbientCapabilities=CAP_NET_BIND_SERVICE= covers ports
   sshd requires that binary to be root-owned and not group/world
   writable. Unknown keys fail authentication inside sshd, so system mode
   requires =registration.mode = "closed"= (check-config enforces this).
+  Under the forced command the CLI's leading =--term=<cols>[,color]=
+  argument works as is; a client that sets =GITBAY_TERM= instead needs
+  =AcceptEnv GITBAY_TERM= in =sshd_config=, since that env request is
+  handled by the host's sshd, not gitbayd.
 
 * Configuration reference
 

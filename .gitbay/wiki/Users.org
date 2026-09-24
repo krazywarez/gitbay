@@ -727,10 +727,9 @@ terminal, and follows these rules so every noun reads the same way.
 
 - A list command prints one row per item, tab-separated, no header.
   Columns run identifier, state, then description; a trailing column
-  may carry a word (=due 2027-01-01=, =via team=). The =gitbay= CLI pads
-  the tabs into aligned columns when stdout is a terminal and leaves
-  them as tabs when piped, so =cut -f= sees the same bytes stock ssh
-  prints. Under =--json= nothing is touched.
+  may carry a word (=due 2027-01-01=, =via team=). Piped, a timestamp in
+  a row is RFC3339 to the second, UTC. Under =--json= nothing is
+  touched.
 - An empty list prints nothing on stdout and =nothing to list= on
   stderr.
 - A mutation prints one line: verb, object, identifier
@@ -747,6 +746,43 @@ terminal, and follows these rules so every noun reads the same way.
   (repository, issue, release, team), =add= and =remove= for attaching
   something to them (a key, a member, a label on an issue), =set= for
   a value, =revoke= for a credential, =show= and =list= for reads.
+
+** At a terminal
+
+The =gitbay= CLI sends a leading =--term=<cols>[,color]= argument on
+the SSH command line when stdout is a terminal (OpenSSH's multiplexed
+sessions, which the CLI uses, do not forward a session's =SetEnv=).
+The server strips =--term=<v>= wherever it appears in the argument
+list. The server then prints:
+
+- lists under a header, padded, fitted to the width (the title or
+  description column is cut with =…= first), states in colour, ages as
+  =2h ago=, and the next page as a command on stderr (piped output
+  keeps a =next\t<cursor>= row instead);
+- =show= views with a title line, aligned fields, the body rendered
+  from markdown or org, one line per event, and comments under a rule;
+  a sub-table (labels, revisions, and the like) carries a section label
+  line in both terminal and piped output; timestamps as
+  =2026-09-23 23:26 UTC=. =wiki show= piped prints the page source
+  verbatim; the rendered page is terminal-only;
+- help with flag descriptions, defaults, and examples; =gitbay --help=
+  groups commands under WORK, REPOSITORIES, YOU and INSTANCE;
+  =help --json= adds =flags= and =examples=.
+
+=NO_COLOR=, =TERM=dumb= and =--no-color= drop the colour. =show=,
+=diff= and =log= at a terminal go through =$GITBAY_PAGER=, else
+=$PAGER=, else =less= (with =LESS=FRX= when =LESS= is unset); an empty
+=GITBAY_PAGER= turns paging off. Paging never applies to =--follow=,
+=--json=, or piped output.
+
+Stock ssh without the CLI's multiplexing gets the plain output unless
+it passes the same leading argument or sets the environment variable
+sshd is told to accept:
+
+#+begin_src sh
+ssh git@gitbay.org --term=120,color issue list krz/gitbay
+ssh -o SetEnv=GITBAY_TERM=120,color git@gitbay.org issue list krz/gitbay
+#+end_src
 
 * Scripting
 
