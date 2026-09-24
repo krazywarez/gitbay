@@ -43,6 +43,9 @@ type Ctx struct {
 	// Cmd is the command being run, set by Dispatch, so a usage error can
 	// print the registered usage rather than a copy of it.
 	Cmd Command
+	// Argv is the command's arguments after its path, global flags
+	// removed, so output can print a command to run next.
+	Argv []string
 	// Done, when the surface has one, closes when nobody is reading any
 	// more: the SSH channel closed or the HTTP request ended. A command
 	// that runs until something happens (build log --follow) stops on it.
@@ -142,6 +145,7 @@ func Dispatch(c *Ctx, argv []string) int {
 		}
 		args = append(args, a)
 	}
+	c.Argv = args
 	// A runner-scoped key reaches the runner protocol and nothing else, so
 	// the key a CI host holds cannot administer the instance.
 	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {

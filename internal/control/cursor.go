@@ -120,8 +120,21 @@ func (c *Ctx) emitPage(p page, items any, next string, plain func(w io.Writer)) 
 	}
 	return c.emit(out{items, next}, func(w io.Writer) {
 		plain(w)
-		if next != "" {
-			fmt.Fprintf(w, "next\t%s\n", next)
+		if next == "" {
+			return
 		}
+		if c.Term.Cols == 0 {
+			fmt.Fprintf(w, "next\t%s\n", next)
+			return
+		}
+		var again []string
+		for i := 0; i < len(c.Argv); i++ {
+			if c.Argv[i] == "--cursor" {
+				i++
+				continue
+			}
+			again = append(again, c.Argv[i])
+		}
+		fmt.Fprintf(c.Stderr, "more: gitbay %s %s --cursor %s\n", joinPath(c.Cmd.Path), strings.Join(again, " "), next)
 	})
 }
