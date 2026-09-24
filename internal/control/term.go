@@ -46,6 +46,33 @@ const (
 	sgrMagenta   = "\x1b[35m"
 )
 
+// termSafe replaces the bytes a terminal would act on — ESC, the C0
+// controls but tab and newline, DEL, and the C1 controls — with U+FFFD,
+// so user text cannot move the cursor, set the clipboard (OSC 52) or
+// clear the screen. Terminal output only: plain output is unchanged.
+func termSafe(s string) string {
+	unsafe := func(r rune) bool {
+		return (r < 0x20 && r != '\t' && r != '\n') || (r >= 0x7f && r <= 0x9f)
+	}
+	if strings.IndexFunc(s, unsafe) < 0 {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if unsafe(r) {
+			return '\uFFFD'
+		}
+		return r
+	}, s)
+}
+
+// safe is termSafe at a terminal and s unchanged in plain output.
+func (t Term) safe(s string) string {
+	if t.Cols == 0 {
+		return s
+	}
+	return termSafe(s)
+}
+
 // paint wraps s in an SGR sequence when colour is on.
 func (t Term) paint(sgr, s string) string {
 	if !t.Color || sgr == "" || s == "" {

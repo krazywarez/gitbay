@@ -61,6 +61,7 @@ func (t *table) row(cs ...cell) {
 	}
 	now := termNow()
 	for i := range cs {
+		cs[i].s = termSafe(cs[i].s)
 		if cs[i].kind == kindAge {
 			cs[i].s = relAge(cs[i].s, now)
 		}

@@ -20,6 +20,8 @@ type Options struct {
 	Base  string
 }
 
+// Render lays out markdown or org for a terminal. It passes control
+// bytes in src through: callers sanitise src first (control.termSafe).
 func Render(src, format string, o Options) string {
 	if format == "org" {
 		return Org(src, o)

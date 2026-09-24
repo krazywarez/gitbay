@@ -70,6 +70,7 @@ func (v *view) section(label string) {
 func (v *view) title(ref, title, state string) {
 	v.sep()
 	t := v.c.Term
+	ref, title, state = t.safe(ref), t.safe(title), t.safe(state)
 	if t.Cols == 0 {
 		switch {
 		case title == "" && state == "":
@@ -134,7 +135,7 @@ func (v *view) fields(kv ...string) {
 	}
 	v.sep()
 	for i := 0; i+1 < len(kv); i += 2 {
-		key, val := kv[i], kv[i+1]
+		key, val := v.c.Term.safe(kv[i]), v.c.Term.safe(kv[i+1])
 		if val == "" {
 			continue
 		}
@@ -159,6 +160,7 @@ func (v *view) body(src, format string) {
 		return
 	}
 	v.sep()
+	src = v.c.Term.safe(src)
 	for _, line := range strings.Split(strings.TrimRight(termtext.Render(src, format, v.opts()), "\n"), "\n") {
 		if line == "" {
 			io.WriteString(v.w, "\n")
@@ -171,8 +173,8 @@ func (v *view) body(src, format string) {
 // event is one line for a system comment: its text without link
 // targets, the time at the right edge at a terminal.
 func (v *view) event(text, format, ts string) {
-	line := "· " + termtext.Inline(text, format)
-	when := v.c.when(ts)
+	line := "· " + termtext.Inline(v.c.Term.safe(text), format)
+	when := v.c.Term.safe(v.c.when(ts))
 	if cols := v.c.Term.Cols; cols > 0 {
 		room := cols - 2 - 2 - cells(when)
 		line = pad(clip(line, room), room)
@@ -182,7 +184,8 @@ func (v *view) event(text, format, ts string) {
 }
 
 func (v *view) comment(author, ts, body, format string) {
-	when := v.c.when(ts)
+	when := v.c.Term.safe(v.c.when(ts))
+	author = v.c.Term.safe(author)
 	cols := v.c.Term.Cols
 	if cols > 0 {
 		suffix := ", " + when + " "
