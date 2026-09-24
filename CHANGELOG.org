@@ -8,6 +8,11 @@ anything beyond "replace the binary and restart" is needed.
 
 Terminal output for the CLI (#254).
 
+*Upgrade note.* Upgrade the instance before the CLI: an older server
+refuses the CLI's leading =--term= argument as an unknown command.
+Against an older instance, set =GITBAY_TERM=off= and the CLI sends no
+terminal size.
+
 - At a terminal, lists print under a header, fitted to the width, with
   states in colour and relative ages; the next page is a command on
   stderr. Piped output keeps the same tab-separated rows, with

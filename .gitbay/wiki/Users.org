@@ -775,6 +775,10 @@ list. The server then prints:
 =GITBAY_PAGER= turns paging off. Paging never applies to =--follow=,
 =--json=, or piped output.
 
+=GITBAY_TERM=off= stops the CLI sending =--term= at all, for an
+instance older than v1.36.0, which refuses the argument as an unknown
+command.
+
 Stock ssh without the CLI's multiplexing gets the plain output unless
 it passes the same leading argument or sets the environment variable
 sshd is told to accept:

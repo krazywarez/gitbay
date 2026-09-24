@@ -114,9 +114,10 @@ var noColor bool
 
 // termValue is GITBAY_TERM for this invocation: the terminal's width,
 // and whether colour is wanted. Empty when stdout is not a terminal,
-// so piped output stays the rows stock ssh prints.
+// so piped output stays the rows stock ssh prints, and when GITBAY_TERM
+// is "off", for an instance older than --term.
 func termValue(isTerminal bool, cols int, env func(string) string) string {
-	if !isTerminal || cols < 40 {
+	if !isTerminal || cols < 40 || env("GITBAY_TERM") == "off" {
 		return ""
 	}
 	v := strconv.Itoa(cols)

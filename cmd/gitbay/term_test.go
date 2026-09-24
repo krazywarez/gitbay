@@ -22,6 +22,7 @@ func TestTermValue(t *testing.T) {
 		{true, 120, map[string]string{"NO_COLOR": "1"}, false, "120"},
 		{true, 120, map[string]string{"TERM": "dumb"}, false, "120"},
 		{true, 120, nil, true, "120"},
+		{true, 120, map[string]string{"GITBAY_TERM": "off"}, false, ""},
 	}
 	for _, c := range cases {
 		noColor = c.noColor
