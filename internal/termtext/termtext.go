@@ -59,7 +59,7 @@ func (w *out) para(s, first, rest string) {
 	prefix := first
 	var open []string
 	for _, hard := range strings.Split(s, "\n") {
-		for _, line := range wrap(hard, w.o.Width-cells(rest)) {
+		for _, line := range Wrap(hard, w.o.Width-cells(rest)) {
 			w.b.WriteString(prefix)
 			for _, sgr := range open {
 				w.b.WriteString(sgr)
@@ -146,9 +146,9 @@ func (w *out) link(text, target string) string {
 	return text + " (" + target + ")"
 }
 
-// wrap breaks s at spaces into lines of at most width cells. A word
+// Wrap breaks s at spaces into lines of at most width cells. A word
 // wider than width is a line of its own. width <= 0 is no wrapping.
-func wrap(s string, width int) []string {
+func Wrap(s string, width int) []string {
 	if width <= 0 {
 		return []string{s}
 	}

@@ -38,13 +38,46 @@ func (v *view) opts() termtext.Options {
 	return termtext.Options{Width: max(0, v.c.Term.Cols-2), Color: v.c.Term.Color, Base: v.c.Cfg.Server.SiteURL}
 }
 
+// title prints "ref  title  state", wrapping title+state to the
+// terminal width. Continuation lines indent under the title, and each
+// line is painted after wrapping so no SGR sequence crosses a break.
 func (v *view) title(ref, title, state string) {
 	t := v.c.Term
-	io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"  "+t.paint(stateColor(state), state)+"\n")
+	if t.Cols == 0 {
+		io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"  "+t.paint(stateColor(state), state)+"\n")
+		return
+	}
+	prefix := ref + "  "
+	indent := strings.Repeat(" ", cells(prefix))
+	lines := termtext.Wrap(title+"  "+state, t.Cols-cells(prefix))
+	for i, line := range lines {
+		p := indent
+		if i == 0 {
+			p = prefix
+		}
+		if i < len(lines)-1 {
+			io.WriteString(v.w, p+t.paint(sgrBold, line)+"\n")
+			continue
+		}
+		// Last line carries the state word, the last word overall
+		// (states are single words): keep it coloured, not bold.
+		rest, last := line, line
+		if idx := strings.LastIndex(line, " "); idx >= 0 {
+			rest, last = line[:idx], line[idx+1:]
+		} else {
+			rest = ""
+		}
+		io.WriteString(v.w, p)
+		if rest != "" {
+			io.WriteString(v.w, t.paint(sgrBold, rest)+" ")
+		}
+		io.WriteString(v.w, t.paint(stateColor(state), last)+"\n")
+	}
 }
 
 // fields prints key/value pairs aligned on the widest key, skipping
-// empty values.
+// empty values. A value that does not fit wraps, its continuation
+// lines indented to the value column.
 func (v *view) fields(kv ...string) {
 	wide := 0
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -54,10 +87,23 @@ func (v *view) fields(kv ...string) {
 	}
 	io.WriteString(v.w, "\n")
 	for i := 0; i+1 < len(kv); i += 2 {
-		if kv[i+1] == "" {
+		key, val := kv[i], kv[i+1]
+		if val == "" {
 			continue
 		}
-		io.WriteString(v.w, "  "+v.c.Term.paint(sgrDim, pad(kv[i], wide))+"  "+kv[i+1]+"\n")
+		prefix := "  " + v.c.Term.paint(sgrDim, pad(key, wide)) + "  "
+		if v.c.Term.Cols == 0 {
+			io.WriteString(v.w, prefix+val+"\n")
+			continue
+		}
+		indent := strings.Repeat(" ", 2+wide+2)
+		for j, line := range termtext.Wrap(val, v.c.Term.Cols-2-wide-2) {
+			p := indent
+			if j == 0 {
+				p = prefix
+			}
+			io.WriteString(v.w, p+line+"\n")
+		}
 	}
 }
 
@@ -88,9 +134,15 @@ func (v *view) event(text, format, ts string) {
 }
 
 func (v *view) comment(author, ts, body, format string) {
-	head := "── " + author + ", " + v.c.when(ts) + " "
-	if cols := v.c.Term.Cols; cols > 0 {
-		head += strings.Repeat("─", max(0, cols-cells(head)))
+	when := v.c.when(ts)
+	cols := v.c.Term.Cols
+	if cols > 0 {
+		suffix := ", " + when + " "
+		author = clip(author, max(0, cols-cells("── "+suffix)-1))
+	}
+	head := "── " + author + ", " + when + " "
+	if cols > 0 {
+		head += strings.Repeat("─", max(1, cols-cells(head)))
 	}
 	io.WriteString(v.w, "\n"+v.c.Term.paint(sgrDim, head)+"\n")
 	v.body(body, format)
