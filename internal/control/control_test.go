@@ -276,3 +276,29 @@ func TestArgumentRefusalsNameTheUsage(t *testing.T) {
 		}
 	}
 }
+
+// TestTermArgument: --term= is read only as the first argument, and
+// never over HTTP.
+func TestTermArgument(t *testing.T) {
+	cases := []struct {
+		name     string
+		viaAPI   bool
+		argv     []string
+		want     Term
+		wantArgv []string
+	}{
+		{"leading", false, []string{"--term=80,color", "issue", "list", "a/b"}, Term{Cols: 80, Color: true}, []string{"a/b"}},
+		{"later", false, []string{"issue", "list", "a/b", "--term=x"}, Term{}, []string{"a/b", "--term=x"}},
+		{"over HTTP", true, []string{"--term=80,color", "issue", "list", "a/b"}, Term{}, []string{"a/b"}},
+	}
+	for _, tc := range cases {
+		c := &Ctx{Scope: "git", ViaAPI: tc.viaAPI, Stdout: io.Discard, Stderr: io.Discard}
+		Dispatch(c, tc.argv)
+		if c.Term != tc.want {
+			t.Errorf("%s: Term %+v, want %+v", tc.name, c.Term, tc.want)
+		}
+		if !slices.Equal(c.Argv, tc.wantArgv) {
+			t.Errorf("%s: Argv %q, want %q", tc.name, c.Argv, tc.wantArgv)
+		}
+	}
+}

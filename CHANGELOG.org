@@ -30,11 +30,12 @@ terminal size.
   moved to stderr. =notifications device add= prints =registered
   device <n>=. =dashboard= prints =none= under an empty section.
 
-The CLI sends a leading =--term=<cols>[,color]= argument on the SSH
-command line, since OpenSSH's multiplexed sessions do not forward a
-session's =SetEnv=; the server strips it wherever it appears. Stock
-ssh opts in with =ssh git@gitbay.org --term=120,color issue list
-krz/gitbay= or =-o SetEnv=GITBAY_TERM=120,color=. Operators running
+The CLI sends =--term=<cols>[,color]= as the first argument on the
+SSH command line, since OpenSSH's multiplexed sessions do not forward
+a session's =SetEnv=; the server reads it only there, and ignores it
+over HTTP. Stock ssh opts in with =ssh git@gitbay.org -- --term=120,color
+issue list krz/gitbay= (the =--= keeps ssh from reading it as its own
+option) or =-o SetEnv=GITBAY_TERM=120,color=. Operators running
 the system-sshd forced command add =AcceptEnv GITBAY_TERM= to
 =sshd_config= for the =SetEnv= form; the =--term= argument needs no
 sshd configuration.

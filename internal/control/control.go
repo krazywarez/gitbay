@@ -123,17 +123,16 @@ func Dispatch(c *Ctx, argv []string) int {
 	// A leading --term=<v> selects terminal output for this session, the
 	// same as GITBAY_TERM. It must come off before Lookup: Lookup matches
 	// argv against a command's Path, and a --term= in front would never
-	// match one.
-	for len(argv) > 0 {
-		v, ok := strings.CutPrefix(argv[0], "--term=")
-		if !ok {
-			break
+	// match one. Over HTTP it is dropped unread: the web and the API
+	// render no terminal.
+	if v, ok := strings.CutPrefix(argv[0], "--term="); ok {
+		if !c.ViaAPI {
+			c.Term = ParseTerm(v)
 		}
-		c.Term = ParseTerm(v)
 		argv = argv[1:]
-	}
-	if len(argv) == 0 {
-		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
+		if len(argv) == 0 {
+			return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
+		}
 	}
 	cmd, rest, ok := Lookup(argv)
 	c.Cmd = cmd
@@ -147,10 +146,6 @@ func Dispatch(c *Ctx, argv []string) int {
 	for _, a := range rest {
 		if a == "--json" {
 			c.JSON = true
-			continue
-		}
-		if v, ok := strings.CutPrefix(a, "--term="); ok {
-			c.Term = ParseTerm(v)
 			continue
 		}
 		args = append(args, a)

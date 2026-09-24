@@ -752,8 +752,8 @@ terminal, and follows these rules so every noun reads the same way.
 The =gitbay= CLI sends a leading =--term=<cols>[,color]= argument on
 the SSH command line when stdout is a terminal (OpenSSH's multiplexed
 sessions, which the CLI uses, do not forward a session's =SetEnv=).
-The server strips =--term=<v>= wherever it appears in the argument
-list. The server then prints:
+The argument goes first: the server reads =--term=<v>= only as the
+first argument, and ignores it over HTTP. The server then prints:
 
 - lists under a header, padded, fitted to the width (the title or
   description column is cut with =…= first), states in colour, ages as
@@ -781,10 +781,11 @@ command.
 
 Stock ssh without the CLI's multiplexing gets the plain output unless
 it passes the same leading argument or sets the environment variable
-sshd is told to accept:
+sshd is told to accept. OpenSSH parses options after the host, so the
+argument goes after =--=:
 
 #+begin_src sh
-ssh git@gitbay.org --term=120,color issue list krz/gitbay
+ssh git@gitbay.org -- --term=120,color issue list krz/gitbay
 ssh -o SetEnv=GITBAY_TERM=120,color git@gitbay.org issue list krz/gitbay
 #+end_src
 
