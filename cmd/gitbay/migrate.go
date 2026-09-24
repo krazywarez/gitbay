@@ -18,8 +18,8 @@ func migrateCmd() *cobra.Command {
 	var from string
 	var fromPort int
 	cmd := &cobra.Command{
-		Use:   "migrate",
-		Short: "move your account here from another gitbay instance: gitbay migrate --from <host>",
+		Use:   "migrate --from <host>",
+		Short: "move your account here from another gitbay instance",
 		Long: `Migrate authenticates to the source instance with your own SSH key,
 exports your account bundle (profile, emails, repos with settings,
 issues, MRs, comments), replays it on this instance, then mirrors each

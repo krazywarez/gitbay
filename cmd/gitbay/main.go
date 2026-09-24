@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	"golang.org/x/term"
 
 	"gitbay.org/gitbay/internal/protocol"
 )
@@ -38,68 +39,55 @@ func newRoot() *cobra.Command {
 	root.AddCommand(
 		authCmd(),
 		group("label", "issue labels",
-			pass("list", "labels with colour and use", passOpts{server: []string{"label", "list"}, needsRepo: true}),
-			pass("set", "create a label or set its colour: <label> [--color rrggbb|'']", passOpts{server: []string{"label", "set"}, needsRepo: true}),
-			pass("remove", "remove a label everywhere: <label>", passOpts{server: []string{"label", "remove"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"label", "list"}, needsRepo: true}),
+			pass("set", passOpts{server: []string{"label", "set"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"label", "remove"}, needsRepo: true}),
 		),
 		group("status", "commit statuses (CI)",
-			pass("set", "report a status: <sha> --context <c> --state <s> [--description d] [--url u]", passOpts{server: []string{"status", "set"}, needsRepo: true}),
-			pass("list", "statuses on a commit: <sha>", passOpts{server: []string{"status", "list"}, needsRepo: true}),
+			pass("set", passOpts{server: []string{"status", "set"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"status", "list"}, needsRepo: true}),
 		),
 		group("build", "CI builds",
-			pass("list", "recent builds: <owner/name>", passOpts{server: []string{"build", "list"}, needsRepo: true}),
-			pass("show", "one build: <owner/name> <n>", passOpts{server: []string{"build", "show"}, needsRepo: true}),
-			pass("log", "a build's log: <owner/name> <n> [--follow]", passOpts{server: []string{"build", "log"}, needsRepo: true}),
-			pass("jobs", "list the jobs a trigger can name", passOpts{server: []string{"build", "jobs"}, needsRepo: true}),
-			pass("trigger", "queue a job now: <job>", passOpts{server: []string{"build", "trigger"}, needsRepo: true}),
-			pass("cancel", "withdraw a queued build: <n>", passOpts{server: []string{"build", "cancel"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"build", "list"}, needsRepo: true}),
+			pass("show", passOpts{server: []string{"build", "show"}, needsRepo: true}),
+			pass("log", passOpts{server: []string{"build", "log"}, needsRepo: true}),
+			pass("jobs", passOpts{server: []string{"build", "jobs"}, needsRepo: true}),
+			pass("trigger", passOpts{server: []string{"build", "trigger"}, needsRepo: true}),
+			pass("cancel", passOpts{server: []string{"build", "cancel"}, needsRepo: true}),
 		),
-		pass("dashboard", "one read for the account dashboard: pinned repos, open MRs, assigned issues, recent builds",
-			passOpts{server: []string{"dashboard"}}),
-		pass("feed", "activity on repositories you can reach [--limit n] [--cursor c]",
-			passOpts{server: []string{"feed"}}),
-		pass("explore", "public repositories on this instance [--limit n] [--cursor c]",
-			passOpts{server: []string{"explore"}}),
-		pass("search", "find repositories, issues and merge requests: <query> [--kind repo|issue|mr]",
-			passOpts{server: []string{"search"}}),
+		withShort(pass("dashboard", passOpts{server: []string{"dashboard"}}), "pinned repos, open MRs, assigned issues, recent builds"),
+		pass("feed", passOpts{server: []string{"feed"}}),
+		withShort(pass("explore", passOpts{server: []string{"explore"}}), "public repositories on this instance"),
+		withShort(pass("search", passOpts{server: []string{"search"}}), "find repositories, issues and merge requests"),
 		group("notifications", "your notification inbox",
-			pass("list", "unread notifications, or [--all] [--limit n] [--cursor c]",
-				passOpts{server: []string{"notifications", "list"}}),
-			pass("read", "mark notifications read: <id>... | --all",
-				passOpts{server: []string{"notifications", "read"}}),
+			pass("list", passOpts{server: []string{"notifications", "list"}}),
+			pass("read", passOpts{server: []string{"notifications", "read"}}),
 			group("settings", "notification preferences",
-				pass("show", "your notification preferences", passOpts{server: []string{"notifications", "settings", "show"}}),
-				pass("mail", "activity by mail as well as the inbox: on|off", passOpts{server: []string{"notifications", "settings", "mail"}}),
-				pass("watch", "every issue and merge request on repositories you can write to: on|off", passOpts{server: []string{"notifications", "settings", "watch"}}),
-				pass("push", "activity on your registered devices: on|off", passOpts{server: []string{"notifications", "settings", "push"}}),
+				pass("show", passOpts{server: []string{"notifications", "settings", "show"}}),
+				pass("mail", passOpts{server: []string{"notifications", "settings", "mail"}}),
+				pass("watch", passOpts{server: []string{"notifications", "settings", "watch"}}),
+				pass("push", passOpts{server: []string{"notifications", "settings", "push"}}),
 			),
 			group("device", "Apple devices registered for push",
-				pass("add", "register a device, token on stdin: [--label name]",
-					passOpts{server: []string{"notifications", "device", "add"}, alwaysStdin: true, stdinWhat: "the device token"}),
-				pass("list", "your registered devices",
-					passOpts{server: []string{"notifications", "device", "list"}}),
-				pass("remove", "deregister a device: <id>",
-					passOpts{server: []string{"notifications", "device", "remove"}}),
+				pass("add", passOpts{server: []string{"notifications", "device", "add"}, alwaysStdin: true, stdinWhat: "the device token"}),
+				pass("list", passOpts{server: []string{"notifications", "device", "list"}}),
+				pass("remove", passOpts{server: []string{"notifications", "device", "remove"}}),
 			),
 		),
 		group("wiki", "a repository's wiki pages",
-			pass("list", "list pages: [<owner/name>]", passOpts{server: []string{"wiki", "list"}, needsRepo: true}),
-			pass("show", "print a page: [<owner/name>] [<page>]", passOpts{server: []string{"wiki", "show"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"wiki", "list"}, needsRepo: true}),
+			pass("show", passOpts{server: []string{"wiki", "show"}, needsRepo: true}),
 		),
 		group("snippet", "shared text files, outside any repository",
-			pass("create", "create from one file on stdin: <filename> [--description d] [--visibility public|unlisted|private] < file",
-				passOpts{server: []string{"snippet", "create"}, alwaysStdin: true, stdinWhat: "the file's text"}),
-			pass("show", "metadata and files: <id>", passOpts{server: []string{"snippet", "show"}}),
-			pass("list", "your snippets, or an owner's public ones: [<owner>] [--limit n] [--cursor c]",
-				passOpts{server: []string{"snippet", "list"}}),
-			pass("edit", "change description or visibility: <id> [--description d] [--visibility v]",
-				passOpts{server: []string{"snippet", "edit"}}),
-			pass("delete", "delete a snippet: <id>", passOpts{server: []string{"snippet", "delete"}}),
+			pass("create", passOpts{server: []string{"snippet", "create"}, alwaysStdin: true, stdinWhat: "the file's text"}),
+			pass("show", passOpts{server: []string{"snippet", "show"}}),
+			pass("list", passOpts{server: []string{"snippet", "list"}}),
+			pass("edit", passOpts{server: []string{"snippet", "edit"}}),
+			pass("delete", passOpts{server: []string{"snippet", "delete"}}),
 			group("file", "the files in a snippet",
-				pass("set", "add or replace a file from stdin: <id> <filename> < file",
-					passOpts{server: []string{"snippet", "file", "set"}, alwaysStdin: true, stdinWhat: "the file's text"}),
-				pass("get", "print a file: <id> <filename> > file", passOpts{server: []string{"snippet", "file", "get"}}),
-				pass("remove", "remove a file: <id> <filename>", passOpts{server: []string{"snippet", "file", "remove"}}),
+				pass("set", passOpts{server: []string{"snippet", "file", "set"}, alwaysStdin: true, stdinWhat: "the file's text"}),
+				pass("get", passOpts{server: []string{"snippet", "file", "get"}}),
+				pass("remove", passOpts{server: []string{"snippet", "file", "remove"}}),
 			),
 		),
 		repoCmd(),
@@ -111,50 +99,104 @@ func newRoot() *cobra.Command {
 		webCmd(),
 		orgCmd(),
 		group("profile", "user and org profiles",
-			pass("show", "show a profile: [name]", passOpts{server: []string{"profile", "show"}}),
-			pass("set", "set your profile: [--description d] [--website url] [--link label|url]...",
-				passOpts{server: []string{"profile", "set"}}),
+			pass("show", passOpts{server: []string{"profile", "show"}}),
+			pass("set", passOpts{server: []string{"profile", "set"}}),
 		),
 		webhookCmd(),
 		remoteCmd(),
 		initCmd(),
-		pass("register", "create an account on the default instance: gitbay register --username <n> --email <a> | --invite <code>",
-			passOpts{server: []string{"register"}}),
-		pass("audit", "instance audit log (admins): [--actor <user>|-] [--action <prefix>] [--since <duration|date>] [--limit <n>]", passOpts{server: []string{"audit"}}),
+		withShort(pass("register", passOpts{server: []string{"register"}}), "create an account on this instance"),
+		pass("audit", passOpts{server: []string{"audit"}}),
 		group("admin", "instance administration (admins)",
 			group("user", "accounts on this instance",
-				pass("list", "list accounts: [--state active|pending|disabled|admin] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "user", "list"}}),
-				pass("show", "show an account: <username>", passOpts{server: []string{"admin", "user", "show"}}),
-				pass("promote", "make an account an instance admin: <username>", passOpts{server: []string{"admin", "user", "promote"}}),
-				pass("demote", "remove instance admin (never the last one): <username>", passOpts{server: []string{"admin", "user", "demote"}}),
-				pass("create", "create an account: <username> [--admin] [--email a [--verified]] [--key -] < key.pub", passOpts{server: []string{"admin", "user", "create"}, stdinOK: true}),
-				pass("disable", "suspend an account: <username>", passOpts{server: []string{"admin", "user", "disable"}}),
-				pass("enable", "restore a suspended account: <username>", passOpts{server: []string{"admin", "user", "enable"}}),
-				pass("delete", "delete an account that anchors nothing: <username> --yes", passOpts{server: []string{"admin", "user", "delete"}}),
-				pass("limits", "show or set repository and storage caps: <username> [--repos n|default] [--bytes n|default]", passOpts{server: []string{"admin", "user", "limits"}}),
+				pass("list", passOpts{server: []string{"admin", "user", "list"}}),
+				pass("show", passOpts{server: []string{"admin", "user", "show"}}),
+				pass("promote", passOpts{server: []string{"admin", "user", "promote"}}),
+				pass("demote", passOpts{server: []string{"admin", "user", "demote"}}),
+				pass("create", passOpts{server: []string{"admin", "user", "create"}, stdinOK: true}),
+				pass("disable", passOpts{server: []string{"admin", "user", "disable"}}),
+				pass("enable", passOpts{server: []string{"admin", "user", "enable"}}),
+				pass("delete", passOpts{server: []string{"admin", "user", "delete"}}),
+				pass("limits", passOpts{server: []string{"admin", "user", "limits"}}),
 			),
 			group("email", "addresses on any account",
-				pass("verify", "mark an address verified by admin assertion: <username> <address>", passOpts{server: []string{"admin", "email", "verify"}}),
+				pass("verify", passOpts{server: []string{"admin", "email", "verify"}}),
 			),
-			pass("invite", "issue a registration invite and mail its code: --email <address>", passOpts{server: []string{"admin", "invite"}}),
-			pass("stats", "instance statistics: counts and per-repository disk usage", passOpts{server: []string{"admin", "stats"}}),
-			withSub(pass("runners", "the build queue and runner keys: last poll, scope, the build each holds", passOpts{server: []string{"admin", "runners"}}),
-				pass("remove", "drop a key's heartbeat row: <fingerprint>", passOpts{server: []string{"admin", "runners", "remove"}}),
-				pass("forget", "alias of remove: <fingerprint>", passOpts{server: []string{"admin", "runners", "forget"}})),
+			pass("invite", passOpts{server: []string{"admin", "invite"}}),
+			pass("stats", passOpts{server: []string{"admin", "stats"}}),
+			withSub(pass("runners", passOpts{server: []string{"admin", "runners"}}),
+				pass("remove", passOpts{server: []string{"admin", "runners", "remove"}}),
+				pass("forget", passOpts{server: []string{"admin", "runners", "forget"}})),
 			group("repo", "any repository, for moderation (audited)",
-				pass("list", "every repository with size and last push: [--owner o] [--visibility v] [--limit n] [--cursor c]", passOpts{server: []string{"admin", "repo", "list"}}),
-				pass("archive", "archive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "archive"}}),
-				pass("unarchive", "unarchive a repository: <owner/name>", passOpts{server: []string{"admin", "repo", "unarchive"}}),
-				pass("visibility", "set visibility: <owner/name> public|private", passOpts{server: []string{"admin", "repo", "visibility"}}),
-				pass("delete", "delete a repository: <owner/name> --yes", passOpts{server: []string{"admin", "repo", "delete"}}),
+				pass("list", passOpts{server: []string{"admin", "repo", "list"}}),
+				pass("archive", passOpts{server: []string{"admin", "repo", "archive"}}),
+				pass("unarchive", passOpts{server: []string{"admin", "repo", "unarchive"}}),
+				pass("visibility", passOpts{server: []string{"admin", "repo", "visibility"}}),
+				pass("delete", passOpts{server: []string{"admin", "repo", "delete"}}),
 			),
 			group("mr", "merge requests in any repository (audited)",
-				pass("prune", "drop merged or closed MRs' head refs and the objects only they kept: <owner/name> <n>... --yes", passOpts{server: []string{"admin", "mr", "prune"}}),
+				pass("prune", passOpts{server: []string{"admin", "mr", "prune"}}),
 			),
 		),
 		manCmd(root),
 	)
+	defaultHelp := root.HelpFunc()
+	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd == root {
+			rootHelp(root)
+			return
+		}
+		defaultHelp(cmd, args)
+	})
 	return root
+}
+
+// rootSection is one heading in gitbay --help: a title and the root
+// commands that belong under it.
+type rootSection struct {
+	title string
+	names []string
+}
+
+var rootSections = []rootSection{
+	{"WORK", []string{"issue", "mr", "build", "release", "milestone", "label", "search"}},
+	{"REPOSITORIES", []string{"repo", "wiki", "status", "webhook", "init"}},
+	{"YOU", []string{"dashboard", "feed", "notifications", "auth", "profile", "snippet", "web"}},
+	{"INSTANCE", []string{"org", "explore", "register", "migrate", "remote", "admin", "audit", "man"}},
+}
+
+// rootHelp is gitbay --help: the nouns grouped by what they are for.
+func rootHelp(root *cobra.Command) {
+	byName := map[string]*cobra.Command{}
+	wide := 0
+	for _, c := range root.Commands() {
+		byName[c.Name()] = c
+		if !c.Hidden {
+			wide = max(wide, len(c.Name()))
+		}
+	}
+	fmt.Println("gitbay: command-line client for a gitbay forge")
+	fmt.Println()
+	fmt.Println("USAGE")
+	fmt.Println("  gitbay <command> [<owner/name>] [flags]")
+	for _, s := range rootSections {
+		var rows [][2]string
+		for _, n := range s.names {
+			if c := byName[n]; c != nil && !c.Hidden {
+				rows = append(rows, [2]string{n, c.Short})
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Println()
+		fmt.Println(s.title)
+		for _, r := range rows {
+			fmt.Printf("  %-*s  %s\n", wide, r[0], r[1])
+		}
+	}
+	fmt.Println()
+	fmt.Println("gitbay <command> --help for its verbs; gitbay help <prefix> for the server reference.")
 }
 
 // serverPath is the annotation key holding a passthrough command's
@@ -197,10 +239,10 @@ func (o passOpts) stdinModeName() string {
 	return "none"
 }
 
-func pass(use, short string, o passOpts) *cobra.Command {
+func pass(use string, o passOpts) *cobra.Command {
 	return &cobra.Command{
 		Use:   use,
-		Short: short,
+		Short: summaries[strings.Join(o.server, " ")],
 		Annotations: map[string]string{
 			serverPath: strings.Join(o.server, " "),
 			stdinMode:  o.stdinModeName(),
@@ -220,6 +262,17 @@ func pass(use, short string, o passOpts) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// withShort overrides a passthrough command's one-line summary. Used
+// where the registry's own Summary for a single-verb noun (dashboard,
+// explore, search, register) reads differently from nounSummaries, which
+// is what a grouped noun's header and the root help both show; the two
+// must agree (TestGroupsSayWhatTheServerSays), so these few take the
+// noun's wording instead of the command's.
+func withShort(cmd *cobra.Command, short string) *cobra.Command {
+	cmd.Short = short
+	return cmd
 }
 
 // runServerHelp prints the registry's usage for one command.
@@ -335,11 +388,17 @@ func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 }
 
 // serverHelp prints the registry's usage for a prefix and reports whether
-// it did.
+// it did. At a terminal it goes through the terminal-aware path, so it
+// gets the same --term=<cols>[,color] treatment (and layout) as any other
+// command; piped, it stays a quiet capture, so a network or lookup
+// failure falls back to cobra's local help without noise.
 func serverHelp(prefix string) bool {
 	t, err := resolveTarget()
 	if err != nil {
 		return false
+	}
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		return runSSH(t, []string{"help", prefix}, strings.NewReader("")) == 0
 	}
 	out, code := sshCapture(t, []string{"help", prefix})
 	if code != 0 || out == "" {
@@ -368,8 +427,7 @@ func local(use, short string, fn func(args []string) int) *cobra.Command {
 }
 
 func authCmd() *cobra.Command {
-	keysAdd := pass("add", "register an SSH public key (reads the key from stdin or --file -)",
-		passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
+	keysAdd := pass("add", passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
 	// keys add always reads stdin on the server; wire it through directly.
 	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
 		t, err := resolveTarget()
@@ -405,212 +463,197 @@ func authCmd() *cobra.Command {
 		},
 	}
 	tokens := group("token", "API tokens (minted over SSH, used with the JSON API)",
-		pass("create", "mint a token: --name <n> [--scope full|read] [--ttl 30d]", passOpts{server: []string{"token", "create"}}),
-		pass("list", "list API tokens", passOpts{server: []string{"token", "list"}}),
-		pass("revoke", "revoke a token by name", passOpts{server: []string{"token", "revoke"}}),
+		pass("create", passOpts{server: []string{"token", "create"}}),
+		pass("list", passOpts{server: []string{"token", "list"}}),
+		pass("revoke", passOpts{server: []string{"token", "revoke"}}),
 	)
 	return group("auth", "identity: whoami, SSH and PGP keys",
-		pass("export", "write your account bundle (a user-level backup) to stdout",
-			passOpts{server: []string{"account", "export"}}),
+		pass("export", passOpts{server: []string{"account", "export"}}),
 		tokens,
-		pass("whoami", "show the authenticated account", passOpts{server: []string{"whoami"}}),
+		pass("whoami", passOpts{server: []string{"whoami"}}),
 		group("keys", "manage SSH keys",
-			pass("list", "list registered SSH keys", passOpts{server: []string{"keys", "list"}}),
+			pass("list", passOpts{server: []string{"keys", "list"}}),
 			keysAdd,
-			pass("label", "name a key: <fingerprint> [<text>]; no text clears it", passOpts{server: []string{"keys", "label"}}),
-			pass("remove", "remove an SSH key by fingerprint", passOpts{server: []string{"keys", "remove"}}),
+			pass("label", passOpts{server: []string{"keys", "label"}}),
+			pass("remove", passOpts{server: []string{"keys", "remove"}}),
 		),
 		group("email", "manage email addresses",
-			pass("add", "add an address and get a verification code by mail", passOpts{server: []string{"email", "add"}}),
-			pass("verify", "confirm a verification code", passOpts{server: []string{"email", "verify"}}),
-			pass("list", "list the addresses on your account", passOpts{server: []string{"email", "list"}}),
-			pass("remove", "remove an address; not the primary, nor the last verified one", passOpts{server: []string{"email", "remove"}}),
-			pass("primary", "make a verified address the primary", passOpts{server: []string{"email", "primary"}}),
+			pass("add", passOpts{server: []string{"email", "add"}}),
+			pass("verify", passOpts{server: []string{"email", "verify"}}),
+			pass("list", passOpts{server: []string{"email", "list"}}),
+			pass("remove", passOpts{server: []string{"email", "remove"}}),
+			pass("primary", passOpts{server: []string{"email", "primary"}}),
 		),
 		group("pgp", "manage OpenPGP keys",
-			pass("list", "list registered PGP keys", passOpts{server: []string{"pgp", "list"}}),
+			pass("list", passOpts{server: []string{"pgp", "list"}}),
 			pgpAdd,
-			pass("remove", "remove a PGP key by fingerprint", passOpts{server: []string{"pgp", "remove"}}),
+			pass("remove", passOpts{server: []string{"pgp", "remove"}}),
 		),
 	)
 }
 
 func repoCmd() *cobra.Command {
 	return group("repo", "create and manage repositories",
-		pass("create", "create a repository: gitbay repo create <owner/name> [--private]",
-			passOpts{server: []string{"repo", "create"}}),
-		pass("list", "list repositories you own or can access [--limit n] [--cursor c]", passOpts{server: []string{"repo", "list"}}),
-		pass("show", "show repository details", passOpts{server: []string{"repo", "show"}, needsRepo: true}),
-		pass("log", "commit log with signature states", passOpts{server: []string{"repo", "log"}, needsRepo: true}),
-		pass("transfer", "move a repository to another owner: <new-owner>", passOpts{server: []string{"repo", "transfer"}, needsRepo: true}),
-		pass("rename", "rename a repository: <new-name> (clone URLs change)", passOpts{server: []string{"repo", "rename"}, needsRepo: true}),
-		pass("delete", "delete a repository (--yes)", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
-		pass("fork", "fork a repository to you or an organization", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
-		pass("search", "find repositories by name, description, or topic: <query>", passOpts{server: []string{"repo", "search"}}),
-		pass("grep", "search file contents: <query> [--ref <ref>]", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
-		pass("diff", "the patch between two refs: <base> <head>", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
-		pass("tree", "list a directory: [<path>] [--ref <ref>]", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
-		pass("cat", "read a file: <path> [--ref <ref>]", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
-		pass("blame", "attribute lines to commits: <path> [--ref <ref>] [--from <n>] [--to <n>]",
-			passOpts{server: []string{"repo", "blame"}, needsRepo: true}),
-		pass("commit", "show one commit with its patch: <sha>",
-			passOpts{server: []string{"repo", "commit"}, needsRepo: true}),
-		pass("commit-file", "write a file and commit it: <path> [--ref <ref>] [--message <m>] --file -",
-			passOpts{server: []string{"repo", "commit-file"}, needsRepo: true, stdinOK: true}),
-		pass("refs", "list branches and tags", passOpts{server: []string{"repo", "refs"}, needsRepo: true}),
-		pass("download", "write a tar.gz of a ref to stdout: [--ref <r>] > repo.tar.gz",
-			passOpts{server: []string{"repo", "download"}, needsRepo: true}),
-		pass("pin", "pin a repository to your dashboard", passOpts{server: []string{"repo", "pin"}, needsRepo: true}),
-		pass("unpin", "unpin a repository", passOpts{server: []string{"repo", "unpin"}, needsRepo: true}),
-		pass("bookmark", "bookmark a repository to come back to", passOpts{server: []string{"repo", "bookmark"}, needsRepo: true}),
-		pass("unbookmark", "remove a bookmark", passOpts{server: []string{"repo", "unbookmark"}, needsRepo: true}),
-		pass("bookmarks", "list the repositories you have bookmarked", passOpts{server: []string{"repo", "bookmarks"}}),
-		pass("watch", "hear about all activity on a repository", passOpts{server: []string{"repo", "watch"}, needsRepo: true}),
-		pass("unwatch", "stop watching a repository", passOpts{server: []string{"repo", "unwatch"}, needsRepo: true}),
-		pass("mute", "mute a repository, including work you are part of", passOpts{server: []string{"repo", "mute"}, needsRepo: true}),
-		pass("archive", "archive a repository (read-only)", passOpts{server: []string{"repo", "archive"}, needsRepo: true}),
-		pass("unarchive", "unarchive a repository", passOpts{server: []string{"repo", "unarchive"}, needsRepo: true}),
+		pass("create", passOpts{server: []string{"repo", "create"}}),
+		pass("list", passOpts{server: []string{"repo", "list"}}),
+		pass("show", passOpts{server: []string{"repo", "show"}, needsRepo: true}),
+		pass("log", passOpts{server: []string{"repo", "log"}, needsRepo: true}),
+		pass("transfer", passOpts{server: []string{"repo", "transfer"}, needsRepo: true}),
+		pass("rename", passOpts{server: []string{"repo", "rename"}, needsRepo: true}),
+		pass("delete", passOpts{server: []string{"repo", "delete"}, needsRepo: true}),
+		pass("fork", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
+		pass("search", passOpts{server: []string{"repo", "search"}}),
+		pass("grep", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
+		pass("diff", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
+		pass("tree", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
+		pass("cat", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
+		pass("blame", passOpts{server: []string{"repo", "blame"}, needsRepo: true}),
+		pass("commit", passOpts{server: []string{"repo", "commit"}, needsRepo: true}),
+		pass("commit-file", passOpts{server: []string{"repo", "commit-file"}, needsRepo: true, stdinOK: true}),
+		pass("refs", passOpts{server: []string{"repo", "refs"}, needsRepo: true}),
+		pass("download", passOpts{server: []string{"repo", "download"}, needsRepo: true}),
+		pass("pin", passOpts{server: []string{"repo", "pin"}, needsRepo: true}),
+		pass("unpin", passOpts{server: []string{"repo", "unpin"}, needsRepo: true}),
+		pass("bookmark", passOpts{server: []string{"repo", "bookmark"}, needsRepo: true}),
+		pass("unbookmark", passOpts{server: []string{"repo", "unbookmark"}, needsRepo: true}),
+		pass("bookmarks", passOpts{server: []string{"repo", "bookmarks"}}),
+		pass("watch", passOpts{server: []string{"repo", "watch"}, needsRepo: true}),
+		pass("unwatch", passOpts{server: []string{"repo", "unwatch"}, needsRepo: true}),
+		pass("mute", passOpts{server: []string{"repo", "mute"}, needsRepo: true}),
+		pass("archive", passOpts{server: []string{"repo", "archive"}, needsRepo: true}),
+		pass("unarchive", passOpts{server: []string{"repo", "unarchive"}, needsRepo: true}),
 		local("clone", "clone via ssh: gitbay repo clone <owner/name> [dir]", cmdRepoClone),
 		importCmd(),
-		pass("import-issues", "import GitHub issue/PR history: --from <ghowner/ghrepo> [--token-stdin]",
-			passOpts{server: []string{"repo", "import-issues"}, needsRepo: true, stdinOK: true}),
+		pass("import-issues", passOpts{server: []string{"repo", "import-issues"}, needsRepo: true, stdinOK: true}),
 		group("deploy-key", "repository-bound CI keys",
-			pass("add", "bind a key: [--rw] < key.pub", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "an SSH public key"}),
-			pass("list", "list deploy keys", passOpts{server: []string{"repo", "deploy-key", "list"}, needsRepo: true}),
-			pass("remove", "remove a deploy key: <fingerprint>", passOpts{server: []string{"repo", "deploy-key", "remove"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"repo", "deploy-key", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "an SSH public key"}),
+			pass("list", passOpts{server: []string{"repo", "deploy-key", "list"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "deploy-key", "remove"}, needsRepo: true}),
 		),
 		group("runner", "runners attached to a repository",
-			pass("add", "attach a runner's public key: < key.pub", passOpts{server: []string{"repo", "runner", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "an SSH public key"}),
-			pass("list", "list attached runners", passOpts{server: []string{"repo", "runner", "list"}, needsRepo: true}),
-			pass("remove", "detach a runner: <fingerprint>", passOpts{server: []string{"repo", "runner", "remove"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"repo", "runner", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "an SSH public key"}),
+			pass("list", passOpts{server: []string{"repo", "runner", "list"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "runner", "remove"}, needsRepo: true}),
 		),
 		group("mirror", "sync with a foreign remote",
-			pass("add", "add a mirror: <https-url> --direction push|pull [--username <u>] [--token-stdin]",
-				passOpts{server: []string{"repo", "mirror", "add"}, needsRepo: true, stdinOK: true}),
-			pass("list", "list mirrors with sync status", passOpts{server: []string{"repo", "mirror", "list"}, needsRepo: true}),
-			pass("remove", "remove a mirror: <id>", passOpts{server: []string{"repo", "mirror", "remove"}, needsRepo: true}),
-			pass("sync", "schedule an immediate sync", passOpts{server: []string{"repo", "mirror", "sync"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"repo", "mirror", "add"}, needsRepo: true, stdinOK: true}),
+			pass("list", passOpts{server: []string{"repo", "mirror", "list"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "mirror", "remove"}, needsRepo: true}),
+			pass("sync", passOpts{server: []string{"repo", "mirror", "sync"}, needsRepo: true}),
 		),
 		group("deps", "check dependencies against upstream registries",
-			pass("enable", "check this repo's dependencies for updates", passOpts{server: []string{"repo", "deps", "enable"}, needsRepo: true}),
-			pass("disable", "stop checking dependencies", passOpts{server: []string{"repo", "deps", "disable"}, needsRepo: true}),
-			pass("status", "show check state and what is behind", passOpts{server: []string{"repo", "deps", "status"}, needsRepo: true}),
+			pass("enable", passOpts{server: []string{"repo", "deps", "enable"}, needsRepo: true}),
+			pass("disable", passOpts{server: []string{"repo", "deps", "disable"}, needsRepo: true}),
+			pass("status", passOpts{server: []string{"repo", "deps", "status"}, needsRepo: true}),
 		),
 		group("secret", "build secrets (values on stdin, injected into build env)",
-			pass("set", "set a secret: <NAME> (value on stdin)", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the secret value", stdinSecret: true}),
-			pass("list", "list secret names", passOpts{server: []string{"repo", "secret", "list"}, needsRepo: true}),
-			pass("remove", "remove a secret: <NAME>", passOpts{server: []string{"repo", "secret", "remove"}, needsRepo: true}),
+			pass("set", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the secret value", stdinSecret: true}),
+			pass("list", passOpts{server: []string{"repo", "secret", "list"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "secret", "remove"}, needsRepo: true}),
 		),
 		group("domain", "custom domains for the pages branch",
-			pass("add", "claim a domain (verify with a DNS TXT record): <domain>", passOpts{server: []string{"repo", "domain", "add"}, needsRepo: true}),
-			pass("verify", "check the DNS challenge and activate a claim: <domain>", passOpts{server: []string{"repo", "domain", "verify"}, needsRepo: true}),
-			pass("list", "list custom pages domains", passOpts{server: []string{"repo", "domain", "list"}, needsRepo: true}),
-			pass("remove", "remove a custom pages domain: <domain>", passOpts{server: []string{"repo", "domain", "remove"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"repo", "domain", "add"}, needsRepo: true}),
+			pass("verify", passOpts{server: []string{"repo", "domain", "verify"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"repo", "domain", "list"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "domain", "remove"}, needsRepo: true}),
 		),
 		group("topics", "free-form repository tags",
-			pass("list", "list topics", passOpts{server: []string{"repo", "topics"}, needsRepo: true}),
-			pass("add", "add topics: <topic>...", passOpts{server: []string{"repo", "topics", "add"}, needsRepo: true}),
-			pass("remove", "remove topics: <topic>...", passOpts{server: []string{"repo", "topics", "remove"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"repo", "topics"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"repo", "topics", "add"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"repo", "topics", "remove"}, needsRepo: true}),
 		),
 		group("access", "manage access grants",
-			pass("grant", "grant access: ... <user> read|write|admin", passOpts{server: []string{"repo", "access", "grant"}, needsRepo: true}),
-			pass("revoke", "revoke access: ... <user>", passOpts{server: []string{"repo", "access", "revoke"}, needsRepo: true}),
-			pass("list", "list access grants", passOpts{server: []string{"repo", "access", "list"}, needsRepo: true}),
+			pass("grant", passOpts{server: []string{"repo", "access", "grant"}, needsRepo: true}),
+			pass("revoke", passOpts{server: []string{"repo", "access", "revoke"}, needsRepo: true}),
+			pass("list", passOpts{server: []string{"repo", "access", "list"}, needsRepo: true}),
 		),
 		group("settings", "repository settings",
-			pass("show", "show settings", passOpts{server: []string{"repo", "settings", "show"}, needsRepo: true}),
-			pass("protect", "protect a branch", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
-			pass("unprotect", "unprotect a branch", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
-			pass("protect-tag", "protect tags matching a glob: <glob>", passOpts{server: []string{"repo", "settings", "protect-tag"}, needsRepo: true}),
-			pass("unprotect-tag", "drop a protected-tag glob: <glob>", passOpts{server: []string{"repo", "settings", "unprotect-tag"}, needsRepo: true}),
-			pass("default-branch", "set the default branch: <branch>", passOpts{server: []string{"repo", "settings", "default-branch"}, needsRepo: true}),
-			pass("require-approvals", "require N fresh approvals to merge: <n>", passOpts{server: []string{"repo", "settings", "require-approvals"}, needsRepo: true}),
-			pass("require-resolved", "require threads resolved to merge: on|off", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),
-			pass("require-codeowners", "require an owner's approval per covered file: on|off", passOpts{server: []string{"repo", "settings", "require-codeowners"}, needsRepo: true}),
-			pass("require-checks", "gate merges on green statuses: ... on|off", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
-			pass("visibility", "set repository visibility: public|private", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
-			pass("require-signed", "require verified commit signatures: ... on|off", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
-			pass("require-mr", "protected branches take changes through merge requests only: on|off", passOpts{server: []string{"repo", "settings", "require-mr"}, needsRepo: true}),
-			pass("description", "set the repository description: <text>", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
-			pass("website", "set the repository website: <url> ('' clears)", passOpts{server: []string{"repo", "settings", "website"}, needsRepo: true}),
-			pass("git-daemon", "expose over git://: ... on|off", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),
+			pass("show", passOpts{server: []string{"repo", "settings", "show"}, needsRepo: true}),
+			pass("protect", passOpts{server: []string{"repo", "settings", "protect"}, needsRepo: true}),
+			pass("unprotect", passOpts{server: []string{"repo", "settings", "unprotect"}, needsRepo: true}),
+			pass("protect-tag", passOpts{server: []string{"repo", "settings", "protect-tag"}, needsRepo: true}),
+			pass("unprotect-tag", passOpts{server: []string{"repo", "settings", "unprotect-tag"}, needsRepo: true}),
+			pass("default-branch", passOpts{server: []string{"repo", "settings", "default-branch"}, needsRepo: true}),
+			pass("require-approvals", passOpts{server: []string{"repo", "settings", "require-approvals"}, needsRepo: true}),
+			pass("require-resolved", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),
+			pass("require-codeowners", passOpts{server: []string{"repo", "settings", "require-codeowners"}, needsRepo: true}),
+			pass("require-checks", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
+			pass("visibility", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
+			pass("require-signed", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
+			pass("require-mr", passOpts{server: []string{"repo", "settings", "require-mr"}, needsRepo: true}),
+			pass("description", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
+			pass("website", passOpts{server: []string{"repo", "settings", "website"}, needsRepo: true}),
+			pass("git-daemon", passOpts{server: []string{"repo", "settings", "git-daemon"}, needsRepo: true}),
 		),
 	)
 }
 
 func issueCmd() *cobra.Command {
 	return group("issue", "issues",
-		pass("create", "open an issue: --title <t> [--body|--file -|$EDITOR]",
-			passOpts{server: []string{"issue", "create"}, needsRepo: true, stdinOK: true, editor: "issue"}),
-		pass("list", "list issues [--state open|closed|all] [--label l] [--assignee u] [--author u] [--milestone m|none] [--limit n] [--cursor c]", passOpts{server: []string{"issue", "list"}, needsRepo: true}),
-		pass("show", "show an issue with comments", passOpts{server: []string{"issue", "show"}, needsRepo: true}),
-		pass("comment", "comment on an issue [--message|--file -|$EDITOR]",
-			passOpts{server: []string{"issue", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
-		pass("close", "close an issue", passOpts{server: []string{"issue", "close"}, needsRepo: true}),
-		pass("reopen", "reopen an issue", passOpts{server: []string{"issue", "reopen"}, needsRepo: true}),
-		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"issue", "label"}, needsRepo: true}),
-		pass("assign", "assign users: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
-		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"issue", "edit"}, needsRepo: true, stdinOK: true}),
-		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"issue", "milestone"}, needsRepo: true}),
-		pass("templates", "list issue templates (.gitbay/issue-template*.md)", passOpts{server: []string{"issue", "templates"}, needsRepo: true}),
+		pass("create", passOpts{server: []string{"issue", "create"}, needsRepo: true, stdinOK: true, editor: "issue"}),
+		pass("list", passOpts{server: []string{"issue", "list"}, needsRepo: true}),
+		pass("show", passOpts{server: []string{"issue", "show"}, needsRepo: true}),
+		pass("comment", passOpts{server: []string{"issue", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
+		pass("close", passOpts{server: []string{"issue", "close"}, needsRepo: true}),
+		pass("reopen", passOpts{server: []string{"issue", "reopen"}, needsRepo: true}),
+		pass("label", passOpts{server: []string{"issue", "label"}, needsRepo: true}),
+		pass("assign", passOpts{server: []string{"issue", "assign"}, needsRepo: true}),
+		pass("edit", passOpts{server: []string{"issue", "edit"}, needsRepo: true, stdinOK: true}),
+		pass("milestone", passOpts{server: []string{"issue", "milestone"}, needsRepo: true}),
+		pass("templates", passOpts{server: []string{"issue", "templates"}, needsRepo: true}),
 	)
 }
 
 func releaseCmd() *cobra.Command {
 	return group("release", "tag-anchored releases with notes and assets",
-		pass("create", "create a release on a pushed tag: <tag> [--title <t>] [--notes|--file -|$EDITOR]",
-			passOpts{server: []string{"release", "create"}, needsRepo: true, stdinOK: true, editor: "release"}),
-		pass("edit", "update title and notes: <tag> [--title <t>] [--notes|--file -]",
-			passOpts{server: []string{"release", "edit"}, needsRepo: true, stdinOK: true}),
-		pass("list", "releases: <owner/name> [--limit <n>] [--cursor <c>]", passOpts{server: []string{"release", "list"}, needsRepo: true}),
-		pass("show", "show a release with assets: <tag>", passOpts{server: []string{"release", "show"}, needsRepo: true}),
-		pass("delete", "delete a release and its assets: <tag> --yes", passOpts{server: []string{"release", "delete"}, needsRepo: true}),
+		pass("create", passOpts{server: []string{"release", "create"}, needsRepo: true, stdinOK: true, editor: "release"}),
+		pass("edit", passOpts{server: []string{"release", "edit"}, needsRepo: true, stdinOK: true}),
+		pass("list", passOpts{server: []string{"release", "list"}, needsRepo: true}),
+		pass("show", passOpts{server: []string{"release", "show"}, needsRepo: true}),
+		pass("delete", passOpts{server: []string{"release", "delete"}, needsRepo: true}),
 		group("asset", "binary assets on a release",
-			pass("add", "upload from stdin: <tag> <filename> < file", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the asset's bytes"}),
-			pass("get", "download to stdout: <tag> <filename> > file", passOpts{server: []string{"release", "asset", "get"}, needsRepo: true}),
-			pass("remove", "remove an asset: <tag> <filename>", passOpts{server: []string{"release", "asset", "remove"}, needsRepo: true}),
+			pass("add", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the asset's bytes"}),
+			pass("get", passOpts{server: []string{"release", "asset", "get"}, needsRepo: true}),
+			pass("remove", passOpts{server: []string{"release", "asset", "remove"}, needsRepo: true}),
 		),
 	)
 }
 
 func milestoneCmd() *cobra.Command {
 	return group("milestone", "group issues and MRs toward a release",
-		pass("create", "create a milestone: <title> [--description <d>] [--due YYYY-MM-DD]",
-			passOpts{server: []string{"milestone", "create"}, needsRepo: true}),
-		pass("list", "list milestones with progress [--state open|closed|all]",
-			passOpts{server: []string{"milestone", "list"}, needsRepo: true}),
-		pass("close", "close a milestone: <title>", passOpts{server: []string{"milestone", "close"}, needsRepo: true}),
-		pass("reopen", "reopen a milestone: <title>", passOpts{server: []string{"milestone", "reopen"}, needsRepo: true}),
+		pass("create", passOpts{server: []string{"milestone", "create"}, needsRepo: true}),
+		pass("list", passOpts{server: []string{"milestone", "list"}, needsRepo: true}),
+		pass("close", passOpts{server: []string{"milestone", "close"}, needsRepo: true}),
+		pass("reopen", passOpts{server: []string{"milestone", "reopen"}, needsRepo: true}),
 	)
 }
 
 func mrCmd() *cobra.Command {
-	review := pass("review", "submit a review: --approve|--request-changes|--comment, or --discard a pending batch", passOpts{server: []string{"mr", "review"}, needsRepo: true})
-	review.AddCommand(pass("request", "ask specific people for review: [--add <u>]... [--remove <u>]...", passOpts{server: []string{"mr", "review", "request"}, needsRepo: true}))
+	review := pass("review", passOpts{server: []string{"mr", "review"}, needsRepo: true})
+	review.AddCommand(pass("request", passOpts{server: []string{"mr", "review", "request"}, needsRepo: true}))
 	return group("mr", "merge requests",
-		pass("create", "open a merge request: --source <branch> --target <branch> --title <t>",
-			passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
-		pass("list", "list merge requests [--state ...] [--label l] [--author u] [--milestone m|none] [--limit n] [--cursor c]", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
-		pass("show", "show a merge request", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
-		pass("diff", "show the diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
+		pass("create", passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
+		pass("list", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
+		pass("show", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
+		pass("diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
 		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),
 		local("rebase", "replay the MR's branch onto its target and re-push: gitbay mr rebase <n>", cmdMRRebase),
-		pass("comment", "comment on a merge request", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
-		pass("diff-comment", "comment on a diff line: --path <f> --line <l> [--old] [--pending] [--reply <id>]", passOpts{server: []string{"mr", "diff-comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
-		pass("threads", "review threads on an MR", passOpts{server: []string{"mr", "threads"}, needsRepo: true}),
-		pass("resolve", "resolve a review thread: <n> <thread-id>", passOpts{server: []string{"mr", "resolve"}, needsRepo: true}),
-		pass("unresolve", "reopen a review thread: <n> <thread-id>", passOpts{server: []string{"mr", "unresolve"}, needsRepo: true}),
+		pass("comment", passOpts{server: []string{"mr", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
+		pass("diff-comment", passOpts{server: []string{"mr", "diff-comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
+		pass("threads", passOpts{server: []string{"mr", "threads"}, needsRepo: true}),
+		pass("resolve", passOpts{server: []string{"mr", "resolve"}, needsRepo: true}),
+		pass("unresolve", passOpts{server: []string{"mr", "unresolve"}, needsRepo: true}),
 		review,
-		pass("merge", "merge: [--strategy ff|merge|squash|rebase]", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
-		pass("close", "close without merging", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
-		pass("revisions", "the heads this merge request has had", passOpts{server: []string{"mr", "revisions"}, needsRepo: true}),
-		pass("range-diff", "what changed between two revisions: [--from <sha>] [--to <sha>]", passOpts{server: []string{"mr", "range-diff"}, needsRepo: true}),
-		pass("draft", "mark as work in progress", passOpts{server: []string{"mr", "draft"}, needsRepo: true}),
-		pass("ready", "take the draft mark off, so it can merge", passOpts{server: []string{"mr", "ready"}, needsRepo: true}),
-		pass("edit", "edit title or body: <n> [--title <t>] [--body <b>|--file -]", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),
-		pass("label", "add or remove labels: [--add <l>]... [--remove <l>]...", passOpts{server: []string{"mr", "label"}, needsRepo: true}),
-		pass("milestone", "set or clear the milestone: <n> <title|none>", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
-		pass("retarget", "retarget onto another branch: <n> <branch>", passOpts{server: []string{"mr", "retarget"}, needsRepo: true}),
+		pass("merge", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),
+		pass("close", passOpts{server: []string{"mr", "close"}, needsRepo: true}),
+		pass("revisions", passOpts{server: []string{"mr", "revisions"}, needsRepo: true}),
+		pass("range-diff", passOpts{server: []string{"mr", "range-diff"}, needsRepo: true}),
+		pass("draft", passOpts{server: []string{"mr", "draft"}, needsRepo: true}),
+		pass("ready", passOpts{server: []string{"mr", "ready"}, needsRepo: true}),
+		pass("edit", passOpts{server: []string{"mr", "edit"}, needsRepo: true, stdinOK: true}),
+		pass("label", passOpts{server: []string{"mr", "label"}, needsRepo: true}),
+		pass("milestone", passOpts{server: []string{"mr", "milestone"}, needsRepo: true}),
+		pass("retarget", passOpts{server: []string{"mr", "retarget"}, needsRepo: true}),
 	)
 }
 
@@ -652,65 +695,64 @@ func usesTokenStdin(args []string) bool {
 
 func webCmd() *cobra.Command {
 	return group("web", "browser session",
-		pass("login", "mint a one-time browser login URL over ssh", passOpts{server: []string{"web", "login"}}),
+		pass("login", passOpts{server: []string{"web", "login"}}),
 		group("sessions", "your browser sessions",
-			pass("list", "list your browser sessions", passOpts{server: []string{"web", "sessions", "list"}}),
-			pass("revoke", "end a browser session: <id>|--all", passOpts{server: []string{"web", "sessions", "revoke"}}),
+			pass("list", passOpts{server: []string{"web", "sessions", "list"}}),
+			pass("revoke", passOpts{server: []string{"web", "sessions", "revoke"}}),
 		),
 		group("theme", "the colour scheme the web UI uses for you",
-			pass("show", "show your colour scheme", passOpts{server: []string{"web", "theme", "show"}}),
-			pass("set", "follow the browser, or force one: system|light|dark", passOpts{server: []string{"web", "theme", "set"}}),
+			pass("show", passOpts{server: []string{"web", "theme", "show"}}),
+			pass("set", passOpts{server: []string{"web", "theme", "set"}}),
 		),
 	)
 }
 
 func webhookCmd() *cobra.Command {
 	return group("webhook", "outbound event delivery",
-		pass("add", "add a webhook: <url> [--secret s] [--events k1,k2|*]", passOpts{server: []string{"webhook", "add"}, needsRepo: true}),
-		pass("list", "list webhooks", passOpts{server: []string{"webhook", "list"}, needsRepo: true}),
-		pass("remove", "remove a webhook: <id>", passOpts{server: []string{"webhook", "remove"}, needsRepo: true}),
-		pass("deliveries", "recent deliveries [--limit n]", passOpts{server: []string{"webhook", "deliveries"}, needsRepo: true}),
-		pass("redeliver", "requeue a delivery: <delivery-id>", passOpts{server: []string{"webhook", "redeliver"}, needsRepo: true}),
+		pass("add", passOpts{server: []string{"webhook", "add"}, needsRepo: true}),
+		pass("list", passOpts{server: []string{"webhook", "list"}, needsRepo: true}),
+		pass("remove", passOpts{server: []string{"webhook", "remove"}, needsRepo: true}),
+		pass("deliveries", passOpts{server: []string{"webhook", "deliveries"}, needsRepo: true}),
+		pass("redeliver", passOpts{server: []string{"webhook", "redeliver"}, needsRepo: true}),
 	)
 }
 
 func orgCmd() *cobra.Command {
 	return group("org", "organizations",
-		pass("create", "create an organization", passOpts{server: []string{"org", "create"}}),
-		pass("list", "list organizations you belong to", passOpts{server: []string{"org", "list"}}),
-		pass("show", "show an organization and its members", passOpts{server: []string{"org", "show"}}),
-		pass("rename", "rename an organization: <old> <new>", passOpts{server: []string{"org", "rename"}}),
-		pass("delete", "delete an empty organization (--yes)", passOpts{server: []string{"org", "delete"}}),
-		pass("profile", "show or set an org profile: <org> [--description d] [--website url] [--link label|url]...",
-			passOpts{server: []string{"org", "profile"}}),
+		pass("create", passOpts{server: []string{"org", "create"}}),
+		pass("list", passOpts{server: []string{"org", "list"}}),
+		pass("show", passOpts{server: []string{"org", "show"}}),
+		pass("rename", passOpts{server: []string{"org", "rename"}}),
+		pass("delete", passOpts{server: []string{"org", "delete"}}),
+		pass("profile", passOpts{server: []string{"org", "profile"}}),
 		group("members", "manage members",
-			pass("add", "add or update a member: <org> <user> [--role member|admin]", passOpts{server: []string{"org", "members", "add"}}),
-			pass("remove", "remove a member: <org> <user>", passOpts{server: []string{"org", "members", "remove"}}),
-			pass("list", "list members: <org>", passOpts{server: []string{"org", "members", "list"}}),
+			pass("add", passOpts{server: []string{"org", "members", "add"}}),
+			pass("remove", passOpts{server: []string{"org", "members", "remove"}}),
+			pass("list", passOpts{server: []string{"org", "members", "list"}}),
 		),
 		group("label", "labels every org repository sees",
-			pass("set", "create an org label or set its colour: <org> <label> [--color rrggbb|'']", passOpts{server: []string{"org", "label", "set"}}),
-			pass("list", "list org labels with use across readable repositories: <org>", passOpts{server: []string{"org", "label", "list"}}),
-			pass("remove", "remove an org label everywhere: <org> <label>", passOpts{server: []string{"org", "label", "remove"}}),
+			pass("set", passOpts{server: []string{"org", "label", "set"}}),
+			pass("list", passOpts{server: []string{"org", "label", "list"}}),
+			pass("remove", passOpts{server: []string{"org", "label", "remove"}}),
 		),
 		group("milestone", "milestones spanning an org's repositories",
-			pass("create", "create an org milestone: <org> <title> [--description d] [--due YYYY-MM-DD]", passOpts{server: []string{"org", "milestone", "create"}}),
-			pass("list", "list org milestones with progress: <org> [--state open|closed|all]", passOpts{server: []string{"org", "milestone", "list"}}),
-			pass("close", "close an org milestone: <org> <title>", passOpts{server: []string{"org", "milestone", "close"}}),
-			pass("reopen", "reopen an org milestone: <org> <title>", passOpts{server: []string{"org", "milestone", "reopen"}}),
+			pass("create", passOpts{server: []string{"org", "milestone", "create"}}),
+			pass("list", passOpts{server: []string{"org", "milestone", "list"}}),
+			pass("close", passOpts{server: []string{"org", "milestone", "close"}}),
+			pass("reopen", passOpts{server: []string{"org", "milestone", "reopen"}}),
 		),
 		group("team", "scope repository access with teams",
-			pass("create", "create a team: <org> <team>", passOpts{server: []string{"org", "team", "create"}}),
-			pass("delete", "delete a team: <org> <team>", passOpts{server: []string{"org", "team", "delete"}}),
-			pass("list", "list teams: <org>", passOpts{server: []string{"org", "team", "list"}}),
-			pass("show", "show members and grants: <org> <team>", passOpts{server: []string{"org", "team", "show"}}),
-			pass("add", "add org members: <org> <team> <user>...", passOpts{server: []string{"org", "team", "add"}}),
-			pass("remove", "remove members: <org> <team> <user>...", passOpts{server: []string{"org", "team", "remove"}}),
-			pass("grant", "grant a repo role: <org> <team> <owner/name> read|write|admin", passOpts{server: []string{"org", "team", "grant"}}),
-			pass("revoke", "revoke a repo grant: <org> <team> <owner/name>", passOpts{server: []string{"org", "team", "revoke"}}),
+			pass("create", passOpts{server: []string{"org", "team", "create"}}),
+			pass("delete", passOpts{server: []string{"org", "team", "delete"}}),
+			pass("list", passOpts{server: []string{"org", "team", "list"}}),
+			pass("show", passOpts{server: []string{"org", "team", "show"}}),
+			pass("add", passOpts{server: []string{"org", "team", "add"}}),
+			pass("remove", passOpts{server: []string{"org", "team", "remove"}}),
+			pass("grant", passOpts{server: []string{"org", "team", "grant"}}),
+			pass("revoke", passOpts{server: []string{"org", "team", "revoke"}}),
 		),
 		group("settings", "organization settings",
-			pass("members-role", "role plain membership implies: <org> write|read|none", passOpts{server: []string{"org", "settings", "members-role"}}),
+			pass("members-role", passOpts{server: []string{"org", "settings", "members-role"}}),
 		),
 	)
 }
@@ -724,7 +766,7 @@ func remoteCmd() *cobra.Command {
 }
 
 func initCmd() *cobra.Command {
-	return local("init", "git init + repo create + set origin, in one step: gitbay init [name] [--private]", cmdInit)
+	return local("init [name] [--private]", "git init + repo create + set origin, in one step", cmdInit)
 }
 
 // manCmd generates man pages; a CLI-first tool without man pages is not
@@ -759,7 +801,8 @@ func helpCmd(root *cobra.Command) *cobra.Command {
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return root.Help()
+				rootHelp(root)
+				return nil
 			}
 			t, err := resolveTarget()
 			if err != nil {
