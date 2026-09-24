@@ -4,7 +4,24 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
 )
+
+func TestDashboardEmptySectionsSayNone(t *testing.T) {
+	st, _, uid := newQueueTestRepo(t)
+	c, errOut := pruneCtx(st, t.TempDir(), store.User{ID: uid})
+	if code := Dispatch(c, []string{"dashboard"}); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	out := c.Stdout.(*bytes.Buffer).String()
+	for _, h := range []string{"waiting on your review:", "assigned to you:", "open merge requests:", "open issues:"} {
+		if !strings.Contains(out, h+"\n  none\n") {
+			t.Errorf("%q not followed by none:\n%s", h, out)
+		}
+	}
+}
 
 // The push queue is the one worker queue whose worst failure — a key_id
 // or team_id Apple did not issue, which config validation cannot check —

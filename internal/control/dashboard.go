@@ -175,6 +175,9 @@ func runDashboard(c *Ctx, args []string) int {
 		fmt.Fprintln(w, "open issues:")
 		printDashboardItems(w, d.Issues, "#")
 		fmt.Fprintln(w, "pinned:")
+		if len(d.Pinned) == 0 {
+			fmt.Fprintln(w, "  none")
+		}
 		for _, p := range d.Pinned {
 			mark := ""
 			if p.Archived {
@@ -183,10 +186,16 @@ func runDashboard(c *Ctx, args []string) int {
 			fmt.Fprintf(w, "  %s\t%s\t%s%s\n", p.Path, p.Visibility, p.Description, mark)
 		}
 		fmt.Fprintln(w, "recent activity:")
+		if len(d.Activity) == 0 {
+			fmt.Fprintln(w, "  none")
+		}
 		for _, e := range d.Activity {
 			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n", e.CreatedAt, e.Actor, e.Kind, e.Repo, string(e.Data))
 		}
 		fmt.Fprintln(w, "builds:")
+		if len(d.Builds) == 0 {
+			fmt.Fprintln(w, "  none")
+		}
 		for _, b := range d.Builds {
 			fmt.Fprintf(w, "  %s\t%d\t%s\t%s\t%.10s\t%s\n", b.Repo, b.Number, b.Job, b.Status, b.SHA, b.Ref)
 		}
@@ -229,6 +238,10 @@ func runDashboard(c *Ctx, args []string) int {
 }
 
 func printDashboardItems(w io.Writer, items []DashboardItem, marker string) {
+	if len(items) == 0 {
+		fmt.Fprintln(w, "  none")
+		return
+	}
 	for _, item := range items {
 		fmt.Fprintf(w, "  %s%s%d\t%s\t%s\n", item.Repo, marker, item.Number, item.Title, item.Author)
 	}
