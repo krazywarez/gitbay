@@ -17,8 +17,14 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "import"},
-		Summary:    "server-side mirror of a foreign repository",
-		Usage:      "repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		Summary: "server-side mirror of a foreign repository",
+		Usage:   "repo import <owner/name> --from <url> [--private] [--token-stdin]",
+		Flags: []Flag{
+			{"--from", "<url>", "the repository to import", ""},
+			{"--private", "", "create it private", ""},
+			{"--token-stdin", "", "read a credential token from stdin", ""},
+		},
+		Examples:   []string{"repo import krz/imported --from https://github.com/krz/old.git"},
 		ReadsStdin: true, Run: runRepoImport})
 }
 

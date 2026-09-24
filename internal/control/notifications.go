@@ -48,14 +48,20 @@ func init() {
 		Summary: "activity on your registered devices as well as the inbox",
 		Usage:   "notifications settings push on|off", Run: runNotificationsSettingsPush})
 	register(Command{Path: []string{"repo", "watch"},
-		Summary: "hear about all activity on a repository",
-		Usage:   "repo watch <owner/name>", Run: runRepoWatch})
+		Summary:  "hear about all activity on a repository",
+		Usage:    "repo watch <owner/name>",
+		Examples: []string{"repo watch krz/gitbay"},
+		Run:      runRepoWatch})
 	register(Command{Path: []string{"repo", "unwatch"},
-		Summary: "back to the default: only work you are part of",
-		Usage:   "repo unwatch <owner/name>", Run: runRepoUnwatch})
+		Summary:  "back to the default: only work you are part of",
+		Usage:    "repo unwatch <owner/name>",
+		Examples: []string{"repo unwatch krz/gitbay"},
+		Run:      runRepoUnwatch})
 	register(Command{Path: []string{"repo", "mute"},
-		Summary: "mute a repository, including work you are part of",
-		Usage:   "repo mute <owner/name>", Run: runRepoMute})
+		Summary:  "mute a repository, including work you are part of",
+		Usage:    "repo mute <owner/name>",
+		Examples: []string{"repo mute krz/gitbay"},
+		Run:      runRepoMute})
 }
 
 // notice is one thing that happened, in the shape both delivery routes

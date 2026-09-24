@@ -17,23 +17,37 @@ import (
 
 func init() {
 	register(Command{
-		Path:     []string{"repo", "tree"},
-		Summary:  "list a directory",
-		Usage:    "repo tree <owner/name> [<path>] [--ref <ref>]",
+		Path:    []string{"repo", "tree"},
+		Summary: "list a directory",
+		Usage:   "repo tree <owner/name> [<path>] [--ref <ref>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "branch, tag or commit to read", "the default branch"},
+		},
+		Examples: []string{"repo tree krz/gitbay internal/control"},
 		ReadOnly: true,
 		Run:      runRepoTree,
 	})
 	register(Command{
-		Path:     []string{"repo", "cat"},
-		Summary:  "read a file",
-		Usage:    "repo cat <owner/name> <path> [--ref <ref>]",
+		Path:    []string{"repo", "cat"},
+		Summary: "read a file",
+		Usage:   "repo cat <owner/name> <path> [--ref <ref>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "branch, tag or commit to read", "the default branch"},
+		},
+		Examples: []string{"repo cat krz/gitbay internal/control/control.go"},
 		ReadOnly: true,
 		Run:      runRepoCat,
 	})
 	register(Command{
-		Path:     []string{"repo", "blame"},
-		Summary:  "attribute lines to commits",
-		Usage:    "repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]",
+		Path:    []string{"repo", "blame"},
+		Summary: "attribute lines to commits",
+		Usage:   "repo blame <owner/name> <path> [--ref <ref>] [--from <n>] [--to <n>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "branch, tag or commit to read", "the default branch"},
+			{"--from", "<n>", "first line to attribute", "1"},
+			{"--to", "<n>", "last line to attribute", "the file's last line"},
+		},
+		Examples: []string{"repo blame krz/gitbay internal/control/control.go --from 1 --to 40"},
 		ReadOnly: true,
 		Run:      runRepoBlame,
 	})
@@ -41,6 +55,7 @@ func init() {
 		Path:     []string{"repo", "refs"},
 		Summary:  "list branches and tags",
 		Usage:    "repo refs <owner/name>",
+		Examples: []string{"repo refs krz/gitbay"},
 		ReadOnly: true,
 		Run:      runRepoRefs,
 	})

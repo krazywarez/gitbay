@@ -17,25 +17,46 @@ import (
 func init() {
 	register(Command{Path: []string{"milestone", "create"},
 		Summary: "create a milestone",
-		Usage:   "milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]", Run: runMilestoneCreate})
+		Usage:   "milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]",
+		Flags: []Flag{
+			{"--description", "<d>", "what the milestone covers", ""},
+			{"--due", "YYYY-MM-DD", "target date", ""},
+		},
+		Examples: []string{`milestone create krz/gitbay v1.31.0 --due 2026-10-01`},
+		Run:      runMilestoneCreate})
 	register(Command{Path: []string{"milestone", "list"},
 		Summary: "list milestones with progress",
-		Usage:   "milestone list <owner/name> [--state open|closed|all]", ReadOnly: true, Run: runMilestoneList})
+		Usage:   "milestone list <owner/name> [--state open|closed|all]",
+		Flags: []Flag{
+			{"--state", "open|closed|all", "which milestones", "open"},
+		},
+		Examples: []string{"milestone list krz/gitbay --state all"},
+		ReadOnly: true, Run: runMilestoneList})
 	register(Command{Path: []string{"milestone", "close"},
-		Summary: "close a milestone",
-		Usage:   "milestone close <owner/name> <title>", Run: runMilestoneClose})
+		Summary:  "close a milestone",
+		Usage:    "milestone close <owner/name> <title>",
+		Examples: []string{"milestone close krz/gitbay v1.30.0"},
+		Run:      runMilestoneClose})
 	register(Command{Path: []string{"milestone", "reopen"},
-		Summary: "reopen a milestone",
-		Usage:   "milestone reopen <owner/name> <title>", Run: runMilestoneReopen})
+		Summary:  "reopen a milestone",
+		Usage:    "milestone reopen <owner/name> <title>",
+		Examples: []string{"milestone reopen krz/gitbay v1.30.0"},
+		Run:      runMilestoneReopen})
 	register(Command{Path: []string{"issue", "milestone"},
-		Summary: "set or clear an issue's milestone",
-		Usage:   "issue milestone <owner/name> <n> <title|none>", Run: runIssueMilestone})
+		Summary:  "set or clear an issue's milestone",
+		Usage:    "issue milestone <owner/name> <n> <title|none>",
+		Examples: []string{"issue milestone krz/gitbay 42 v1.31.0"},
+		Run:      runIssueMilestone})
 	register(Command{Path: []string{"mr", "milestone"},
-		Summary: "set or clear an MR's milestone",
-		Usage:   "mr milestone <owner/name> <n> <title|none>", Run: runMRMilestone})
+		Summary:  "set or clear an MR's milestone",
+		Usage:    "mr milestone <owner/name> <n> <title|none>",
+		Examples: []string{"mr milestone krz/gitbay 431 v1.31.0"},
+		Run:      runMRMilestone})
 	register(Command{Path: []string{"issue", "templates"},
-		Summary: "list issue templates (.gitbay/issue-template*.md)",
-		Usage:   "issue templates <owner/name>", ReadOnly: true, Run: runIssueTemplates})
+		Summary:  "list issue templates (.gitbay/issue-template*.md)",
+		Usage:    "issue templates <owner/name>",
+		Examples: []string{"issue templates krz/gitbay"},
+		ReadOnly: true, Run: runIssueTemplates})
 }
 
 var duePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)

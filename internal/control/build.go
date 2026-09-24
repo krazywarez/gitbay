@@ -22,37 +22,64 @@ import (
 func init() {
 	register(Command{Path: []string{"build", "list"},
 		Summary: "list recent builds",
-		Usage:   "build list <owner/name> [--ref <branch>] [--status <state>] [--job <name>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runBuildList})
+		Usage:   "build list <owner/name> [--ref <branch>] [--status <state>] [--job <name>] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--ref", "<branch>", "only builds on this branch", ""},
+			{"--status", "<state>", "only builds in this state", ""},
+			{"--job", "<name>", "only this job", ""},
+			{"--limit", "<n>", "rows per page", "50"},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"build list krz/gitbay --status failure"},
+		ReadOnly: true, Run: runBuildList})
 	register(Command{Path: []string{"build", "show"},
-		Summary: "show one build",
-		Usage:   "build show <owner/name> <n>", ReadOnly: true, Run: runBuildShow})
+		Summary:  "show one build",
+		Usage:    "build show <owner/name> <n>",
+		Examples: []string{"build show krz/gitbay 431"},
+		ReadOnly: true, Run: runBuildShow})
 	register(Command{Path: []string{"build", "log"},
 		Summary: "print a build's log, or follow it until the build ends",
-		Usage:   "build log <owner/name> <n> [--follow]", ReadOnly: true, Run: runBuildLog})
+		Usage:   "build log <owner/name> <n> [--follow]",
+		Flags: []Flag{
+			{"--follow", "", "stream the log until the build ends", ""},
+		},
+		Examples: []string{"build log krz/gitbay 431 --follow"},
+		ReadOnly: true, Run: runBuildLog})
 
 	register(Command{Path: []string{"build", "jobs"},
-		Summary: "list the jobs a trigger can name",
-		Usage:   "build jobs <owner/name>", ReadOnly: true, Run: runBuildJobs})
+		Summary:  "list the jobs a trigger can name",
+		Usage:    "build jobs <owner/name>",
+		Examples: []string{"build jobs krz/gitbay"},
+		ReadOnly: true, Run: runBuildJobs})
 
 	register(Command{Path: []string{"build", "cancel"},
-		Summary: "withdraw a queued build before a runner claims it",
-		Usage:   "build cancel <owner/name> <n>", Run: runBuildCancel})
+		Summary:  "withdraw a queued build before a runner claims it",
+		Usage:    "build cancel <owner/name> <n>",
+		Examples: []string{"build cancel krz/gitbay 431"},
+		Run:      runBuildCancel})
 	register(Command{Path: []string{"build", "trigger"},
-		Summary: "queue a job now (scheduled or not)",
-		Usage:   "build trigger <owner/name> <job>", Run: runBuildTrigger})
+		Summary:  "queue a job now (scheduled or not)",
+		Usage:    "build trigger <owner/name> <job>",
+		Examples: []string{"build trigger krz/gitbay vuln"},
+		Run:      runBuildTrigger})
 	// Secrets: set over stdin, listed by name only, injected into the
 	// repo's builds as environment variables. Same discipline as mirror
 	// tokens — the value never appears in argv, logs, or output.
 	register(Command{Path: []string{"repo", "secret", "set"},
 		Summary:    "set a build secret",
 		Usage:      "repo secret set <owner/name> <NAME> (value on stdin)",
+		Examples:   []string{"repo secret set krz/gitbay DEPLOY_TOKEN"},
 		ReadsStdin: true, Run: runSecretSet})
 	register(Command{Path: []string{"repo", "secret", "remove"},
-		Summary: "remove a build secret",
-		Usage:   "repo secret remove <owner/name> <NAME>", Run: runSecretRemove})
+		Summary:  "remove a build secret",
+		Usage:    "repo secret remove <owner/name> <NAME>",
+		Examples: []string{"repo secret remove krz/gitbay DEPLOY_TOKEN"},
+		Run:      runSecretRemove})
 	register(Command{Path: []string{"repo", "secret", "list"},
-		Summary: "list build secret names",
-		Usage:   "repo secret list <owner/name>", ReadOnly: true, Run: runSecretList})
+		Summary:  "list build secret names",
+		Usage:    "repo secret list <owner/name>",
+		Examples: []string{"repo secret list krz/gitbay"},
+		ReadOnly: true, Run: runSecretList})
 
 	// Runner commands: the claim/report loop for gitbay-runner. A runner
 	// executes arbitrary repo code, so handing out jobs is the instance
@@ -61,13 +88,22 @@ func init() {
 	// an admin key, which a runner host should not hold (#92).
 	register(Command{Path: []string{"runner", "next"},
 		Summary: "claim the oldest pending build this key may run (runner protocol)",
-		Usage:   "runner next [--untrusted] [<owner/name>...]", Run: runRunnerNext})
+		Usage:   "runner next [--untrusted] [<owner/name>...]",
+		Flags: []Flag{
+			{"--untrusted", "", "this runner may build a fork's merge request head", ""},
+		},
+		Examples: []string{"runner next krz/gitbay"},
+		Run:      runRunnerNext})
 	register(Command{Path: []string{"runner", "log"},
-		Summary: "append a build's log from stdin",
-		Usage:   "runner log <build-id>", ReadsStdin: true, Run: runRunnerLog})
+		Summary:    "append a build's log from stdin",
+		Usage:      "runner log <build-id>",
+		Examples:   []string{"runner log 431"},
+		ReadsStdin: true, Run: runRunnerLog})
 	register(Command{Path: []string{"runner", "done"},
-		Summary: "finish a build",
-		Usage:   "runner done <build-id> success|failure", Run: runRunnerDone})
+		Summary:  "finish a build",
+		Usage:    "runner done <build-id> success|failure",
+		Examples: []string{"runner done 431 success"},
+		Run:      runRunnerDone})
 }
 
 type BuildOut struct {

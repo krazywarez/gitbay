@@ -18,6 +18,7 @@ func init() {
 		Path:     []string{"wiki", "list"},
 		Summary:  "list a repository's wiki pages",
 		Usage:    "wiki list <owner/name>",
+		Examples: []string{"wiki list krz/gitbay"},
 		ReadOnly: true,
 		Run:      runWikiList,
 	})
@@ -25,6 +26,7 @@ func init() {
 		Path:     []string{"wiki", "show"},
 		Summary:  "print a wiki page",
 		Usage:    "wiki show <owner/name> [<page>]",
+		Examples: []string{"wiki show krz/gitbay Quickstart"},
 		ReadOnly: true,
 		Run:      runWikiShow,
 	})

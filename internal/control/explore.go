@@ -11,9 +11,14 @@ import (
 
 func init() {
 	register(Command{
-		Path:     []string{"explore"},
-		Summary:  "list public repositories",
-		Usage:    "explore [--limit <n>] [--cursor <c>]",
+		Path:    []string{"explore"},
+		Summary: "list public repositories",
+		Usage:   "explore [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"explore --limit 20"},
 		ReadOnly: true,
 		Run:      runExplore,
 	})
@@ -21,8 +26,12 @@ func init() {
 		Path: []string{"repo", "download"},
 		// Not "repo archive": that name is taken by the read-only flag,
 		// and renaming it would break every script that sets it.
-		Summary:  "write a tar.gz of a ref to stdout",
-		Usage:    "repo download <owner/name> [--ref <r>] > repo.tar.gz",
+		Summary: "write a tar.gz of a ref to stdout",
+		Usage:   "repo download <owner/name> [--ref <r>] > repo.tar.gz",
+		Flags: []Flag{
+			{"--ref", "<r>", "branch, tag or commit to archive", ""},
+		},
+		Examples: []string{"repo download krz/gitbay --ref main '> gitbay.tar.gz'"},
 		ReadOnly: true,
 		Run:      runRepoDownload,
 	})

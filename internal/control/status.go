@@ -15,10 +15,21 @@ func init() {
 	register(Command{Path: []string{"status", "set"},
 		Summary: "report a commit status (CI)",
 		Usage:   "status set <owner/name> <sha> --context <c> --state pending|success|failure|error [--description <d>] [--url <u>]",
-		Run:     runStatusSet})
+		Flags: []Flag{
+			{"--context", "<c>", "the check this status reports for", ""},
+			{"--state", "pending|success|failure|error", "the check's outcome", ""},
+			{"--description", "<d>", "short text shown beside the state", ""},
+			{"--url", "<u>", "link to the check's own output", ""},
+		},
+		Examples: []string{
+			"status set krz/gitbay a1b2c3d --context ci/build --state success",
+		},
+		Run: runStatusSet})
 	register(Command{Path: []string{"status", "list"},
-		Summary: "statuses on a commit",
-		Usage:   "status list <owner/name> <sha>", ReadOnly: true, Run: runStatusList})
+		Summary:  "statuses on a commit",
+		Usage:    "status list <owner/name> <sha>",
+		Examples: []string{"status list krz/gitbay a1b2c3d"},
+		ReadOnly: true, Run: runStatusList})
 }
 
 var validStatusState = map[string]bool{"pending": true, "success": true, "failure": true, "error": true}

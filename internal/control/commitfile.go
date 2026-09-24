@@ -17,6 +17,14 @@ func init() {
 		Summary: "write a file and commit it",
 		Usage: "repo commit-file <owner/name> <path> " +
 			"--ref <branch> [--message <m>] [--file -]",
+		Flags: []Flag{
+			{"--ref", "<branch>", "branch to commit to", ""},
+			{"--message", "<m>", "the commit message", ""},
+			{"--file", "-", "read the new content from stdin", ""},
+		},
+		Examples: []string{
+			`repo commit-file krz/gitbay CHANGELOG.org --ref main --message "note the release" --file - '< CHANGELOG.org'`,
+		},
 		ReadsStdin: true,
 		Run:        runCommitFile,
 	})

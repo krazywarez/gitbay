@@ -20,33 +20,67 @@ import (
 
 func init() {
 	register(Command{Path: []string{"release", "create"},
-		Summary:    "create a release on a tag",
-		Usage:      "release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Summary: "create a release on a tag",
+		Usage:   "release create <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--title", "<t>", "the release's title", "the tag"},
+			{"--notes", "<n>", "the release notes", ""},
+			{"--file", "-", "read the release notes from stdin", ""},
+			{"--format", "md|org", "the notes' markup", "md"},
+		},
+		Examples: []string{
+			`release create krz/gitbay v1.31.0 --title "v1.31.0" --notes "flag help"`,
+			"release create krz/gitbay v1.31.0 --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runReleaseCreate})
 	register(Command{Path: []string{"release", "edit"},
-		Summary:    "update a release's title and notes",
-		Usage:      "release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Summary: "update a release's title and notes",
+		Usage:   "release edit <owner/name> <tag> [--title <t>] [--notes <n> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--title", "<t>", "the release's new title", ""},
+			{"--notes", "<n>", "the release's new notes", ""},
+			{"--file", "-", "read the new release notes from stdin", ""},
+			{"--format", "md|org", "the notes' markup", ""},
+		},
+		Examples:   []string{`release edit krz/gitbay v1.31.0 --title "v1.31.0"`},
 		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
 		Summary: "list releases",
-		Usage:   "release list <owner/name> [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runReleaseList})
+		Usage:   "release list <owner/name> [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"release list krz/gitbay --limit 10"},
+		ReadOnly: true, Run: runReleaseList})
 	register(Command{Path: []string{"release", "show"},
-		Summary: "show a release with assets",
-		Usage:   "release show <owner/name> <tag>", ReadOnly: true, Run: runReleaseShow})
+		Summary:  "show a release with assets",
+		Usage:    "release show <owner/name> <tag>",
+		Examples: []string{"release show krz/gitbay v1.30.0"},
+		ReadOnly: true, Run: runReleaseShow})
 	register(Command{Path: []string{"release", "delete"},
 		Summary: "delete a release and its assets",
-		Usage:   "release delete <owner/name> <tag> --yes", Run: runReleaseDelete})
+		Usage:   "release delete <owner/name> <tag> --yes",
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent delete", ""},
+		},
+		Examples: []string{"release delete krz/gitbay v1.30.0 --yes"},
+		Run:      runReleaseDelete})
 	register(Command{Path: []string{"release", "asset", "add"},
 		Summary:    "upload an asset from stdin",
 		Usage:      "release asset add <owner/name> <tag> <filename> < file",
+		Examples:   []string{"release asset add krz/gitbay v1.30.0 gitbay-darwin-arm64 '< gitbay-darwin-arm64'"},
 		ReadsStdin: true, Run: runAssetAdd})
 	register(Command{Path: []string{"release", "asset", "get"},
 		Summary:  "write an asset to stdout",
 		Usage:    "release asset get <owner/name> <tag> <filename> > file",
+		Examples: []string{"release asset get krz/gitbay v1.30.0 gitbay-darwin-arm64 '> gitbay-darwin-arm64'"},
 		ReadOnly: true, Run: runAssetGet})
 	register(Command{Path: []string{"release", "asset", "remove"},
-		Summary: "remove an asset",
-		Usage:   "release asset remove <owner/name> <tag> <filename>", Run: runAssetRemove})
+		Summary:  "remove an asset",
+		Usage:    "release asset remove <owner/name> <tag> <filename>",
+		Examples: []string{"release asset remove krz/gitbay v1.30.0 gitbay-darwin-arm64"},
+		Run:      runAssetRemove})
 }
 
 var assetNamePat = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$`)

@@ -16,18 +16,30 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "mirror", "add"},
-		Summary:    "mirror to or from a remote",
-		Usage:      "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
+		Summary: "mirror to or from a remote",
+		Usage:   "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
+		Flags: []Flag{
+			{"--direction", "push|pull", "which way the mirror syncs", ""},
+			{"--username", "<u>", "the remote's username", ""},
+			{"--token-stdin", "", "read a credential token from stdin", ""},
+		},
+		Examples:   []string{"repo mirror add krz/gitbay https://github.com/krazywarez/gitbay.git --direction push"},
 		ReadsStdin: true, Run: runMirrorAdd})
 	register(Command{Path: []string{"repo", "mirror", "list"},
-		Summary: "list mirrors with sync status",
-		Usage:   "repo mirror list <owner/name>", ReadOnly: true, Run: runMirrorList})
+		Summary:  "list mirrors with sync status",
+		Usage:    "repo mirror list <owner/name>",
+		Examples: []string{"repo mirror list krz/gitbay"},
+		ReadOnly: true, Run: runMirrorList})
 	register(Command{Path: []string{"repo", "mirror", "remove"},
-		Summary: "remove a mirror",
-		Usage:   "repo mirror remove <owner/name> <id>", Run: runMirrorRemove})
+		Summary:  "remove a mirror",
+		Usage:    "repo mirror remove <owner/name> <id>",
+		Examples: []string{"repo mirror remove krz/gitbay 3"},
+		Run:      runMirrorRemove})
 	register(Command{Path: []string{"repo", "mirror", "sync"},
-		Summary: "schedule an immediate sync",
-		Usage:   "repo mirror sync <owner/name>", Run: runMirrorSync})
+		Summary:  "schedule an immediate sync",
+		Usage:    "repo mirror sync <owner/name>",
+		Examples: []string{"repo mirror sync krz/gitbay"},
+		Run:      runMirrorSync})
 }
 
 func runMirrorAdd(c *Ctx, args []string) int {

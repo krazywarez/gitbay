@@ -18,10 +18,16 @@ func init() {
 	register(Command{Path: []string{"dashboard"},
 		Summary:  "one read for the account dashboard: review queue, assigned and open work, pins, activity, builds",
 		Usage:    "dashboard",
+		Examples: []string{"dashboard"},
 		ReadOnly: true, Run: runDashboard})
 	register(Command{Path: []string{"feed"},
-		Summary:  "activity on repositories you can reach",
-		Usage:    "feed [--limit <n>] [--cursor <c>]",
+		Summary: "activity on repositories you can reach",
+		Usage:   "feed [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"feed --limit 20"},
 		ReadOnly: true, Run: runFeed})
 }
 

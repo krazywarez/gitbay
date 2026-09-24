@@ -21,13 +21,18 @@ func init() {
 	register(Command{Path: []string{"repo", "runner", "add"},
 		Summary:    "attach a runner's public key to a repository",
 		Usage:      "repo runner add <owner/name> < key.pub",
+		Examples:   []string{"repo runner add krz/gitbay '< key.pub'"},
 		ReadsStdin: true, Run: runRepoRunnerAdd})
 	register(Command{Path: []string{"repo", "runner", "list"},
-		Summary: "list the runners attached to a repository",
-		Usage:   "repo runner list <owner/name>", ReadOnly: true, Run: runRepoRunnerList})
+		Summary:  "list the runners attached to a repository",
+		Usage:    "repo runner list <owner/name>",
+		Examples: []string{"repo runner list krz/gitbay"},
+		ReadOnly: true, Run: runRepoRunnerList})
 	register(Command{Path: []string{"repo", "runner", "remove"},
-		Summary: "detach a runner from a repository",
-		Usage:   "repo runner remove <owner/name> <fingerprint>", Run: runRepoRunnerRemove})
+		Summary:  "detach a runner from a repository",
+		Usage:    "repo runner remove <owner/name> <fingerprint>",
+		Examples: []string{"repo runner remove krz/gitbay SHA256:abcd1234"},
+		Run:      runRepoRunnerRemove})
 }
 
 func runRepoRunnerAdd(c *Ctx, args []string) int {

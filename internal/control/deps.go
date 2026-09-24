@@ -15,14 +15,20 @@ func init() {
 	// public registry what the repository depends on, which is the owner's
 	// disclosure to make, not the instance's.
 	register(Command{Path: []string{"repo", "deps", "enable"},
-		Summary: "check dependencies for updates",
-		Usage:   "repo deps enable <owner/name>", Run: runDepsEnable})
+		Summary:  "check dependencies for updates",
+		Usage:    "repo deps enable <owner/name>",
+		Examples: []string{"repo deps enable krz/gitbay"},
+		Run:      runDepsEnable})
 	register(Command{Path: []string{"repo", "deps", "disable"},
-		Summary: "stop checking dependencies",
-		Usage:   "repo deps disable <owner/name>", Run: runDepsDisable})
+		Summary:  "stop checking dependencies",
+		Usage:    "repo deps disable <owner/name>",
+		Examples: []string{"repo deps disable krz/gitbay"},
+		Run:      runDepsDisable})
 	register(Command{Path: []string{"repo", "deps", "status"},
-		Summary: "show dependency check state",
-		Usage:   "repo deps status <owner/name>", ReadOnly: true, Run: runDepsStatus})
+		Summary:  "show dependency check state",
+		Usage:    "repo deps status <owner/name>",
+		Examples: []string{"repo deps status krz/gitbay"},
+		ReadOnly: true, Run: runDepsStatus})
 }
 
 // DepsOut is what `repo deps status` emits: the check's state and what

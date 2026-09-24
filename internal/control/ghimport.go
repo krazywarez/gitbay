@@ -23,8 +23,14 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "import-issues"},
-		Summary:    "import issue and PR history from GitHub or Forgejo",
-		Usage:      "repo import-issues <owner/name> --from <owner/repo> [--token-stdin] [--api-base <url>]",
+		Summary: "import issue and PR history from GitHub or Forgejo",
+		Usage:   "repo import-issues <owner/name> --from <owner/repo> [--token-stdin] [--api-base <url>]",
+		Flags: []Flag{
+			{"--from", "<owner/repo>", "the source repository", ""},
+			{"--token-stdin", "", "read an API token from stdin", ""},
+			{"--api-base", "<url>", "the API's base URL, for Forgejo", ""},
+		},
+		Examples:   []string{"repo import-issues krz/gitbay --from krz/gitbay-old"},
 		ReadsStdin: true, Run: runImportIssues})
 }
 

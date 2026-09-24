@@ -20,78 +20,183 @@ import (
 func init() {
 	register(Command{Path: []string{"repo", "fork"},
 		Summary: "fork a repository under your account",
-		Usage:   "repo fork <owner/name> [--owner <o>] [--name <n>]", Run: runRepoFork})
+		Usage:   "repo fork <owner/name> [--owner <o>] [--name <n>]",
+		Flags: []Flag{
+			{"--owner", "<o>", "fork under this user or org, default your account", ""},
+			{"--name", "<n>", "name the fork", "the source's name"},
+		},
+		Examples: []string{"repo fork krz/gitbay"},
+		Run:      runRepoFork})
 	register(Command{Path: []string{"repo", "settings", "require-approvals"},
-		Summary: "require N fresh approvals to merge",
-		Usage:   "repo settings require-approvals <owner/name> <n> (0 = off)", Run: runRequireApprovals})
+		Summary:  "require N fresh approvals to merge",
+		Usage:    "repo settings require-approvals <owner/name> <n> (0 = off)",
+		Examples: []string{"repo settings require-approvals krz/gitbay 1"},
+		Run:      runRequireApprovals})
 	register(Command{Path: []string{"repo", "settings", "require-resolved"},
-		Summary: "require all review threads resolved to merge",
-		Usage:   "repo settings require-resolved <owner/name> on|off", Run: runRequireResolved})
+		Summary:  "require all review threads resolved to merge",
+		Usage:    "repo settings require-resolved <owner/name> on|off",
+		Examples: []string{"repo settings require-resolved krz/gitbay on"},
+		Run:      runRequireResolved})
 	register(Command{Path: []string{"repo", "settings", "require-codeowners"},
-		Summary: "require an owner's approval for every file CODEOWNERS covers",
-		Usage:   "repo settings require-codeowners <owner/name> on|off", Run: runRequireCodeowners})
+		Summary:  "require an owner's approval for every file CODEOWNERS covers",
+		Usage:    "repo settings require-codeowners <owner/name> on|off",
+		Examples: []string{"repo settings require-codeowners krz/gitbay on"},
+		Run:      runRequireCodeowners})
 	register(Command{Path: []string{"repo", "settings", "require-checks"},
-		Summary: "gate merges on green statuses",
-		Usage:   "repo settings require-checks <owner/name> on|off", Run: runRequireChecks})
+		Summary:  "gate merges on green statuses",
+		Usage:    "repo settings require-checks <owner/name> on|off",
+		Examples: []string{"repo settings require-checks krz/gitbay on"},
+		Run:      runRequireChecks})
 	register(Command{Path: []string{"repo", "settings", "require-mr"},
-		Summary: "protected branches take changes through merge requests only",
-		Usage:   "repo settings require-mr <owner/name> on|off", Run: runRequireMR})
+		Summary:  "protected branches take changes through merge requests only",
+		Usage:    "repo settings require-mr <owner/name> on|off",
+		Examples: []string{"repo settings require-mr krz/gitbay on"},
+		Run:      runRequireMR})
 	register(Command{Path: []string{"repo", "settings", "require-signed"},
-		Summary: "require verified commit signatures",
-		Usage:   "repo settings require-signed <owner/name> on|off", Run: runRequireSigned})
+		Summary:  "require verified commit signatures",
+		Usage:    "repo settings require-signed <owner/name> on|off",
+		Examples: []string{"repo settings require-signed krz/gitbay on"},
+		Run:      runRequireSigned})
 	register(Command{Path: []string{"mr", "create"},
-		Summary:    "open a merge request",
-		Usage:      "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org] [--draft]",
+		Summary: "open a merge request",
+		Usage:   "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--body <b> | --file -] [--format md|org] [--draft]",
+		Flags: []Flag{
+			{"--source", "[owner/name:]<branch>", "the branch to merge, from a fork with owner/name:", ""},
+			{"--target", "<branch>", "the branch to merge into", ""},
+			{"--title", "<t>", "the merge request's title", ""},
+			{"--body", "<b>", "the merge request's body", ""},
+			{"--file", "-", "read the body from stdin", ""},
+			{"--format", "md|org", "the body's markup", "md"},
+			{"--draft", "", "open it as work in progress", ""},
+		},
+		Examples: []string{
+			`mr create krz/gitbay --source cli-output-help --target main --title "control: flag help"`,
+			"mr create krz/gitbay --source cli-output-help --target main --title notes --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "range-diff"},
-		Summary:  "what changed between two revisions of a merge request",
-		Usage:    "mr range-diff <owner/name> <n> [--from <sha>] [--to <sha>]",
+		Summary: "what changed between two revisions of a merge request",
+		Usage:   "mr range-diff <owner/name> <n> [--from <sha>] [--to <sha>]",
+		Flags: []Flag{
+			{"--from", "<sha>", "earlier revision, default the one before --to", ""},
+			{"--to", "<sha>", "later revision, default the head", ""},
+		},
+		Examples: []string{"mr range-diff krz/gitbay 431"},
 		ReadOnly: true, Run: runMRRangeDiff})
 	register(Command{Path: []string{"mr", "revisions"},
 		Summary:  "the heads a merge request has had",
 		Usage:    "mr revisions <owner/name> <n>",
+		Examples: []string{"mr revisions krz/gitbay 431"},
 		ReadOnly: true, Run: runMRRevisions})
 	register(Command{Path: []string{"mr", "draft"},
-		Summary: "mark a merge request as work in progress",
-		Usage:   "mr draft <owner/name> <n>", Run: runMRDraft})
+		Summary:  "mark a merge request as work in progress",
+		Usage:    "mr draft <owner/name> <n>",
+		Examples: []string{"mr draft krz/gitbay 431"},
+		Run:      runMRDraft})
 	register(Command{Path: []string{"mr", "ready"},
-		Summary: "take the draft mark off, so it can merge",
-		Usage:   "mr ready <owner/name> <n>", Run: runMRReady})
+		Summary:  "take the draft mark off, so it can merge",
+		Usage:    "mr ready <owner/name> <n>",
+		Examples: []string{"mr ready krz/gitbay 431"},
+		Run:      runMRReady})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
-		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--label <l>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runMRList})
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--label <l>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--state", "open|merged|closed|source_gone|all", "which merge requests", "open"},
+			{"--label", "<l>", "only MRs carrying this label", ""},
+			{"--author", "<user>", "only MRs opened by this user", ""},
+			{"--milestone", "<title>|none", "only MRs in this milestone, or in none", ""},
+			{"--search", "<text>", "match title and body", ""},
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{
+			"mr list krz/gitbay --state open",
+			"mr list krz/gitbay --author cmc --state all",
+		},
+		ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
-		Summary: "show a merge request",
-		Usage:   "mr show <owner/name> <n>", ReadOnly: true, Run: runMRShow})
+		Summary:  "show a merge request",
+		Usage:    "mr show <owner/name> <n>",
+		Examples: []string{"mr show krz/gitbay 431"},
+		ReadOnly: true, Run: runMRShow})
 	register(Command{Path: []string{"mr", "diff"},
-		Summary: "show the diff",
-		Usage:   "mr diff <owner/name> <n>", ReadOnly: true, Run: runMRDiff})
+		Summary:  "show the diff",
+		Usage:    "mr diff <owner/name> <n>",
+		Examples: []string{"mr diff krz/gitbay 431"},
+		ReadOnly: true, Run: runMRDiff})
 	register(Command{Path: []string{"mr", "edit"},
-		Summary:    "edit title or body",
-		Usage:      "mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org] [--superseded-by <m>|none]",
+		Summary: "edit title or body",
+		Usage:   "mr edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org] [--superseded-by <m>|none]",
+		Flags: []Flag{
+			{"--title", "<t>", "the merge request's new title", ""},
+			{"--body", "<b>", "the merge request's new body", ""},
+			{"--file", "-", "read the new body from stdin", ""},
+			{"--format", "md|org", "the body's markup", ""},
+			{"--superseded-by", "<m>|none", "the MR that replaces this closed one, or none to clear", ""},
+		},
+		Examples:   []string{`mr edit krz/gitbay 431 --title "control: flag help, take two"`},
 		ReadsStdin: true, Run: runMREdit})
 	register(Command{Path: []string{"mr", "retarget"},
-		Summary: "retarget onto another branch",
-		Usage:   "mr retarget <owner/name> <n> <branch>", Run: runMRRetarget})
+		Summary:  "retarget onto another branch",
+		Usage:    "mr retarget <owner/name> <n> <branch>",
+		Examples: []string{"mr retarget krz/gitbay 431 main"},
+		Run:      runMRRetarget})
 	register(Command{Path: []string{"mr", "comment"},
-		Summary:    "comment",
-		Usage:      "mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Summary: "comment",
+		Usage:   "mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--message", "<m>", "the comment's text", ""},
+			{"--file", "-", "read the comment from stdin", ""},
+			{"--format", "md|org", "the comment's markup", "md"},
+		},
+		Examples:   []string{`mr comment krz/gitbay 431 --message "looks good"`},
 		ReadsStdin: true, Run: runMRComment})
 	register(Command{Path: []string{"mr", "review"},
 		Summary: "review",
-		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard", Run: runMRReview})
+		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard",
+		Flags: []Flag{
+			{"--approve", "", "approve the merge request", ""},
+			{"--request-changes", "", "ask for changes", ""},
+			{"--comment", "", "submit pending diff comments without a verdict", ""},
+			{"--discard", "", "throw away pending diff comments", ""},
+		},
+		Examples: []string{"mr review krz/gitbay 431 --approve"},
+		Run:      runMRReview})
 	register(Command{Path: []string{"mr", "review", "request"},
 		Summary: "ask specific people for a review",
-		Usage:   "mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runMRReviewRequest})
+		Usage:   "mr review request <owner/name> <n> [--add <user>]... [--remove <user>]...",
+		Flags: []Flag{
+			{"--add", "<user>", "reviewer to add, may repeat", ""},
+			{"--remove", "<user>", "reviewer to remove, may repeat", ""},
+		},
+		Examples: []string{"mr review request krz/gitbay 431 --add cmc"},
+		Run:      runMRReviewRequest})
 	register(Command{Path: []string{"mr", "label"},
 		Summary: "labels",
-		Usage:   "mr label <owner/name> <n> [--add <l>]... [--remove <l>]...", Run: runMRLabel})
+		Usage:   "mr label <owner/name> <n> [--add <l>]... [--remove <l>]...",
+		Flags: []Flag{
+			{"--add", "<l>", "label to add, may repeat", ""},
+			{"--remove", "<l>", "label to remove, may repeat", ""},
+		},
+		Examples: []string{"mr label krz/gitbay 431 --add needs-review"},
+		Run:      runMRLabel})
 	register(Command{Path: []string{"mr", "merge"},
 		Summary: "merge",
-		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]", Run: runMRMerge})
+		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]",
+		Flags: []Flag{
+			{"--strategy", "ff|merge|squash|rebase", "how to merge", ""},
+		},
+		Examples: []string{"mr merge krz/gitbay 431 --strategy ff"},
+		Run:      runMRMerge})
 	register(Command{Path: []string{"mr", "close"},
 		Summary: "close without merging",
-		Usage:   "mr close <owner/name> <n> [--by <m>]", Run: runMRClose})
+		Usage:   "mr close <owner/name> <n> [--by <m>]",
+		Flags: []Flag{
+			{"--by", "<m>", "the MR that supersedes this one", ""},
+		},
+		Examples: []string{"mr close krz/gitbay 431"},
+		Run:      runMRClose})
 }
 
 // ForkOut is what `repo fork` emits: where the fork landed, and what it

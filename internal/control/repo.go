@@ -28,100 +28,177 @@ func HooksDir(root string) string { return filepath.Join(root, "hooks") }
 func init() {
 	register(Command{Path: []string{"repo", "create"},
 		Summary: "create a repository",
-		Usage:   "repo create <owner/name> [--private]", Run: runRepoCreate})
+		Usage:   "repo create <owner/name> [--private]",
+		Flags: []Flag{
+			{"--private", "", "create it private", ""},
+		},
+		Examples: []string{"repo create krz/newthing --private"},
+		Run:      runRepoCreate})
 	register(Command{Path: []string{"repo", "list"},
 		Summary: "list repositories you own or can access",
-		Usage:   "repo list [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runRepoList})
+		Usage:   "repo list [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{"repo list --limit 20"},
+		ReadOnly: true, Run: runRepoList})
 	register(Command{Path: []string{"repo", "show"},
-		Summary: "show repository details",
-		Usage:   "repo show <owner/name>", ReadOnly: true, Run: runRepoShow})
+		Summary:  "show repository details",
+		Usage:    "repo show <owner/name>",
+		Examples: []string{"repo show krz/gitbay"},
+		ReadOnly: true, Run: runRepoShow})
 	register(Command{Path: []string{"repo", "transfer"},
-		Summary: "move a repository to another owner",
-		Usage:   "repo transfer <owner/name> <new-owner> (clone URLs change)", Run: runRepoTransfer})
+		Summary:  "move a repository to another owner",
+		Usage:    "repo transfer <owner/name> <new-owner> (clone URLs change)",
+		Examples: []string{"repo transfer krz/gitbay krazywarez"},
+		Run:      runRepoTransfer})
 	register(Command{Path: []string{"repo", "rename"},
-		Summary: "rename a repository",
-		Usage:   "repo rename <owner/name> <new-name> (clone URLs change)", Run: runRepoRename})
+		Summary:  "rename a repository",
+		Usage:    "repo rename <owner/name> <new-name> (clone URLs change)",
+		Examples: []string{"repo rename krz/gitbay forge"},
+		Run:      runRepoRename})
 	register(Command{Path: []string{"repo", "delete"},
 		Summary: "delete a repository",
-		Usage:   "repo delete <owner/name> --yes", Run: runRepoDelete})
+		Usage:   "repo delete <owner/name> --yes",
+		Flags: []Flag{
+			{"--yes", "", "confirm the permanent delete", ""},
+		},
+		Examples: []string{"repo delete cmc/scratch --yes"},
+		Run:      runRepoDelete})
 	register(Command{Path: []string{"repo", "access", "grant"},
-		Summary: "grant access",
-		Usage:   "repo access grant <owner/name> <user> read|write|admin", Run: runAccessGrant})
+		Summary:  "grant access",
+		Usage:    "repo access grant <owner/name> <user> read|write|admin",
+		Examples: []string{"repo access grant krz/gitbay cmc write"},
+		Run:      runAccessGrant})
 	register(Command{Path: []string{"repo", "access", "revoke"},
-		Summary: "revoke access",
-		Usage:   "repo access revoke <owner/name> <user>", Run: runAccessRevoke})
+		Summary:  "revoke access",
+		Usage:    "repo access revoke <owner/name> <user>",
+		Examples: []string{"repo access revoke krz/gitbay cmc"},
+		Run:      runAccessRevoke})
 	register(Command{Path: []string{"repo", "access", "list"},
-		Summary: "list who can reach the repository, with the role and where it comes from",
-		Usage:   "repo access list <owner/name>", ReadOnly: true, Run: runAccessList})
+		Summary:  "list who can reach the repository, with the role and where it comes from",
+		Usage:    "repo access list <owner/name>",
+		Examples: []string{"repo access list krz/gitbay"},
+		ReadOnly: true, Run: runAccessList})
 	register(Command{Path: []string{"repo", "settings", "show"},
-		Summary: "show settings",
-		Usage:   "repo settings show <owner/name>", ReadOnly: true, Run: runSettingsShow})
+		Summary:  "show settings",
+		Usage:    "repo settings show <owner/name>",
+		Examples: []string{"repo settings show krz/gitbay"},
+		ReadOnly: true, Run: runSettingsShow})
 	register(Command{Path: []string{"repo", "settings", "protect"},
-		Summary: "protect a branch",
-		Usage:   "repo settings protect <owner/name> <branch>", Run: runProtect})
+		Summary:  "protect a branch",
+		Usage:    "repo settings protect <owner/name> <branch>",
+		Examples: []string{"repo settings protect krz/gitbay main"},
+		Run:      runProtect})
 	register(Command{Path: []string{"repo", "settings", "unprotect"},
-		Summary: "unprotect a branch",
-		Usage:   "repo settings unprotect <owner/name> <branch>", Run: runUnprotect})
+		Summary:  "unprotect a branch",
+		Usage:    "repo settings unprotect <owner/name> <branch>",
+		Examples: []string{"repo settings unprotect krz/gitbay main"},
+		Run:      runUnprotect})
 	register(Command{Path: []string{"repo", "settings", "protect-tag"},
-		Summary: "protect tags matching a glob (created once, never moved or deleted)",
-		Usage:   "repo settings protect-tag <owner/name> <glob>", Run: runProtectTag})
+		Summary:  "protect tags matching a glob (created once, never moved or deleted)",
+		Usage:    "repo settings protect-tag <owner/name> <glob>",
+		Examples: []string{"repo settings protect-tag krz/gitbay 'v*'"},
+		Run:      runProtectTag})
 	register(Command{Path: []string{"repo", "settings", "unprotect-tag"},
-		Summary: "drop a protected-tag glob",
-		Usage:   "repo settings unprotect-tag <owner/name> <glob>", Run: runUnprotectTag})
+		Summary:  "drop a protected-tag glob",
+		Usage:    "repo settings unprotect-tag <owner/name> <glob>",
+		Examples: []string{"repo settings unprotect-tag krz/gitbay 'v*'"},
+		Run:      runUnprotectTag})
 	register(Command{Path: []string{"repo", "settings", "description"},
-		Summary: "set the repository description",
-		Usage:   "repo settings description <owner/name> <text> ('' clears)", Run: runSetDescription})
+		Summary:  "set the repository description",
+		Usage:    "repo settings description <owner/name> <text> ('' clears)",
+		Examples: []string{`repo settings description krz/gitbay "a CLI-first git forge"`},
+		Run:      runSetDescription})
 	register(Command{Path: []string{"repo", "settings", "visibility"},
-		Summary: "set repository visibility",
-		Usage:   "repo settings visibility <owner/name> public|private", Run: runSetVisibility})
+		Summary:  "set repository visibility",
+		Usage:    "repo settings visibility <owner/name> public|private",
+		Examples: []string{"repo settings visibility krz/gitbay public"},
+		Run:      runSetVisibility})
 	register(Command{Path: []string{"repo", "settings", "website"},
-		Summary: "set the repository website",
-		Usage:   "repo settings website <owner/name> <url> ('' clears)", Run: runSetWebsite})
+		Summary:  "set the repository website",
+		Usage:    "repo settings website <owner/name> <url> ('' clears)",
+		Examples: []string{"repo settings website krz/gitbay https://gitbay.org"},
+		Run:      runSetWebsite})
 	register(Command{Path: []string{"repo", "settings", "default-branch"},
-		Summary: "set the default branch",
-		Usage:   "repo settings default-branch <owner/name> <branch>", Run: runSetDefaultBranch})
+		Summary:  "set the default branch",
+		Usage:    "repo settings default-branch <owner/name> <branch>",
+		Examples: []string{"repo settings default-branch krz/gitbay main"},
+		Run:      runSetDefaultBranch})
 	register(Command{Path: []string{"repo", "settings", "git-daemon"},
-		Summary: "expose over git://",
-		Usage:   "repo settings git-daemon <owner/name> on|off", Run: runGitDaemon})
+		Summary:  "expose over git://",
+		Usage:    "repo settings git-daemon <owner/name> on|off",
+		Examples: []string{"repo settings git-daemon krz/gitbay on"},
+		Run:      runGitDaemon})
 	register(Command{Path: []string{"repo", "archive"},
-		Summary: "archive a repository (read-only: pushes and issue/MR writes refused)",
-		Usage:   "repo archive <owner/name>", Run: runArchive})
+		Summary:  "archive a repository (read-only: pushes and issue/MR writes refused)",
+		Usage:    "repo archive <owner/name>",
+		Examples: []string{"repo archive krz/gitbay"},
+		Run:      runArchive})
 	register(Command{Path: []string{"repo", "unarchive"},
-		Summary: "unarchive a repository",
-		Usage:   "repo unarchive <owner/name>", Run: runUnarchive})
+		Summary:  "unarchive a repository",
+		Usage:    "repo unarchive <owner/name>",
+		Examples: []string{"repo unarchive krz/gitbay"},
+		Run:      runUnarchive})
 	register(Command{Path: []string{"repo", "topics"},
-		Summary: "list topics",
-		Usage:   "repo topics <owner/name>", ReadOnly: true, Run: runTopicsList})
+		Summary:  "list topics",
+		Usage:    "repo topics <owner/name>",
+		Examples: []string{"repo topics krz/gitbay"},
+		ReadOnly: true, Run: runTopicsList})
 	register(Command{Path: []string{"repo", "topics", "add"},
-		Summary: "add topics",
-		Usage:   "repo topics add <owner/name> <topic>...", Run: runTopicsAdd})
+		Summary:  "add topics",
+		Usage:    "repo topics add <owner/name> <topic>...",
+		Examples: []string{"repo topics add krz/gitbay git forge cli"},
+		Run:      runTopicsAdd})
 	register(Command{Path: []string{"repo", "topics", "remove"},
-		Summary: "remove topics",
-		Usage:   "repo topics remove <owner/name> <topic>...", Run: runTopicsRemove})
+		Summary:  "remove topics",
+		Usage:    "repo topics remove <owner/name> <topic>...",
+		Examples: []string{"repo topics remove krz/gitbay cli"},
+		Run:      runTopicsRemove})
 	register(Command{Path: []string{"repo", "search"},
-		Summary: "find repositories by name, description, or topic",
-		Usage:   "repo search <query>", ReadOnly: true, Run: runRepoSearch})
+		Summary:  "find repositories by name, description, or topic",
+		Usage:    "repo search <query>",
+		Examples: []string{"repo search forge"},
+		ReadOnly: true, Run: runRepoSearch})
 	register(Command{Path: []string{"repo", "grep"},
 		Summary: "search file contents",
-		Usage:   "repo grep <owner/name> <query> [--ref <ref>]", ReadOnly: true, Run: runRepoGrep})
+		Usage:   "repo grep <owner/name> <query> [--ref <ref>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "branch, tag or commit to search", "the default branch"},
+		},
+		Examples: []string{"repo grep krz/gitbay TODO"},
+		ReadOnly: true, Run: runRepoGrep})
 	register(Command{Path: []string{"repo", "diff"},
-		Summary: "the patch between two refs, from their merge base",
-		Usage:   "repo diff <owner/name> <base> <head>", ReadOnly: true, Run: runRepoDiff})
+		Summary:  "the patch between two refs, from their merge base",
+		Usage:    "repo diff <owner/name> <base> <head>",
+		Examples: []string{"repo diff krz/gitbay main cli-output-help"},
+		ReadOnly: true, Run: runRepoDiff})
 	register(Command{Path: []string{"repo", "pin"},
-		Summary: "pin a repository to your dashboard",
-		Usage:   "repo pin <owner/name>", Run: runRepoPin})
+		Summary:  "pin a repository to your dashboard",
+		Usage:    "repo pin <owner/name>",
+		Examples: []string{"repo pin krz/gitbay"},
+		Run:      runRepoPin})
 	register(Command{Path: []string{"repo", "unpin"},
-		Summary: "unpin a repository",
-		Usage:   "repo unpin <owner/name>", Run: runRepoUnpin})
+		Summary:  "unpin a repository",
+		Usage:    "repo unpin <owner/name>",
+		Examples: []string{"repo unpin krz/gitbay"},
+		Run:      runRepoUnpin})
 	register(Command{Path: []string{"repo", "bookmark"},
-		Summary: "bookmark a repository to come back to",
-		Usage:   "repo bookmark <owner/name>", Run: runRepoBookmark})
+		Summary:  "bookmark a repository to come back to",
+		Usage:    "repo bookmark <owner/name>",
+		Examples: []string{"repo bookmark krz/gitbay"},
+		Run:      runRepoBookmark})
 	register(Command{Path: []string{"repo", "unbookmark"},
-		Summary: "remove a bookmark",
-		Usage:   "repo unbookmark <owner/name>", Run: runRepoUnbookmark})
+		Summary:  "remove a bookmark",
+		Usage:    "repo unbookmark <owner/name>",
+		Examples: []string{"repo unbookmark krz/gitbay"},
+		Run:      runRepoUnbookmark})
 	register(Command{Path: []string{"repo", "bookmarks"},
-		Summary: "list the repositories you have bookmarked",
-		Usage:   "repo bookmarks", ReadOnly: true, Run: runRepoBookmarks})
+		Summary:  "list the repositories you have bookmarked",
+		Usage:    "repo bookmarks",
+		Examples: []string{"repo bookmarks"},
+		ReadOnly: true, Run: runRepoBookmarks})
 }
 
 const (

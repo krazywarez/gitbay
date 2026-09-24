@@ -12,8 +12,15 @@ import (
 
 func init() {
 	register(Command{Path: []string{"search"},
-		Summary:  "find repositories, issues and merge requests across the instance",
-		Usage:    "search <query> [--kind repo|issue|mr]",
+		Summary: "find repositories, issues and merge requests across the instance",
+		Usage:   "search <query> [--kind repo|issue|mr]",
+		Flags: []Flag{
+			{"--kind", "repo|issue|mr", "only this kind of result, may repeat", ""},
+		},
+		Examples: []string{
+			"search auth bug",
+			"search auth bug --kind issue",
+		},
 		ReadOnly: true, Run: runSearch})
 }
 

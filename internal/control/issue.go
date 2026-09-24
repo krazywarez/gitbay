@@ -16,35 +16,97 @@ const maxBodyBytes = 64 << 10
 
 func init() {
 	register(Command{Path: []string{"issue", "create"},
-		Summary:    "open an issue",
-		Usage:      "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
+		Summary: "open an issue",
+		Usage:   "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--title", "<t>", "the issue's title", ""},
+			{"--body", "<b>", "the issue's body", ""},
+			{"--file", "-", "read the body from stdin", ""},
+			{"--format", "md|org", "the body's markup", "md"},
+		},
+		Examples: []string{
+			`issue create krz/gitbay --title "crash on empty repo" --body "steps to reproduce..."`,
+			"issue create krz/gitbay --title notes --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
 		Summary: "list issues",
-		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runIssueList})
+		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]",
+		Flags: []Flag{
+			{"--state", "open|closed|all", "which issues", "open"},
+			{"--label", "<l>", "only issues carrying this label", ""},
+			{"--assignee", "<user>", "only issues assigned to this user", ""},
+			{"--author", "<user>", "only issues opened by this user", ""},
+			{"--milestone", "<title>|none", "only issues in this milestone, or in none", ""},
+			{"--search", "<text>", "match title and body", ""},
+			{"--limit", "<n>", "rows per page", ""},
+			{"--cursor", "<c>", "continue from the previous page", ""},
+		},
+		Examples: []string{
+			"issue list krz/gitbay --label bug --state all",
+			"issue list krz/gitbay --assignee cmc",
+		},
+		ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
-		Summary: "show an issue with comments",
-		Usage:   "issue show <owner/name> <n>", ReadOnly: true, Run: runIssueShow})
+		Summary:  "show an issue with comments",
+		Usage:    "issue show <owner/name> <n>",
+		Examples: []string{"issue show krz/gitbay 42"},
+		ReadOnly: true, Run: runIssueShow})
 	register(Command{Path: []string{"issue", "edit"},
-		Summary:    "edit title or body",
-		Usage:      "issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
+		Summary: "edit title or body",
+		Usage:   "issue edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--title", "<t>", "the issue's new title", ""},
+			{"--body", "<b>", "the issue's new body", ""},
+			{"--file", "-", "read the new body from stdin", ""},
+			{"--format", "md|org", "the body's markup", ""},
+		},
+		Examples: []string{
+			`issue edit krz/gitbay 42 --title "crash on empty repo, take two"`,
+			"issue edit krz/gitbay 42 --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
-		Summary:    "comment",
-		Usage:      "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Summary: "comment",
+		Usage:   "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
+		Flags: []Flag{
+			{"--message", "<m>", "the comment's text", ""},
+			{"--file", "-", "read the comment from stdin", ""},
+			{"--format", "md|org", "the comment's markup", "md"},
+		},
+		Examples: []string{
+			`issue comment krz/gitbay 42 --message "can't reproduce on main"`,
+			"issue comment krz/gitbay 42 --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runIssueComment})
 	register(Command{Path: []string{"issue", "close"},
-		Summary: "close an issue",
-		Usage:   "issue close <owner/name> <n>", Run: runIssueClose})
+		Summary:  "close an issue",
+		Usage:    "issue close <owner/name> <n>",
+		Examples: []string{"issue close krz/gitbay 42"},
+		Run:      runIssueClose})
 	register(Command{Path: []string{"issue", "reopen"},
-		Summary: "reopen an issue",
-		Usage:   "issue reopen <owner/name> <n>", Run: runIssueReopen})
+		Summary:  "reopen an issue",
+		Usage:    "issue reopen <owner/name> <n>",
+		Examples: []string{"issue reopen krz/gitbay 42"},
+		Run:      runIssueReopen})
 	register(Command{Path: []string{"issue", "label"},
 		Summary: "labels",
-		Usage:   "issue label <owner/name> <n> [--add <l>]... [--remove <l>]...", Run: runIssueLabel})
+		Usage:   "issue label <owner/name> <n> [--add <l>]... [--remove <l>]...",
+		Flags: []Flag{
+			{"--add", "<l>", "label to add, may repeat", ""},
+			{"--remove", "<l>", "label to remove, may repeat", ""},
+		},
+		Examples: []string{"issue label krz/gitbay 42 --add bug --remove needs-triage"},
+		Run:      runIssueLabel})
 	register(Command{Path: []string{"issue", "assign"},
 		Summary: "assignees",
-		Usage:   "issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...", Run: runIssueAssign})
+		Usage:   "issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...",
+		Flags: []Flag{
+			{"--add", "<user>", "user to assign, may repeat", ""},
+			{"--remove", "<user>", "user to unassign, may repeat", ""},
+		},
+		Examples: []string{"issue assign krz/gitbay 42 --add cmc"},
+		Run:      runIssueAssign})
 }
 
 // issueArgs parses "<owner/name> <n>" plus flags handled by the caller.

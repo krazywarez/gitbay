@@ -29,10 +29,18 @@ func init() {
 	register(Command{Path: []string{"repo", "commit"},
 		Summary:  "show one commit with its patch",
 		Usage:    "repo commit <owner/name> <sha>",
+		Examples: []string{"repo commit krz/gitbay a1b2c3d"},
 		ReadOnly: true, Run: runRepoCommit})
 	register(Command{Path: []string{"repo", "log"},
 		Summary: "commit log with signature states",
-		Usage:   "repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]", ReadOnly: true, Run: runRepoLog})
+		Usage:   "repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]",
+		Flags: []Flag{
+			{"--ref", "<r>", "branch, tag or commit to start from", "the default branch"},
+			{"--limit", "n", "rows to show", "30"},
+			{"--path", "<file>", "only commits touching this path", ""},
+		},
+		Examples: []string{"repo log krz/gitbay --limit 10"},
+		ReadOnly: true, Run: runRepoLog})
 }
 
 func runPGPAdd(c *Ctx, args []string) int {

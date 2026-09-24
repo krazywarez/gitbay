@@ -68,6 +68,14 @@ func (c *Ctx) usageWith(msg string) int {
 	return c.fail(protocol.ExitUsage, "%s\nusage: %s", msg, c.Cmd.Usage)
 }
 
+// Flag is one flag in a command's help.
+type Flag struct {
+	Name    string // "--state"
+	Arg     string // "open|closed|all"; empty for a switch
+	Desc    string // what it does, lower case, no full stop
+	Default string // empty for none
+}
+
 type Command struct {
 	Path []string // e.g. ["keys", "add"]
 	// Summary is one line of prose: what the command does, no argument
@@ -75,6 +83,8 @@ type Command struct {
 	// help renders them separately, so neither may carry the other's job.
 	Summary    string
 	Usage      string
+	Flags      []Flag
+	Examples   []string // full argv after the program, repository named
 	ReadsStdin bool
 	ReadOnly   bool // safe for read-scoped API tokens
 	Run        func(c *Ctx, args []string) int

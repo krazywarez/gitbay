@@ -16,18 +16,37 @@ import (
 
 func init() {
 	register(Command{Path: []string{"mr", "diff-comment"},
-		Summary:    "comment on a diff line",
-		Usage:      "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]",
+		Summary: "comment on a diff line",
+		Usage:   "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]",
+		Flags: []Flag{
+			{"--path", "<file>", "the file the comment is on", ""},
+			{"--line", "<l>", "the line the comment is on", ""},
+			{"--old", "", "the line is on the old side of the diff", ""},
+			{"--pending", "", "hold the comment for `mr review --comment`", ""},
+			{"--reply", "<id>", "reply to this thread instead of opening one", ""},
+			{"--message", "<m>", "the comment's text", ""},
+			{"--file", "-", "read the comment from stdin", ""},
+		},
+		Examples: []string{
+			`mr diff-comment krz/gitbay 431 --path internal/control/build.go --line 42 --message "why is this a switch"`,
+			"mr diff-comment krz/gitbay 431 --reply 12 --file - '< notes.md'",
+		},
 		ReadsStdin: true, Run: runDiffComment})
 	register(Command{Path: []string{"mr", "threads"},
-		Summary: "review threads on an MR",
-		Usage:   "mr threads <owner/name> <n>", ReadOnly: true, Run: runMRThreads})
+		Summary:  "review threads on an MR",
+		Usage:    "mr threads <owner/name> <n>",
+		Examples: []string{"mr threads krz/gitbay 431"},
+		ReadOnly: true, Run: runMRThreads})
 	register(Command{Path: []string{"mr", "resolve"},
-		Summary: "resolve a review thread",
-		Usage:   "mr resolve <owner/name> <n> <thread-id>", Run: runMRResolve})
+		Summary:  "resolve a review thread",
+		Usage:    "mr resolve <owner/name> <n> <thread-id>",
+		Examples: []string{"mr resolve krz/gitbay 431 12"},
+		Run:      runMRResolve})
 	register(Command{Path: []string{"mr", "unresolve"},
-		Summary: "reopen a review thread",
-		Usage:   "mr unresolve <owner/name> <n> <thread-id>", Run: runMRUnresolve})
+		Summary:  "reopen a review thread",
+		Usage:    "mr unresolve <owner/name> <n> <thread-id>",
+		Examples: []string{"mr unresolve krz/gitbay 431 12"},
+		Run:      runMRUnresolve})
 }
 
 func runDiffComment(c *Ctx, args []string) int {

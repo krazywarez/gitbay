@@ -13,25 +13,49 @@ import (
 func init() {
 	register(Command{Path: []string{"org", "label", "set"},
 		Summary: "create an org label every org repository sees, or set its colour; folds in same-named repo labels",
-		Usage:   "org label set <org> <label> [--color rrggbb|'']", Run: runOrgLabelSet})
+		Usage:   "org label set <org> <label> [--color rrggbb|'']",
+		Flags: []Flag{
+			{"--color", "rrggbb|''", "the label's colour, or '' to clear it", ""},
+		},
+		Examples: []string{"org label set krz bug --color d73a4a"},
+		Run:      runOrgLabelSet})
 	register(Command{Path: []string{"org", "label", "list"},
-		Summary: "list an org's labels with use across the repositories you can read",
-		Usage:   "org label list <org>", ReadOnly: true, Run: runOrgLabelList})
+		Summary:  "list an org's labels with use across the repositories you can read",
+		Usage:    "org label list <org>",
+		Examples: []string{"org label list krz"},
+		ReadOnly: true, Run: runOrgLabelList})
 	register(Command{Path: []string{"org", "label", "remove"},
-		Summary: "remove an org label from the org and from every issue under it",
-		Usage:   "org label remove <org> <label>", Run: runOrgLabelRemove})
+		Summary:  "remove an org label from the org and from every issue under it",
+		Usage:    "org label remove <org> <label>",
+		Examples: []string{"org label remove krz wontfix"},
+		Run:      runOrgLabelRemove})
 	register(Command{Path: []string{"org", "milestone", "create"},
 		Summary: "create an org milestone spanning every org repository; folds in same-titled repo milestones",
-		Usage:   "org milestone create <org> <title> [--description <d>] [--due YYYY-MM-DD]", Run: runOrgMilestoneCreate})
+		Usage:   "org milestone create <org> <title> [--description <d>] [--due YYYY-MM-DD]",
+		Flags: []Flag{
+			{"--description", "<d>", "what the milestone covers", ""},
+			{"--due", "YYYY-MM-DD", "target date", ""},
+		},
+		Examples: []string{"org milestone create krz mobile --due 2026-12-01"},
+		Run:      runOrgMilestoneCreate})
 	register(Command{Path: []string{"org", "milestone", "list"},
 		Summary: "list an org's milestones with progress across the repositories you can read",
-		Usage:   "org milestone list <org> [--state open|closed|all]", ReadOnly: true, Run: runOrgMilestoneList})
+		Usage:   "org milestone list <org> [--state open|closed|all]",
+		Flags: []Flag{
+			{"--state", "open|closed|all", "which milestones", "open"},
+		},
+		Examples: []string{"org milestone list krz --state all"},
+		ReadOnly: true, Run: runOrgMilestoneList})
 	register(Command{Path: []string{"org", "milestone", "close"},
-		Summary: "close an org milestone",
-		Usage:   "org milestone close <org> <title>", Run: runOrgMilestoneClose})
+		Summary:  "close an org milestone",
+		Usage:    "org milestone close <org> <title>",
+		Examples: []string{"org milestone close krz mobile"},
+		Run:      runOrgMilestoneClose})
 	register(Command{Path: []string{"org", "milestone", "reopen"},
-		Summary: "reopen an org milestone",
-		Usage:   "org milestone reopen <org> <title>", Run: runOrgMilestoneReopen})
+		Summary:  "reopen an org milestone",
+		Usage:    "org milestone reopen <org> <title>",
+		Examples: []string{"org milestone reopen krz mobile"},
+		Run:      runOrgMilestoneReopen})
 }
 
 // orgReader resolves an org for a read of its labels or milestones.

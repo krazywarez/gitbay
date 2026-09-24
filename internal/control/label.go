@@ -14,14 +14,23 @@ import (
 
 func init() {
 	register(Command{Path: []string{"label", "list"},
-		Summary: "list a repository's labels with colour and use",
-		Usage:   "label list <owner/name>", ReadOnly: true, Run: runLabelList})
+		Summary:  "list a repository's labels with colour and use",
+		Usage:    "label list <owner/name>",
+		Examples: []string{"label list krz/gitbay"},
+		ReadOnly: true, Run: runLabelList})
 	register(Command{Path: []string{"label", "set"},
 		Summary: "create a label or set its colour",
-		Usage:   "label set <owner/name> <label> [--color rrggbb|'']", Run: runLabelSet})
+		Usage:   "label set <owner/name> <label> [--color rrggbb|'']",
+		Flags: []Flag{
+			{"--color", "rrggbb|''", "the label's colour, or '' to clear it", ""},
+		},
+		Examples: []string{"label set krz/gitbay bug --color d73a4a"},
+		Run:      runLabelSet})
 	register(Command{Path: []string{"label", "remove"},
-		Summary: "remove a label from the repository and from every issue and merge request",
-		Usage:   "label remove <owner/name> <label>", Run: runLabelRemove})
+		Summary:  "remove a label from the repository and from every issue and merge request",
+		Usage:    "label remove <owner/name> <label>",
+		Examples: []string{"label remove krz/gitbay wontfix"},
+		Run:      runLabelRemove})
 }
 
 // A colour is six hex digits, with or without the hash: over bare ssh a

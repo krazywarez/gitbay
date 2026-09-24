@@ -19,31 +19,57 @@ const maxSnippetFiles = 64
 
 func init() {
 	register(Command{Path: []string{"snippet", "create"},
-		Summary:    "create a snippet from one file on stdin",
-		Usage:      "snippet create <filename> [--description <d>] [--visibility public|unlisted|private] < file",
+		Summary: "create a snippet from one file on stdin",
+		Usage:   "snippet create <filename> [--description <d>] [--visibility public|unlisted|private] < file",
+		Flags: []Flag{
+			{"--description", "<d>", "one line about the snippet", ""},
+			{"--visibility", "public|unlisted|private", "who can find it", "unlisted"},
+		},
+		Examples:   []string{"snippet create notes.md --visibility private '< notes.md'"},
 		ReadsStdin: true, Run: runSnippetCreate})
 	register(Command{Path: []string{"snippet", "show"},
-		Summary: "show a snippet's metadata and files",
-		Usage:   "snippet show <id>", ReadOnly: true, Run: runSnippetShow})
+		Summary:  "show a snippet's metadata and files",
+		Usage:    "snippet show <id>",
+		Examples: []string{"snippet show a1b2c3"},
+		ReadOnly: true, Run: runSnippetShow})
 	register(Command{Path: []string{"snippet", "list"},
 		Summary: "list your snippets, or an owner's public ones",
-		Usage:   "snippet list [<owner>] [--limit n] [--cursor c]", ReadOnly: true, Run: runSnippetList})
+		Usage:   "snippet list [<owner>] [--limit n] [--cursor c]",
+		Flags: []Flag{
+			{"--limit", "n", "rows per page", ""},
+			{"--cursor", "c", "continue from the previous page", ""},
+		},
+		Examples: []string{"snippet list cmc"},
+		ReadOnly: true, Run: runSnippetList})
 	register(Command{Path: []string{"snippet", "edit"},
 		Summary: "change a snippet's description or visibility",
-		Usage:   "snippet edit <id> [--description <d>] [--visibility public|unlisted|private]", Run: runSnippetEdit})
+		Usage:   "snippet edit <id> [--description <d>] [--visibility public|unlisted|private]",
+		Flags: []Flag{
+			{"--description", "<d>", "one line about the snippet", ""},
+			{"--visibility", "public|unlisted|private", "who can find it", ""},
+		},
+		Examples: []string{"snippet edit a1b2c3 --visibility public"},
+		Run:      runSnippetEdit})
 	register(Command{Path: []string{"snippet", "delete"},
-		Summary: "delete a snippet and its files",
-		Usage:   "snippet delete <id>", Run: runSnippetDelete})
+		Summary:  "delete a snippet and its files",
+		Usage:    "snippet delete <id>",
+		Examples: []string{"snippet delete a1b2c3"},
+		Run:      runSnippetDelete})
 	register(Command{Path: []string{"snippet", "file", "set"},
 		Summary:    "add a file to a snippet, or replace one, from stdin",
 		Usage:      "snippet file set <id> <filename> < file",
+		Examples:   []string{"snippet file set a1b2c3 notes.md '< notes.md'"},
 		ReadsStdin: true, Run: runSnippetFileSet})
 	register(Command{Path: []string{"snippet", "file", "get"},
-		Summary: "write a snippet file to stdout",
-		Usage:   "snippet file get <id> <filename> > file", ReadOnly: true, Run: runSnippetFileGet})
+		Summary:  "write a snippet file to stdout",
+		Usage:    "snippet file get <id> <filename> > file",
+		Examples: []string{"snippet file get a1b2c3 notes.md '> notes.md'"},
+		ReadOnly: true, Run: runSnippetFileGet})
 	register(Command{Path: []string{"snippet", "file", "remove"},
-		Summary: "remove a file from a snippet",
-		Usage:   "snippet file remove <id> <filename>", Run: runSnippetFileRemove})
+		Summary:  "remove a file from a snippet",
+		Usage:    "snippet file remove <id> <filename>",
+		Examples: []string{"snippet file remove a1b2c3 notes.md"},
+		Run:      runSnippetFileRemove})
 }
 
 type SnippetFileOut struct {
