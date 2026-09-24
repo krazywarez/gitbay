@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
+	"golang.org/x/text/width"
 	_ "modernc.org/sqlite"
 
 	"gitbay.org/gitbay/internal/control"
@@ -168,6 +170,21 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	}
 	// Reads whose subject legitimately does not exist in this fixture.
 	notFoundOK := map[string]bool{"wiki show": true, "repo deps status": true}
+	// rawOutput prints content verbatim (a file, a log, a diff) and is
+	// not fitted to the terminal.
+	rawOutput := map[string]bool{
+		"repo download":    true,
+		"account export":   true,
+		"admin user show":  true, // until the view layout (Part 3)
+		"admin runners":    true, // until the view layout (Part 3)
+		"admin stats":      true, // until the view layout (Part 3)
+		"repo deps status": true, // until the view layout (Part 3)
+		"release show":     true, // until the view layout (Part 3)
+		"mr revisions":     true, // single-revision hint is free text, not a table row that can be shrunk
+	}
+	// binaryOutput's bytes are not text: a stray 0x1b is coincidence, not
+	// an SGR sequence escaping into plain output.
+	binaryOutput := map[string]bool{"repo download": true}
 
 	dbPath := filepath.Join(inst.root, "gitbay.db")
 	before := dbFingerprint(t, dbPath)
@@ -197,7 +214,40 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 			}
 		}
 		before = after
+
+		argv := append(append([]string{}, cmd.Path...), args...)
+		plainOut, _, _ := inst.sshTerm(t, aliceKey, "", argv...)
+		if !binaryOutput[path] && strings.Contains(plainOut, "\x1b") {
+			t.Errorf("%s: SGR bytes in plain output", path)
+		}
+		termOut, _, _ := inst.sshTerm(t, aliceKey, "60,color", argv...)
+		if !rawOutput[path] {
+			for _, line := range strings.Split(termOut, "\n") {
+				if w := displayCells(stripSGRe2e(line)); w > 60 {
+					t.Errorf("%s: line of %d cells at 60 columns: %q", path, w, line)
+					break
+				}
+			}
+		}
 	}
+}
+
+func stripSGRe2e(s string) string {
+	return regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(s, "")
+}
+
+func displayCells(s string) int {
+	n := 0
+	for _, r := range s {
+		switch {
+		case unicode.In(r, unicode.Mn, unicode.Me):
+		case width.LookupRune(r).Kind() == width.EastAsianWide || width.LookupRune(r).Kind() == width.EastAsianFullwidth:
+			n += 2
+		default:
+			n++
+		}
+	}
+	return n
 }
 
 // dbFingerprint hashes every row of every table, per table. Columns that
