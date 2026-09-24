@@ -28,7 +28,7 @@ func init() {
 		ReadsStdin: true, Run: runReleaseEdit})
 	register(Command{Path: []string{"release", "list"},
 		Summary: "list releases",
-		Usage:   "release list <owner/name>", ReadOnly: true, Run: runReleaseList})
+		Usage:   "release list <owner/name> [--limit <n>] [--cursor <c>]", ReadOnly: true, Run: runReleaseList})
 	register(Command{Path: []string{"release", "show"},
 		Summary: "show a release with assets",
 		Usage:   "release show <owner/name> <tag>", ReadOnly: true, Run: runReleaseShow})
@@ -197,24 +197,33 @@ func runReleaseEdit(c *Ctx, args []string) int {
 }
 
 func runReleaseList(c *Ctx, args []string) int {
-	if len(args) != 1 {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanRead)
+	rest, p, code := parsePageFlags(c, args, "release", true)
 	if code >= 0 {
 		return code
 	}
-	rels, err := c.Store.ListReleases(repo.ID)
+	if len(rest) != 1 {
+		return c.usage()
+	}
+	repo, code := resolveRepo(c, rest[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	rels, err := c.Store.ListReleasesPage(repo.ID, p.queryLimit(), p.keyInt())
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	rels, next := trimPage(p, rels, "release", func(r store.Release) string { return strconv.FormatInt(r.ID, 10) })
 	var ds []releaseOut
 	for _, r := range rels {
 		ds = append(ds, releaseToOut(r, false))
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitPage(p, ds, next, func(w io.Writer) {
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%d asset(s)\n", d.Tag, d.Title, len(d.Assets))
+			title := d.Title
+			if title == d.Tag {
+				title = ""
+			}
+			fmt.Fprintf(w, "%s\t%s\t%d asset(s)\n", d.Tag, title, len(d.Assets))
 		}
 	})
 }

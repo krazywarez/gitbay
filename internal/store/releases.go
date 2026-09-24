@@ -90,7 +90,24 @@ func (s *Store) ReleaseByTag(repoID int64, tag string) (Release, error) {
 
 // ListReleases returns releases newest-first, assets included.
 func (s *Store) ListReleases(repoID int64) ([]Release, error) {
-	rows, err := s.DB.Query(releaseSelect+" WHERE r.repo_id = ? ORDER BY r.created_at DESC", repoID)
+	return s.ListReleasesPage(repoID, 0, 0)
+}
+
+// ListReleasesPage lists newest first. limit 0 is every row; afterID is
+// the last release of the previous page, 0 for the first.
+func (s *Store) ListReleasesPage(repoID int64, limit int, afterID int64) ([]Release, error) {
+	q := releaseSelect + " WHERE r.repo_id = ?"
+	args := []any{repoID}
+	if afterID > 0 {
+		q += " AND (r.created_at, r.id) < (SELECT created_at, id FROM releases WHERE id = ?)"
+		args = append(args, afterID)
+	}
+	q += " ORDER BY r.created_at DESC, r.id DESC"
+	if limit > 0 {
+		q += " LIMIT ?"
+		args = append(args, limit)
+	}
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
