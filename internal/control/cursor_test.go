@@ -9,6 +9,26 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
+func TestShellWord(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"plain", "plain"},
+		{"foo-bar", "foo-bar"},
+		{"123", "123"},
+		{"foo bar", "'foo bar'"},
+		{"it's", "'it'\\''s'"},
+		{"a'b'c", "'a'\\''b'\\''c'"},
+		{"", "''"},
+	}
+	for _, tt := range tests {
+		if got := shellWord(tt.input); got != tt.want {
+			t.Errorf("shellWord(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestCursorRoundTrip(t *testing.T) {
 	cur := encodeCursor("issue", "42")
 	key, err := decodeCursor("issue", cur)
@@ -60,8 +80,13 @@ func TestEmitPageHintsTheNextPageAtATerminal(t *testing.T) {
 	if strings.Contains(c.Stdout.(*bytes.Buffer).String(), "next\t") {
 		t.Errorf("cursor row on stdout at a terminal")
 	}
+	stderr := errOut.String()
 	want := "more: gitbay build list " + repo.Path() + " --limit 2 --cursor "
-	if !strings.Contains(errOut.String(), want) {
-		t.Errorf("stderr = %q, want %q…", errOut.String(), want)
+	if !strings.Contains(stderr, want) {
+		t.Errorf("stderr = %q, want %q…", stderr, want)
+	}
+	// Ensure no double space in the output.
+	if strings.Contains(stderr, "  ") {
+		t.Errorf("stderr contains double space: %q", stderr)
 	}
 }

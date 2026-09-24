@@ -6,11 +6,25 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/protocol"
 )
+
+// bareWord matches arguments that need no quoting for the server-side
+// POSIX tokenizer.
+var bareWord = regexp.MustCompile(`^[A-Za-z0-9@%+=:,./_!-]+$`)
+
+// shellWord quotes one argument the way the gitbay CLI does, so a
+// printed command can be pasted.
+func shellWord(arg string) string {
+	if arg != "" && bareWord.MatchString(arg) {
+		return arg
+	}
+	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+}
 
 // Cursor pagination. A cursor is opaque to clients: base64url of
 // "<kind>:<key>", where key is the sort key of the last row of the
@@ -135,6 +149,11 @@ func (c *Ctx) emitPage(p page, items any, next string, plain func(w io.Writer)) 
 			}
 			again = append(again, c.Argv[i])
 		}
-		fmt.Fprintf(c.Stderr, "more: gitbay %s %s --cursor %s\n", joinPath(c.Cmd.Path), strings.Join(again, " "), next)
+		cmd := []string{"gitbay", joinPath(c.Cmd.Path)}
+		for _, a := range again {
+			cmd = append(cmd, shellWord(a))
+		}
+		cmd = append(cmd, "--cursor", next)
+		fmt.Fprintf(c.Stderr, "more: %s\n", strings.Join(cmd, " "))
 	})
 }
