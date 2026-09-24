@@ -25,7 +25,7 @@ func TestHelpVerb(t *testing.T) {
 	out := helpOut(t, Term{Cols: 100}, "issue", "list")
 	for _, want := range []string{
 		"list issues\n",
-		"USAGE\n  gitbay issue list [<owner/name>] [flags]\n",
+		"USAGE\n  gitbay issue list <owner/name> [flags]\n",
 		"FLAGS\n",
 		"  --state open|closed|all",
 		"which issues (default open)\n",
@@ -42,6 +42,28 @@ func TestHelpVerb(t *testing.T) {
 	}
 	if !strings.Contains(plain, "USAGE\n  ssh git@forge.test issue list <owner/name> [flags]\n") {
 		t.Errorf("plain usage:\n%s", plain)
+	}
+}
+
+// TestHelpVerbUsageKeepsRequiredFlags covers a usage line with no
+// optional flag to cut at: it prints whole, not truncated to "[flags]"
+// as though --yes were optional.
+func TestHelpVerbUsageKeepsRequiredFlags(t *testing.T) {
+	out := helpOut(t, Term{Cols: 100}, "repo", "delete")
+	if !strings.Contains(out, "USAGE\n  gitbay repo delete <owner/name> --yes\n") {
+		t.Errorf("missing required --yes in usage:\n%s", out)
+	}
+	if strings.Contains(out, "[flags]") {
+		t.Errorf("repo delete has no optional flags; should not print [flags]:\n%s", out)
+	}
+}
+
+// TestHelpVerbUsageKeepsAlternative covers a usage line whose flag is
+// one side of a "|" alternative, not an optional extra.
+func TestHelpVerbUsageKeepsAlternative(t *testing.T) {
+	out := helpOut(t, Term{Cols: 100}, "notifications", "read")
+	if !strings.Contains(out, "USAGE\n  gitbay notifications read <id>... | --all\n") {
+		t.Errorf("missing whole alternative in usage:\n%s", out)
 	}
 }
 

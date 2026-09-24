@@ -146,17 +146,14 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 	fmt.Fprintln(w, cmd.Summary)
 	fmt.Fprintln(w)
 	c.heading(w, "USAGE")
+	// Cutting at the first optional flag drops the rest of the usage
+	// syntax behind "[flags]" — safe only for what is actually optional.
+	// A required flag (repo delete --yes) or an alternative
+	// (notifications read <id>... | --all) has no " [--" to cut at, so
+	// the usage prints whole.
 	shape := cmd.Usage
 	if i := strings.Index(shape, " [--"); i >= 0 {
-		shape = shape[:i]
-	} else if i := strings.Index(shape, " --"); i >= 0 {
-		shape = shape[:i]
-	}
-	if c.Term.Cols > 0 {
-		shape = strings.Replace(shape, "<owner/name>", "[<owner/name>]", 1)
-	}
-	if len(cmd.Flags) > 0 {
-		shape += " [flags]"
+		shape = shape[:i] + " [flags]"
 	}
 	fmt.Fprintf(w, "  %s %s\n", c.program(), shape)
 	fmt.Fprintln(w)
