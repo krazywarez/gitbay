@@ -84,8 +84,9 @@ for _, is := range issues {
 t.flush()
 ```
 
-Cells are typed: `ref`, `state`, `text`, `age`, `num`. The first
-`text` column is the flexible one.
+Cells are typed: `ref`, `state`, `text`, `flex`, `age`, `num`. The
+`flex` column (a title or description, one per table) is the one that
+shrinks first.
 
 Plain (`Term.Cols == 0`): one row per item, cells joined by tabs, no
 header, `age` as RFC3339 to the second in UTC (`2026-09-23T23:26:00Z`).
@@ -238,12 +239,14 @@ resolves through `Lookup` to its own command.
 - `release list` takes `--limit`/`--cursor`; the title column is
   empty when the title equals the tag.
 - `notifications device add` prints `registered device <n>`.
-- `build log --follow` giving up on a queued build prints
-  `build <n> still queued after 10m; run build log again to keep
-  watching` and exits 1, unchanged.
-- Every missing positional goes through `usageWith` (`snippet show`,
-  `org label list`, and any other found by the test below).
 - `dashboard` prints `none` under an empty section.
+
+Two audit findings need no change. `build log --follow` already
+says what to do when it gives up on a queued build
+(`buildfollow.go`). A missing positional through `c.usage()` already
+prints the registered usage and exits 2, which is the rule; converting
+198 call sites to `usageWith` for an extra line is not worth the
+churn.
 - The stale `build list` help goes with the `pass()` short text.
 
 ## Rules
@@ -266,8 +269,6 @@ to the second.
   `\x1b` in stdout; with `GITBAY_TERM=60,color`, asserting no line
   wider than 60 display cells after stripping ANSI, code blocks
   excepted.
-- e2e: a missing positional on every command exits 2 with the
-  registered usage on stderr.
 - CLI: `SetEnv` sent only when stdout is a terminal; `NO_COLOR`,
   `TERM=dumb` and `--no-color` drop `color`; pager selection order.
 
