@@ -1,0 +1,30 @@
+[1mA heading[0m
+
+A paragraph long enough to wrap at sixty columns, with
+[1mstrong[0m and [4memphasis[0m, code, a link
+(https://example.com/page), a forge link
+(https://forge.test/krz/gitbay/issues/1), an autolink
+https://example.com, and struck text.
+
+• one
+• two, which is long enough that its continuation line has
+  to hang under the text rather than the bullet
+  • nested
+
+1. first
+2. second
+
+• [x] done
+• [ ] open
+
+[2m│ [0mquoted text
+
+    [96mfunc[0m[97m [0m[93mmain[0m[97m()[0m[97m [0m[97m{[0m[97m [0m[93mfmt[0m[97m.[0m[93mPrintln[0m[97m([0m[37m"a line longer than sixty columns stays on one line, unwrapped"[0m[97m)[0m[97m [0m[97m}[0m
+
+[image: alt text]
+
+[2m───[0m
+
+    [97m| a | b |[0m
+    [97m|---|---|[0m
+    [97m| 1 | 2 |[0m
