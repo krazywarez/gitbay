@@ -310,7 +310,7 @@ func runReleaseShow(c *Ctx, args []string) int {
 		)
 		v.body(d.Notes, d.NotesFormat)
 		if len(d.Assets) > 0 {
-			io.WriteString(w, "\n")
+			v.section("assets")
 			tb := c.table(w, "NAME", "SIZE", "SHA256")
 			for _, a := range d.Assets {
 				tb.row(cRef(a.Name), cNum(a.Size), cFlex(a.SHA256))

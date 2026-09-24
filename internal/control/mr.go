@@ -790,7 +790,7 @@ func runMRShow(c *Ctx, args []string) int {
 		v.body(d.Body, d.BodyFormat)
 
 		if len(commits) > 1 {
-			io.WriteString(w, "\n")
+			v.section("commit")
 			tb := c.table(w, "SHA", "SUBJECT")
 			for _, cm := range commits {
 				tb.row(cRef(fmt.Sprintf("%.10s", cm.SHA)), cFlex(cm.Subject))

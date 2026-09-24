@@ -333,7 +333,7 @@ func runAdminStats(c *Ctx, args []string) int {
 			"lfs", humanBytes(d.LFSBytes),
 		)
 		if len(d.Repos) > 0 {
-			io.WriteString(w, "\n")
+			v.section("repos")
 			tb := c.table(w, "PATH", "BYTES")
 			for _, r := range d.Repos {
 				tb.row(cRef(r.Path), cText(humanBytes(r.Bytes)))

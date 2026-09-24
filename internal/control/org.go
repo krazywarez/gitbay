@@ -140,7 +140,7 @@ func runOrgShow(c *Ctx, args []string) int {
 		v := c.view(w)
 		v.title(d.Org, "", "")
 		if len(ms) > 0 {
-			io.WriteString(w, "\n")
+			v.section("members")
 			tb := c.table(w, "USER", "ROLE")
 			for _, m := range ms {
 				tb.row(cRef(m.User), cState(m.Role))

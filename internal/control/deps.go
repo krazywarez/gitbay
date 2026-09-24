@@ -122,7 +122,7 @@ func runDepsStatus(c *Ctx, args []string) int {
 			"tracked in", tracked,
 		)
 		if len(out.Behind) > 0 {
-			io.WriteString(w, "\n")
+			v.section("behind")
 			tb := c.table(w, "ECOSYSTEM", "NAME", "CURRENT", "LATEST")
 			for _, b := range out.Behind {
 				tb.row(cText(b.Ecosystem), cRef(b.Name), cText(b.Current), cText(b.Latest))

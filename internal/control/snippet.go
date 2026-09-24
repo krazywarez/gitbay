@@ -231,7 +231,7 @@ func runSnippetShow(c *Ctx, args []string) int {
 			"url", snippetURL(c, sn),
 		)
 		if len(files) > 0 {
-			io.WriteString(w, "\n")
+			v.section("files")
 			tb := c.table(w, "NAME", "SIZE")
 			for _, f := range files {
 				tb.row(cRef(f.Name), cText(fmt.Sprintf("%d bytes", f.Size)))

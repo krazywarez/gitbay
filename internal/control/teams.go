@@ -190,7 +190,7 @@ func runTeamShow(c *Ctx, args []string) int {
 		v.title(org.Name+"/"+team.Name, "", "")
 		v.fields("members", strings.Join(members, ", "))
 		if len(grants) > 0 {
-			io.WriteString(w, "\n")
+			v.section("grants")
 			tb := c.table(w, "REPO", "ROLE")
 			for _, g := range grants {
 				tb.row(cRef(g.RepoPath), cState(g.Role))
