@@ -87,9 +87,11 @@ func runOrgList(c *Ctx, args []string) int {
 		ds = append(ds, out{o.Username, o.Role})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "ORG", "ROLE")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\n", d.Org, d.Role)
+			tb.row(cRef(d.Org), cState(d.Role))
 		}
+		tb.flush()
 	})
 }
 
@@ -122,9 +124,11 @@ func runOrgShow(c *Ctx, args []string) int {
 	}{org.Name, ms}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "%s\n", d.Org)
+		tb := c.table(w, "USER", "ROLE")
 		for _, m := range ms {
-			fmt.Fprintf(w, "  %s\t%s\n", m.User, m.Role)
+			tb.row(cRef("  "+m.User), cState(m.Role))
 		}
+		tb.flush()
 	})
 }
 

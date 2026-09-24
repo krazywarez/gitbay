@@ -62,16 +62,19 @@ func runEmailList(c *Ctx, args []string) int {
 		ds = append(ds, out{e.Address, e.Verified, e.VerifiedBy, e.Primary})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "ADDRESS", "STATE")
 		for _, d := range ds {
 			state := "unverified"
 			if d.Verified {
 				state = "verified"
 			}
+			cells := []cell{cRef(d.Address), cState(state)}
 			if d.Primary {
-				state += "\tprimary"
+				cells = append(cells, cText("primary"))
 			}
-			fmt.Fprintf(w, "%s\t%s\n", d.Address, state)
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 

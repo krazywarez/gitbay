@@ -303,9 +303,11 @@ func runNotificationsDeviceList(c *Ctx, args []string) int {
 			Token: ShortToken(d.Token), Added: d.CreatedAt})
 	}
 	return c.emit(rows, func(w io.Writer) {
+		tb := c.table(w, "ID", "LABEL", "TOKEN", "ADDED")
 		for _, r := range rows {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", r.ID, r.Label, r.Token, r.Added)
+			tb.row(cRef(fmt.Sprintf("%d", r.ID)), cText(r.Label), cText(r.Token), cAge(r.Added))
 		}
+		tb.flush()
 	})
 }
 
@@ -381,14 +383,16 @@ func runNotificationsList(c *Ctx, args []string) int {
 		ds = append(ds, out{n.ID, n.RepoPath, n.Kind, n.Actor, n.Summary, n.Path, n.CreatedAt, n.ReadAt})
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "ID", "WHEN", "REPO", "EVENT", "PATH")
 		for _, d := range ds {
 			mark := "*"
 			if d.ReadAt != "" {
 				mark = " "
 			}
-			fmt.Fprintf(w, "%s %d\t%s\t%s\t%s %s\t%s\n",
-				mark, d.ID, d.CreatedAt, d.Repo, d.Actor, d.Summary, d.Path)
+			tb.row(cRef(fmt.Sprintf("%s %d", mark, d.ID)), cAge(d.CreatedAt), cRef(d.Repo),
+				cFlex(fmt.Sprintf("%s %s", d.Actor, d.Summary)), cText(d.Path))
 		}
+		tb.flush()
 	})
 }
 

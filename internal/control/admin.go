@@ -128,13 +128,15 @@ func runAdminUserList(c *Ctx, args []string) int {
 		ds = append(ds, adminUserRow(u))
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "USERNAME", "STATE", "ADMIN", "CREATED", "LAST SEEN")
 		for _, d := range ds {
 			mark := ""
 			if d.Admin {
 				mark = "admin"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", d.Username, d.State, mark, d.CreatedAt, d.LastSeen)
+			tb.row(cRef(d.Username), cState(d.State), cText(mark), cAge(d.CreatedAt), cAge(d.LastSeen))
 		}
+		tb.flush()
 	})
 }
 
@@ -257,37 +259,47 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		}
 		fmt.Fprintf(w, "repos\t%d\nweb sessions\t%d\n", d.Repos, d.WebSessions)
 		fmt.Fprintln(w, "keys:")
+		tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
 		for _, k := range d.Keys {
-			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n", k.Fingerprint, k.Algo, k.Scope, k.LastUsedAt)
+			tk.row(cRef("  "+k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
 		}
+		tk.flush()
 		fmt.Fprintln(w, "emails:")
+		te := c.table(w, "ADDRESS", "STATE")
 		for _, e := range d.Emails {
 			state := "unverified"
 			if e.Verified {
 				state = "verified by " + e.VerifiedBy
 			}
-			mark := ""
+			cells := []cell{cRef("  " + e.Address), cState(state)}
 			if e.Primary {
-				mark = "\tprimary"
+				cells = append(cells, cText("primary"))
 			}
-			fmt.Fprintf(w, "  %s\t%s%s\n", e.Address, state, mark)
+			te.row(cells...)
 		}
+		te.flush()
 		fmt.Fprintln(w, "pgp keys:")
+		tp := c.table(w, "FINGERPRINT")
 		for _, k := range d.PGPKeys {
-			fmt.Fprintf(w, "  %s\n", k.Fingerprint)
+			tp.row(cRef("  " + k.Fingerprint))
 		}
+		tp.flush()
 		fmt.Fprintln(w, "orgs:")
+		to := c.table(w, "ORG", "ROLE")
 		for _, o := range d.Orgs {
-			fmt.Fprintf(w, "  %s\t%s\n", o.Org, o.Role)
+			to.row(cRef("  "+o.Org), cState(o.Role))
 		}
+		to.flush()
 		fmt.Fprintln(w, "api tokens:")
+		tt := c.table(w, "NAME", "SCOPE", "LAST USED")
 		for _, t := range d.APITokens {
 			used := ""
 			if t.LastUsedAt != nil {
-				used = t.LastUsedAt.UTC().Format(time.RFC3339)
+				used = t.LastUsedAt.UTC().Format(time.RFC3339Nano)
 			}
-			fmt.Fprintf(w, "  %s\t%s\t%s\n", t.Name, t.Scope, strings.TrimSpace(used))
+			tt.row(cRef("  "+t.Name), cState(t.Scope), cAge(used))
 		}
+		tt.flush()
 	})
 }
 
@@ -382,13 +394,15 @@ func runAdminRepoList(c *Ctx, args []string) int {
 		ds = append(ds, out{r.Path, r.Visibility, r.Archived, r.CreatedAt, r.LastPush, size})
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "PATH", "VISIBILITY", "BYTES", "CREATED", "LAST PUSH")
 		for _, d := range ds {
-			mark := ""
+			cells := []cell{cRef(d.Path), cState(d.Visibility), cNum(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
 			if d.Archived {
-				mark = "\t[archived]"
+				cells = append(cells, cText("[archived]"))
 			}
-			fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s%s\n", d.Path, d.Visibility, d.Bytes, d.CreatedAt, d.LastPush, mark)
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 
@@ -517,6 +531,7 @@ func runAdminRunners(c *Ctx, args []string) int {
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "queue: %d pending; last 24h: %d claimed, wait avg %ds max %ds, %d reaped\n",
 			queue.Pending, queue.Claimed24h, queue.ClaimWaitAvgS, queue.ClaimWaitMaxS, queue.Reaped24h)
+		tb := c.table(w, "USER", "FINGERPRINT", "LAST SEEN", "SCOPE", "HELD")
 		for _, r := range runners {
 			scope := r.Scope
 			if scope == "" {
@@ -526,8 +541,9 @@ func runAdminRunners(c *Ctx, args []string) int {
 			if r.BuildNumber != 0 {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Username, r.Fingerprint, r.LastSeen, scope, held)
+			tb.row(cText(r.Username), cRef(r.Fingerprint), cAge(r.LastSeen), cText(scope), cText(held))
 		}
+		tb.flush()
 	})
 }
 
@@ -609,12 +625,14 @@ func runAdminMRPrune(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v; the head refs are deleted but the objects are not yet pruned; re-run the same command", err)
 	}
 	return c.emit(rows, func(w io.Writer) {
+		tb := c.table(w, "!", "HEAD")
 		for _, r := range rows {
 			if r.Head == "" {
-				fmt.Fprintf(w, "!%d\talready gone\n", r.Number)
+				tb.row(cRef(fmt.Sprintf("!%d", r.Number)), cText("already gone"))
 				continue
 			}
-			fmt.Fprintf(w, "!%d\t%s\n", r.Number, r.Head)
+			tb.row(cRef(fmt.Sprintf("!%d", r.Number)), cRef(r.Head))
 		}
+		tb.flush()
 	})
 }

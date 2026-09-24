@@ -202,9 +202,11 @@ func runSnippetShow(c *Ctx, args []string) int {
 			fmt.Fprintf(w, "%s\n", sn.Description)
 		}
 		fmt.Fprintf(w, "%s\nupdated %s\n", snippetURL(c, sn), sn.UpdatedAt)
+		tb := c.table(w, "NAME", "SIZE")
 		for _, f := range files {
-			fmt.Fprintf(w, "  %s\t%d bytes\n", f.Name, f.Size)
+			tb.row(cRef("  "+f.Name), cText(fmt.Sprintf("%d bytes", f.Size)))
 		}
+		tb.flush()
 	})
 }
 
@@ -238,6 +240,7 @@ func runSnippetList(c *Ctx, args []string) int {
 		items = append(items, snippetOut(c, sn))
 	}
 	return c.emitPage(p, items, next, func(w io.Writer) {
+		tb := c.table(w, "ID", "VISIBILITY", "FILES", "DESCRIPTION")
 		for _, sn := range rows {
 			names := ""
 			for i, f := range sn.Files {
@@ -246,8 +249,9 @@ func runSnippetList(c *Ctx, args []string) int {
 				}
 				names += f.Name
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sn.PublicID, sn.Visibility, names, sn.Description)
+			tb.row(cRef(sn.PublicID), cState(sn.Visibility), cText(names), cFlex(sn.Description))
 		}
+		tb.flush()
 	})
 }
 

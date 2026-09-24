@@ -98,9 +98,11 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		ds = append(ds, out{k.Fingerprint, k.Algo, mode, k.Label})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", d.Fingerprint, d.Algo, d.Mode, d.Label)
+			tb.row(cRef(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label))
 		}
+		tb.flush()
 	})
 }
 

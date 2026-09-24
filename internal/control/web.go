@@ -33,9 +33,17 @@ func runWebSessionsList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(sessions, func(w io.Writer) {
+		tb := c.table(w, "ID", "SINCE", "UNTIL")
 		for _, s := range sessions {
-			fmt.Fprintf(w, "%s\tsince %s\tuntil %s\n", s.ID, s.CreatedAt, s.ExpiresAt)
+			since, until := s.CreatedAt, s.ExpiresAt
+			if c.Term.Cols == 0 {
+				since, until = stamp(since), stamp(until)
+			} else {
+				since, until = relAge(since, termNow()), relAge(until, termNow())
+			}
+			tb.row(cRef(s.ID), cText("since "+since), cText("until "+until))
 		}
+		tb.flush()
 	})
 }
 

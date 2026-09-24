@@ -83,9 +83,11 @@ func runKeysList(c *Ctx, args []string) int {
 		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", d.Fingerprint, d.Algo, d.Scope, d.Label)
+			tb.row(cRef(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label))
 		}
+		tb.flush()
 	})
 }
 

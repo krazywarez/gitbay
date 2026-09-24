@@ -1,7 +1,6 @@
 package control
 
 import (
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -47,13 +46,15 @@ func runAudit(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(entries, func(w io.Writer) {
+		tb := c.table(w, "WHEN", "ACTOR", "ACTION", "DATA")
 		for _, e := range entries {
 			actor := e.Actor
 			if actor == "" {
 				actor = "-"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.CreatedAt, actor, e.Action, e.Data)
+			tb.row(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(e.Data))
 		}
+		tb.flush()
 	})
 }
 

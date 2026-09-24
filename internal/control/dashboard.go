@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"gitbay.org/gitbay/internal/buildinfo"
 	"gitbay.org/gitbay/internal/gitutil"
@@ -163,88 +164,133 @@ func runDashboard(c *Ctx, args []string) int {
 	}
 
 	return c.emit(d, func(w io.Writer) {
+		section := func(title string, header []string, rows [][]cell) {
+			if c.Term.Cols > 0 {
+				fmt.Fprintln(w, c.Term.paint(sgrBold, title))
+			} else {
+				fmt.Fprintln(w, title)
+			}
+			if len(rows) == 0 {
+				fmt.Fprintln(w, "  none")
+				return
+			}
+			if c.Term.Cols == 0 {
+				for _, r := range rows {
+					parts := make([]string, len(r))
+					for i, cl := range r {
+						parts[i] = cl.s
+						if cl.kind == kindAge {
+							parts[i] = stamp(cl.s)
+						}
+					}
+					fmt.Fprintf(w, "  %s\n", strings.Join(parts, "\t"))
+				}
+				return
+			}
+			tb := c.table(w, header...)
+			for _, r := range rows {
+				tb.row(r...)
+			}
+			tb.flush()
+		}
+		itemRows := func(items []DashboardItem, marker string) [][]cell {
+			rows := make([][]cell, len(items))
+			for i, item := range items {
+				rows[i] = []cell{cRef(fmt.Sprintf("%s%s%d", item.Repo, marker, item.Number)), cFlex(item.Title), cText(item.Author)}
+			}
+			return rows
+		}
+
 		if d.Unread > 0 {
 			fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
 		}
-		fmt.Fprintln(w, "waiting on your review:")
-		printDashboardItems(w, d.Reviews, "!")
-		fmt.Fprintln(w, "assigned to you:")
-		printDashboardItems(w, d.Assigned, "#")
-		fmt.Fprintln(w, "open merge requests:")
-		printDashboardItems(w, d.MRs, "!")
-		fmt.Fprintln(w, "open issues:")
-		printDashboardItems(w, d.Issues, "#")
-		fmt.Fprintln(w, "pinned:")
-		if len(d.Pinned) == 0 {
-			fmt.Fprintln(w, "  none")
-		}
-		for _, p := range d.Pinned {
-			mark := ""
+		itemHeader := []string{"REF", "TITLE", "AUTHOR"}
+		section("waiting on your review:", itemHeader, itemRows(d.Reviews, "!"))
+		section("assigned to you:", itemHeader, itemRows(d.Assigned, "#"))
+		section("open merge requests:", itemHeader, itemRows(d.MRs, "!"))
+		section("open issues:", itemHeader, itemRows(d.Issues, "#"))
+
+		pinnedRows := make([][]cell, len(d.Pinned))
+		for i, p := range d.Pinned {
+			cells := []cell{cRef(p.Path), cState(p.Visibility), cFlex(p.Description)}
 			if p.Archived {
-				mark = "\t[archived]"
+				cells = append(cells, cText("[archived]"))
 			}
-			fmt.Fprintf(w, "  %s\t%s\t%s%s\n", p.Path, p.Visibility, p.Description, mark)
+			pinnedRows[i] = cells
 		}
-		fmt.Fprintln(w, "recent activity:")
-		if len(d.Activity) == 0 {
-			fmt.Fprintln(w, "  none")
+		section("pinned:", []string{"PATH", "VISIBILITY", "DESCRIPTION"}, pinnedRows)
+
+		activityRows := make([][]cell, len(d.Activity))
+		for i, e := range d.Activity {
+			activityRows[i] = []cell{cAge(e.CreatedAt), cText(e.Actor), cText(e.Kind), cRef(e.Repo), cFlex(string(e.Data))}
 		}
-		for _, e := range d.Activity {
-			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n", e.CreatedAt, e.Actor, e.Kind, e.Repo, string(e.Data))
+		section("recent activity:", []string{"WHEN", "ACTOR", "KIND", "REPO", "DATA"}, activityRows)
+
+		buildRows := make([][]cell, len(d.Builds))
+		for i, b := range d.Builds {
+			buildRows[i] = []cell{cRef(b.Repo), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
 		}
-		fmt.Fprintln(w, "builds:")
-		if len(d.Builds) == 0 {
-			fmt.Fprintln(w, "  none")
-		}
-		for _, b := range d.Builds {
-			fmt.Fprintf(w, "  %s\t%d\t%s\t%s\t%.10s\t%s\n", b.Repo, b.Number, b.Job, b.Status, b.SHA, b.Ref)
-		}
+		section("builds:", []string{"REPO", "#", "JOB", "STATUS", "SHA", "REF"}, buildRows)
+
 		if d.Server != nil {
 			fmt.Fprintf(w, "server:\n  build %s\n", d.Server.Commit)
 		}
 		if q := d.Queues; q != nil {
 			fmt.Fprintln(w, "queues:")
+
 			fmt.Fprintf(w, "  webhooks\tpending %d\tretrying %d\tfailed %d\n", q.Webhooks.Pending, q.Webhooks.Retrying, q.Webhooks.Failed)
+			twh := c.table(w, "REPO", "URL", "ATTEMPTS", "ERROR")
 			for _, it := range q.Webhooks.Items {
-				fmt.Fprintf(w, "    %s\t%s\tattempts %d\t%s\n", it.Repo, it.URL, it.Attempts, it.LastError)
+				twh.row(cRef("    "+it.Repo), cText(it.URL), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
 			}
+			twh.flush()
+
 			fmt.Fprintf(w, "  mail\tpending %d\tretrying %d\tfailed %d\n", q.Mail.Pending, q.Mail.Retrying, q.Mail.Failed)
+			tma := c.table(w, "RECIPIENT", "SUBJECT", "ATTEMPTS", "ERROR")
 			for _, it := range q.Mail.Items {
-				fmt.Fprintf(w, "    %s\t%s\tattempts %d\t%s\n", it.Recipient, it.Subject, it.Attempts, it.LastError)
+				tma.row(cRef("    "+it.Recipient), cText(it.Subject), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
 			}
+			tma.flush()
+
 			// The device id, not the token: a token is never echoed.
 			fmt.Fprintf(w, "  push\tpending %d\tretrying %d\tfailed %d\n", q.Push.Pending, q.Push.Retrying, q.Push.Failed)
+			tpu := c.table(w, "DEVICE", "TITLE", "ATTEMPTS", "ERROR")
 			for _, it := range q.Push.Items {
-				fmt.Fprintf(w, "    device %d\t%s\tattempts %d\t%s\n", it.DeviceID, it.Title, it.Attempts, it.LastError)
+				tpu.row(cRef(fmt.Sprintf("    device %d", it.DeviceID)), cText(it.Title), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
 			}
+			tpu.flush()
+
 			fmt.Fprintf(w, "  mirrors\tdirty %d\terrors %d\n", q.Mirrors.Dirty, q.Mirrors.Errors)
+			tmi := c.table(w, "REPO", "DIRECTION", "URL", "ERROR")
 			for _, it := range q.Mirrors.Items {
-				fmt.Fprintf(w, "    %s\t%s\t%s\t%s\n", it.Repo, it.Direction, it.URL, it.LastError)
+				tmi.row(cRef("    "+it.Repo), cText(it.Direction), cText(it.URL), cText(it.LastError))
 			}
+			tmi.flush()
+
 			fmt.Fprintf(w, "  builds\tpending %d\trunning %d\n", q.Builds.Pending, q.Builds.Running)
+			tbq := c.table(w, "REPO", "#", "JOB", "STATUS")
 			for _, it := range q.Builds.Items {
 				since := it.StartedAt
 				if it.Status == "pending" {
 					since = it.CreatedAt
 				}
-				fmt.Fprintf(w, "    %s\t%d\t%s\t%s since %s\n", it.Repo, it.Number, it.Job, it.Status, since)
+				if c.Term.Cols == 0 {
+					since = stamp(since)
+				} else {
+					since = relAge(since, termNow())
+				}
+				tbq.row(cRef("    "+it.Repo), cNum(it.Number), cText(it.Job), cText(fmt.Sprintf("%s since %s", it.Status, since)))
 			}
+			tbq.flush()
+
 			fmt.Fprintf(w, "  deps\terrors %d\n", q.Deps.Errors)
+			tde := c.table(w, "REPO", "ERROR")
 			for _, it := range q.Deps.Items {
-				fmt.Fprintf(w, "    %s\t%s\n", it.Repo, it.LastError)
+				tde.row(cRef("    "+it.Repo), cText(it.LastError))
 			}
+			tde.flush()
 		}
 	})
-}
-
-func printDashboardItems(w io.Writer, items []DashboardItem, marker string) {
-	if len(items) == 0 {
-		fmt.Fprintln(w, "  none")
-		return
-	}
-	for _, item := range items {
-		fmt.Fprintf(w, "  %s%s%d\t%s\t%s\n", item.Repo, marker, item.Number, item.Title, item.Author)
-	}
 }
 
 // feedDefaultLimit caps a bare `feed` call; pagination reaches further
@@ -292,8 +338,10 @@ func runFeed(c *Ctx, args []string) int {
 	})
 	ds := feedOutputs(events)
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "WHEN", "ACTOR", "KIND", "REPO", "DATA")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", d.CreatedAt, d.Actor, d.Kind, d.Repo, string(d.Data))
+			tb.row(cAge(d.CreatedAt), cText(d.Actor), cText(d.Kind), cRef(d.Repo), cFlex(string(d.Data)))
 		}
+		tb.flush()
 	})
 }

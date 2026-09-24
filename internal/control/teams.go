@@ -143,9 +143,11 @@ func runTeamList(c *Ctx, args []string) int {
 		names = append(names, t.Name)
 	}
 	return c.emit(names, func(w io.Writer) {
+		tb := c.table(w, "TEAM")
 		for _, n := range names {
-			fmt.Fprintln(w, n)
+			tb.row(cRef(n))
 		}
+		tb.flush()
 	})
 }
 
@@ -176,9 +178,11 @@ func runTeamShow(c *Ctx, args []string) int {
 	}{team.Name, members, grants}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "%s/%s\nmembers: %s\n", org.Name, team.Name, strings.Join(members, ", "))
+		tb := c.table(w, "REPO", "ROLE")
 		for _, g := range grants {
-			fmt.Fprintf(w, "%s\t%s\n", g.RepoPath, g.Role)
+			tb.row(cRef(g.RepoPath), cState(g.Role))
 		}
+		tb.flush()
 	})
 }
 
