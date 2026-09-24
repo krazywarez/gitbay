@@ -48,7 +48,9 @@ const (
 // termSafe replaces the bytes a terminal would act on — ESC, the C0
 // controls but tab and newline, DEL, and the C1 controls — with U+FFFD,
 // so user text cannot move the cursor, set the clipboard (OSC 52) or
-// clear the screen. Terminal output only: plain output is unchanged.
+// clear the screen. Carriage return is dropped rather than replaced:
+// web forms store CRLF line endings, and a lone CR would let text
+// overwrite its own line. Terminal output only: plain output is unchanged.
 func termSafe(s string) string {
 	unsafe := func(r rune) bool {
 		return (r < 0x20 && r != '\t' && r != '\n') || (r >= 0x7f && r <= 0x9f)
@@ -57,7 +59,10 @@ func termSafe(s string) string {
 		return s
 	}
 	return strings.Map(func(r rune) rune {
-		if unsafe(r) {
+		switch {
+		case r == '\r':
+			return -1
+		case unsafe(r):
 			return '\uFFFD'
 		}
 		return r

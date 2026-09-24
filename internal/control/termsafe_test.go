@@ -15,7 +15,9 @@ func TestTermSafe(t *testing.T) {
 	cases := map[string]string{
 		"plain\ttext\n":   "plain\ttext\n",
 		"a\x1bb":          "a�b",
-		"a\rb\x00c\x7fd":  "a�b�c�d",
+		"a\x00c\x7fd":     "a�c�d",
+		"a\r\nb\r\n":      "a\nb\n",
+		"a\rb":            "ab",
 		"a\u0085b\u009bc": "a�b�c",
 		"ümlaut":          "ümlaut",
 	}
@@ -66,5 +68,22 @@ func TestIssueShowControlBytes(t *testing.T) {
 	noControls(t, "issue show", show(Term{Cols: 80, Color: true}))
 	if out := show(Term{}); !strings.Contains(out, "#1  "+evil+"  open\n") {
 		t.Errorf("plain title changed:\n%q", out)
+	}
+}
+
+// A body written in a browser arrives with CRLF line endings.
+func TestIssueShowCRLFBody(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	if _, err := st.CreateIssue(repo.ID, uid, "t", "first line\r\nsecond line\r\n", "md"); err != nil {
+		t.Fatal(err)
+	}
+	c, errOut := pruneCtx(st, t.TempDir(), store.User{ID: uid, Username: "alice"})
+	c.Term = Term{Cols: 80}
+	if code := Dispatch(c, []string{"issue", "show", repo.Path(), "1"}); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	out := c.Stdout.(*bytes.Buffer).String()
+	if strings.ContainsAny(out, "\r�") || !strings.Contains(out, "first line second line") {
+		t.Errorf("CRLF body at a terminal:\n%q", out)
 	}
 }
