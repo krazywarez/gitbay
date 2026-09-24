@@ -51,15 +51,51 @@ func (w *out) paint(sgr, s string) string {
 }
 
 // para writes s wrapped to the width, the first line after first and
-// the rest after rest. Hard breaks in s ("\n") start a new line.
+// the rest after rest. Hard breaks in s ("\n") start a new line. An
+// SGR run open at a wrapped line's end is closed there and reopened
+// after the next line's prefix, so the prefix itself is never painted
+// and a style never bleeds past a line break.
 func (w *out) para(s, first, rest string) {
 	prefix := first
+	var open []string
 	for _, hard := range strings.Split(s, "\n") {
 		for _, line := range wrap(hard, w.o.Width-cells(rest)) {
-			w.b.WriteString(prefix + line + "\n")
+			w.b.WriteString(prefix)
+			for _, sgr := range open {
+				w.b.WriteString(sgr)
+			}
+			w.b.WriteString(line)
+			open = sgrOpen(line, open)
+			if len(open) > 0 {
+				w.b.WriteString(sgrReset)
+			}
+			w.b.WriteString("\n")
 			prefix = rest
 		}
 	}
+}
+
+// sgrOpen scans s for SGR sequences, starting from the stack of runs
+// already open, and returns the stack still open at s's end. sgrReset
+// clears the whole stack; any other sequence pushes onto it.
+func sgrOpen(s string, open []string) []string {
+	for i := 0; i < len(s); i++ {
+		if s[i] != 0x1b {
+			continue
+		}
+		j := strings.IndexByte(s[i:], 'm')
+		if j < 0 {
+			break
+		}
+		sgr := s[i : i+j+1]
+		if sgr == sgrReset {
+			open = nil
+		} else {
+			open = append(open, sgr)
+		}
+		i += j
+	}
+	return open
 }
 
 // code writes lines verbatim under prefix plus four spaces,
@@ -103,7 +139,8 @@ func (w *out) link(text, target string) string {
 	if text == "" {
 		return target
 	}
-	if target == "" || target == text || strings.TrimPrefix(strings.TrimPrefix(target, "https://"), "http://") == text {
+	if target == "" || target == text || "mailto:"+text == target ||
+		strings.TrimPrefix(strings.TrimPrefix(target, "https://"), "http://") == text {
 		return text
 	}
 	return text + " (" + target + ")"

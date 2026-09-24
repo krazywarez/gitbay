@@ -59,6 +59,40 @@ func TestMarkdownWidth(t *testing.T) {
 	}
 }
 
+// TestWrappedColorClosesAtLineEnd covers a bold span that wraps mid-run:
+// the style must not bleed across the line break onto the unstyled
+// list-hang prefix, and stripping colour must reproduce the plain
+// rendering exactly.
+func TestWrappedColorClosesAtLineEnd(t *testing.T) {
+	src := "- item with **some very long bold phrase spanning many words here** and more text after it to force a wrap"
+	color := Markdown(src, Options{Width: 30, Color: true})
+	plain := Markdown(src, Options{Width: 30})
+
+	if got := stripSGR(color); got != plain {
+		t.Errorf("stripSGR(color) = %q, want %q", got, plain)
+	}
+
+	// Both continuation lines land wholly inside the wrapped bold span
+	// (the first) or start inside it (the second): the plain prefix
+	// always comes before the reopened style, never styled itself, and
+	// a run left open at wrap time is closed again at line's end.
+	lines := strings.Split(strings.TrimRight(color, "\n"), "\n")
+	for _, i := range []int{1, 2} {
+		if !strings.HasPrefix(lines[i], "  \x1b[1m") {
+			t.Errorf("line %d: styled run starts before the plain prefix, or is missing: %q", i, lines[i])
+		}
+	}
+	if !strings.HasSuffix(lines[1], sgrReset) {
+		t.Errorf("line 1: open run never closed: %q", lines[1])
+	}
+	if want := "  \x1b[1mbold phrase spanning many\x1b[0m"; lines[1] != want {
+		t.Errorf("line 1 = %q, want %q", lines[1], want)
+	}
+	if want := "  \x1b[1mwords here\x1b[0m and more text"; lines[2] != want {
+		t.Errorf("line 2 = %q, want %q", lines[2], want)
+	}
+}
+
 func TestInlineDropsLinkTargets(t *testing.T) {
 	got := Inline("referenced in commit [6c4d1e1454](/krz/gitbay/commit/6c4d) by [cmc](/cmc): landing", "md")
 	if got != "referenced in commit 6c4d1e1454 by cmc: landing" {
