@@ -70,10 +70,10 @@ func (c *Ctx) usageWith(msg string) int {
 
 // Flag is one flag in a command's help.
 type Flag struct {
-	Name    string // "--state"
-	Arg     string // "open|closed|all"; empty for a switch
-	Desc    string // what it does, lower case, no full stop
-	Default string // empty for none
+	Name    string `json:"name"`              // "--state"
+	Arg     string `json:"arg,omitempty"`     // "open|closed|all"; empty for a switch
+	Desc    string `json:"desc,omitempty"`    // what it does, lower case, no full stop
+	Default string `json:"default,omitempty"` // empty for none
 }
 
 type Command struct {
@@ -323,58 +323,6 @@ func (c *Ctx) fail(code int, format string, args ...any) int {
 		fmt.Fprintln(c.Stderr, msg)
 	}
 	return code
-}
-
-func init() {
-	register(Command{
-		Path:     []string{"help"},
-		Summary:  "list available commands",
-		Usage:    "help [<prefix>...]",
-		Examples: []string{"help", "help repo"},
-		ReadOnly: true,
-		Run:      runHelp,
-	})
-}
-
-// helpEntry is one row of the registry as help reports it.
-type helpEntry struct {
-	Path    string `json:"path"`
-	Summary string `json:"summary"`
-	Usage   string `json:"usage"`
-}
-
-// runHelp lists the registry, sorted, so a noun's commands sit together.
-// A prefix narrows the listing and adds each command's argument syntax —
-// the only place flags are written down. The unfiltered listing stays one
-// line per command.
-func runHelp(c *Ctx, args []string) int {
-	prefix := joinPath(args)
-	var matched []helpEntry
-	for _, cmd := range registry {
-		p := joinPath(cmd.Path)
-		if prefix != "" && p != prefix && !strings.HasPrefix(p, prefix+" ") {
-			continue
-		}
-		matched = append(matched, helpEntry{Path: p, Summary: cmd.Summary, Usage: cmd.Usage})
-	}
-	if len(matched) == 0 {
-		return c.fail(protocol.ExitNotFound, "no command matches %q; try: help", prefix)
-	}
-	slices.SortFunc(matched, func(a, b helpEntry) int { return strings.Compare(a.Path, b.Path) })
-	return c.emit(matched, func(w io.Writer) {
-		for _, e := range matched {
-			summary := e.Summary
-			if c.Term.Cols > 0 {
-				if avail := c.Term.Cols - max(cells(e.Path), 24) - 1; avail > 0 {
-					summary = clip(summary, avail)
-				}
-			}
-			fmt.Fprintf(w, "%-24s %s\n", e.Path, summary)
-			if prefix != "" {
-				fmt.Fprintf(w, "  %s\n", e.Usage)
-			}
-		}
-	})
 }
 
 func joinPath(p []string) string {

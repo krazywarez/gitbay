@@ -1,6 +1,7 @@
 package control
 
 import (
+	"bytes"
 	"regexp"
 	"slices"
 	"strings"
@@ -8,6 +9,61 @@ import (
 
 	"gitbay.org/gitbay/internal/protocol"
 )
+
+func helpOut(t *testing.T, term Term, prefix ...string) string {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	c := &Ctx{Stdout: &out, Stderr: &errOut, Term: term, Scope: "full"}
+	c.Cfg.Server.SiteURL = "https://forge.test"
+	if code := Dispatch(c, append([]string{"help"}, prefix...)); code != protocol.ExitOK {
+		t.Fatalf("help %v: exit %d: %s", prefix, code, errOut.String())
+	}
+	return out.String()
+}
+
+func TestHelpVerb(t *testing.T) {
+	out := helpOut(t, Term{Cols: 100}, "issue", "list")
+	for _, want := range []string{
+		"list issues\n",
+		"USAGE\n  gitbay issue list [<owner/name>] [flags]\n",
+		"FLAGS\n",
+		"  --state open|closed|all",
+		"which issues (default open)\n",
+		"  --json",
+		"EXAMPLES\n  gitbay issue list krz/gitbay --label bug --state all\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	plain := helpOut(t, Term{}, "issue", "list")
+	if !strings.Contains(plain, "  ssh git@forge.test issue list krz/gitbay --label bug --state all\n") {
+		t.Errorf("plain examples not ssh:\n%s", plain)
+	}
+	if !strings.Contains(plain, "USAGE\n  ssh git@forge.test issue list <owner/name> [flags]\n") {
+		t.Errorf("plain usage:\n%s", plain)
+	}
+}
+
+func TestHelpNoun(t *testing.T) {
+	out := helpOut(t, Term{Cols: 100}, "issue")
+	for _, want := range []string{"issues\n", "READ\n", "WRITE\n", "  list ", "  create ", "gitbay issue <verb> --help for flags.\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Index(out, "  list ") > strings.Index(out, "WRITE") {
+		t.Errorf("list is not under READ:\n%s", out)
+	}
+}
+
+func TestEveryNounHasASummary(t *testing.T) {
+	for _, cmd := range Commands() {
+		if nounSummaries[cmd.Path[0]] == "" {
+			t.Errorf("no noun summary for %q", cmd.Path[0])
+		}
+	}
+}
 
 var usageFlag = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 

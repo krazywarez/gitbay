@@ -125,25 +125,21 @@ func TestEveryCommandDocumentsItsUsage(t *testing.T) {
 	}
 }
 
-// TestHelpPrefixNarrowsAndShowsFlags covers the reason the command exists:
-// before this, reading one command's flags meant reading all of them.
-func TestHelpPrefixNarrowsAndShowsFlags(t *testing.T) {
+// TestHelpPrefixNarrowsToTheNoun covers the reason the command exists:
+// before this, reading one command's flags meant reading all of them. A
+// noun prefix now lists its verbs under READ/WRITE; a verb's own flags
+// are on `help <noun> <verb>` (TestHelpVerb, help_test.go).
+func TestHelpPrefixNarrowsToTheNoun(t *testing.T) {
 	var buf bytes.Buffer
 	c := &Ctx{Stdout: &buf, Stderr: io.Discard}
 	if code := runHelp(c, []string{"issue"}); code != protocol.ExitOK {
 		t.Fatalf("help issue exited %d", code)
 	}
 	out := buf.String()
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if strings.HasPrefix(line, "  ") {
-			continue // the indented usage line
+	for _, want := range []string{"READ\n", "  list", "WRITE\n", "  create", "issue <verb> --help for flags.\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
 		}
-		if !strings.HasPrefix(line, "issue ") {
-			t.Errorf("help issue listed an unrelated command: %q", line)
-		}
-	}
-	if !strings.Contains(out, "--state open|closed|all") {
-		t.Error("help issue did not print issue list's flags")
 	}
 }
 
