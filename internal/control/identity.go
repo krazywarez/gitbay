@@ -85,7 +85,7 @@ func runKeysList(c *Ctx, args []string) int {
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL")
 		for _, d := range ds {
-			tb.row(cRef(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label))
+			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label))
 		}
 		tb.flush()
 	})

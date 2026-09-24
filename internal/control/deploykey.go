@@ -100,7 +100,7 @@ func runDeployKeyList(c *Ctx, args []string) int {
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL")
 		for _, d := range ds {
-			tb.row(cRef(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label))
+			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label))
 		}
 		tb.flush()
 	})

@@ -352,7 +352,13 @@ func runHelp(c *Ctx, args []string) int {
 	slices.SortFunc(matched, func(a, b helpEntry) int { return strings.Compare(a.Path, b.Path) })
 	return c.emit(matched, func(w io.Writer) {
 		for _, e := range matched {
-			fmt.Fprintf(w, "%-24s %s\n", e.Path, e.Summary)
+			summary := e.Summary
+			if c.Term.Cols > 0 {
+				if avail := c.Term.Cols - max(cells(e.Path), 24) - 1; avail > 0 {
+					summary = clip(summary, avail)
+				}
+			}
+			fmt.Fprintf(w, "%-24s %s\n", e.Path, summary)
 			if prefix != "" {
 				fmt.Fprintf(w, "  %s\n", e.Usage)
 			}
