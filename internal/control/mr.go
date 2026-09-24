@@ -1715,7 +1715,7 @@ func runMRRevisions(c *Ctx, args []string) int {
 		}
 		tb.flush()
 		if len(revs) < 2 {
-			fmt.Fprintf(w, "\nonly one revision; %s!%d has not been pushed to since it was opened\n",
+			fmt.Fprintf(c.Stderr, "only one revision; %s!%d has not been pushed to since it was opened\n",
 				repo.Path(), mr.Number)
 		}
 	})

@@ -541,7 +541,7 @@ func runAdminRunners(c *Ctx, args []string) int {
 			if r.BuildNumber != 0 {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
-			tb.row(cText(r.Username), cRef(r.Fingerprint), cAge(r.LastSeen), cText(scope), cText(held))
+			tb.row(cText(r.Username), cFlex(r.Fingerprint), cAge(r.LastSeen), cText(scope), cText(held))
 		}
 		tb.flush()
 	})
