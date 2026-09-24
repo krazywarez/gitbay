@@ -18,8 +18,8 @@ func init() {
 			{"--kind", "repo|issue|mr", "only this kind of result, may repeat", ""},
 		},
 		Examples: []string{
-			"search auth bug",
-			"search auth bug --kind issue",
+			`search "auth bug"`,
+			`search "auth bug" --kind issue`,
 		},
 		ReadOnly: true, Run: runSearch})
 }

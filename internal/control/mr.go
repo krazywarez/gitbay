@@ -133,7 +133,7 @@ func init() {
 			{"--body", "<b>", "the merge request's new body", ""},
 			{"--file", "-", "read the new body from stdin", ""},
 			{"--format", "md|org", "the body's markup", ""},
-			{"--superseded-by", "<m>|none", "the MR that replaces this closed one, or none to clear", ""},
+			{"--superseded-by", "<m>|none", "the MR replacing this one, or none to clear", ""},
 		},
 		Examples:   []string{`mr edit krz/gitbay 431 --title "control: flag help, take two"`},
 		ReadsStdin: true, Run: runMREdit})
