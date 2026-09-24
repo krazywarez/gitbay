@@ -243,6 +243,19 @@ func TestNotificationsDeviceAddReturnsTheID(t *testing.T) {
 	}
 }
 
+func TestNotificationsDeviceAddPlainSaysRegisteredDevice(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	c.Stdin = strings.NewReader("DEVTOKEN\n")
+	var out bytes.Buffer
+	c.Stdout, c.JSON = &out, false
+	if code := runNotificationsDeviceAdd(c, nil); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if got := out.String(); !strings.HasPrefix(got, "registered device ") {
+		t.Errorf("device add printed %q", got)
+	}
+}
+
 func TestNotificationsSettingsShowsPush(t *testing.T) {
 	c := notifTestCtx(t, "alice")
 	var out bytes.Buffer

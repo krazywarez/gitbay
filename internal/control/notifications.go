@@ -279,7 +279,7 @@ func runNotificationsDeviceAdd(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]any{"id": id, "status": "registered"}, func(w io.Writer) {
-		fmt.Fprintf(w, "device %d registered\n", id)
+		fmt.Fprintf(w, "registered device %d\n", id)
 	})
 }
 
