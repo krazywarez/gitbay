@@ -282,7 +282,7 @@ func TestMergeRequests(t *testing.T) {
 	}
 	// So does mr show, human and JSON.
 	showOut, _, code := inst.ssh(t, aliceKey, "", "mr", "show", "alice/lib", "1")
-	if code != 0 || !strings.Contains(showOut, "commit: ") {
+	if code != 0 || !strings.Contains(showOut, "add feature (amended)") {
 		t.Fatalf("mr show missing commits: %d\n%s", code, showOut)
 	}
 	showJSON, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/lib", "1", "--json")

@@ -602,73 +602,146 @@ func runMRShow(c *Ctx, args []string) int {
 		if d.Draft {
 			state = "draft"
 		}
-		fmt.Fprintf(w, "!%d %s [%s] by %s\n%s -> %s @ %.10s\n", d.Number, d.Title, state, d.Author, d.Source, d.TargetRef, d.HeadSHA)
-		if len(d.Labels) > 0 {
-			fmt.Fprintf(w, "labels: %s\n", strings.Join(d.Labels, ", "))
-		}
-		if len(d.ReviewRequests) > 0 {
-			fmt.Fprintf(w, "reviewers: %s\n", strings.Join(d.ReviewRequests, ", "))
-		}
+		v := c.view(w)
+		v.title(fmt.Sprintf("!%d", d.Number), d.Title, state)
+
+		stackedOn, stacked := "", ""
 		if d.StackedOn != nil {
-			fmt.Fprintf(w, "stacked on !%d %s\n", d.StackedOn.Number, d.StackedOn.Title)
+			stackedOn = fmt.Sprintf("!%d %s", d.StackedOn.Number, d.StackedOn.Title)
 		}
 		for _, k := range d.Stacked {
-			fmt.Fprintf(w, "stacked: !%d %s\n", k.Number, k.Title)
+			if stacked != "" {
+				stacked += ", "
+			}
+			stacked += fmt.Sprintf("!%d %s", k.Number, k.Title)
 		}
+		merged, closed, superseded := "", "", ""
 		if d.MergedAt != "" {
-			fmt.Fprintf(w, "merged %s%s\n", d.MergedAt, byWhom(d.MergedBy))
+			merged = c.when(d.MergedAt) + byWhom(d.MergedBy)
 		}
 		if d.ClosedAt != "" {
-			fmt.Fprintf(w, "closed %s%s\n", d.ClosedAt, byWhom(d.ClosedBy))
+			closed = c.when(d.ClosedAt) + byWhom(d.ClosedBy)
 		}
 		if d.SupersededBy != 0 {
-			fmt.Fprintf(w, "superseded by: !%d\n", d.SupersededBy)
+			superseded = fmt.Sprintf("!%d", d.SupersededBy)
 		}
-		if d.Body != "" {
-			fmt.Fprintf(w, "\n%s\n", d.Body)
-		}
-		for _, cm := range commits {
-			fmt.Fprintf(w, "commit: %.10s %s\n", cm.SHA, cm.Subject)
-		}
-		for _, x := range checks {
-			dur := ""
-			if x.Duration != "" {
-				dur = " in " + x.Duration
-			}
-			fmt.Fprintf(w, "check: %s %s at %s%s\n", x.Context, x.State, x.UpdatedAt, dur)
-		}
-		if d.UnresolvedThreads > 0 {
-			fmt.Fprintf(w, "unresolved threads: %d\n", d.UnresolvedThreads)
-		}
+		gates := ""
 		if g := d.Gates; g != nil {
 			ff := "fast-forward possible"
 			if !g.FastForward {
 				ff = "fast-forward not possible"
 			}
 			if len(g.Unmet) == 0 {
-				fmt.Fprintf(w, "gates: met; %s\n", ff)
+				gates = "met; " + ff
 			} else {
-				fmt.Fprintf(w, "gates: %d unmet; %s\n", len(g.Unmet), ff)
-				for _, u := range g.Unmet {
-					fmt.Fprintf(w, "gate: %s\n", u)
-				}
+				gates = fmt.Sprintf("%d unmet; %s", len(g.Unmet), ff)
 			}
 		}
-		for _, r := range rs {
-			stale := ""
-			if r.Stale {
-				stale = " (stale)"
+		unresolved := ""
+		if d.UnresolvedThreads > 0 {
+			unresolved = fmt.Sprintf("%d", d.UnresolvedThreads)
+		}
+		v.fields(
+			"author", d.Author+", "+c.when(d.CreatedAt),
+			"source", fmt.Sprintf("%s -> %s", d.Source, d.TargetRef),
+			"head", fmt.Sprintf("%.10s", d.HeadSHA),
+			"milestone", d.Milestone,
+			"labels", strings.Join(d.Labels, ", "),
+			"reviewers", strings.Join(d.ReviewRequests, ", "),
+			"stacked on", stackedOn,
+			"stacked", stacked,
+			"merged", merged,
+			"closed", closed,
+			"superseded by", superseded,
+			"unresolved threads", unresolved,
+			"gates", gates,
+			"url", c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)),
+		)
+		if g := d.Gates; g != nil && len(g.Unmet) > 0 {
+			var kv []string
+			for _, u := range g.Unmet {
+				kv = append(kv, "unmet", u)
 			}
-			advisory := ""
-			if !r.Counts {
-				advisory = " (advisory: no write access)"
+			v.fields(kv...)
+		}
+		v.body(d.Body, d.BodyFormat)
+
+		if len(commits) == 1 {
+			v.fields("commit", fmt.Sprintf("%.10s %s", commits[0].SHA, commits[0].Subject))
+		} else if len(commits) > 1 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "SHA", "SUBJECT")
+			for _, cm := range commits {
+				tb.row(cRef(fmt.Sprintf("%.10s", cm.SHA)), cFlex(cm.Subject))
 			}
-			fmt.Fprintf(w, "review: %s %s%s%s at %s\n", r.Reviewer, r.Verdict, stale, advisory, r.CreatedAt)
+			tb.flush()
+		}
+
+		if len(checks) == 1 {
+			x := checks[0]
+			dur := ""
+			if x.Duration != "" {
+				dur = " in " + x.Duration
+			}
+			v.fields("check", fmt.Sprintf("%s %s at %s%s", x.Context, x.State, c.when(x.UpdatedAt), dur))
+		} else if len(checks) > 1 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "CHECK", "STATE", "UPDATED")
+			for _, x := range checks {
+				tb.row(cText(x.Context), cState(x.State), cText(c.when(x.UpdatedAt)))
+			}
+			tb.flush()
+		}
+
+		if len(rs) == 1 {
+			v.fields("review", reviewLine(rs[0])+" at "+c.when(rs[0].CreatedAt))
+		} else if len(rs) > 1 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "REVIEWER", "VERDICT", "WHEN")
+			for _, r := range rs {
+				verdict := r.Verdict
+				if r.Stale {
+					verdict += " (stale)"
+				}
+				if !r.Counts {
+					verdict += " (advisory)"
+				}
+				tb.row(cText(r.Reviewer), cState(verdict), cText(c.when(r.CreatedAt)))
+			}
+			tb.flush()
+		}
+
+		events := false
+		for _, cm := range cs {
+			if cm.Kind != "system" {
+				continue
+			}
+			if !events {
+				io.WriteString(w, "\n")
+				events = true
+			}
+			v.event(cm.Body, cm.BodyFormat, cm.CreatedAt)
 		}
 		for _, cm := range cs {
-			fmt.Fprintf(w, "\n--- %s at %s\n%s\n", cm.Author, cm.CreatedAt, cm.Body)
+			if cm.Kind == "system" {
+				continue
+			}
+			v.comment(cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
 		}
 	})
+}
+
+// reviewLine renders one review as fields prose: "reviewer verdict
+// (stale) (advisory) at when".
+func reviewLine(r ReviewOut) string {
+	s := r.Reviewer + " " + r.Verdict
+	if r.Stale {
+		s += " (stale)"
+	}
+	if !r.Counts {
+		s += " (advisory: no write access)"
+	}
+	return s
 }
 
 func runMRDiff(c *Ctx, args []string) int {

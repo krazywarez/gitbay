@@ -41,35 +41,57 @@ func (v *view) opts() termtext.Options {
 // title prints "ref  title  state", wrapping title+state to the
 // terminal width. Continuation lines indent under the title, and each
 // line is painted after wrapping so no SGR sequence crosses a break.
+// title or state may be "": either is skipped rather than leaving a
+// trailing blank field.
 func (v *view) title(ref, title, state string) {
 	t := v.c.Term
 	if t.Cols == 0 {
-		io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"  "+t.paint(stateColor(state), state)+"\n")
+		switch {
+		case title == "" && state == "":
+			io.WriteString(v.w, ref+"\n")
+		case state == "":
+			io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"\n")
+		case title == "":
+			io.WriteString(v.w, ref+"  "+t.paint(stateColor(state), state)+"\n")
+		default:
+			io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"  "+t.paint(stateColor(state), state)+"\n")
+		}
 		return
 	}
 	prefix := ref + "  "
 	indent := strings.Repeat(" ", cells(prefix))
-	lines := termtext.Wrap(title+"  "+state, t.Cols-cells(prefix))
+	rest := title
+	if state != "" {
+		if rest != "" {
+			rest += "  "
+		}
+		rest += state
+	}
+	if rest == "" {
+		io.WriteString(v.w, ref+"\n")
+		return
+	}
+	lines := termtext.Wrap(rest, t.Cols-cells(prefix))
 	for i, line := range lines {
 		p := indent
 		if i == 0 {
 			p = prefix
 		}
-		if i < len(lines)-1 {
+		if i < len(lines)-1 || state == "" {
 			io.WriteString(v.w, p+t.paint(sgrBold, line)+"\n")
 			continue
 		}
 		// Last line carries the state word, the last word overall
 		// (states are single words): keep it coloured, not bold.
-		rest, last := line, line
+		head, last := line, line
 		if idx := strings.LastIndex(line, " "); idx >= 0 {
-			rest, last = line[:idx], line[idx+1:]
+			head, last = line[:idx], line[idx+1:]
 		} else {
-			rest = ""
+			head = ""
 		}
 		io.WriteString(v.w, p)
-		if rest != "" {
-			io.WriteString(v.w, t.paint(sgrBold, rest)+" ")
+		if head != "" {
+			io.WriteString(v.w, t.paint(sgrBold, head)+" ")
 		}
 		io.WriteString(v.w, t.paint(stateColor(state), last)+"\n")
 	}

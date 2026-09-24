@@ -88,7 +88,7 @@ func TestMergeGatesVisible(t *testing.T) {
 	if strings.Contains(out, `"unmet"`) || !strings.Contains(out, `"approvals":["bob"]`) {
 		t.Fatalf("gates after approval:\n%s", out)
 	}
-	if out, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/svc", "1"); !strings.Contains(out, "gates: met; fast-forward possible") {
+	if out, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/svc", "1"); !strings.Contains(out, "met; fast-forward possible") {
 		t.Fatalf("text gates line: %s", out)
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/svc", "1"); code != 0 {
