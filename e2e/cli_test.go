@@ -146,10 +146,14 @@ func TestCLI(t *testing.T) {
 	mustGit(t, dir, cliGitEnv, "add", ".")
 	mustGit(t, dir, cliGitEnv, "commit", "-q", "-m", "feature work")
 	mustGit(t, dir, cliGitEnv, "push", "-q", "origin", "feature")
-	// A noun's --help is the server's reference for that noun, flags
-	// included, not cobra's flagless subcommand list (#130).
-	if out := c.must(t, dir, "", "issue", "--help"); !strings.Contains(out, "issue create <owner/name>") {
+	// A noun's --help is the server's reference for that noun, not
+	// cobra's flagless subcommand list (#130); a verb's --help carries
+	// its flags.
+	if out := c.must(t, dir, "", "issue", "--help"); !strings.Contains(out, "WRITE\n") || !strings.Contains(out, "issue <verb> --help for flags.") {
 		t.Fatalf("issue --help is not the server's reference:\n%s", out)
+	}
+	if out := c.must(t, dir, "", "issue", "create", "--help"); !strings.Contains(out, "issue create <owner/name>") || !strings.Contains(out, "--title <t>") {
+		t.Fatalf("issue create --help carries no flags:\n%s", out)
 	}
 
 	// Inside the clone on the branch, --source is the checked-out branch
