@@ -72,13 +72,19 @@ func (t *table) flush() {
 	if t.term.Cols == 0 || len(t.rows) == 0 {
 		return
 	}
+	// The column count is never smaller than the longest row: a row with
+	// more cells than the header has still gets every cell rendered, the
+	// header just shows blank above the ones it doesn't name.
 	n := len(t.header)
+	for _, r := range t.rows {
+		n = max(n, len(r))
+	}
 	widths := make([]int, n)
 	for i, h := range t.header {
 		widths[i] = cells(h)
 	}
 	for _, r := range t.rows {
-		for i := 0; i < n && i < len(r); i++ {
+		for i := 0; i < len(r); i++ {
 			widths[i] = max(widths[i], cells(r[i].s))
 		}
 	}
@@ -86,8 +92,10 @@ func (t *table) flush() {
 
 	var b strings.Builder
 	line := make([]string, n)
-	for i, h := range t.header {
-		line[i] = h
+	for i := range line {
+		if i < len(t.header) {
+			line[i] = t.header[i]
+		}
 	}
 	b.WriteString(t.term.paint(sgrDim, t.join(line, widths)) + "\n")
 	for _, r := range t.rows {
@@ -115,10 +123,11 @@ func (t *table) fit(widths []int) {
 		return s
 	}
 	kinds := make([]cellKind, len(widths))
-	if len(t.rows) > 0 {
-		for i := range widths {
-			if i < len(t.rows[0]) {
-				kinds[i] = t.rows[0][i].kind
+	for i := range widths {
+		for _, r := range t.rows {
+			if i < len(r) {
+				kinds[i] = r[i].kind
+				break
 			}
 		}
 	}

@@ -70,6 +70,37 @@ func TestTableAgesAndPlainStamps(t *testing.T) {
 	}
 }
 
+// A row may carry a cell beyond what the header names — repo list's
+// trailing [archived] marker, only present on some rows. flush must
+// still render it, not silently drop it because it falls past
+// len(header).
+func TestTableKeepsCellsBeyondTheHeader(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b, "PATH", "VISIBILITY", "DESCRIPTION")
+	tb.row(cRef("a/x"), cState("public"), cFlex("one"))
+	tb.row(cRef("a/y"), cState("public"), cFlex("two"), cText("[archived]"))
+	tb.flush()
+
+	out := b.String()
+	if !strings.Contains(out, "[archived]") {
+		t.Fatalf("archived marker dropped:\n%s", out)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("want 3 lines, got %d:\n%s", len(lines), out)
+	}
+	header, row1, row2 := lines[0], lines[1], lines[2]
+	descAt := strings.Index(header, "DESCRIPTION")
+	oneAt := strings.Index(row1, "one")
+	twoAt := strings.Index(row2, "two")
+	if descAt < 0 || oneAt < 0 || twoAt < 0 {
+		t.Fatalf("columns not found:\n%s", out)
+	}
+	if descAt != oneAt || descAt != twoAt {
+		t.Errorf("DESCRIPTION column not aligned: header at %d, row1 at %d, row2 at %d\n%s", descAt, oneAt, twoAt, out)
+	}
+}
+
 func TestTableEmptyPrintsNothing(t *testing.T) {
 	var b bytes.Buffer
 	(&Ctx{Term: Term{Cols: 80}}).table(&b, "#").flush()
