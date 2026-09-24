@@ -279,7 +279,7 @@ func runReleaseShow(c *Ctx, args []string) int {
 			io.WriteString(w, "\n")
 			tb := c.table(w, "NAME", "SIZE", "SHA256")
 			for _, a := range d.Assets {
-				tb.row(cRef(a.Name), cNum(a.Size), cText(a.SHA256[:min(10, len(a.SHA256))]))
+				tb.row(cRef(a.Name), cNum(a.Size), cFlex(a.SHA256))
 			}
 			tb.flush()
 		}

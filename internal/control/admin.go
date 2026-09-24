@@ -263,7 +263,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			"web sessions", fmt.Sprintf("%d", d.WebSessions),
 		)
 		if len(d.Keys) > 0 {
-			io.WriteString(w, "\n")
+			v.section("keys")
 			tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
 			for _, k := range d.Keys {
 				tk.row(cFlex(k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
@@ -271,7 +271,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			tk.flush()
 		}
 		if len(d.Emails) > 0 {
-			io.WriteString(w, "\n")
+			v.section("emails")
 			te := c.table(w, "ADDRESS", "STATE")
 			for _, e := range d.Emails {
 				state := "unverified"
@@ -287,7 +287,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			te.flush()
 		}
 		if len(d.PGPKeys) > 0 {
-			io.WriteString(w, "\n")
+			v.section("pgp keys")
 			tp := c.table(w, "FINGERPRINT")
 			for _, k := range d.PGPKeys {
 				tp.row(cFlex(k.Fingerprint))
@@ -295,7 +295,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			tp.flush()
 		}
 		if len(d.Orgs) > 0 {
-			io.WriteString(w, "\n")
+			v.section("orgs")
 			to := c.table(w, "ORG", "ROLE")
 			for _, o := range d.Orgs {
 				to.row(cRef(o.Org), cState(o.Role))
@@ -303,7 +303,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			to.flush()
 		}
 		if len(d.APITokens) > 0 {
-			io.WriteString(w, "\n")
+			v.section("api tokens")
 			tt := c.table(w, "NAME", "SCOPE", "LAST USED")
 			for _, t := range d.APITokens {
 				used := ""
@@ -551,6 +551,9 @@ func runAdminRunners(c *Ctx, args []string) int {
 			"wait max", fmt.Sprintf("%ds", queue.ClaimWaitMaxS),
 			"reaped 24h", fmt.Sprintf("%d", queue.Reaped24h),
 		)
+		if len(runners) > 0 {
+			v.section("runners")
+		}
 		tb := c.table(w, "USER", "FINGERPRINT", "LAST SEEN", "SCOPE", "HELD")
 		for _, r := range runners {
 			scope := r.Scope

@@ -641,8 +641,12 @@ func runMRShow(c *Ctx, args []string) int {
 		if d.UnresolvedThreads > 0 {
 			unresolved = fmt.Sprintf("%d", d.UnresolvedThreads)
 		}
-		v.fields(
-			"author", d.Author+", "+c.when(d.CreatedAt),
+		// One fields call for every one-row fact, including the unmet
+		// gates and the commit/check/review that only has a single row
+		// to show: separate calls each compute their own key width, so
+		// keeping them in one call keeps every key aligned.
+		kv := []string{
+			"author", d.Author + ", " + c.when(d.CreatedAt),
 			"source", fmt.Sprintf("%s -> %s", d.Source, d.TargetRef),
 			"head", fmt.Sprintf("%.10s", d.HeadSHA),
 			"milestone", d.Milestone,
@@ -655,20 +659,32 @@ func runMRShow(c *Ctx, args []string) int {
 			"superseded by", superseded,
 			"unresolved threads", unresolved,
 			"gates", gates,
-			"url", c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)),
-		)
-		if g := d.Gates; g != nil && len(g.Unmet) > 0 {
-			var kv []string
+		}
+		if g := d.Gates; g != nil {
 			for _, u := range g.Unmet {
 				kv = append(kv, "unmet", u)
 			}
-			v.fields(kv...)
 		}
+		if len(commits) == 1 {
+			kv = append(kv, "commit", fmt.Sprintf("%.10s %s", commits[0].SHA, commits[0].Subject))
+		}
+		if len(checks) == 1 {
+			x := checks[0]
+			dur := ""
+			if x.Duration != "" {
+				dur = " in " + x.Duration
+			}
+			kv = append(kv, "check", fmt.Sprintf("%s %s at %s%s", x.Context, x.State, c.when(x.UpdatedAt), dur))
+		}
+		if len(rs) == 1 {
+			kv = append(kv, "review", reviewLine(rs[0])+" at "+c.when(rs[0].CreatedAt))
+		}
+		kv = append(kv, "url", c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)))
+		v.fields(kv...)
+
 		v.body(d.Body, d.BodyFormat)
 
-		if len(commits) == 1 {
-			v.fields("commit", fmt.Sprintf("%.10s %s", commits[0].SHA, commits[0].Subject))
-		} else if len(commits) > 1 {
+		if len(commits) > 1 {
 			io.WriteString(w, "\n")
 			tb := c.table(w, "SHA", "SUBJECT")
 			for _, cm := range commits {
@@ -677,26 +693,17 @@ func runMRShow(c *Ctx, args []string) int {
 			tb.flush()
 		}
 
-		if len(checks) == 1 {
-			x := checks[0]
-			dur := ""
-			if x.Duration != "" {
-				dur = " in " + x.Duration
-			}
-			v.fields("check", fmt.Sprintf("%s %s at %s%s", x.Context, x.State, c.when(x.UpdatedAt), dur))
-		} else if len(checks) > 1 {
-			io.WriteString(w, "\n")
-			tb := c.table(w, "CHECK", "STATE", "UPDATED")
+		if len(checks) > 1 {
+			v.section("check")
+			tb := c.table(w, "CHECK", "STATE", "DURATION", "UPDATED")
 			for _, x := range checks {
-				tb.row(cText(x.Context), cState(x.State), cText(c.when(x.UpdatedAt)))
+				tb.row(cText(x.Context), cState(x.State), cText(x.Duration), cText(c.when(x.UpdatedAt)))
 			}
 			tb.flush()
 		}
 
-		if len(rs) == 1 {
-			v.fields("review", reviewLine(rs[0])+" at "+c.when(rs[0].CreatedAt))
-		} else if len(rs) > 1 {
-			io.WriteString(w, "\n")
+		if len(rs) > 1 {
+			v.section("review")
 			tb := c.table(w, "REVIEWER", "VERDICT", "WHEN")
 			for _, r := range rs {
 				verdict := r.Verdict

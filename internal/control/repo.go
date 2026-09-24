@@ -384,7 +384,7 @@ func runRepoShow(c *Ctx, args []string) int {
 			"url", c.siteURL(d.Path),
 		)
 		if len(d.Mirrors) > 0 {
-			io.WriteString(w, "\n")
+			v.section("mirror")
 			tb := c.table(w, "DIRECTION", "URL", "LAST SYNC", "STATUS")
 			for _, m := range d.Mirrors {
 				status := "ok"

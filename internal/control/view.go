@@ -28,8 +28,9 @@ func (c *Ctx) siteURL(parts ...string) string {
 // view lays out a show: a title line, aligned fields, a body, events,
 // comments. Plain output is the same lines without colour or wrapping.
 type view struct {
-	c *Ctx
-	w io.Writer
+	c     *Ctx
+	w     io.Writer
+	wrote bool // has this view written anything yet
 }
 
 func (c *Ctx) view(w io.Writer) *view { return &view{c: c, w: w} }
@@ -38,12 +39,36 @@ func (v *view) opts() termtext.Options {
 	return termtext.Options{Width: max(0, v.c.Term.Cols-2), Color: v.c.Term.Color, Base: v.c.Cfg.Server.SiteURL}
 }
 
+// sep writes a blank line before the next block, unless this view has
+// written nothing yet: fields, a body or a section as the first thing a
+// command prints (admin runners, admin stats, notifications settings
+// show, ...) does not open with an empty line.
+func (v *view) sep() {
+	if v.wrote {
+		io.WriteString(v.w, "\n")
+	}
+	v.wrote = true
+}
+
+// section prints a sub-table's label: a blank line, then the label bold
+// at a terminal or "label:" in plain. Callers skip the call entirely
+// when the table it introduces has no rows.
+func (v *view) section(label string) {
+	v.sep()
+	if v.c.Term.Cols == 0 {
+		io.WriteString(v.w, label+":\n")
+		return
+	}
+	io.WriteString(v.w, v.c.Term.paint(sgrBold, label)+"\n")
+}
+
 // title prints "ref  title  state", wrapping title+state to the
 // terminal width. Continuation lines indent under the title, and each
 // line is painted after wrapping so no SGR sequence crosses a break.
 // title or state may be "": either is skipped rather than leaving a
 // trailing blank field.
 func (v *view) title(ref, title, state string) {
+	v.sep()
 	t := v.c.Term
 	if t.Cols == 0 {
 		switch {
@@ -107,7 +132,7 @@ func (v *view) fields(kv ...string) {
 			wide = max(wide, cells(kv[i]))
 		}
 	}
-	io.WriteString(v.w, "\n")
+	v.sep()
 	for i := 0; i+1 < len(kv); i += 2 {
 		key, val := kv[i], kv[i+1]
 		if val == "" {
@@ -133,7 +158,7 @@ func (v *view) body(src, format string) {
 	if strings.TrimSpace(src) == "" {
 		return
 	}
-	io.WriteString(v.w, "\n")
+	v.sep()
 	for _, line := range strings.Split(strings.TrimRight(termtext.Render(src, format, v.opts()), "\n"), "\n") {
 		if line == "" {
 			io.WriteString(v.w, "\n")
@@ -153,6 +178,7 @@ func (v *view) event(text, format, ts string) {
 		line = pad(clip(line, room), room)
 	}
 	io.WriteString(v.w, "  "+v.c.Term.paint(sgrDim, line+"  "+when)+"\n")
+	v.wrote = true
 }
 
 func (v *view) comment(author, ts, body, format string) {
@@ -166,6 +192,7 @@ func (v *view) comment(author, ts, body, format string) {
 	if cols > 0 {
 		head += strings.Repeat("─", max(1, cols-cells(head)))
 	}
-	io.WriteString(v.w, "\n"+v.c.Term.paint(sgrDim, head)+"\n")
+	v.sep()
+	io.WriteString(v.w, v.c.Term.paint(sgrDim, head)+"\n")
 	v.body(body, format)
 }

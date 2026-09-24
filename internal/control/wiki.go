@@ -168,6 +168,12 @@ func runWikiShow(c *Ctx, args []string) int {
 			format = "org"
 		}
 		return c.emit(d, func(w io.Writer) {
+			// Plain: the page source verbatim, same as any other piped
+			// file read. The title/fields/body layout is terminal-only.
+			if c.Term.Cols == 0 {
+				fmt.Fprint(w, d.Content)
+				return
+			}
 			v := c.view(w)
 			v.title(repo.Path(), page, "")
 			binaryNote := ""

@@ -165,7 +165,7 @@ func TestAdminUserListAndShow(t *testing.T) {
 		t.Fatalf("unknown user: exit %d", code)
 	}
 	// Plain output carries the same facts.
-	if out, _, _ := inst.ssh(t, adminKey, "", "admin", "user", "show", "alice"); !strings.Contains(out, "alice") || !strings.Contains(out, "active") ||
+	if out, _, _ := inst.ssh(t, adminKey, "", "admin", "user", "show", "alice"); !strings.HasPrefix(out, "alice  active\n") ||
 		!strings.Contains(out, "acme\tadmin") || !strings.Contains(out, "verified by admin") {
 		t.Fatalf("plain show:\n%s", out)
 	}
