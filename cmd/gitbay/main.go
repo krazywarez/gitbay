@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+	os.Args, noColor = stripNoColor(os.Args)
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		os.Exit(protocol.ExitUsage)
