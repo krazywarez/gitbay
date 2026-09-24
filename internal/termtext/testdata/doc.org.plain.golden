@@ -4,7 +4,6 @@ A paragraph long enough to wrap at sixty columns, with bold, italic, underline, 
 
 • one
 • two, which is long enough that its continuation line has to hang under the text rather than the bullet
-
   • nested
 
 1. first

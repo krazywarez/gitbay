@@ -16,11 +16,24 @@ func TestOrgGolden(t *testing.T) {
 	golden(t, "doc.org.60color.golden", Org(string(src), Options{Width: 60, Color: true, Base: "https://forge.test"}))
 }
 
-// #+INCLUDE reads nothing from the server's disk.
+// #+INCLUDE reads nothing from the server's disk, and the keyword
+// itself renders nothing either.
 func TestOrgIncludeIsInert(t *testing.T) {
 	got := Org("#+INCLUDE: \"/etc/passwd\"\n\ntext\n", Options{})
 	if strings.Contains(got, "root:") {
 		t.Fatalf("include read a file: %q", got)
+	}
+	if strings.Contains(got, "#+INCLUDE") {
+		t.Fatalf("include rendered as text: %q", got)
+	}
+}
+
+// A keyword (dropped) followed by a blank line then a paragraph must
+// not leave the paragraph's leading LineBreak as a stray space.
+func TestOrgKeywordGapNoLeadingSpace(t *testing.T) {
+	got := Org("#+SETUPFILE: \"x\"\n\ntext\n", Options{})
+	if got != "text\n" {
+		t.Errorf("Org = %q, want %q", got, "text\n")
 	}
 }
 

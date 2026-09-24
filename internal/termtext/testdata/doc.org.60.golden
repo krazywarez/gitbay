@@ -7,7 +7,6 @@ italic, underline, verbatim, code, a link
 • one
 • two, which is long enough that its continuation line has
   to hang under the text rather than the bullet
-
   • nested
 
 1. first
