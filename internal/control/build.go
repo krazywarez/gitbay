@@ -159,9 +159,11 @@ func runBuildList(c *Ctx, args []string) int {
 		ds[i].Subject = subjects[ds[i].SHA]
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "#", "JOB", "STATUS", "SHA", "REF", "TITLE")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%.10s\t%s\t%s\n", d.Number, d.Job, d.Status, d.SHA, d.Ref, d.Subject)
+			tb.row(cRef(fmt.Sprintf("%d", d.Number)), cText(d.Job), cState(d.Status), cRef(fmt.Sprintf("%.10s", d.SHA)), cText(d.Ref), cFlex(d.Subject))
 		}
+		tb.flush()
 	})
 }
 
@@ -259,16 +261,18 @@ func runBuildJobs(c *Ctx, args []string) int {
 		out = append(out, JobOut{Name: j.Name, Schedule: j.Schedule, Tags: j.Tags})
 	}
 	return c.emit(out, func(w io.Writer) {
+		tb := c.table(w, "NAME", "WHEN")
 		for _, j := range out {
+			when := "on push"
 			switch {
 			case j.Schedule != "":
-				fmt.Fprintf(w, "%s\tschedule %s\n", j.Name, j.Schedule)
+				when = "schedule " + j.Schedule
 			case j.Tags != "":
-				fmt.Fprintf(w, "%s\ttags %s\n", j.Name, j.Tags)
-			default:
-				fmt.Fprintf(w, "%s\ton push\n", j.Name)
+				when = "tags " + j.Tags
 			}
+			tb.row(cRef(j.Name), cText(when))
 		}
+		tb.flush()
 	})
 }
 
@@ -365,9 +369,11 @@ func runSecretList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(names, func(w io.Writer) {
+		tb := c.table(w, "NAME")
 		for _, n := range names {
-			fmt.Fprintln(w, n)
+			tb.row(cRef(n))
 		}
+		tb.flush()
 	})
 }
 

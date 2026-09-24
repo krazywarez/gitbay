@@ -114,17 +114,19 @@ func emitMilestones(c *Ctx, ms []store.Milestone) int {
 		ds = append(ds, out{m.Title, m.Description, m.DueDate, m.State, m.OrgID != 0, m.OpenItems, m.ClosedItems})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		tb := c.table(w, "TITLE", "STATE", "DUE", "PROGRESS")
 		for _, d := range ds {
 			due := d.Due
 			if due == "" {
 				due = "-"
 			}
-			mark := ""
+			cells := []cell{cRef(d.Title), cState(d.State), cText("due " + due), cText(fmt.Sprintf("%d open, %d closed", d.Open, d.Closed))}
 			if d.Org {
-				mark = "\torg"
+				cells = append(cells, cText("org"))
 			}
-			fmt.Fprintf(w, "%s\t%s\tdue %s\t%d open, %d closed%s\n", d.Title, d.State, due, d.Open, d.Closed, mark)
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 
@@ -241,9 +243,11 @@ func runIssueTemplates(c *Ctx, args []string) int {
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	ts := IssueTemplates(dir, repo.DefaultBranch)
 	return c.emit(ts, func(w io.Writer) {
+		tb := c.table(w, "NAME")
 		for _, t := range ts {
-			fmt.Fprintln(w, t.Name)
+			tb.row(cRef(t.Name))
 		}
+		tb.flush()
 	})
 }
 

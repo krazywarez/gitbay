@@ -204,9 +204,11 @@ func runIssueList(c *Ctx, args []string) int {
 		ds = append(ds, issueToOut(i, false))
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "#", "STATE", "TITLE", "AUTHOR")
 		for _, d := range ds {
-			fmt.Fprintf(w, "#%d\t%s\t%s\t%s\n", d.Number, d.State, d.Title, d.Author)
+			tb.row(cRef(fmt.Sprintf("#%d", d.Number)), cState(d.State), cFlex(d.Title), cText(d.Author))
 		}
+		tb.flush()
 	})
 }
 

@@ -246,13 +246,15 @@ func runReleaseList(c *Ctx, args []string) int {
 		ds = append(ds, releaseToOut(r, false))
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "TAG", "TITLE", "ASSETS")
 		for _, d := range ds {
 			title := d.Title
 			if title == d.Tag {
 				title = ""
 			}
-			fmt.Fprintf(w, "%s\t%s\t%d asset(s)\n", d.Tag, title, len(d.Assets))
+			tb.row(cRef(d.Tag), cFlex(title), cText(fmt.Sprintf("%d asset(s)", len(d.Assets))))
 		}
+		tb.flush()
 	})
 }
 

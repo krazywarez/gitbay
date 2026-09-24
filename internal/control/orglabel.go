@@ -128,9 +128,11 @@ func runOrgLabelList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(labels, func(w io.Writer) {
+		tb := c.table(w, "NAME", "COLOR", "ISSUES", "MRS")
 		for _, l := range labels {
-			fmt.Fprintf(w, "%s\t%s\t%d\t%d\n", l.Name, l.Color, l.Issues, l.MRs)
+			tb.row(cRef(l.Name), cText(l.Color), cNum(l.Issues), cNum(l.MRs))
 		}
+		tb.flush()
 	})
 }
 

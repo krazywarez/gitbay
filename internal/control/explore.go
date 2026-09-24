@@ -1,7 +1,6 @@
 package control
 
 import (
-	"fmt"
 	"io"
 	"strings"
 
@@ -75,9 +74,11 @@ func runExplore(c *Ctx, args []string) int {
 	}
 	ds, next := trimPage(p, ds, "explore", func(o out) string { return o.Path })
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "PATH", "DESCRIPTION")
 		for _, d := range ds {
-			fmt.Fprintf(w, "%s\t%s\n", d.Path, d.Description)
+			tb.row(cRef(d.Path), cFlex(d.Description))
 		}
+		tb.flush()
 	})
 }
 

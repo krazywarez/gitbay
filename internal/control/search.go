@@ -98,15 +98,16 @@ func runSearch(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(results, func(w io.Writer) {
+		tb := c.table(w, "KIND", "REF", "STATE", "TITLE")
 		for _, r := range results {
 			switch r.Kind {
 			case "repo":
-				fmt.Fprintf(w, "repo\t%s\t%s\n", r.Repo, r.Title)
+				tb.row(cText("repo"), cRef(r.Repo), cFlex(r.Title))
 			default:
-				fmt.Fprintf(w, "%s\t%s%s%d\t%s\t%s\n", r.Kind, r.Repo,
-					SearchMarker(r.Kind), r.Number, r.State, r.Title)
+				tb.row(cText(r.Kind), cRef(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number)), cState(r.State), cFlex(r.Title))
 			}
 		}
+		tb.flush()
 	})
 }
 

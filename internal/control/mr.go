@@ -499,17 +499,19 @@ func runMRList(c *Ctx, args []string) int {
 		ds = append(ds, o)
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		tb := c.table(w, "!", "STATE", "TITLE", "REF")
 		for _, d := range ds {
-			stacked := ""
-			if d.StackedOn != nil {
-				stacked = fmt.Sprintf("\tstacked on !%d", d.StackedOn.Number)
-			}
 			state := d.State
 			if d.Draft {
 				state = "draft"
 			}
-			fmt.Fprintf(w, "!%d\t%s\t%s\t%s -> %s%s\n", d.Number, state, d.Title, d.Source, d.TargetRef, stacked)
+			cells := []cell{cRef(fmt.Sprintf("!%d", d.Number)), cState(state), cFlex(d.Title), cText(fmt.Sprintf("%s -> %s", d.Source, d.TargetRef))}
+			if d.StackedOn != nil {
+				cells = append(cells, cText(fmt.Sprintf("stacked on !%d", d.StackedOn.Number)))
+			}
+			tb.row(cells...)
 		}
+		tb.flush()
 	})
 }
 
@@ -1703,13 +1705,15 @@ func runMRRevisions(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(revs, func(w io.Writer) {
+		tb := c.table(w, "REV", "SHA", "WHEN")
 		for _, r := range revs {
 			mark := " "
 			if r.Current {
 				mark = "*"
 			}
-			fmt.Fprintf(w, "%s v%d\t%.10s\t%s\n", mark, r.N, r.SHA, r.CreatedAt)
+			tb.row(cRef(fmt.Sprintf("%s v%d", mark, r.N)), cRef(fmt.Sprintf("%.10s", r.SHA)), cAge(r.CreatedAt))
 		}
+		tb.flush()
 		if len(revs) < 2 {
 			fmt.Fprintf(w, "\nonly one revision; %s!%d has not been pushed to since it was opened\n",
 				repo.Path(), mr.Number)
