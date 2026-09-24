@@ -31,7 +31,7 @@ func init() {
 		Flags: []Flag{
 			{"--ref", "<r>", "branch, tag or commit to archive", ""},
 		},
-		Examples: []string{"repo download krz/gitbay --ref main '> gitbay.tar.gz'"},
+		Examples: []string{"repo download krz/gitbay --ref main > gitbay.tar.gz"},
 		ReadOnly: true,
 		Run:      runRepoDownload,
 	})

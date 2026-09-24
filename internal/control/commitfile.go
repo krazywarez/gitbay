@@ -23,7 +23,7 @@ func init() {
 			{"--file", "-", "read the new content from stdin", ""},
 		},
 		Examples: []string{
-			`repo commit-file krz/gitbay CHANGELOG.org --ref main --message "note the release" --file - '< CHANGELOG.org'`,
+			`repo commit-file krz/gitbay CHANGELOG.org --ref main --message "note the release" --file - < CHANGELOG.org`,
 		},
 		ReadsStdin: true,
 		Run:        runCommitFile,

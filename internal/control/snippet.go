@@ -25,7 +25,7 @@ func init() {
 			{"--description", "<d>", "one line about the snippet", ""},
 			{"--visibility", "public|unlisted|private", "who can find it", "unlisted"},
 		},
-		Examples:   []string{"snippet create notes.md --visibility private '< notes.md'"},
+		Examples:   []string{"snippet create notes.md --visibility private < notes.md"},
 		ReadsStdin: true, Run: runSnippetCreate})
 	register(Command{Path: []string{"snippet", "show"},
 		Summary:  "show a snippet's metadata and files",
@@ -58,12 +58,12 @@ func init() {
 	register(Command{Path: []string{"snippet", "file", "set"},
 		Summary:    "add a file to a snippet, or replace one, from stdin",
 		Usage:      "snippet file set <id> <filename> < file",
-		Examples:   []string{"snippet file set a1b2c3 notes.md '< notes.md'"},
+		Examples:   []string{"snippet file set a1b2c3 notes.md < notes.md"},
 		ReadsStdin: true, Run: runSnippetFileSet})
 	register(Command{Path: []string{"snippet", "file", "get"},
 		Summary:  "write a snippet file to stdout",
 		Usage:    "snippet file get <id> <filename> > file",
-		Examples: []string{"snippet file get a1b2c3 notes.md '> notes.md'"},
+		Examples: []string{"snippet file get a1b2c3 notes.md > notes.md"},
 		ReadOnly: true, Run: runSnippetFileGet})
 	register(Command{Path: []string{"snippet", "file", "remove"},
 		Summary:  "remove a file from a snippet",

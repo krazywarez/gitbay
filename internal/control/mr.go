@@ -71,7 +71,7 @@ func init() {
 		},
 		Examples: []string{
 			`mr create krz/gitbay --source cli-output-help --target main --title "control: flag help"`,
-			"mr create krz/gitbay --source cli-output-help --target main --title notes --file - '< notes.md'",
+			"mr create krz/gitbay --source cli-output-help --target main --title notes --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runMRCreate})
 	register(Command{Path: []string{"mr", "range-diff"},

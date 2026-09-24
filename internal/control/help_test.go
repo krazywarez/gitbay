@@ -11,6 +11,12 @@ import (
 
 var usageFlag = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 
+// trailingRedirect strips a shell redirect an example ends with, the way a
+// person's shell would before gitbay ever sees argv: protocol.Tokenize
+// rejects a bare < or > as a shell metacharacter, so the redirected part
+// is not something the command's own tokenizer parses.
+var trailingRedirect = regexp.MustCompile(`^(.*?)\s+[<>]\s*\S+$`)
+
 // helpCovered restricts TestHelpIsComplete to the path prefixes whose help
 // text this commit filled in. Task 4.3 fills the rest and removes this set.
 // "org label" and "org milestone" name the two prefixes under "org" this
@@ -66,7 +72,11 @@ func TestHelpIsComplete(t *testing.T) {
 			t.Errorf("%s: no example", path)
 		}
 		for _, ex := range cmd.Examples {
-			argv, err := protocol.Tokenize(ex)
+			toParse := ex
+			if m := trailingRedirect.FindStringSubmatch(ex); m != nil {
+				toParse = m[1]
+			}
+			argv, err := protocol.Tokenize(toParse)
 			if err != nil {
 				t.Errorf("%s: example %q: %v", path, ex, err)
 				continue

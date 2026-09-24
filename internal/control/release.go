@@ -30,7 +30,7 @@ func init() {
 		},
 		Examples: []string{
 			`release create krz/gitbay v1.31.0 --title "v1.31.0" --notes "flag help"`,
-			"release create krz/gitbay v1.31.0 --file - '< notes.md'",
+			"release create krz/gitbay v1.31.0 --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runReleaseCreate})
 	register(Command{Path: []string{"release", "edit"},
@@ -69,12 +69,12 @@ func init() {
 	register(Command{Path: []string{"release", "asset", "add"},
 		Summary:    "upload an asset from stdin",
 		Usage:      "release asset add <owner/name> <tag> <filename> < file",
-		Examples:   []string{"release asset add krz/gitbay v1.30.0 gitbay-darwin-arm64 '< gitbay-darwin-arm64'"},
+		Examples:   []string{"release asset add krz/gitbay v1.30.0 gitbay-darwin-arm64 < gitbay-darwin-arm64"},
 		ReadsStdin: true, Run: runAssetAdd})
 	register(Command{Path: []string{"release", "asset", "get"},
 		Summary:  "write an asset to stdout",
 		Usage:    "release asset get <owner/name> <tag> <filename> > file",
-		Examples: []string{"release asset get krz/gitbay v1.30.0 gitbay-darwin-arm64 '> gitbay-darwin-arm64'"},
+		Examples: []string{"release asset get krz/gitbay v1.30.0 gitbay-darwin-arm64 > gitbay-darwin-arm64"},
 		ReadOnly: true, Run: runAssetGet})
 	register(Command{Path: []string{"release", "asset", "remove"},
 		Summary:  "remove an asset",

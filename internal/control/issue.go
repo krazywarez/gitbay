@@ -26,7 +26,7 @@ func init() {
 		},
 		Examples: []string{
 			`issue create krz/gitbay --title "crash on empty repo" --body "steps to reproduce..."`,
-			"issue create krz/gitbay --title notes --file - '< notes.md'",
+			"issue create krz/gitbay --title notes --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
@@ -63,7 +63,7 @@ func init() {
 		},
 		Examples: []string{
 			`issue edit krz/gitbay 42 --title "crash on empty repo, take two"`,
-			"issue edit krz/gitbay 42 --file - '< notes.md'",
+			"issue edit krz/gitbay 42 --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
@@ -76,7 +76,7 @@ func init() {
 		},
 		Examples: []string{
 			`issue comment krz/gitbay 42 --message "can't reproduce on main"`,
-			"issue comment krz/gitbay 42 --file - '< notes.md'",
+			"issue comment krz/gitbay 42 --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runIssueComment})
 	register(Command{Path: []string{"issue", "close"},

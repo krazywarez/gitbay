@@ -29,7 +29,7 @@ func init() {
 		},
 		Examples: []string{
 			`mr diff-comment krz/gitbay 431 --path internal/control/build.go --line 42 --message "why is this a switch"`,
-			"mr diff-comment krz/gitbay 431 --reply 12 --file - '< notes.md'",
+			"mr diff-comment krz/gitbay 431 --reply 12 --file - < notes.md",
 		},
 		ReadsStdin: true, Run: runDiffComment})
 	register(Command{Path: []string{"mr", "threads"},
