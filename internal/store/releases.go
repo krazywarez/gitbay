@@ -90,17 +90,20 @@ func (s *Store) ReleaseByTag(repoID int64, tag string) (Release, error) {
 
 // ListReleases returns releases newest-first, assets included.
 func (s *Store) ListReleases(repoID int64) ([]Release, error) {
-	return s.ListReleasesPage(repoID, 0, 0)
+	return s.ListReleasesPage(repoID, 0, "", 0)
 }
 
-// ListReleasesPage lists newest first. limit 0 is every row; afterID is
-// the last release of the previous page, 0 for the first.
-func (s *Store) ListReleasesPage(repoID int64, limit int, afterID int64) ([]Release, error) {
+// ListReleasesPage lists newest first. limit 0 is every row; afterCreated
+// and afterID are the (created_at, id) of the last release of the
+// previous page, afterID 0 for the first page. The pair, not a lookup by
+// id, is what survives the pointed-to release being deleted between
+// requests.
+func (s *Store) ListReleasesPage(repoID int64, limit int, afterCreated string, afterID int64) ([]Release, error) {
 	q := releaseSelect + " WHERE r.repo_id = ?"
 	args := []any{repoID}
 	if afterID > 0 {
-		q += " AND (r.created_at, r.id) < (SELECT created_at, id FROM releases WHERE id = ?)"
-		args = append(args, afterID)
+		q += " AND (r.created_at, r.id) < (?, ?)"
+		args = append(args, afterCreated, afterID)
 	}
 	q += " ORDER BY r.created_at DESC, r.id DESC"
 	if limit > 0 {

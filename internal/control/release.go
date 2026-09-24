@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
@@ -196,8 +197,24 @@ func runReleaseEdit(c *Ctx, args []string) int {
 	})
 }
 
+// splitReleaseCursor pulls "<created_at>|<id>" apart. The id is what a
+// deleted release loses, so the created_at half carries the sort
+// position even when the row the cursor names is gone.
+func splitReleaseCursor(key string) (created string, id int64, ok bool) {
+	i := strings.LastIndex(key, "|")
+	if i < 0 {
+		return "", 0, false
+	}
+	created = key[:i]
+	n, err := strconv.ParseInt(key[i+1:], 10, 64)
+	if err != nil || created == "" {
+		return "", 0, false
+	}
+	return created, n, true
+}
+
 func runReleaseList(c *Ctx, args []string) int {
-	rest, p, code := parsePageFlags(c, args, "release", true)
+	rest, p, code := parsePageFlags(c, args, "release", false)
 	if code >= 0 {
 		return code
 	}
@@ -208,11 +225,22 @@ func runReleaseList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	rels, err := c.Store.ListReleasesPage(repo.ID, p.queryLimit(), p.keyInt())
+	var afterCreated string
+	var afterID int64
+	if p.key != "" {
+		var ok bool
+		afterCreated, afterID, ok = splitReleaseCursor(p.key)
+		if !ok {
+			return c.fail(protocol.ExitUsage, "bad cursor")
+		}
+	}
+	rels, err := c.Store.ListReleasesPage(repo.ID, p.queryLimit(), afterCreated, afterID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	rels, next := trimPage(p, rels, "release", func(r store.Release) string { return strconv.FormatInt(r.ID, 10) })
+	rels, next := trimPage(p, rels, "release", func(r store.Release) string {
+		return r.CreatedAt + "|" + strconv.FormatInt(r.ID, 10)
+	})
 	var ds []releaseOut
 	for _, r := range rels {
 		ds = append(ds, releaseToOut(r, false))
