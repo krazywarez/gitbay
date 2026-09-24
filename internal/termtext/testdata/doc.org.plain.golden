@@ -1,0 +1,24 @@
+A heading
+
+A paragraph long enough to wrap at sixty columns, with bold, italic, underline, verbatim, code, a link (https://example.com/page), and a bare https://example.com.
+
+• one
+• two, which is long enough that its continuation line has to hang under the text rather than the bullet
+
+  • nested
+
+1. first
+2. second
+
+term
+  its description
+
+    func main() { fmt.Println("a line longer than sixty columns stays on one line, unwrapped") }
+
+│ quoted text
+
+───
+
+    | a | b |
+    |---+---|
+    | 1 | 2 |

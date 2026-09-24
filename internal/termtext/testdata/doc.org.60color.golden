@@ -1,0 +1,27 @@
+[1mA heading[0m
+
+A paragraph long enough to wrap at sixty columns, with [1mbold[0m,
+[4mitalic[0m, [4munderline[0m, verbatim, code, a link
+(https://example.com/page), and a bare https://example.com.
+
+• one
+• two, which is long enough that its continuation line has
+  to hang under the text rather than the bullet
+
+  • nested
+
+1. first
+2. second
+
+[1mterm[0m
+  its description
+
+    [96mfunc[0m[97m [0m[93mmain[0m[97m()[0m[97m [0m[97m{[0m[97m [0m[93mfmt[0m[97m.[0m[93mPrintln[0m[97m([0m[37m"a line longer than sixty columns stays on one line, unwrapped"[0m[97m)[0m[97m [0m[97m}[0m
+
+[2m│ [0mquoted text
+
+[2m───[0m
+
+    [97m| a | b |[0m
+    [97m|---+---|[0m
+    [97m| 1 | 2 |[0m
