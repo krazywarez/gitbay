@@ -54,7 +54,7 @@ func TestRepoShowCarriesViewerState(t *testing.T) {
 	}
 
 	// Plain output carries the same.
-	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "alice/app"); !strings.Contains(out, "watch: watching") ||
+	if out, _, _ := inst.ssh(t, bobKey, "", "repo", "show", "alice/app"); !strings.Contains(out, "watching") ||
 		!strings.Contains(out, "bookmarked") {
 		t.Errorf("plain output lacks the state:\n%s", out)
 	}

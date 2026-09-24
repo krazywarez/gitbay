@@ -198,7 +198,12 @@ func emitNotificationSettings(c *Ctx) int {
 			}
 			return "off"
 		}
-		fmt.Fprintf(w, "mail: %s\nwatch: %s\npush: %s\n", onOff(mail), onOff(watch), onOff(push))
+		v := c.view(w)
+		v.fields(
+			"mail", onOff(mail),
+			"watch", onOff(watch),
+			"push", onOff(push),
+		)
 	})
 }
 

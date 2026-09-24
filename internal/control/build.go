@@ -183,17 +183,21 @@ func buildSubjects(c *Ctx, repo store.Repo, ds []BuildOut) map[string]string {
 }
 
 func runBuildShow(c *Ctx, args []string) int {
-	_, b, code := buildRef(c, args)
+	repo, b, code := buildRef(c, args)
 	if code >= 0 {
 		return code
 	}
 	d := buildToOut(b)
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "build %d\t%s\t%s\n%.10s on %s\nqueued %s", d.Number, d.Job, d.Status, d.SHA, d.Ref, d.CreatedAt)
-		if d.FinishedAt != "" {
-			fmt.Fprintf(w, ", finished %s", d.FinishedAt)
-		}
-		fmt.Fprintln(w)
+		v := c.view(w)
+		v.title(fmt.Sprintf("#%d", d.Number), d.Job, d.Status)
+		v.fields(
+			"sha", fmt.Sprintf("%.10s", d.SHA),
+			"ref", d.Ref,
+			"queued", c.when(d.CreatedAt),
+			"finished", c.when(d.FinishedAt),
+			"url", c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10)),
+		)
 	})
 }
 

@@ -173,13 +173,8 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	// rawOutput prints content verbatim (a file, a log, a diff) and is
 	// not fitted to the terminal.
 	rawOutput := map[string]bool{
-		"repo download":    true,
-		"account export":   true,
-		"admin user show":  true, // until the view layout (Part 3)
-		"admin runners":    true, // until the view layout (Part 3): the queue summary line
-		"admin stats":      true, // until the view layout (Part 3)
-		"repo deps status": true, // until the view layout (Part 3)
-		"release show":     true, // until the view layout (Part 3)
+		"repo download":  true,
+		"account export": true,
 	}
 	// binaryOutput's bytes are not text: a stray 0x1b is coincidence, not
 	// an SGR sequence escaping into plain output.

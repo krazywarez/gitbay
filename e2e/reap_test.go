@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -111,7 +112,7 @@ func TestAdminRunners(t *testing.T) {
 		t.Fatal("runner next failed")
 	}
 	out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners")
-	if !strings.HasPrefix(out, "queue: 0 pending; last 24h: 0 claimed") || !strings.Contains(out, "\nci\t") ||
+	if !regexp.MustCompile(`pending\s+0`).MatchString(out) || !regexp.MustCompile(`claimed 24h\s+0`).MatchString(out) || !strings.Contains(out, "\nci\t") ||
 		!strings.Contains(out, "\talice/app\tidle") {
 		t.Fatalf("idle runner row:\n%s", out)
 	}
@@ -142,7 +143,7 @@ func TestAdminRunners(t *testing.T) {
 		t.Fatal("runner done failed")
 	}
 	if out, _, _ := inst.ssh(t, rootKey, "", "admin", "runners"); !strings.Contains(out, "\tany\tidle") ||
-		!strings.HasPrefix(out, "queue: 0 pending; last 24h: 1 claimed, wait avg ") {
+		!regexp.MustCompile(`pending\s+0`).MatchString(out) || !regexp.MustCompile(`claimed 24h\s+1`).MatchString(out) {
 		t.Fatalf("runner still holds a build after done:\n%s", out)
 	}
 	// Host-local, the same read.

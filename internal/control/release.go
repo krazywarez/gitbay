@@ -265,12 +265,23 @@ func runReleaseShow(c *Ctx, args []string) int {
 	}
 	d := releaseToOut(rel, true)
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s\t%s\tby %s on %s\n", d.Tag, d.Title, d.Author, d.CreatedAt)
-		if d.Notes != "" {
-			fmt.Fprintf(w, "\n%s\n", d.Notes)
+		title := d.Title
+		if title == d.Tag {
+			title = ""
 		}
-		for _, a := range d.Assets {
-			fmt.Fprintf(w, "%s\t%d\t%s\n", a.Name, a.Size, a.SHA256)
+		v := c.view(w)
+		v.title(d.Tag, title, "")
+		v.fields(
+			"author", d.Author+", "+c.when(d.CreatedAt),
+		)
+		v.body(d.Notes, d.NotesFormat)
+		if len(d.Assets) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "NAME", "SIZE", "SHA256")
+			for _, a := range d.Assets {
+				tb.row(cRef(a.Name), cNum(a.Size), cText(a.SHA256[:min(10, len(a.SHA256))]))
+			}
+			tb.flush()
 		}
 	})
 }

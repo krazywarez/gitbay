@@ -177,12 +177,17 @@ func runTeamShow(c *Ctx, args []string) int {
 		Grants  []store.TeamGrant `json:"grants,omitempty"`
 	}{team.Name, members, grants}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s/%s\nmembers: %s\n", org.Name, team.Name, strings.Join(members, ", "))
-		tb := c.table(w, "REPO", "ROLE")
-		for _, g := range grants {
-			tb.row(cRef(g.RepoPath), cState(g.Role))
+		v := c.view(w)
+		v.title(org.Name+"/"+team.Name, "", "")
+		v.fields("members", strings.Join(members, ", "))
+		if len(grants) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "REPO", "ROLE")
+			for _, g := range grants {
+				tb.row(cRef(g.RepoPath), cState(g.Role))
+			}
+			tb.flush()
 		}
-		tb.flush()
 	})
 }
 

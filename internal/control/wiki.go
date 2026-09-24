@@ -163,8 +163,25 @@ func runWikiShow(c *Ctx, args []string) int {
 		} else {
 			d.Content = string(raw)
 		}
+		format := "md"
+		if ext == ".org" {
+			format = "org"
+		}
 		return c.emit(d, func(w io.Writer) {
-			fmt.Fprint(w, d.Content)
+			v := c.view(w)
+			v.title(repo.Path(), page, "")
+			binaryNote := ""
+			if binary {
+				binaryNote = fmt.Sprintf("%d bytes, binary", d.Size)
+			}
+			v.fields(
+				"file", d.File,
+				"binary", binaryNote,
+				"url", c.siteURL(repo.Path(), "wiki", page),
+			)
+			if !binary {
+				v.body(d.Content, format)
+			}
 		})
 	}
 	return c.fail(protocol.ExitNotFound, "no wiki page %q in %s", page, repo.Path())

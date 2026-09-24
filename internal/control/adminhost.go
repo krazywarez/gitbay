@@ -302,12 +302,24 @@ func runAdminStats(c *Ctx, args []string) int {
 		d.DBBytes = fi.Size()
 	}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "users %d · orgs %d · repos %d · issues %d (%d open) · MRs %d (%d open)\n",
-			counts.Users, counts.Orgs, counts.Repos,
-			counts.Issues, counts.OpenIssues, counts.MRs, counts.OpenMRs)
-		fmt.Fprintf(w, "database %s · repositories %s · lfs %s\n\n", humanBytes(d.DBBytes), humanBytes(d.RepoBytes), humanBytes(d.LFSBytes))
-		for _, r := range d.Repos {
-			fmt.Fprintf(w, "%s\t%s\n", r.Path, humanBytes(r.Bytes))
+		v := c.view(w)
+		v.fields(
+			"users", fmt.Sprintf("%d", counts.Users),
+			"orgs", fmt.Sprintf("%d", counts.Orgs),
+			"repos", fmt.Sprintf("%d", counts.Repos),
+			"issues", fmt.Sprintf("%d (%d open)", counts.Issues, counts.OpenIssues),
+			"MRs", fmt.Sprintf("%d (%d open)", counts.MRs, counts.OpenMRs),
+			"database", humanBytes(d.DBBytes),
+			"repositories", humanBytes(d.RepoBytes),
+			"lfs", humanBytes(d.LFSBytes),
+		)
+		if len(d.Repos) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "PATH", "BYTES")
+			for _, r := range d.Repos {
+				tb.row(cRef(r.Path), cText(humanBytes(r.Bytes)))
+			}
+			tb.flush()
 		}
 	})
 }

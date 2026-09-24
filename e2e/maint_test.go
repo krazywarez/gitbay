@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -39,7 +40,7 @@ func TestAdminGCAndStats(t *testing.T) {
 
 	// Stats: counts and per-repo disk usage.
 	out := inst.admin(t, "admin", "stats")
-	if !strings.Contains(out, "repos 2") || !strings.Contains(out, "issues 1 (1 open)") ||
+	if !regexp.MustCompile(`repos\s+2`).MatchString(out) || !strings.Contains(out, "1 (1 open)") ||
 		!strings.Contains(out, "alice/app") || !strings.Contains(out, "alice/other") {
 		t.Fatalf("stats output: %s", out)
 	}

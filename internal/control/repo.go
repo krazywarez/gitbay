@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
@@ -361,44 +362,41 @@ func runRepoShow(c *Ctx, args []string) int {
 		}
 	}
 	return c.emit(d, func(w io.Writer) {
-		line := fmt.Sprintf("%s\t%s\tdefault: %s", d.Path, d.Visibility, d.DefaultBranch)
-		if d.Archived {
-			line += "\t[archived]"
-		}
-		fmt.Fprintln(w, line)
-		if d.Description != "" {
-			fmt.Fprintf(w, "%s\n", d.Description)
-		}
-		if d.Website != "" {
-			fmt.Fprintf(w, "website: %s\n", d.Website)
-		}
-		if len(d.Topics) > 0 {
-			fmt.Fprintf(w, "topics: %s\n", strings.Join(d.Topics, ", "))
-		}
-		if len(d.ProtectedBranches) > 0 {
-			fmt.Fprintf(w, "protected: %s\n", strings.Join(d.ProtectedBranches, ", "))
-		}
-		if len(d.Domains) > 0 {
-			fmt.Fprintf(w, "pages domains: %s\n", strings.Join(d.Domains, ", "))
-		}
-		if d.ForkOf != "" {
-			fmt.Fprintf(w, "fork of: %s\n", d.ForkOf)
-		}
-		if d.Watch != "" {
-			fmt.Fprintf(w, "watch: %s\n", d.Watch)
-		}
+		bookmarked, archived := "", ""
 		if d.Bookmarked {
-			fmt.Fprintln(w, "bookmarked")
+			bookmarked = "yes"
 		}
-		for _, m := range d.Mirrors {
-			status := "ok"
-			if m.Pending {
-				status = "pending"
+		if d.Archived {
+			archived = "yes"
+		}
+		v := c.view(w)
+		v.title(d.Path, d.Description, d.Visibility)
+		v.fields(
+			"default branch", d.DefaultBranch,
+			"website", d.Website,
+			"topics", strings.Join(d.Topics, ", "),
+			"protected", strings.Join(d.ProtectedBranches, ", "),
+			"pages domains", strings.Join(d.Domains, ", "),
+			"fork of", d.ForkOf,
+			"watch", d.Watch,
+			"bookmarked", bookmarked,
+			"archived", archived,
+			"url", c.siteURL(d.Path),
+		)
+		if len(d.Mirrors) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "DIRECTION", "URL", "LAST SYNC", "STATUS")
+			for _, m := range d.Mirrors {
+				status := "ok"
+				if m.Pending {
+					status = "pending"
+				}
+				if m.LastError != "" {
+					status = "error: " + m.LastError
+				}
+				tb.row(cText(m.Direction), cFlex(m.URL), cText(orDash(m.LastSync)), cState(status))
 			}
-			if m.LastError != "" {
-				status = "error: " + m.LastError
-			}
-			fmt.Fprintf(w, "mirror: %s %s\tlast %s\t%s\n", m.Direction, m.URL, orDash(m.LastSync), status)
+			tb.flush()
 		}
 	})
 }
@@ -630,8 +628,16 @@ func runSettingsShow(c *Ctx, args []string) int {
 		return code
 	}
 	return c.emit(repo.Settings, func(w io.Writer) {
-		fmt.Fprintf(w, "protected_branches: %s\nprotected_tags: %s\nrequire_mr: %v\nrequire_signed_commits: %v\ngit_daemon: %v\narchived: %v\n",
-			strings.Join(repo.Settings.ProtectedBranches, ", "), strings.Join(repo.Settings.ProtectedTags, ", "), repo.Settings.RequireMR, repo.Settings.RequireSignedCommits, repo.Settings.GitDaemon, repo.Settings.Archived)
+		v := c.view(w)
+		v.title(repo.Path(), "settings", "")
+		v.fields(
+			"protected branches", strings.Join(repo.Settings.ProtectedBranches, ", "),
+			"protected tags", strings.Join(repo.Settings.ProtectedTags, ", "),
+			"require mr", strconv.FormatBool(repo.Settings.RequireMR),
+			"require signed commits", strconv.FormatBool(repo.Settings.RequireSignedCommits),
+			"git daemon", strconv.FormatBool(repo.Settings.GitDaemon),
+			"archived", strconv.FormatBool(repo.Settings.Archived),
+		)
 	})
 }
 

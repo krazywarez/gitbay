@@ -49,14 +49,14 @@ func TestReleases(t *testing.T) {
 		t.Fatalf("release edit: %s", errOut)
 	}
 	out, _, _ := inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0")
-	if !strings.Contains(out, "the **rebuilt** notes") || !strings.Contains(out, "First light") {
+	if !strings.Contains(out, "the rebuilt notes") || !strings.Contains(out, "First light") {
 		t.Fatalf("edit lost a field:\n%s", out)
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "release", "edit", "alice/app", "v1.0", "--title", "'Second light'"); code != 0 {
 		t.Fatal("title edit failed")
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "release", "show", "alice/app", "v1.0")
-	if !strings.Contains(out, "Second light") || !strings.Contains(out, "the **rebuilt** notes") {
+	if !strings.Contains(out, "Second light") || !strings.Contains(out, "the rebuilt notes") {
 		t.Fatalf("title edit lost notes:\n%s", out)
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "release", "edit", "alice/app", "v9.9", "--title", "x"); code != 3 {

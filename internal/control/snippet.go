@@ -197,16 +197,21 @@ func runSnippetShow(c *Ctx, args []string) int {
 	}
 	sn.Files = files
 	return c.emit(snippetOut(c, sn), func(w io.Writer) {
-		fmt.Fprintf(w, "snippet %s by %s (%s)\n", sn.PublicID, sn.OwnerName, sn.Visibility)
-		if sn.Description != "" {
-			fmt.Fprintf(w, "%s\n", sn.Description)
+		v := c.view(w)
+		v.title(sn.PublicID, sn.Description, sn.Visibility)
+		v.fields(
+			"author", sn.OwnerName,
+			"updated", c.when(sn.UpdatedAt),
+			"url", snippetURL(c, sn),
+		)
+		if len(files) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "NAME", "SIZE")
+			for _, f := range files {
+				tb.row(cRef(f.Name), cText(fmt.Sprintf("%d bytes", f.Size)))
+			}
+			tb.flush()
 		}
-		fmt.Fprintf(w, "%s\nupdated %s\n", snippetURL(c, sn), sn.UpdatedAt)
-		tb := c.table(w, "NAME", "SIZE")
-		for _, f := range files {
-			tb.row(cRef("  "+f.Name), cText(fmt.Sprintf("%d bytes", f.Size)))
-		}
-		tb.flush()
 	})
 }
 

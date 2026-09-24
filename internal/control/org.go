@@ -123,12 +123,16 @@ func runOrgShow(c *Ctx, args []string) int {
 		Members []memberOut `json:"members"`
 	}{org.Name, ms}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s\n", d.Org)
-		tb := c.table(w, "USER", "ROLE")
-		for _, m := range ms {
-			tb.row(cRef("  "+m.User), cState(m.Role))
+		v := c.view(w)
+		v.title(d.Org, "", "")
+		if len(ms) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "USER", "ROLE")
+			for _, m := range ms {
+				tb.row(cRef(m.User), cState(m.Role))
+			}
+			tb.flush()
 		}
-		tb.flush()
 	})
 }
 

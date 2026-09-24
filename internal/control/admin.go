@@ -249,57 +249,71 @@ func runAdminUserShow(c *Ctx, args []string) int {
 	}
 
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s\t%s", d.Username, d.State)
+		admin := ""
 		if d.Admin {
-			fmt.Fprint(w, "\tadmin")
+			admin = "yes"
 		}
-		fmt.Fprintf(w, "\ncreated\t%s\n", d.CreatedAt)
-		if d.LastSeen != "" {
-			fmt.Fprintf(w, "last seen\t%s\n", d.LastSeen)
-		}
-		fmt.Fprintf(w, "repos\t%d\nweb sessions\t%d\n", d.Repos, d.WebSessions)
-		fmt.Fprintln(w, "keys:")
-		tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
-		for _, k := range d.Keys {
-			tk.row(cRef("  "+k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
-		}
-		tk.flush()
-		fmt.Fprintln(w, "emails:")
-		te := c.table(w, "ADDRESS", "STATE")
-		for _, e := range d.Emails {
-			state := "unverified"
-			if e.Verified {
-				state = "verified by " + e.VerifiedBy
+		v := c.view(w)
+		v.title(d.Username, "", d.State)
+		v.fields(
+			"admin", admin,
+			"created", c.when(d.CreatedAt),
+			"last seen", c.when(d.LastSeen),
+			"repos", fmt.Sprintf("%d", d.Repos),
+			"web sessions", fmt.Sprintf("%d", d.WebSessions),
+		)
+		if len(d.Keys) > 0 {
+			io.WriteString(w, "\n")
+			tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
+			for _, k := range d.Keys {
+				tk.row(cFlex(k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
 			}
-			cells := []cell{cRef("  " + e.Address), cState(state)}
-			if e.Primary {
-				cells = append(cells, cText("primary"))
+			tk.flush()
+		}
+		if len(d.Emails) > 0 {
+			io.WriteString(w, "\n")
+			te := c.table(w, "ADDRESS", "STATE")
+			for _, e := range d.Emails {
+				state := "unverified"
+				if e.Verified {
+					state = "verified by " + e.VerifiedBy
+				}
+				cells := []cell{cRef(e.Address), cState(state)}
+				if e.Primary {
+					cells = append(cells, cText("primary"))
+				}
+				te.row(cells...)
 			}
-			te.row(cells...)
+			te.flush()
 		}
-		te.flush()
-		fmt.Fprintln(w, "pgp keys:")
-		tp := c.table(w, "FINGERPRINT")
-		for _, k := range d.PGPKeys {
-			tp.row(cRef("  " + k.Fingerprint))
-		}
-		tp.flush()
-		fmt.Fprintln(w, "orgs:")
-		to := c.table(w, "ORG", "ROLE")
-		for _, o := range d.Orgs {
-			to.row(cRef("  "+o.Org), cState(o.Role))
-		}
-		to.flush()
-		fmt.Fprintln(w, "api tokens:")
-		tt := c.table(w, "NAME", "SCOPE", "LAST USED")
-		for _, t := range d.APITokens {
-			used := ""
-			if t.LastUsedAt != nil {
-				used = t.LastUsedAt.UTC().Format(time.RFC3339Nano)
+		if len(d.PGPKeys) > 0 {
+			io.WriteString(w, "\n")
+			tp := c.table(w, "FINGERPRINT")
+			for _, k := range d.PGPKeys {
+				tp.row(cFlex(k.Fingerprint))
 			}
-			tt.row(cRef("  "+t.Name), cState(t.Scope), cAge(used))
+			tp.flush()
 		}
-		tt.flush()
+		if len(d.Orgs) > 0 {
+			io.WriteString(w, "\n")
+			to := c.table(w, "ORG", "ROLE")
+			for _, o := range d.Orgs {
+				to.row(cRef(o.Org), cState(o.Role))
+			}
+			to.flush()
+		}
+		if len(d.APITokens) > 0 {
+			io.WriteString(w, "\n")
+			tt := c.table(w, "NAME", "SCOPE", "LAST USED")
+			for _, t := range d.APITokens {
+				used := ""
+				if t.LastUsedAt != nil {
+					used = t.LastUsedAt.UTC().Format(time.RFC3339Nano)
+				}
+				tt.row(cRef(t.Name), cState(t.Scope), cAge(used))
+			}
+			tt.flush()
+		}
 	})
 }
 
@@ -529,8 +543,14 @@ func runAdminRunners(c *Ctx, args []string) int {
 	}
 	d := map[string]any{"queue": queue, "runners": runners}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "queue: %d pending; last 24h: %d claimed, wait avg %ds max %ds, %d reaped\n",
-			queue.Pending, queue.Claimed24h, queue.ClaimWaitAvgS, queue.ClaimWaitMaxS, queue.Reaped24h)
+		v := c.view(w)
+		v.fields(
+			"pending", fmt.Sprintf("%d", queue.Pending),
+			"claimed 24h", fmt.Sprintf("%d", queue.Claimed24h),
+			"wait avg", fmt.Sprintf("%ds", queue.ClaimWaitAvgS),
+			"wait max", fmt.Sprintf("%ds", queue.ClaimWaitMaxS),
+			"reaped 24h", fmt.Sprintf("%d", queue.Reaped24h),
+		)
 		tb := c.table(w, "USER", "FINGERPRINT", "LAST SEEN", "SCOPE", "HELD")
 		for _, r := range runners {
 			scope := r.Scope

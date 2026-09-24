@@ -240,31 +240,50 @@ func ActivityWindow() string {
 
 func emitProfile(c *Ctx, d ProfileOut) int {
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "%s (%s)\n", d.Name, d.Kind)
-		if d.Description != "" {
-			fmt.Fprintf(w, "%s\n", d.Description)
-		}
-		if d.Website != "" {
-			fmt.Fprintf(w, "%s\n", d.Website)
-		}
-		for _, l := range d.Links {
-			fmt.Fprintf(w, "link\t%s\t%s\n", l.Label, l.URL)
-		}
-		for _, m := range d.Orgs {
-			fmt.Fprintf(w, "org\t%s\t%s\n", m.Name, m.Role)
-		}
-		for _, m := range d.Members {
-			fmt.Fprintf(w, "member\t%s\t%s\n", m.Name, m.Role)
-		}
-		for _, r := range d.Repos {
-			fmt.Fprintf(w, "repo\t%s\t%s\t%s\n", r.Path, r.Visibility, r.Description)
-		}
+		activity := ""
 		if d.ActivityTotal > 0 {
-			fmt.Fprintf(w, "activity\t%d in the last year\n", d.ActivityTotal)
+			activity = fmt.Sprintf("%d in the last year", d.ActivityTotal)
 		}
-		if d.About != "" {
-			fmt.Fprintf(w, "\n%s\n", d.About)
+		v := c.view(w)
+		v.title(d.Name, d.Description, d.Kind)
+		v.fields(
+			"website", d.Website,
+			"url", c.siteURL(d.Name),
+			"activity", activity,
+		)
+		if len(d.Links) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "LINK", "URL")
+			for _, l := range d.Links {
+				tb.row(cText(l.Label), cFlex(l.URL))
+			}
+			tb.flush()
 		}
+		if len(d.Orgs) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "ORG", "ROLE")
+			for _, m := range d.Orgs {
+				tb.row(cRef(m.Name), cState(m.Role))
+			}
+			tb.flush()
+		}
+		if len(d.Members) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "MEMBER", "ROLE")
+			for _, m := range d.Members {
+				tb.row(cRef(m.Name), cState(m.Role))
+			}
+			tb.flush()
+		}
+		if len(d.Repos) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "REPO", "VISIBILITY", "DESCRIPTION")
+			for _, r := range d.Repos {
+				tb.row(cRef(r.Path), cState(r.Visibility), cFlex(r.Description))
+			}
+			tb.flush()
+		}
+		v.body(d.About, d.AboutFormat)
 	})
 }
 

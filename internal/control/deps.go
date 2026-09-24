@@ -87,7 +87,8 @@ func runDepsStatus(c *Ctx, args []string) int {
 	check, err := c.Store.DepCheckFor(repo.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return c.emit(map[string]any{"enabled": false}, func(w io.Writer) {
-			fmt.Fprintf(w, "dependency checks are off for %s (repo deps enable %s)\n", repo.Path(), repo.Path())
+			v := c.view(w)
+			v.fields("checks", fmt.Sprintf("off (repo deps enable %s)", repo.Path()))
 		})
 	}
 	if err != nil {
@@ -103,15 +104,24 @@ func runDepsStatus(c *Ctx, args []string) int {
 		out.Behind = append(out.Behind, DepBehind{r.Ecosystem, r.Name, r.Current, r.Latest})
 	}
 	return c.emit(out, func(w io.Writer) {
-		fmt.Fprintf(w, "checks on, last %s\n", orDash(check.LastCheck))
-		if check.LastError != "" {
-			fmt.Fprintf(w, "last error: %s\n", check.LastError)
-		}
+		tracked := ""
 		if check.IssueNumber != 0 {
-			fmt.Fprintf(w, "tracked in #%d\n", check.IssueNumber)
+			tracked = fmt.Sprintf("#%d", check.IssueNumber)
 		}
-		for _, b := range out.Behind {
-			fmt.Fprintf(w, "%s\t%s\t%s\t-> %s\n", b.Ecosystem, b.Name, b.Current, b.Latest)
+		v := c.view(w)
+		v.fields(
+			"checks", "on",
+			"last check", c.when(check.LastCheck),
+			"last error", check.LastError,
+			"tracked in", tracked,
+		)
+		if len(out.Behind) > 0 {
+			io.WriteString(w, "\n")
+			tb := c.table(w, "ECOSYSTEM", "NAME", "CURRENT", "LATEST")
+			for _, b := range out.Behind {
+				tb.row(cText(b.Ecosystem), cRef(b.Name), cText(b.Current), cText(b.Latest))
+			}
+			tb.flush()
 		}
 	})
 }
