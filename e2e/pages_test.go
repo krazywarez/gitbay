@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -244,7 +245,7 @@ func TestPages(t *testing.T) {
 	}
 	// repo show lists it; removal stops serving.
 	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "show", "alice/site")
-	if !strings.Contains(out, "pages domains: docs.example.org") {
+	if !regexp.MustCompile(`pages domains\s+docs\.example\.org`).MatchString(out) {
 		t.Fatalf("repo show missing domains:\n%s", out)
 	}
 	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "domain", "remove", "alice/site", "docs.example.org"); code != 0 {

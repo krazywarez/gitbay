@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -63,7 +64,7 @@ func TestRepoImport(t *testing.T) {
 		t.Fatalf("imported HEAD = %s", head)
 	}
 	showOut, _, _ := inst.ssh(t, aliceKey, "", "repo", "show", "alice/mirror")
-	if !strings.Contains(showOut, "private") || !strings.Contains(showOut, "default: trunk") {
+	if !strings.Contains(showOut, "private") || !regexp.MustCompile(`default branch\s+trunk`).MatchString(showOut) {
 		t.Fatalf("repo show after import: %s", showOut)
 	}
 
