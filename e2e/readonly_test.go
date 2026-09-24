@@ -176,11 +176,10 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"repo download":    true,
 		"account export":   true,
 		"admin user show":  true, // until the view layout (Part 3)
-		"admin runners":    true, // until the view layout (Part 3)
+		"admin runners":    true, // until the view layout (Part 3): the queue summary line
 		"admin stats":      true, // until the view layout (Part 3)
 		"repo deps status": true, // until the view layout (Part 3)
 		"release show":     true, // until the view layout (Part 3)
-		"mr revisions":     true, // single-revision hint is free text, not a table row that can be shrunk
 	}
 	// binaryOutput's bytes are not text: a stray 0x1b is coincidence, not
 	// an SGR sequence escaping into plain output.
@@ -216,11 +215,17 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		before = after
 
 		argv := append(append([]string{}, cmd.Path...), args...)
-		plainOut, _, _ := inst.sshTerm(t, aliceKey, "", argv...)
+		plainOut, plainErrOut, plainCode := inst.sshTerm(t, aliceKey, "", argv...)
+		if plainCode != 0 && !(plainCode == 3 && notFoundOK[path]) {
+			t.Errorf("%s: --term= plain exit %d: %s", path, plainCode, strings.TrimSpace(plainErrOut))
+		}
 		if !binaryOutput[path] && strings.Contains(plainOut, "\x1b") {
 			t.Errorf("%s: SGR bytes in plain output", path)
 		}
-		termOut, _, _ := inst.sshTerm(t, aliceKey, "60,color", argv...)
+		termOut, termErrOut, termCode := inst.sshTerm(t, aliceKey, "60,color", argv...)
+		if termCode != 0 && !(termCode == 3 && notFoundOK[path]) {
+			t.Errorf("%s: --term=60,color exit %d: %s", path, termCode, strings.TrimSpace(termErrOut))
+		}
 		if !rawOutput[path] {
 			for _, line := range strings.Split(termOut, "\n") {
 				if w := displayCells(stripSGRe2e(line)); w > 60 {
