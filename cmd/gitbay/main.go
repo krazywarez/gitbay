@@ -290,7 +290,7 @@ func runPass(o passOpts, args []string) int {
 			stdin = r
 		}
 	}
-	return runSSH(t, append(o.server, args...), stdin)
+	return runSSHPaged(t, append(o.server, args...), stdin, pages(o.server, args))
 }
 
 func isEmptyReader(r io.Reader) bool {

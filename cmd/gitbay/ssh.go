@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"gitbay.org/gitbay/internal/cliconfig"
 	"gitbay.org/gitbay/internal/protocol"
@@ -139,9 +140,40 @@ func stripNoColor(args []string) ([]string, bool) {
 	return out, found
 }
 
+// pagerArgv is the pager to run long output through: GITBAY_PAGER, then
+// PAGER, then less. An empty GITBAY_PAGER turns paging off.
+func pagerArgv(env func(string) (string, bool)) []string {
+	if v, ok := env("GITBAY_PAGER"); ok {
+		return strings.Fields(v)
+	}
+	if v, ok := env("PAGER"); ok && v != "" {
+		return strings.Fields(v)
+	}
+	return []string{"less"}
+}
+
+// pages reports whether a command's output goes through the pager at a
+// terminal: views, diffs and logs, never a follow or JSON.
+func pages(server, args []string) bool {
+	if len(server) == 0 || slices.Contains(args, "--json") || slices.Contains(args, "--follow") {
+		return false
+	}
+	switch server[len(server)-1] {
+	case "show", "diff", "log":
+		return true
+	}
+	return false
+}
+
 // runSSH executes the server command over the system ssh binary, wiring
-// stdio through. It returns the remote exit code.
+// stdio through, with no pager. It returns the remote exit code.
 func runSSH(t target, serverArgv []string, stdin io.Reader) int {
+	return runSSHPaged(t, serverArgv, stdin, false)
+}
+
+// runSSHPaged is runSSH with output optionally run through the pager when
+// stdout is a terminal and page is true. It returns the remote exit code.
+func runSSHPaged(t target, serverArgv []string, stdin io.Reader, page bool) int {
 	args := sshArgs(t.inst)
 
 	fd := int(os.Stdout.Fd())
@@ -164,11 +196,41 @@ func runSSH(t target, serverArgv []string, stdin io.Reader) int {
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	var pager *exec.Cmd
+	var pw io.WriteCloser
+	if page && isTTY {
+		if argv := pagerArgv(os.LookupEnv); len(argv) > 0 {
+			pager = exec.Command(toolpath.Look(argv[0]), argv[1:]...)
+			pager.Stdout, pager.Stderr = os.Stdout, os.Stderr
+			if _, ok := os.LookupEnv("LESS"); !ok {
+				pager.Env = append(os.Environ(), "LESS=FRX")
+			}
+			if w, err := pager.StdinPipe(); err == nil && pager.Start() == nil {
+				pw = w
+				cmd.Stdout = pw
+			} else {
+				pager = nil
+			}
+		}
+	}
+
 	err := cmd.Run()
+	if pager != nil {
+		pw.Close()
+		pager.Wait()
+	}
 	if err == nil {
 		return 0
 	}
 	if ee, ok := err.(*exec.ExitError); ok {
+		if pager != nil {
+			if ws, ok := ee.Sys().(syscall.WaitStatus); ok && ws.Signaled() && ws.Signal() == syscall.SIGPIPE {
+				// The user quit the pager before ssh finished writing;
+				// that is not a failure of the command itself.
+				return 0
+			}
+		}
 		code := ee.ExitCode()
 		if code == 255 { // ssh-level failure (connection, auth, host key)
 			fmt.Fprintln(os.Stderr, "gitbay: ssh could not connect or authenticate; if this worked a moment ago,"+
