@@ -84,6 +84,3 @@ is preserved.
 | Hide a repository                  | =admin repo visibility <repo> private=           |
 | Close registration                 | =registration.mode = "closed"= and restart       |
 | See what happened                  | =audit= (filter by actor, action, time)                |
-
-Open connections of a removed key keep working until they close; see
-#256.

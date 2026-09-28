@@ -4,6 +4,12 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* unreleased
+
+- Removing an SSH key, removing a deploy key, or disabling or deleting an
+  account closes every open connection using an affected key, git
+  transports included; every command re-reads its key (#256).
+
 * v1.36.0 — 2026-09-23
 
 Terminal output for the CLI (#254).

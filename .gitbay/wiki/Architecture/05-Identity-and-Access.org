@@ -15,8 +15,8 @@
 
 | Credential         | Format and generation                           | Stored as                        | Scope                                      | Expiry                        | Revocation                          |
 |--------------------+-------------------------------------------------+----------------------------------+--------------------------------------------+-------------------------------+-------------------------------------|
-| SSH user key       | user's public key                               | fingerprint and public blob      | =full=, =git=, or =runner=                 | none                          | =keys remove= (own keys)            |
-| Deploy key         | public key                                      | same table, scope =deploy:<repo>:ro/rw= | one repository, read or read-write  | none                          | =repo deploy-key remove= (repo admin) |
+| SSH user key       | user's public key                               | fingerprint and public blob      | =full=, =git=, or =runner=                 | none                          | =keys remove= (own keys); closes its connections |
+| Deploy key         | public key                                      | same table, scope =deploy:<repo>:ro/rw= | one repository, read or read-write  | none                          | =repo deploy-key remove= (repo admin); closes its connections |
 | API token          | =gb_= + 32 random bytes hex                     | SHA-256 hash                     | =full= or =read=                           | optional =--ttl=              | =token revoke=                      |
 | Web session        | 32 random bytes hex, cookie =gitbay_session=    | SHA-256 hash                     | full account                               | 7 days, no sliding renewal    | logout, =web sessions revoke=       |
 | Login link         | 32 random bytes hex in a URL                    | SHA-256 hash, single use         | creates a web session                      | 15 min (mail), 5 min (SSH)    | consumed on use                     |

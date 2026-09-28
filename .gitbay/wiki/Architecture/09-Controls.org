@@ -25,7 +25,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Session cookie flags                        | in place | HttpOnly, SameSite=Lax, Secure with TLS (=internal/httpd/accounts.go=) |
 | Session lifetime                            | partial  | 7 days absolute, no idle timeout (#276)                                  |
 | Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none (#277)                    |
-| Revocation takes effect immediately         | gap      | removed SSH key keeps open connections (#256)                    |
+| Revocation takes effect immediately         | in place | removing a key or disabling an account closes its connections; every exec re-reads its key (=internal/sshd/sshd.go=) |
 | Delegation bounded by the delegating credential | gap  | expiring tokens can mint lasting credentials (#257)              |
 
 ** Access control (V4)

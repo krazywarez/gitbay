@@ -69,6 +69,10 @@ A key's label is the comment on its =authorized_keys= line unless
 =--label= gives one; =keys label= renames a key, and with no text
 clears the name. Labels are one line of up to 64 bytes.
 
+Removing a key closes every connection it opened, including the CLI's
+shared one; removing the key the current command runs on ends that
+command's connection too.
+
 Scopes: =full= (default; git plus every control command), =git= (git
 transport only — right for automation keys, which then cannot touch
 issues, settings, or your account), or =runner= (the CI runner's

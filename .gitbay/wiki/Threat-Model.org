@@ -36,6 +36,15 @@ matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Archite
 
 - *SSH public key = identity.* The SSH username is ignored; the presented
   key's fingerprint resolves to an account. Key uniqueness is global.
+- *Revocation is immediate.* Every exec and every git transport session
+  re-reads its key. Removing a key, removing a deploy key, disabling or
+  deleting an account closes the connections the affected keys opened:
+  a git transport is killed with its children, and a push killed before
+  its pre-receive hook answers moves no ref. A control command already
+  inside its database write finishes it; its output is lost. A
+  revocation made by =gitbayd admin= on the host, another process, is
+  found within 15 seconds. In =ssh.mode = "system"= each exec is its
+  own process: the next exec is refused, one already running is not cut.
 - *Per-instance trust.* Email verification and key registration are local
   to an instance and never transfer. Account migration re-registers keys
   and re-verifies emails on the target by design.
