@@ -2,9 +2,11 @@ package httpd
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/store"
 )
 
 // The session cookie must be Lax, not Strict. A login link clicked in a mail
@@ -34,5 +36,27 @@ func TestSessionCookieAttributes(t *testing.T) {
 		if want := tls != "off"; c.Secure != want {
 			t.Errorf("tls=%s: Secure = %v, want %v", tls, c.Secure, want)
 		}
+	}
+}
+
+// The login link's token rides in the query string — the one
+// documented exception to "never in a URL" — so the response that
+// consumes it must never be cached by an intermediary that might log
+// or replay the URL (#261).
+func TestLoginNoStoreHeader(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	s := New(config.Default(), st)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/login?token=bogus", nil)
+	s.login(rr, req)
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
 	}
 }

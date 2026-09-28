@@ -121,6 +121,10 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	// token, when present, is a single-use secret in the query string —
+	// the documented exception to "never in a URL" (Threat-Model). No
+	// cache may keep a copy of this response.
+	w.Header().Set("Cache-Control", "no-store")
 	token := r.URL.Query().Get("token")
 	if token == "" {
 		s.renderLogin(w, "", false, s.peekNext(r))
