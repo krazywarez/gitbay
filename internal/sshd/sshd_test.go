@@ -296,3 +296,118 @@ func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
 		}
 	}
 }
+
+// authMeta is the connection metadata authenticate reads: only the
+// remote address.
+type authMeta struct {
+	ssh.ConnMetadata
+	addr net.Addr
+}
+
+func (m authMeta) RemoteAddr() net.Addr { return m.addr }
+
+func authKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// authServer is a Server holding what authenticate uses: a store with a
+// runner account's key, the registration mode, and a limiter of three
+// failures a minute.
+func authServer(t *testing.T, mode string) (*Server, ssh.PublicKey) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "gitbay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("ci", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := authKey(t)
+	if err := st.AddSSHKey(uid, ssh.FingerprintSHA256(runner), runner.Type(), runner.Marshal(), "runner", ""); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.Registration.Mode = mode
+	return &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(3, time.Minute)}, runner
+}
+
+// With registration closed an unknown key counts against its address.
+// Below the limit a known key's success clears the count. At the limit
+// authenticate refuses before it looks at the key, so the runner's own
+// key from that address is refused too and its success never runs to
+// clear anything, until the window passes. Another address is not
+// affected. This is why a build must not share the runner's source
+// address (#260).
+func TestAuthLockoutHoldsAgainstTheRunnersKey(t *testing.T) {
+	s, runner := authServer(t, "closed")
+	stranger := authKey(t)
+	failTimes := func(n int) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			if _, err := s.authenticate(fromLoopback, stranger); err == nil {
+				t.Fatal("unknown key admitted with registration closed")
+			}
+		}
+	}
+
+	failTimes(2)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner below the limit: %v", err)
+	}
+	failTimes(2)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner after its success cleared the count: %v", err)
+	}
+
+	failTimes(3)
+	for i := 0; i < 2; i++ {
+		if _, err := s.authenticate(fromLoopback, runner); err == nil || !strings.Contains(err.Error(), "too many") {
+			t.Fatalf("attempt %d from a locked-out address: %v, want refused", i+1, err)
+		}
+	}
+	if _, err := s.authenticate(fromPublic, runner); err != nil {
+		t.Fatalf("another address was locked out too: %v", err)
+	}
+
+	s.authLimiter.seen["127.0.0.1"].start = time.Now().Add(-2 * time.Minute)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner after the window passed: %v", err)
+	}
+}
+
+// With registration open or by invite, an unknown key is admitted to run
+// register and never counts, so no number of unknown-key attempts locks
+// the runner's address out. gitbay.org runs open registration (#260).
+func TestAuthUnknownKeyCountsOnlyWhenClosed(t *testing.T) {
+	for _, mode := range []string{"open", "invite"} {
+		s, runner := authServer(t, mode)
+		for i := 0; i < 10; i++ {
+			p, err := s.authenticate(fromLoopback, authKey(t))
+			if err != nil || p.Extensions["anon-key"] == "" {
+				t.Fatalf("%s: unknown key %d: %v %+v", mode, i+1, err, p)
+			}
+		}
+		if _, err := s.authenticate(fromLoopback, runner); err != nil {
+			t.Fatalf("%s: runner refused after unknown keys: %v", mode, err)
+		}
+	}
+}
+
+var (
+	fromLoopback = authMeta{addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}}
+	fromPublic   = authMeta{addr: &net.TCPAddr{IP: net.IPv4(203, 0, 113, 7), Port: 40000}}
+)
