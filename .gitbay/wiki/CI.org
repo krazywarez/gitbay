@@ -64,6 +64,15 @@ seconds: a follower who loses it is told the repository is not found.
 A restart ends every open follow with a message saying so, rather
 than holding the drain; follow again once the daemon is back.
 
+* What a build can reach
+
+Builds have outbound internet access, trusted and untrusted alike. On
+the runner's host they reach only the forge's public ports 22, 80 and
+443: not the host's loopback, not the operator's sshd. The forge is
+reached at its public address, the one in =GITBAY_SSH=. See the
+Threat-Model page, "What a build can reach", for how and why
+(krz/gitbay#260).
+
 * The table
 
 One =ci.yml= with five jobs, each isolating one rule:

@@ -716,6 +716,17 @@ The script installs podman, delegates a subuid/subgid range to
 assuming, enables lingering, and verifies rootless podman actually runs
 as that user. It is idempotent.
 
+It also installs nftables. =make deploy-runner= ships
+=deploy/gitbay-runner-egress.nft= to =/etc/gitbay-runner/egress.nft=
+with =gitbay-runner-egress.service=, which loads it and which the
+runner's unit requires; it checks the file with =nft -c=, reloads the
+unit, and runs =deploy/runner-egress-check.sh= as =ci-runner= before
+restarting the runner: =127.0.0.1:22= and the public 22 must answer,
+2222 must not. The table limits the runner's user to =127.0.0.1:22=,
+DNS on loopback, and 22, 80 and 443 on the host's public address; the
+Threat-Model page says why. A restart of =nftables.service= flushes it;
+=systemctl reload gitbay-runner-egress= restores it.
+
 The drop-in sets =NoNewPrivileges=no=, without which rootless podman
 cannot call =newuidmap= and the runner refuses to start. That is a
 considered trade, explained in the file and in the Threat-Model; if you
