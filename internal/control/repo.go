@@ -471,7 +471,7 @@ func runRepoShow(c *Ctx, args []string) int {
 				if m.LastError != "" {
 					status = "error: " + m.LastError
 				}
-				tb.row(cText(m.Direction), cFlex(m.URL), cText(orDash(m.LastSync)), cState(status))
+				tb.row(cText(m.Direction), cFlex(m.URL), cText(orDash(c.when(m.LastSync))), cState(status))
 			}
 			tb.flush()
 		}

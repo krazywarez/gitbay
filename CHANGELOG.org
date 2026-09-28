@@ -96,6 +96,8 @@ for the eighteen commands whose CLI path differs from the registry's
   =checks (2):=, =reviews (3):= (#268).
 - =repo readme <owner/name> [--ref <ref>]= prints a repository's README,
   picked the same way the web page picks one (#268).
+- =repo show='s mirror table truncates =LAST SYNC= to the second, like
+  every other timestamp in a view (#268).
 
 * v1.36.0 — 2026-09-23
 
