@@ -16,7 +16,7 @@
 <pre class="code buildlog" tabindex="0">{{.Log}}</pre>
 {{else if .Steps}}{{$total := len .Build.Steps}}{{range .Steps}}
 <details class="difffold buildstep"{{if .Failed}} id="failed" open{{end}}>
-  <summary>{{if .N}}<span>step {{.N}}/{{$total}}</span> <code>{{.Step}}</code>{{else}}<span>setup</span>{{end}}{{if .Failed}} <span class="chip check-failure">failed</span>{{end}}</summary>
+  <summary>{{if .N}}<span>step {{.N}}/{{$total}}</span> <code>{{.Head}}</code>{{else}}<span>setup</span>{{end}}{{if .Failed}} <span class="chip check-failure">failed</span>{{end}}</summary>
   <pre class="code buildlog" tabindex="0">{{.Text}}</pre>
 </details>{{end}}
 {{else if .Log}}<pre class="code buildlog" tabindex="0">{{.Log}}</pre>{{else}}<p class="empty-note">no log yet</p>{{end}}

@@ -306,6 +306,9 @@ type buildView struct {
 
 type logStep struct {
 	control.LogSection
+	// Head is the step's first line, which its fold's summary shows, as
+	// build show does; the full step is in the log below it.
+	Head   string
 	Failed bool
 }
 
@@ -326,7 +329,8 @@ func logSteps(log string, b control.BuildOut) ([]logStep, bool) {
 	failed := control.FailedSection(sections, b.Status, b.FailedStep)
 	out := make([]logStep, len(sections))
 	for i, s := range sections {
-		out[i] = logStep{LogSection: s, Failed: i == failed}
+		head, _, _ := strings.Cut(s.Step, "\n")
+		out[i] = logStep{LogSection: s, Head: head, Failed: i == failed}
 	}
 	return out, failed >= 0
 }

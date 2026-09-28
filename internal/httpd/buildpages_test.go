@@ -230,3 +230,27 @@ func TestBuildPageFoldsStepsAndOpensFailure(t *testing.T) {
 		t.Errorf("%d failed anchors, want 1", n)
 	}
 }
+
+// A multi-line step's fold summary shows only its first line, as build
+// show does; the whole step is in the log (#266).
+func TestBuildPageStepSummaryIsFirstLine(t *testing.T) {
+	step := "set -e\ngo test ./..."
+	b := control.BuildOut{Number: 62, Job: "test", Status: "failure",
+		SHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b", Ref: "main",
+		CreatedAt: "2026-08-28T04:42:54Z", FinishedAt: "2026-08-28T04:43:54Z", DurationS: 60,
+		Steps: []string{step}, FailedStep: 1, FailedReason: "exit 1"}
+	log := "$ git clone x (ff6271a9d4)\n$ " + step + "\n--- FAIL: TestCLI\nstep 1/1 failed: exit 1\n"
+	v := buildView{repoPage: testRepoPage(), Build: b, Log: log, Duration: "1m0s"}
+	v.Steps, v.Failed = logSteps(log, b)
+	var sb strings.Builder
+	if err := web.Render(&sb, "build.html", v); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, "<code>set -e</code>") {
+		t.Errorf("summary does not show the step's first line:\n%s", out)
+	}
+	if strings.Contains(out, "<code>set -e\ngo test") {
+		t.Errorf("summary shows the whole multi-line step")
+	}
+}

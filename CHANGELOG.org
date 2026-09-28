@@ -144,7 +144,10 @@ for the eighteen commands whose CLI path differs from the registry's
   a scratch repository per the CI page. (#260)
 - =build show= names a failed build's step and duration; =build log
   --step <n>|failed --tail <lines>= reads one step's output or the
-  last lines of the stored log. (#266)
+  last lines of the stored log. Deploy gitbayd before the runner: an
+  older server refuses the runner's =--step= and =--reason= (exit 2),
+  and its failed builds stay running until the reaper fails them.
+  (#266)
 
 * v1.36.0 — 2026-09-23
 
