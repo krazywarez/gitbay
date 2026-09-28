@@ -57,7 +57,8 @@ type GatesOut struct {
 	ResolvedRequired   bool        `json:"resolved_required"`
 	OpenThreads        int         `json:"open_threads"`
 	ChecksRequired     bool        `json:"checks_required"`
-	Checks             string      `json:"checks,omitempty"` // combined status; "" when none reported
+	Checks             string      `json:"checks,omitempty"`         // combined status; "" when none reported
+	ChecksMissing      []string    `json:"checks_missing,omitempty"` // required contexts not reported
 	FastForward        bool        `json:"fast_forward"`
 	Unmet              []string    `json:"unmet,omitempty"`
 }

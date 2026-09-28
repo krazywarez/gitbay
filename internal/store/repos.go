@@ -27,13 +27,17 @@ type RepoSettings struct {
 	ProtectedTags        []string `json:"protected_tags,omitempty"` // path.Match globs
 	RequireSignedCommits bool     `json:"require_signed_commits,omitempty"`
 	RequireChecks        bool     `json:"require_checks,omitempty"`
-	RequireApprovals     int      `json:"require_approvals,omitempty"`
-	RequireResolved      bool     `json:"require_resolved,omitempty"`
-	RequireCodeowners    bool     `json:"require_codeowners,omitempty"`
-	RequireMR            bool     `json:"require_mr,omitempty"`
-	GitDaemon            bool     `json:"git_daemon,omitempty"`
-	Archived             bool     `json:"archived,omitempty"`
-	Website              string   `json:"website,omitempty"`
+	// RequiredContexts are statuses require_checks waits for whether or
+	// not they have reported; one that has not is pending. Setting a
+	// non-empty list turns RequireChecks on (#258).
+	RequiredContexts  []string `json:"required_contexts,omitempty"`
+	RequireApprovals  int      `json:"require_approvals,omitempty"`
+	RequireResolved   bool     `json:"require_resolved,omitempty"`
+	RequireCodeowners bool     `json:"require_codeowners,omitempty"`
+	RequireMR         bool     `json:"require_mr,omitempty"`
+	GitDaemon         bool     `json:"git_daemon,omitempty"`
+	Archived          bool     `json:"archived,omitempty"`
+	Website           string   `json:"website,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

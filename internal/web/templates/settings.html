@@ -72,8 +72,14 @@
 <p class="meta">Checked before a merge, in this order: checks, approvals, resolved threads, signatures.</p>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-checks">
-  <div><label for="require-checks">Required checks</label><p class="hint">Requires CI to succeed.</p></div>
+  <div><label for="require-checks">Required checks</label><p class="hint">Requires CI to succeed.{{with .Repo.Settings.RequiredContexts}} Also waits for {{range $i, $c := .}}{{if $i}}, {{end}}<code>{{$c}}</code>{{end}} until they report{{if not $.Repo.Settings.RequireChecks}}, once this is on{{end}}.{{end}}</p></div>
   <div class="check"><input type="checkbox" id="require-checks" name="require-checks" value="on"{{if .Repo.Settings.RequireChecks}} checked{{end}}></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="require-contexts">
+  <div><label for="contexts">Required contexts</label><p class="hint">Statuses the checks gate waits for until they report, separated by spaces. Saving any turns required checks on; saving none leaves it as it is.</p></div>
+  <div><input type="text" id="contexts" name="contexts" value="{{range $i, $c := .Repo.Settings.RequiredContexts}}{{if $i}} {{end}}{{$c}}{{end}}" autocomplete="off"></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
 <form method="post" action="{{$base}}" class="setform">

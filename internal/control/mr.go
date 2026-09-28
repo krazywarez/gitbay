@@ -47,6 +47,11 @@ func init() {
 		Usage:    "repo settings require-checks <owner/name> on|off",
 		Examples: []string{"repo settings require-checks krz/gitbay on"},
 		Run:      runRequireChecks})
+	register(Command{Path: []string{"repo", "settings", "require-contexts"},
+		Summary:  "name the statuses the checks gate waits for, and turn the gate on",
+		Usage:    "repo settings require-contexts <owner/name> [<context>...] (none clears the list)",
+		Examples: []string{"repo settings require-contexts krz/gitbay ci/build ci/test"},
+		Run:      runRequireContexts})
 	register(Command{Path: []string{"repo", "settings", "require-mr"},
 		Summary:  "protected branches take changes through merge requests only",
 		Usage:    "repo settings require-mr <owner/name> on|off",
@@ -337,6 +342,54 @@ func runRequireChecks(c *Ctx, args []string) int {
 	}
 	return c.emit(s, func(w io.Writer) {
 		fmt.Fprintf(w, "require_checks %s on %s\n", args[1], repo.Path())
+	})
+}
+
+// maxRequiredContexts bounds the list: a gate naming more checks than
+// this is a configuration mistake.
+const maxRequiredContexts = 20
+
+func runRequireContexts(c *Ctx, args []string) int {
+	if len(args) < 1 {
+		return c.usage()
+	}
+	var contexts []string
+	for _, ctx := range args[1:] {
+		if ctx == "" || len(ctx) > 100 || strings.ContainsAny(ctx, " \t\r\n") {
+			return c.fail(protocol.ExitUsage, "a context is 1 to 100 characters with no whitespace: %q", ctx)
+		}
+		if !slices.Contains(contexts, ctx) {
+			contexts = append(contexts, ctx)
+		}
+	}
+	if len(contexts) > maxRequiredContexts {
+		return c.fail(protocol.ExitUsage, "at most %d required contexts", maxRequiredContexts)
+	}
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	// Naming contexts asks for the gate, so it turns require_checks on in
+	// the same update. Clearing the list leaves the gate as it was.
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) {
+		s.RequiredContexts = contexts
+		if len(contexts) > 0 {
+			s.RequireChecks = true
+		}
+	})
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(s, func(w io.Writer) {
+		if len(contexts) > 0 {
+			fmt.Fprintf(w, "required contexts on %s: %s; require_checks on\n", repo.Path(), strings.Join(contexts, ", "))
+			return
+		}
+		gate := "off"
+		if s.RequireChecks {
+			gate = "on"
+		}
+		fmt.Fprintf(w, "required contexts cleared on %s; require_checks %s\n", repo.Path(), gate)
 	})
 }
 
@@ -1577,13 +1630,28 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 	}
 
 	// Checks: with require_checks, every status the head carries must be
-	// green, and a head something was going to report on must carry some.
+	// green, a head something was going to report on must carry some, and
+	// every required context must have reported: one that has not is
+	// pending whatever the others say (#258). Setting contexts turns
+	// require_checks on; turned off again, the list is kept and unread.
 	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
 	if err != nil {
 		return g, err
 	}
 	g.Checks = store.CombinedStatus(statuses)
 	if set.RequireChecks {
+		reported := map[string]bool{}
+		for _, s := range statuses {
+			reported[s.Context] = true
+		}
+		for _, want := range set.RequiredContexts {
+			if !reported[want] {
+				g.ChecksMissing = append(g.ChecksMissing, want)
+			}
+		}
+		if len(g.ChecksMissing) > 0 && (g.Checks == "" || g.Checks == "success") {
+			g.Checks = "pending"
+		}
 		switch g.Checks {
 		case "success":
 		case "":
@@ -1596,6 +1664,9 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 				if st.State != "success" {
 					bad = append(bad, st.Context+"="+st.State)
 				}
+			}
+			for _, m := range g.ChecksMissing {
+				bad = append(bad, m+"=missing")
 			}
 			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks; %.10s has %s", repo.Path(), headSHA, strings.Join(bad, ", ")))
 		}

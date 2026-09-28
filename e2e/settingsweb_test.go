@@ -55,7 +55,12 @@ func TestRepoSettingsWeb(t *testing.T) {
 
 	post(url.Values{"field": {"description"}, "description": {"a fine tool"}})
 	post(url.Values{"field": {"website"}, "website": {"https://tool.example"}})
-	post(url.Values{"field": {"require-checks"}, "require-checks": {"on"}})
+	// Saving required contexts turns the checks gate on, and the page
+	// shows it ticked with the contexts in its hint (#258).
+	if body := post(url.Values{"field": {"require-contexts"}, "contexts": {"ext/deploy lint"}}); !strings.Contains(body, `id="require-checks" name="require-checks" value="on" checked`) ||
+		!strings.Contains(body, `Also waits for <code>ext/deploy</code>, <code>lint</code> until they report.`) {
+		t.Fatalf("required contexts did not show as turning required checks on:\n%s", body)
+	}
 	post(url.Values{"field": {"require-approvals"}, "approvals": {"2"}})
 	post(url.Values{"field": {"protect"}, "branch": {"main"}})
 
@@ -66,7 +71,7 @@ func TestRepoSettingsWeb(t *testing.T) {
 		}
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "repo", "settings", "show", "alice/app", "--json")
-	for _, want := range []string{`"require_checks":true`, `"require_approvals":2`, `"main"`} {
+	for _, want := range []string{`"require_checks":true`, `"required_contexts":["ext/deploy","lint"]`, `"require_approvals":2`, `"main"`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("settings show missing %q:\n%s", want, out)
 		}

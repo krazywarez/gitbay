@@ -105,6 +105,8 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "git-daemon", repo, onOff(v("git-daemon"))}
 	case "require-checks":
 		argv = []string{"repo", "settings", "require-checks", repo, onOff(v("require-checks"))}
+	case "require-contexts":
+		argv = append([]string{"repo", "settings", "require-contexts", repo}, strings.Fields(v("contexts"))...)
 	case "require-resolved":
 		argv = []string{"repo", "settings", "require-resolved", repo, onOff(v("require-resolved"))}
 	case "require-codeowners":
@@ -227,6 +229,8 @@ func fieldLabel(field string) string {
 		return "git:// serving"
 	case "require-checks":
 		return "required checks"
+	case "require-contexts":
+		return "required contexts"
 	case "require-approvals":
 		return "approvals"
 	case "require-resolved":

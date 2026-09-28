@@ -195,6 +195,9 @@ func TestMRGatesRender(t *testing.T) {
 	if out := render(&control.GatesOut{FastForward: true}); !strings.Contains(out, "All gates met") || !strings.Contains(out, "fast-forward possible") {
 		t.Errorf("met gates not rendered:\n%s", out)
 	}
+	if out := render(&control.GatesOut{Checks: "pending", ChecksMissing: []string{"ext/deploy"}}); !strings.Contains(out, "waiting on <code>ext/deploy</code>") {
+		t.Errorf("missing required context not rendered:\n%s", out)
+	}
 	if out := render(nil); strings.Contains(out, "Merge gates") {
 		t.Errorf("gates block on a merge request without gates:\n%s", out)
 	}

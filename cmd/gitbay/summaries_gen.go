@@ -187,6 +187,7 @@ var summaries = map[string]string{
 	"repo settings require-approvals":  "require N fresh approvals to merge",
 	"repo settings require-checks":     "gate merges on green statuses",
 	"repo settings require-codeowners": "require an owner's approval for every file CODEOWNERS covers",
+	"repo settings require-contexts":   "name the statuses the checks gate waits for, and turn the gate on",
 	"repo settings require-mr":         "protected branches take changes through merge requests only",
 	"repo settings require-resolved":   "require all review threads resolved to merge",
 	"repo settings require-signed":     "require verified commit signatures",

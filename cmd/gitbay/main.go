@@ -618,6 +618,7 @@ func repoCmd() *cobra.Command {
 			pass("require-resolved", passOpts{server: []string{"repo", "settings", "require-resolved"}, needsRepo: true}),
 			pass("require-codeowners", passOpts{server: []string{"repo", "settings", "require-codeowners"}, needsRepo: true}),
 			pass("require-checks", passOpts{server: []string{"repo", "settings", "require-checks"}, needsRepo: true}),
+			pass("require-contexts", passOpts{server: []string{"repo", "settings", "require-contexts"}, needsRepo: true}),
 			pass("visibility", passOpts{server: []string{"repo", "settings", "visibility"}, needsRepo: true}),
 			pass("require-signed", passOpts{server: []string{"repo", "settings", "require-signed"}, needsRepo: true}),
 			pass("require-mr", passOpts{server: []string{"repo", "settings", "require-mr"}, needsRepo: true}),

@@ -711,6 +711,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 			"protected branches", strings.Join(repo.Settings.ProtectedBranches, ", "),
 			"protected tags", strings.Join(repo.Settings.ProtectedTags, ", "),
 			"require mr", strconv.FormatBool(repo.Settings.RequireMR),
+			"require checks", strconv.FormatBool(repo.Settings.RequireChecks),
+			"required contexts", strings.Join(repo.Settings.RequiredContexts, ", "),
 			"require signed commits", strconv.FormatBool(repo.Settings.RequireSignedCommits),
 			"git daemon", strconv.FormatBool(repo.Settings.GitDaemon),
 			"archived", strconv.FormatBool(repo.Settings.Archived),
