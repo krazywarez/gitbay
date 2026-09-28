@@ -48,8 +48,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | create from a fork     | yes | yes | yes |
 | retarget               | yes | yes | yes |
 | milestone              | yes | yes | yes |
-| labels                 | yes | yes | no  |
-| filter by label        | yes | yes | no  |
+| labels                 | yes | yes | yes |
+| filter by label        | yes | yes | yes |
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
 | preview body markup    | n/a | yes | no  |
@@ -465,10 +465,11 @@ now a page waiting to be built rather than a rule. A credential still
 travels on stdin wherever it is set, since argv is world-readable in
 /proc and the audit log keeps flag values.
 
-Deleting, transferring or renaming a repository stays CLI-only on
-purpose, as does deleting an organization and pruning merge request
-heads (=admin mr prune=): each removes or moves what clone URLs point
-at, and wants a typed command rather than a button.
+Deleting or transferring a repository stays CLI-only on purpose, as
+does deleting an organization and pruning merge request heads (=admin
+mr prune=): each removes or moves what clone URLs point at, and wants a
+typed command rather than a button. Renaming is the exception: the iOS
+client offers it, and the web has no page yet.
 
 =n/a= means a surface cannot usefully carry the capability at all —
 see the archive note above.
