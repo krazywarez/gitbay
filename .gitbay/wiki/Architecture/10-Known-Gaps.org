@@ -20,7 +20,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | #274  | Backups          | The local backup archive is not encrypted                             | medium   |
 | #275  | Audit            | Refused writes are not audited; the audit table is writable by the daemon user | medium |
 | #276  | Sessions         | Web sessions last 7 days with no idle timeout                         | low      |
-| #277  | Credentials      | SSH and deploy keys never expire                                      | low      |
 | #278  | Login links      | =web login= over SSH skips the login-link rate limit                  | low      |
 | #279  | SSRF             | Mirror URLs are checked when saved, not when git connects             | medium   |
 | #280  | Mail             | STARTTLS only when the relay offers it                                | medium   |

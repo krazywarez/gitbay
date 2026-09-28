@@ -16,7 +16,7 @@ enabled = true
 Tokens are minted wherever the registry is reached: over SSH, on the
 API, anywhere. =token create= makes a =read= token unless =--scope full=
 is given; a read token runs only commands marked read-only. A full-scope
-token can mint another, but a token with a =--ttl= cannot run any
+token can mint another, but a token or SSH key with a =--ttl= cannot run any
 command that creates a credential — =token create=, =keys add=,
 =repo deploy-key add=, =repo runner add=, =web login=, =admin invite=,
 =admin user create=, =email verify=, =admin email verify= — since what

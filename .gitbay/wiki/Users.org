@@ -61,6 +61,7 @@ username is always =git= — the key alone determines who you are.
 gitbay auth keys list
 gitbay auth keys add --scope git < ~/.ssh/ci_key.pub   # key on stdin
 gitbay auth keys add --label laptop < ~/.ssh/id_ed25519.pub
+gitbay auth keys add --scope git --ttl 90d < ~/.ssh/ci_key.pub
 gitbay auth keys label SHA256:... "work laptop"
 gitbay auth keys remove SHA256:...
 #+end_src
@@ -68,6 +69,12 @@ gitbay auth keys remove SHA256:...
 A key's label is the comment on its =authorized_keys= line unless
 =--label= gives one; =keys label= renames a key, and with no text
 clears the name. Labels are one line of up to 64 bytes.
+
+=--ttl 90d= (or any Go duration, =720h=) makes a key stop
+authenticating after that long; =repo deploy-key add= takes the same
+flag. An expiring key cannot create credentials: tokens, keys, login
+links. =keys list= shows when each key was last used and when it
+expires, so a key nobody uses is easy to spot.
 
 Removing a key closes every connection it opened, including the CLI's
 shared one; removing the key the current command runs on ends that

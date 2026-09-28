@@ -24,7 +24,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Account enumeration resistance at login     | in place | uniform response (=internal/control/loginlink.go=)         |
 | Session cookie flags                        | in place | HttpOnly, SameSite=Lax, Secure with TLS (=internal/httpd/accounts.go=) |
 | Session lifetime                            | partial  | 7 days absolute, no idle timeout (#276)                                  |
-| Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none (#277)                    |
+| Credential expiry                           | in place | optional =--ttl= on API tokens, SSH and deploy keys; checked at auth and per exec |
 | Revocation takes effect immediately         | in place | removing a key or disabling an account closes its connections; every exec re-reads its key (=internal/sshd/sshd.go=) |
 | Delegation bounded by the delegating credential | partial | expiring tokens refused on =MintsCredential= commands; credentials record their creating token (=internal/control/control.go=); a web session can still mint credentials that outlive it (#297) |
 

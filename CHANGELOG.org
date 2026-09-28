@@ -20,6 +20,11 @@ must add =--scope full=. Existing tokens keep their scope.
   those too (#257).
 - Removing an SSH key, a deploy key, or disabling an account closes the
   connections the key opened, a push in flight included (#256).
+- =keys add= and =repo deploy-key add= take =--ttl=; an expired key is
+  refused at authentication, and an open connection on it closes within
+  15 seconds. An expiring key cannot create credentials, like an
+  expiring token. =keys list= and =repo deploy-key list= gain =USED= and
+  =EXPIRES= columns, after the label (#277).
 
 * v1.36.0 — 2026-09-23
 
