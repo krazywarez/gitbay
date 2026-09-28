@@ -155,8 +155,11 @@ func TestPeerRefusalIsAudited(t *testing.T) {
 	peerCheck = func(net.Conn) error { return errors.New("peer uid not permitted") }
 	t.Cleanup(func() { peerCheck = old })
 	sock, st, repoID, uid := serveSocket(t)
-	if resp, err := Ask(sock, Request{Hook: "pre-receive", RepoID: repoID, UserID: uid}, nil); err != nil || resp.Allow {
-		t.Fatalf("refused peer: %+v, %v", resp, err)
+	// The server answers and closes without reading the request, so the
+	// client may see the refusal or a broken pipe; either way it is not
+	// allowed, and the row is written before the connection closes.
+	if resp, err := Ask(sock, Request{Hook: "pre-receive", RepoID: repoID, UserID: uid}, nil); err == nil && resp.Allow {
+		t.Fatalf("refused peer was allowed: %+v", resp)
 	}
 	rows := refusedRows(t, st, "refused hook")
 	if len(rows) != 1 || rows[0].Actor != "" || !strings.Contains(rows[0].Data, "peer uid not permitted") {
