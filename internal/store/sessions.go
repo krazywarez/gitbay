@@ -64,25 +64,40 @@ func (s *Store) ConsumeLoginToken(hash string) (int64, error) {
 	return userID, err
 }
 
+// WebSessionIdle is how long a browser session lasts without a request.
+// Each use moves its expiry this far ahead, never past the cap it was
+// created with. Migration 0062 repeats the value for sessions it
+// converts.
+const WebSessionIdle = 12 * time.Hour
+
+// CreateWebSession stores a session that lapses after WebSessionIdle
+// without use, and after ttl regardless.
 func (s *Store) CreateWebSession(hash string, userID int64, ttl time.Duration) error {
+	now := time.Now()
 	_, err := s.DB.Exec(
-		"INSERT INTO web_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
-		hash, userID, fmtTime(time.Now().Add(ttl)))
+		"INSERT INTO web_sessions (token_hash, user_id, expires_at, absolute_expires_at, last_used_at) VALUES (?, ?, ?, ?, ?)",
+		hash, userID, fmtTime(now.Add(min(ttl, WebSessionIdle))), fmtTime(now.Add(ttl)), fmtTime(now))
 	return err
 }
 
-// WebSessionUser resolves a session cookie hash to its user.
+// WebSessionUser resolves a session cookie hash to its user and renews
+// the session's idle expiry. A session is written at most once a
+// minute, so a burst of requests costs one UPDATE.
 func (s *Store) WebSessionUser(hash string) (User, error) {
+	now := time.Now()
 	var userID int64
 	err := s.DB.QueryRow(
 		"SELECT user_id FROM web_sessions WHERE token_hash = ? AND expires_at > ?",
-		hash, fmtTime(time.Now())).Scan(&userID)
+		hash, fmtTime(now)).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
 	if err != nil {
 		return User{}, err
 	}
+	s.DB.Exec(`UPDATE web_sessions SET last_used_at = ?, expires_at = min(absolute_expires_at, ?)
+		WHERE token_hash = ? AND last_used_at < ?`,
+		fmtTime(now), fmtTime(now.Add(WebSessionIdle)), hash, fmtTime(now.Add(-time.Minute)))
 	return s.UserByID(userID)
 }
 
@@ -95,14 +110,15 @@ func (s *Store) DeleteWebSession(hash string) error {
 // twelve hex digits of the stored token hash: enough to name it, and a
 // hash of the cookie rather than the cookie.
 type WebSession struct {
-	ID        string `json:"id"`
-	CreatedAt string `json:"created_at"`
-	ExpiresAt string `json:"expires_at"`
+	ID         string `json:"id"`
+	CreatedAt  string `json:"created_at"`
+	ExpiresAt  string `json:"expires_at"`
+	LastUsedAt string `json:"last_used_at"`
 }
 
 // ListWebSessions lists the user's unexpired browser sessions, newest first.
 func (s *Store) ListWebSessions(userID int64) ([]WebSession, error) {
-	rows, err := s.DB.Query(`SELECT substr(token_hash, 1, 12), created_at, expires_at
+	rows, err := s.DB.Query(`SELECT substr(token_hash, 1, 12), created_at, expires_at, COALESCE(last_used_at, created_at)
 		FROM web_sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC`,
 		userID, fmtTime(time.Now()))
 	if err != nil {
@@ -112,7 +128,7 @@ func (s *Store) ListWebSessions(userID int64) ([]WebSession, error) {
 	var out []WebSession
 	for rows.Next() {
 		var ws WebSession
-		if err := rows.Scan(&ws.ID, &ws.CreatedAt, &ws.ExpiresAt); err != nil {
+		if err := rows.Scan(&ws.ID, &ws.CreatedAt, &ws.ExpiresAt, &ws.LastUsedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, ws)

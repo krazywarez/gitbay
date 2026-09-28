@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 )
@@ -42,5 +43,77 @@ func TestCountLoginTokensSince(t *testing.T) {
 	}
 	if n, err := s.CountLoginTokensSince(other, time.Now().Add(-time.Hour)); err != nil || n != 0 {
 		t.Fatalf("other account count = %d, %v; want 0", n, err)
+	}
+}
+
+func sessionFixture(t *testing.T) (*Store, int64) {
+	t.Helper()
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s, uid
+}
+
+func sessionTimes(t *testing.T, s *Store, hash string) (expires, absolute time.Time) {
+	t.Helper()
+	var e, a string
+	if err := s.DB.QueryRow("SELECT expires_at, absolute_expires_at FROM web_sessions WHERE token_hash = ?", hash).Scan(&e, &a); err != nil {
+		t.Fatal(err)
+	}
+	return *parseTime(sql.NullString{String: e, Valid: true}), *parseTime(sql.NullString{String: a, Valid: true})
+}
+
+func TestWebSessionIdleExpiry(t *testing.T) {
+	s, uid := sessionFixture(t)
+	if err := s.CreateWebSession("h", uid, 7*24*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	exp, abs := sessionTimes(t, s, "h")
+	if d := time.Until(exp); d < WebSessionIdle-time.Minute || d > WebSessionIdle {
+		t.Fatalf("a new session expires in %s, want %s", d, WebSessionIdle)
+	}
+	if d := time.Until(abs); d < 7*24*time.Hour-time.Minute {
+		t.Fatalf("absolute cap in %s", d)
+	}
+	// Idle past the window: gone.
+	old := fmtTime(time.Now().Add(-time.Second))
+	s.DB.Exec("UPDATE web_sessions SET expires_at = ? WHERE token_hash = 'h'", old)
+	if _, err := s.WebSessionUser("h"); err != ErrNotFound {
+		t.Fatalf("idle session: %v", err)
+	}
+}
+
+func TestWebSessionRenewsUpToTheCap(t *testing.T) {
+	s, uid := sessionFixture(t)
+	if err := s.CreateWebSession("h", uid, 7*24*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	// Last used two minutes ago, one minute left: a request renews it.
+	s.DB.Exec("UPDATE web_sessions SET last_used_at = ?, expires_at = ? WHERE token_hash = 'h'",
+		fmtTime(time.Now().Add(-2*time.Minute)), fmtTime(time.Now().Add(time.Minute)))
+	if _, err := s.WebSessionUser("h"); err != nil {
+		t.Fatal(err)
+	}
+	if exp, _ := sessionTimes(t, s, "h"); time.Until(exp) < WebSessionIdle-time.Minute {
+		t.Fatalf("not renewed: expires in %s", time.Until(exp))
+	}
+	// Near the cap, renewal stops at it.
+	capAt := time.Now().Add(time.Hour)
+	s.DB.Exec("UPDATE web_sessions SET last_used_at = ?, absolute_expires_at = ? WHERE token_hash = 'h'",
+		fmtTime(time.Now().Add(-2*time.Minute)), fmtTime(capAt))
+	if _, err := s.WebSessionUser("h"); err != nil {
+		t.Fatal(err)
+	}
+	if exp, _ := sessionTimes(t, s, "h"); exp.After(capAt) {
+		t.Fatalf("renewed past the cap: %s > %s", exp, capAt)
+	}
+	list, err := s.ListWebSessions(uid)
+	if err != nil || len(list) != 1 || list[0].LastUsedAt == "" {
+		t.Fatalf("list: %+v %v", list, err)
 	}
 }
