@@ -47,7 +47,7 @@ func TestJSONAPI(t *testing.T) {
 		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
 
 	// Tokens are minted over SSH, shown once.
-	out, errOut, code := inst.ssh(t, aliceKey, "", "token", "create", "--name", "ci", "--json")
+	out, errOut, code := inst.ssh(t, aliceKey, "", "token", "create", "--name", "ci", "--scope", "full", "--json")
 	if code != 0 {
 		t.Fatalf("token create: %s", errOut)
 	}
@@ -265,7 +265,7 @@ func TestAPIRateLimit(t *testing.T) {
 // mintToken creates an API token over SSH and returns its value.
 func mintToken(t *testing.T, inst *instance, key, name string) string {
 	t.Helper()
-	out, errOut, code := inst.ssh(t, key, "", "token", "create", "--name", name, "--json")
+	out, errOut, code := inst.ssh(t, key, "", "token", "create", "--name", name, "--scope", "full", "--json")
 	if code != 0 {
 		t.Fatalf("token create: %s", errOut)
 	}

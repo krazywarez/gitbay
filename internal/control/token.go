@@ -15,13 +15,13 @@ import (
 func init() {
 	register(Command{Path: []string{"token", "create"},
 		Summary: "mint an API token (shown once)",
-		Usage:   "token create --name <n> [--scope full|read] [--ttl 30d|720h]",
+		Usage:   "token create --name <n> [--scope read|full] [--ttl 30d|720h]",
 		Flags: []Flag{
 			{"--name", "<n>", "the token's name", ""},
-			{"--scope", "full|read", "what the token may do", "full"},
-			{"--ttl", "30d|720h", "how long the token is valid", "never expires"},
+			{"--scope", "read|full", "what the token may do; full is needed to change anything", "read"},
+			{"--ttl", "30d|720h", "how long the token is valid; an expiring token cannot mint credentials", "never expires"},
 		},
-		Examples:        []string{"token create --name laptop --scope read --ttl 30d"},
+		Examples:        []string{"token create --name laptop --ttl 30d", "token create --name phone --scope full"},
 		MintsCredential: true,
 		Run:             runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
@@ -29,9 +29,12 @@ func init() {
 		Usage:    "token list",
 		Examples: []string{"token list"}, ReadOnly: true, Run: runTokenList})
 	register(Command{Path: []string{"token", "revoke"},
-		Summary:  "revoke an API token by name",
-		Usage:    "token revoke <name>",
-		Examples: []string{"token revoke laptop"},
+		Summary: "revoke an API token by name",
+		Usage:   "token revoke <name> [--created]",
+		Flags: []Flag{
+			{"--created", "", "also revoke the tokens and keys it created, at any depth", ""},
+		},
+		Examples: []string{"token revoke laptop", "token revoke laptop --created"},
 		Run:      runTokenRevoke})
 }
 
@@ -48,11 +51,11 @@ func parseTTL(s string) (time.Duration, error) {
 }
 
 func runTokenCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: "token create --name <n> [--scope full|read] [--ttl 30d]"})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	name, scope, ttl := f.Value("--name"), "full", f.Value("--ttl")
+	name, scope, ttl := f.Value("--name"), "read", f.Value("--ttl")
 	if f.Has("--scope") {
 		scope = f.Value("--scope")
 	}
@@ -99,10 +102,11 @@ func runTokenList(c *Ctx, args []string) int {
 		CreatedAt  string     `json:"created_at"`
 		ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 		LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+		CreatedBy  string     `json:"created_by,omitempty"`
 	}
 	var ds []out
 	for _, t := range tokens {
-		ds = append(ds, out{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt})
+		ds = append(ds, out{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt, t.CreatedBy})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "NAME", "SCOPE", "EXPIRES")
@@ -123,16 +127,43 @@ func runTokenList(c *Ctx, args []string) int {
 }
 
 func runTokenRevoke(c *Ctx, args []string) int {
-	if len(args) != 1 {
+	f, err := parseFlags(args, flagSpec{Bools: []string{"--created"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	name := f.pos(0)
+	if name == "" {
 		return c.usage()
 	}
-	if _, err := c.Store.RevokeAPIToken(c.User.ID, args[0], false); err != nil {
+	withCreated := f.Has("--created")
+	created, err := c.Store.RevokeAPIToken(c.User.ID, name, withCreated)
+	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "no token named %q", args[0])
+			return c.fail(protocol.ExitNotFound, "no token named %q", name)
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]string{"revoked": args[0]}, func(w io.Writer) {
-		fmt.Fprintf(w, "revoked %s\n", args[0])
+	type out struct {
+		Revoked        string        `json:"revoked"`
+		Created        store.Created `json:"created"`
+		CreatedRevoked bool          `json:"created_revoked"`
+	}
+	d := out{name, created, withCreated}
+	return c.emit(d, func(w io.Writer) {
+		fmt.Fprintf(w, "revoked %s\n", name)
+		if len(created.Tokens)+len(created.Keys) == 0 {
+			return
+		}
+		if withCreated {
+			fmt.Fprintln(w, "and what it created:")
+		} else {
+			fmt.Fprintln(w, "it created these, still in place:")
+		}
+		for _, n := range created.Tokens {
+			fmt.Fprintf(w, "  token %s\n", n)
+		}
+		for _, fp := range created.Keys {
+			fmt.Fprintf(w, "  key %s\n", fp)
+		}
 	})
 }

@@ -58,7 +58,7 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		label, _ := keyLabel(comment)
-		if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), "runner", label); err != nil {
+		if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), "runner", label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
 			return c.fail(protocol.ExitFailure, "adding key: %v", err)
 		}
 		if key, err = c.Store.SSHKeyByFingerprint(fp); err != nil {

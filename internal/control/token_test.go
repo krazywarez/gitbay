@@ -64,9 +64,17 @@ func TestTokenCreateDefaultsToReadAndRecordsCreator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var found bool
 	for _, tk := range toks {
-		if tk.Name == "child" && (tk.Scope != "read" || tk.CreatedBy != "parent") {
+		if tk.Name != "child" {
+			continue
+		}
+		found = true
+		if tk.Scope != "read" || tk.CreatedBy != "parent" {
 			t.Fatalf("child: %+v", tk)
 		}
+	}
+	if !found {
+		t.Fatal(`no token named "child"`)
 	}
 }

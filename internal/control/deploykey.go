@@ -69,7 +69,7 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	}
 	fp := ssh.FingerprintSHA256(pub)
 	scope := fmt.Sprintf("deploy:%d:%s", repo.ID, mode)
-	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label); err != nil {
+	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return c.failErr(err)
 		}

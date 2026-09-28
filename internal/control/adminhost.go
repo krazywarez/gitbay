@@ -125,7 +125,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	if pub != nil {
 		fp = ssh.FingerprintSHA256(pub)
 		label, _ := keyLabel(comment)
-		if err := c.Store.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full", label); err != nil {
+		if err := c.Store.AddSSHKeyFrom(uid, fp, pub.Type(), pub.Marshal(), "full", label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
 			return c.failErr(err)
 		}
 	}

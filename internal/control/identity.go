@@ -87,10 +87,11 @@ func runKeysList(c *Ctx, args []string) int {
 		Algo        string `json:"algo"`
 		Scope       string `json:"scope"`
 		Label       string `json:"label"`
+		CreatedBy   string `json:"created_by,omitempty"`
 	}
 	var ds []out
 	for _, k := range keys {
-		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label})
+		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedBy})
 	}
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL")
@@ -150,7 +151,7 @@ func runKeysAdd(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	fp := ssh.FingerprintSHA256(pub)
-	if err := c.Store.AddSSHKey(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label); err != nil {
+	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return c.failErr(err)
 		}
