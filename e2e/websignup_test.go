@@ -56,7 +56,7 @@ func TestWebSignup(t *testing.T) {
 	status, body = browserPost(t, browser, inst.base()+"/register", url.Values{
 		"username": {"erin"}, "invite": {inviteCode}, "key": {string(pub)}})
 	if status != 200 || !strings.Contains(body, "welcome, erin") ||
-		!strings.Contains(body, `href="/settings"`) || !strings.Contains(body, "paste the code") {
+		!strings.Contains(body, `href="/settings#emails"`) || !strings.Contains(body, "Paste the code") {
 		t.Fatalf("signup: %d\n%s", status, body)
 	}
 	out, errOut, code := inst.ssh(t, key, "", "whoami")
