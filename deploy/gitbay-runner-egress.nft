@@ -17,14 +17,20 @@
 # outbound internet access, trusted or not (go mod download needs it).
 #
 # What ci-runner may reach on this host:
-#   127.0.0.1:22      the forge over loopback, for the runner. Builds do
-#                     not reach loopback at all: the runner starts them
-#                     with pasta's gateway mapping off (--no-map-gw).
+#   127.0.0.1:22      the forge over loopback, for the runner. This
+#                     table cannot close it to builds. A build reaches
+#                     the host at 169.254.1.2, pasta's --map-guest-addr,
+#                     which pasta translates to the host's public
+#                     address; --no-map-gw (podman's default, which the
+#                     runner also states) adds no mapping to loopback.
+#                     Runbook R3 checks from inside a build whether
+#                     127.0.0.1:22 answers.
 #   loopback :53      the host's resolver, for when the host's nameserver
 #                     is a loopback address. That pasta forwards a
 #                     build's DNS there is to be confirmed from inside a
 #                     build by runbook R3, not assumed.
-#   public 22/80/443  the forge, as anyone on the internet reaches it.
+#   public 22/80/443  the forge, as anyone on the internet reaches it,
+#                     and as a build reaches it through 169.254.1.2.
 # Everything else is rejected: the admin sshd on 2222 on every address,
 # and any service bound to loopback. -isolation none builds run as the
 # same user and get the same rule.

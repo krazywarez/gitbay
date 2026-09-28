@@ -195,26 +195,29 @@ runner, polling over SSH, clones the commit and runs its steps.
   curated set and arbitrary code from a registry nobody vetted.
 - *What a build can reach.* Outbound internet, trusted or not: a fork's
   merge request to a Go repository has to fetch its modules. On the
-  runner's host, only the forge's public ports 22, 80 and 443, exactly
-  as anyone on the internet reaches them. Two layers keep it there. A
-  runner that polls the daemon over loopback starts its containers with
-  pasta's gateway mapping off, so a build does not reach the host's
-  loopback, and =GITBAY_SSH= names the public address; that keeps the
-  runner's source address, =127.0.0.1=, one no build connects from. And
-  an nftables table (=deploy/gitbay-runner-egress.nft=) rejects every
-  connection the runner's user makes to the host's own addresses except
+  runner's host, the rules below limit it to the forge's public ports
+  22, 80 and 443. Under pasta a build's container holds the host's own
+  public address, and pasta translates =169.254.1.2= (its
+  =--map-guest-addr=) to that address. A runner that polls the daemon
+  over loopback starts its containers with =--network
+  pasta:--no-map-gw=, which is podman's default stated explicitly, and
+  gives them =GITBAY_SSH= at =169.254.1.2=, with the forge's port when
+  it is not 22. The runner's source address is =127.0.0.1=. An nftables
+  table (=deploy/gitbay-runner-egress.nft=) rejects every connection
+  the runner's user makes to the host's own addresses except
   =127.0.0.1:22=, DNS on loopback, and 22, 80 and 443 on the public
   address: the operator's sshd on 2222 and anything bound to loopback
-  are closed to builds. Under rootless podman a build's connections are
+  are closed to it. Under rootless podman a build's connections are
   made by pasta as the runner's user, so the table cannot tell a build
-  from its runner and leaves =127.0.0.1:22= open; the gateway mapping
-  is what closes it to builds. The runner does not start without the
-  table. The SSH auth limiter counts failures per source address and,
-  once an address is over the limit, refuses every key from it until
-  the window passes, the runner's included; with registration open or
-  by invite an unknown key never counts (krz/gitbay#260). Under
-  =-isolation none= a build runs on the host and shares its loopback;
-  the table still applies, since it runs as the same user.
+  from its runner and leaves =127.0.0.1:22= open; that no build reaches
+  the host's loopback is measured from inside a build by runbook R3.
+  The runner does not start without the table. The SSH auth limiter
+  counts failures per source address and, once an address is over the
+  limit, refuses every key from it until the window passes, the
+  runner's included; with registration open or by invite an unknown
+  key never counts (krz/gitbay#260). Under =-isolation none= a build
+  runs on the host and shares its loopback; the table still applies,
+  since it runs as the same user.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its

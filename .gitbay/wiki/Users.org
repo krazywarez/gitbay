@@ -563,11 +563,12 @@ with =sh -c= on the instance's runner, stopping at the first failure;
 a broken config surfaces as a failed =ci/config= status. Environment:
 =GITBAY_REPO=,
 =GITBAY_SHA=, =GITBAY_REF=, =GITBAY_JOB=, =CI=true=, and =GITBAY_SSH=,
-the instance's ssh destination as the build reaches it (=git@gitbay.org=,
-the instance's public address, from a runner elsewhere and from a
-container on the server's own runner alike; =git@host:port= on an
-instance whose ssh is not on 22, so use it as =ssh://$GITBAY_SSH/owner/name.git=
-or =ssh ssh://$GITBAY_SSH …=, which work in both forms). A job that
+the instance's ssh destination as the build reaches it: on the forge's
+own runner, =git@169.254.1.2=, pasta's address for the host; from a
+runner elsewhere, the instance's public address (=git@gitbay.org=).
+Either carries =:port= when the instance's ssh is not on 22, so use it
+as =ssh://$GITBAY_SSH/owner/name.git= or =ssh ssh://$GITBAY_SSH …=,
+which work in both forms. A job that
 talks back to the instance — a release asset, a comment, a push to a
 pages branch — uses =$GITBAY_SSH= with a key it holds as a secret;
 the build's container has no key of its own. Two things about that

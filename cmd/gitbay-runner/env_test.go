@@ -191,23 +191,31 @@ func TestSplitEnvKeepsMultilineOutOfTheFile(t *testing.T) {
 }
 
 // A build that talks back to the instance needs an address that works
-// from where it runs. A runner polling over loopback keeps its podman
-// builds off the host's loopback, so they get the instance's public
-// destination from the claim, port included when it is not 22; any other
-// remote is used as it is (#260).
+// from where it runs. Under pasta a podman build holds the host's public
+// address, so a runner polling over loopback gives its podman builds
+// 169.254.1.2, pasta's address for the host, with the claim's port when
+// it is not 22, and never the loopback address it polls. Any other runner
+// passes on the claim's destination, or its own remote without one (#260).
 func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 	env := stepEnv(job{}, "/tmp/buildhome", "git@gitbay.org")
 	if !containsEnv(env, "GITBAY_SSH=git@gitbay.org") {
 		t.Errorf("GITBAY_SSH missing: %q", env)
 	}
 	for _, tc := range []struct{ remote, isolation, public, want string }{
-		{"git@127.0.0.1", isolationNone, "git@gitbay.org", "git@127.0.0.1"},
-		{"git@127.0.0.1", isolationPodman, "git@gitbay.org", "git@gitbay.org"},
-		{"git@127.0.0.1", isolationPodman, "git@gitbay.test:2022", "git@gitbay.test:2022"},
-		{"git@localhost", isolationPodman, "git@gitbay.org", "git@gitbay.org"},
-		{"git@127.0.0.1", isolationPodman, "", "git@127.0.0.1"},
-		{"git@gitbay.org", isolationPodman, "git@other.test", "git@gitbay.org"},
-		{"gitbay.org", isolationPodman, "git@gitbay.org", "gitbay.org"},
+		{"git@127.0.0.1", isolationPodman, "git@gitbay.org", "git@169.254.1.2"},
+		{"git@127.0.0.1", isolationPodman, "git@gitbay.test:22", "git@169.254.1.2"},
+		{"git@127.0.0.1", isolationPodman, "git@gitbay.test:2022", "git@169.254.1.2:2022"},
+		{"git@127.0.0.1", isolationPodman, "git@[2001:db8::1]:2022", "git@169.254.1.2:2022"},
+		{"git@127.0.0.1", isolationPodman, "git@2001:db8::1", "git@169.254.1.2"},
+		{"git@localhost", isolationPodman, "git@gitbay.org", "git@169.254.1.2"},
+		{"forge@::1", isolationPodman, "git@gitbay.org", "forge@169.254.1.2"},
+		{"127.0.0.1", isolationPodman, "git@gitbay.org", "git@169.254.1.2"},
+		{"git@127.0.0.1", isolationPodman, "", "git@169.254.1.2"},
+		{"git@127.0.0.1", isolationNone, "git@gitbay.org", "git@gitbay.org"},
+		{"git@127.0.0.1", isolationNone, "", "git@127.0.0.1"},
+		{"git@gitbay.org", isolationPodman, "git@other.test", "git@other.test"},
+		{"git@gitbay.org", isolationPodman, "", "git@gitbay.org"},
+		{"gitbay.org", isolationPodman, "", "gitbay.org"},
 	} {
 		r := &runner{remote: tc.remote, isolation: tc.isolation}
 		if got := r.buildSSH(tc.public); got != tc.want {
@@ -217,7 +225,8 @@ func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 }
 
 // Only a runner that polls over loopback shares an address a build could
-// connect from, so only its builds lose the host-loopback mapping (#260).
+// connect from, so only its builds state --no-map-gw rather than rely on
+// podman's default (#260).
 func TestBuildNetworkKeepsLoopbackRunnersBuildsOff(t *testing.T) {
 	for _, tc := range []struct {
 		remote string

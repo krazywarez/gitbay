@@ -16,6 +16,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -496,29 +497,49 @@ func (r *runner) loopbackRemote() bool {
 	return host == "127.0.0.1" || host == "localhost" || host == "::1"
 }
 
-// buildSSH is the instance's ssh destination as a build reaches it. A
-// runner polling over loopback keeps its podman builds off the host's
-// loopback (buildNetwork), so they get the instance's public destination
-// from the claim. Any other remote is a real host elsewhere and works as
-// it is, and under -isolation none a build runs on the host itself.
+// hostAddr is the address a podman build under pasta reaches the host
+// at: pasta's --map-guest-addr, which podman sets to this address and
+// which pasta translates to the host's public address.
+const hostAddr = "169.254.1.2"
+
+// buildSSH is the instance's ssh destination as a build reaches it.
+// Under pasta a podman build holds the host's own public address, so the
+// instance's public name resolves to the container itself. A runner
+// polling over loopback runs on the daemon's host, and its podman builds
+// get hostAddr with the user from -remote and the port from the claim's
+// destination when it is not 22. Otherwise a build uses the claim's
+// destination, or -remote when the claim carries none.
 func (r *runner) buildSSH(public string) string {
-	if r.isolation == isolationPodman && r.loopbackRemote() && public != "" {
+	if r.isolation == isolationPodman && r.loopbackRemote() {
+		user, _, ok := strings.Cut(r.remote, "@")
+		if !ok || user == "" {
+			user = "git"
+		}
+		dest := hostAddr
+		_, hostport, ok := strings.Cut(public, "@")
+		if !ok {
+			hostport = public
+		}
+		if _, port, err := net.SplitHostPort(hostport); err == nil && port != "" && port != "22" {
+			dest = net.JoinHostPort(hostAddr, port)
+		}
+		return user + "@" + dest
+	}
+	if public != "" {
 		return public
 	}
 	return r.remote
 }
 
-// buildNetwork is the podman network option for a build. pasta maps the
-// container's gateway address to the host's loopback, and a build's
-// connection through it arrives from 127.0.0.1 — the address a runner on
-// the daemon's host polls from. The SSH auth limiter counts failures per
-// source address, so a build sharing the runner's could throttle its
-// polling (#260). --no-map-gw removes the mapping: the build reaches the
-// host only at its public address, as any client on the internet does,
-// and keeps its outbound access. The host's nftables table
-// (deploy/gitbay-runner-egress.nft) then limits it to 22, 80 and 443
-// there; it cannot tell a build from the runner by uid, so it leaves
-// 127.0.0.1:22 open, and this flag is what keeps builds off it.
+// buildNetwork is the podman network option for a build on the daemon's
+// host. A build reaches the host at hostAddr, which pasta translates to
+// the host's public address, and cannot reach the host's loopback, so
+// none of its connections arrive from 127.0.0.1, the address the runner
+// polls from; the SSH auth limiter counts failures per source address
+// (#260). podman passes --no-map-gw to pasta by default; it is stated
+// here so the build's view of the host does not depend on that default.
+// The host's nftables table (deploy/gitbay-runner-egress.nft) limits
+// what a build reaches on the host to 22, 80 and 443.
 func (r *runner) buildNetwork() []string {
 	if !r.loopbackRemote() {
 		return nil

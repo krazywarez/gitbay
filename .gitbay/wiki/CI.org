@@ -67,11 +67,12 @@ than holding the drain; follow again once the daemon is back.
 * What a build can reach
 
 Builds have outbound internet access, trusted and untrusted alike. On
-the runner's host they reach only the forge's public ports 22, 80 and
-443: not the host's loopback, not the operator's sshd. The forge is
-reached at its public address, the one in =GITBAY_SSH=. See the
-Threat-Model page, "What a build can reach", for how and why
-(krz/gitbay#260).
+the runner's host an nftables table limits them to the forge's public
+ports 22, 80 and 443, which closes the operator's sshd. The forge is
+reached at the address in =GITBAY_SSH=: on a runner that polls the
+daemon over loopback, =169.254.1.2=, which pasta translates to the
+host's public address. See the Threat-Model page, "What a build can
+reach", for how and why (krz/gitbay#260).
 
 * The table
 
