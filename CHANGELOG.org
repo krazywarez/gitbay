@@ -9,6 +9,9 @@ anything beyond "replace the binary and restart" is needed.
 - Removing an SSH key, removing a deploy key, or disabling or deleting an
   account closes every open connection using an affected key, git
   transports included; every command re-reads its key (#256).
+- A request whose credential has an expiry cannot run a command that
+  mints another one — tokens, keys, login links, invites, accounts,
+  verified addresses (#257).
 
 * v1.36.0 — 2026-09-23
 

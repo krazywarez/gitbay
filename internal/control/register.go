@@ -36,9 +36,10 @@ func init() {
 		Usage:    "email add <address>",
 		Examples: []string{"email add cmc@example.org"}, Run: runEmailAdd})
 	register(Command{Path: []string{"email", "verify"},
-		Summary:  "confirm a verification code",
-		Usage:    "email verify <code>",
-		Examples: []string{"email verify abc123"}, Run: runEmailVerify})
+		Summary:         "confirm a verification code",
+		Usage:           "email verify <code>",
+		MintsCredential: true,
+		Examples:        []string{"email verify abc123"}, Run: runEmailVerify})
 	register(Command{Path: []string{"email", "list"},
 		Summary:  "list the addresses on your account",
 		Usage:    "email list",

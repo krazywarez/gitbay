@@ -14,9 +14,10 @@ func newStoredToken() (token, hash string, err error) { return store.NewToken() 
 
 func init() {
 	register(Command{Path: []string{"web", "login"},
-		Summary:  "mint a one-time browser login URL",
-		Usage:    "web login",
-		Examples: []string{"web login"}, Run: runWebLogin})
+		Summary:         "mint a one-time browser login URL",
+		Usage:           "web login",
+		MintsCredential: true,
+		Examples:        []string{"web login"}, Run: runWebLogin})
 	register(Command{Path: []string{"web", "sessions", "list"},
 		Summary:  "list your browser sessions",
 		Usage:    "web sessions list",

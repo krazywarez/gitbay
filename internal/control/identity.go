@@ -38,9 +38,10 @@ func init() {
 			{"--scope", "full|git|runner", "what the key may do", "full"},
 			{"--label", "<text>", "a name for the key", ""},
 		},
-		Examples:   []string{"keys add --label laptop < key.pub"},
-		ReadsStdin: true,
-		Run:        runKeysAdd,
+		Examples:        []string{"keys add --label laptop < key.pub"},
+		ReadsStdin:      true,
+		MintsCredential: true,
+		Run:             runKeysAdd,
 	})
 	register(Command{
 		Path:     []string{"keys", "label"},

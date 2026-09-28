@@ -28,7 +28,7 @@ const maxAPIBody = 1 << 20
 // semantics. Exit codes map onto HTTP statuses; the body is the command's
 // JSON envelope with exit_code added.
 func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
-	user, scope, ok := s.apiAuth(w, r)
+	user, tok, ok := s.apiAuth(w, r)
 	if !ok {
 		return
 	}
@@ -72,7 +72,9 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 		Stderr:   &stderr,
 		JSON:     true,
 		ViaAPI:   true,
-		ReadOnly: scope == "read",
+		ReadOnly: tok.Scope == "read",
+		TokenID:  tok.ID,
+		Expires:  tok.ExpiresAt,
 		Done:     s.until(r),
 		Stopping: s.stopping,
 	}
@@ -124,23 +126,23 @@ func (s *Server) limitKey(r *http.Request, user store.User) string {
 }
 
 // apiAuth resolves the bearer token; failures are uniform 401s.
-func (s *Server) apiAuth(w http.ResponseWriter, r *http.Request) (store.User, string, bool) {
+func (s *Server) apiAuth(w http.ResponseWriter, r *http.Request) (store.User, store.APIToken, bool) {
 	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok || token == "" {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="gitbay api"`)
 		apiError(w, http.StatusUnauthorized, "missing bearer token; mint one over SSH: token create --name <n>")
-		return store.User{}, "", false
+		return store.User{}, store.APIToken{}, false
 	}
-	user, scope, err := s.st.APITokenUser(store.HashToken(strings.TrimSpace(token)))
+	user, tok, err := s.st.APITokenUser(store.HashToken(strings.TrimSpace(token)))
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			apiError(w, http.StatusUnauthorized, "invalid or expired token")
-			return store.User{}, "", false
+			return store.User{}, store.APIToken{}, false
 		}
 		apiError(w, http.StatusInternalServerError, "internal error")
-		return store.User{}, "", false
+		return store.User{}, store.APIToken{}, false
 	}
-	return user, scope, true
+	return user, tok, true
 }
 
 func apiError(w http.ResponseWriter, status int, msg string) {

@@ -19,8 +19,9 @@ func init() {
 		Flags: []Flag{
 			{"--rw", "", "the key may push, not just fetch", ""},
 		},
-		Examples:   []string{"repo deploy-key add krz/gitbay < key.pub"},
-		ReadsStdin: true, Run: runDeployKeyAdd})
+		Examples:        []string{"repo deploy-key add krz/gitbay < key.pub"},
+		ReadsStdin:      true,
+		MintsCredential: true, Run: runDeployKeyAdd})
 	register(Command{Path: []string{"repo", "deploy-key", "list"},
 		Summary:  "list deploy keys",
 		Usage:    "repo deploy-key list <owner/name>",

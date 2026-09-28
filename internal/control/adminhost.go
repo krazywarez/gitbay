@@ -30,8 +30,9 @@ func init() {
 			{"--verified", "", "mark that address verified", ""},
 			{"--key", "-", "read a public key from stdin", ""},
 		},
-		Examples:   []string{"admin user create alice --email alice@example.org --key - < key.pub"},
-		ReadsStdin: true, Run: runAdminUserCreate})
+		Examples:        []string{"admin user create alice --email alice@example.org --key - < key.pub"},
+		ReadsStdin:      true,
+		MintsCredential: true, Run: runAdminUserCreate})
 	register(Command{Path: []string{"admin", "user", "disable"},
 		Summary:  "suspend an account: SSH, web sessions and API tokens refused until re-enabled",
 		Usage:    "admin user disable <username>",
@@ -51,18 +52,20 @@ func init() {
 		Examples: []string{"admin user delete alice --yes"},
 		Run:      runAdminUserDelete})
 	register(Command{Path: []string{"admin", "email", "verify"},
-		Summary:  "mark an address verified by admin assertion",
-		Usage:    "admin email verify <username> <address>",
-		Examples: []string{"admin email verify alice alice@example.org"},
-		Run:      runAdminEmailVerify})
+		Summary:         "mark an address verified by admin assertion",
+		Usage:           "admin email verify <username> <address>",
+		Examples:        []string{"admin email verify alice alice@example.org"},
+		MintsCredential: true,
+		Run:             runAdminEmailVerify})
 	register(Command{Path: []string{"admin", "invite"},
 		Summary: "issue a registration invite and mail its code",
 		Usage:   "admin invite --email <address>",
 		Flags: []Flag{
 			{"--email", "<address>", "who the invite is for", ""},
 		},
-		Examples: []string{"admin invite --email alice@example.org"},
-		Run:      runAdminInvite})
+		Examples:        []string{"admin invite --email alice@example.org"},
+		MintsCredential: true,
+		Run:             runAdminInvite})
 	register(Command{Path: []string{"admin", "stats"},
 		Summary:  "instance statistics: counts and per-repository disk usage",
 		Usage:    "admin stats",

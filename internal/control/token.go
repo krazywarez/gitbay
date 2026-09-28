@@ -21,8 +21,9 @@ func init() {
 			{"--scope", "full|read", "what the token may do", "full"},
 			{"--ttl", "30d|720h", "how long the token is valid", "never expires"},
 		},
-		Examples: []string{"token create --name laptop --scope read --ttl 30d"},
-		Run:      runTokenCreate})
+		Examples:        []string{"token create --name laptop --scope read --ttl 30d"},
+		MintsCredential: true,
+		Run:             runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
 		Summary:  "list API tokens",
 		Usage:    "token list",
@@ -73,7 +74,7 @@ func runTokenCreate(c *Ctx, args []string) int {
 	}
 	// The gb_ prefix makes leaked tokens findable by secret scanners.
 	token := "gb_" + raw
-	if err := c.Store.CreateAPIToken(c.User.ID, name, store.HashToken(token), scope, expires); err != nil {
+	if err := c.Store.CreateAPIToken(c.User.ID, name, store.HashToken(token), scope, expires, c.TokenID); err != nil {
 		return c.failErr(err)
 	}
 	type out struct {
@@ -125,7 +126,7 @@ func runTokenRevoke(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.usage()
 	}
-	if err := c.Store.RevokeAPIToken(c.User.ID, args[0]); err != nil {
+	if _, err := c.Store.RevokeAPIToken(c.User.ID, args[0], false); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "no token named %q", args[0])
 		}

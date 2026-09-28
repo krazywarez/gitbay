@@ -40,6 +40,13 @@ type Ctx struct {
 	// Source identifies the credential behind this session for the audit
 	// log: an SSH key fingerprint, or "api" for token requests.
 	Source string
+	// TokenID is the API token behind this request, 0 for none. A
+	// credential the request creates records it.
+	TokenID int64
+	// Expires is when the credential behind this request lapses; nil
+	// when it does not. Dispatch refuses MintsCredential commands when
+	// it is set.
+	Expires *time.Time
 	// Cmd is the command being run, set by Dispatch, so a usage error can
 	// print the registered usage rather than a copy of it.
 	Cmd Command
@@ -87,7 +94,11 @@ type Command struct {
 	Examples   []string // full argv after the program, repository named
 	ReadsStdin bool
 	ReadOnly   bool // safe for read-scoped API tokens
-	Run        func(c *Ctx, args []string) int
+	// MintsCredential marks a command that creates a credential or a way
+	// to obtain one: tokens, keys, login links, invites, accounts,
+	// verified addresses. An expiring credential may not run it.
+	MintsCredential bool
+	Run             func(c *Ctx, args []string) int
 }
 
 var registry []Command
@@ -158,6 +169,11 @@ func Dispatch(c *Ctx, argv []string) int {
 	}
 	if c.ReadOnly && !cmd.ReadOnly {
 		return c.fail(protocol.ExitDenied, "this token is read-only; %s modifies state — mint one with --scope full", joinPath(cmd.Path))
+	}
+	// What an expiring credential creates would outlive it (#257).
+	if cmd.MintsCredential && c.Expires != nil {
+		return c.fail(protocol.ExitDenied,
+			"%s creates a credential, and the one this request came with expires; use a token or key without an expiry", joinPath(cmd.Path))
 	}
 	// The SSH listener refuses a disabled account before it gets here; the
 	// API and the web reach Dispatch directly, so the check lives here too.
