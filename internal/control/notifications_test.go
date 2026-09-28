@@ -267,3 +267,34 @@ func TestNotificationsSettingsShowsPush(t *testing.T) {
 		t.Fatalf("no push key: %s", out.String())
 	}
 }
+
+func TestNotificationsListEmptyUnreadSaysHowToSeeRead(t *testing.T) {
+	c, repo, bob := testRepoWithWatcher(t)
+	// Give bob one notice (acting as alice, so bob isn't filtered out as
+	// the actor), then mark it read as bob, so his inbox has rows but no
+	// unread ones.
+	notify(c, []int64{bob}, notice{repo: repo, kind: "issue", subject: "s", action: "a", path: "x"})
+	c.User = store.User{ID: bob, Username: "bob"}
+	if code := runNotificationsRead(c, []string{"--all"}); code != protocol.ExitOK {
+		t.Fatalf("mark read: exit %d", code)
+	}
+	var out, errOut bytes.Buffer
+	c.Stdout, c.Stderr = &out, &errOut
+	if code := runNotificationsList(c, nil); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if got := errOut.String(); got != "no unread notifications (--all for read ones)\n" {
+		t.Errorf("stderr = %q", got)
+	}
+	// --all sees it and stays the generic message when that too is empty.
+	out.Reset()
+	errOut.Reset()
+	if code := runNotificationsList(c, []string{"--all"}); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	// The inbox row's summary is the notice's action ("a"), not its mail
+	// subject ("s"); check the path instead, which is unique to this row.
+	if !strings.Contains(out.String(), "x") {
+		t.Errorf("--all did not show the read notice: %q", out.String())
+	}
+}

@@ -418,6 +418,14 @@ func runNotificationsList(c *Ctx, args []string) int {
 	for _, n := range notices {
 		ds = append(ds, out{n.ID, n.RepoPath, n.Kind, n.Actor, n.Summary, n.Path, n.CreatedAt, n.ReadAt})
 	}
+	if !c.JSON && !p.active && len(ds) == 0 {
+		msg := "nothing to list"
+		if !all {
+			msg = "no unread notifications (--all for read ones)"
+		}
+		fmt.Fprintln(c.Stderr, msg)
+		return protocol.ExitOK
+	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "ID", "WHEN", "REPO", "EVENT", "PATH")
 		for _, d := range ds {
