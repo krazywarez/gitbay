@@ -66,6 +66,17 @@ func PruneNow(dir string) error {
 	return nil
 }
 
+// FsckConnectivity checks that every object reachable from the
+// repository's refs is present, without reading blob contents. A backup
+// verify runs it on each archived repository (#259).
+func FsckConnectivity(dir string) error {
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "fsck", "--connectivity-only", "--no-progress", "--no-dangling")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("fsck --connectivity-only: %v\n%s", err, out)
+	}
+	return nil
+}
+
 // RevListRange returns commits in old..new, newest first.
 func RevListRange(dir, old, new string) ([]string, error) {
 	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-list", "--end-of-options", new, "^"+old)
