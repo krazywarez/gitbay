@@ -16,8 +16,8 @@ import (
 
 // authorizedKeysCmd backs sshd's AuthorizedKeysCommand in system mode:
 //
-//	AuthorizedKeysCommand /usr/bin/gitbayd --config /etc/gitbay/config.toml authorized-keys %t %k
-//	AuthorizedKeysCommandUser git
+//	AuthorizedKeysCommand /usr/local/bin/gitbayd --config /etc/gitbay/config.toml authorized-keys %t %k
+//	AuthorizedKeysCommandUser gitbay
 //
 // It prints a forced-command authorized_keys line for registered keys and
 // nothing for unknown ones — so unknown keys fail authentication inside

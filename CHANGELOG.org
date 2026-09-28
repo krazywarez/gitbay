@@ -29,6 +29,29 @@ timeout (#256, #257, #276, #277).
 =--scope full=. A script that mints a token and then writes with it
 must add =--scope full=. Existing tokens keep their scope.
 
+*Upgrade note.* Upgrade the instance before the CLI: an older server
+refuses the CLI's leading =--path== argument as an unknown command,
+for the eighteen commands whose CLI path differs from the registry's
+(the =gitbay auth ...= commands and =repo topics list=).
+
+*Upgrade note.* gitbayd needs =server.secret_key_file= (default
+=/etc/gitbay/secret.key=) and refuses to start without it. Before
+replacing the binary, run =gitbayd admin secrets init= as root and
+=chown gitbay:gitbay /etc/gitbay/secret.key= (=deploy/install.sh= does
+both when the file is missing). The first start seals the stored
+secrets. Back the key file up separately: =admin backup= archives do
+not carry it (see the Admin wiki, "Secret key"). Downgrading to an
+earlier release after values are sealed is not supported: an older
+gitbayd reads a sealed value's =gbs1:...= prefix as the literal
+secret.
+
+*Upgrade note.* Archives now carry a directory entry for every
+directory, so a bare repository whose refs are all packed restores as
+a repository. An archive written before this release lacks those
+entries; if extracting one leaves a repository's =refs/= directory
+missing, =gitbayd admin backup --verify <archive>= names it, and
+=mkdir -p <root>/repos/<owner>/<name>.git/refs= fixes it.
+
 - A token with a =--ttl= is refused on every command that creates a
   credential: tokens, keys, deploy keys, runner keys, login links,
   invites, accounts and verified addresses (#257).
@@ -85,10 +108,6 @@ must add =--scope full=. Existing tokens keep their scope.
   separately (#275).
 - Audit retention deletes by id, up to the newest row older than the
   retention, so a clock step back cannot leave a gap in the chain (#275).
-*Upgrade note.* Upgrade the instance before the CLI: an older server
-refuses the CLI's leading =--path== argument as an unknown command,
-for the eighteen commands whose CLI path differs from the registry's
-(the =gitbay auth ...= commands and =repo topics list=).
 - =dashboard= and =feed= print activity as sentences
   (=cmc opened issue krz/gitbay#12=) instead of raw event payloads,
   and a labelled event names its labels there and on the web feed. An
@@ -137,18 +156,6 @@ for the eighteen commands whose CLI path differs from the registry's
   previous" link on each revision after the first, so a reviewer whose
   approval a force-push staled can see what changed without leaving the
   browser (#269).
-- Untrusted builds (merge requests from forks) get a fresh HOME removed after the build and no secrets; trusted builds keep a per-repository home under =<workdir>/trusted-home=. Deploy gitbayd before the runner; the old shared homes under the runner's workdir can be deleted. (#255)
-- =status set= refuses =ci/= contexts, which belong to the instance's builds. Build results are reused only from trusted builds on the same image. =repo settings require-contexts= names status contexts that must report green; setting any turns require-checks on, and one not yet reported counts as pending. (#258)
-*Upgrade note.* gitbayd needs =server.secret_key_file= (default
-=/etc/gitbay/secret.key=) and refuses to start without it. Before
-replacing the binary, run =gitbayd admin secrets init= as root and
-=chown gitbay:gitbay /etc/gitbay/secret.key= (=deploy/install.sh= does
-both when the file is missing). The first start seals the stored
-secrets. Back the key file up separately: =admin backup= archives do
-not carry it (see the Admin wiki, "Secret key"). Downgrading to an
-earlier release after values are sealed is not supported: an older
-gitbayd reads a sealed value's =gbs1:...= prefix as the literal
-secret.
 - CI secrets, webhook secrets, mirror tokens and push device tokens are
   stored sealed with AES-256-GCM (#273). =gitbayd admin secrets
   init|rotate|check=.
@@ -186,12 +193,24 @@ secret.
   backup is running" while it runs. =--verify= now also runs =git
   fsck --connectivity-only= on each archived repository and names any
   that fail. (#259)
-*Upgrade note.* Archives now carry a directory entry for every
-directory, so a bare repository whose refs are all packed restores as
-a repository. An archive written before this release lacks those
-entries; if extracting one leaves a repository's =refs/= directory
-missing, =gitbayd admin backup --verify <archive>= names it, and
-=mkdir -p <root>/repos/<owner>/<name>.git/refs= fixes it.
+- A full backup archives each repository's HEAD, =packed-refs= and
+  =refs/= before its objects, so a push during the backup cannot leave
+  an archived ref naming objects the archive lacks. (#259)
+- =gitbayd admin gc= and =admin mr prune= refuse with "a backup is
+  running" during a full backup. A pack or loose object that git's
+  automatic gc removes while the backup walks is skipped instead of
+  failing the run; =--verify= reports it if a ref needed it. (#259)
+- =gitbayd admin backup= and =--verify= no longer need the secret key
+  file: sealed values are copied as they are. A missing database is
+  refused instead of created. (#259)
+- =gitbayd admin backup= refuses an =--out= inside =server.root=, and
+  removes the snapshot directories and temporary archives a killed run
+  left beside its archive once they are a day old. (#259)
+- =gitbayd admin backup --verify= runs fsck with =--git-dir=, so a
+  directory that is not a repository fails instead of git checking an
+  enclosing one, and does not extract =objects/info/alternates=. (#259)
+- =gitbayd admin secrets init= and =rotate= hold an flock on =<key
+  file>.lock=, so two runs at once serialize. (#273)
 
 * v1.36.0 — 2026-09-23
 
