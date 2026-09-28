@@ -162,13 +162,16 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	repoCount := 0
 	root := cfg.Server.Root
 	if !dbOnly {
-		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
+		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 			rel, err := filepath.Rel(root, path)
 			if err != nil {
 				return err
+			}
+			if walkErr != nil {
+				if vanished(walkErr, rel) {
+					return nil
+				}
+				return walkErr
 			}
 			if rel == "." {
 				return nil
@@ -195,6 +198,9 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 				// ref is packed), so extraction recreates it: git's own
 				// repository discovery needs refs/ to exist.
 				if err := addDir(tw, path, filepath.ToSlash(rel)); err != nil {
+					if vanished(err, rel) {
+						return filepath.SkipDir
+					}
 					return err
 				}
 				if strings.HasSuffix(rel, ".git") {
@@ -206,7 +212,11 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 				}
 				return nil
 			}
-			return addFile(tw, path, filepath.ToSlash(rel))
+			beforeAdd(path)
+			if err := addFile(tw, path, filepath.ToSlash(rel)); !vanished(err, rel) {
+				return err
+			}
+			return nil
 		})
 		if err != nil {
 			return err
@@ -295,6 +305,29 @@ func addRefs(tw *tar.Writer, path, name string) error {
 	})
 }
 
+// beforeAdd runs before each file the walk archives outside refs. Tests
+// use it to remove a file between listing and reading.
+var beforeAdd = func(path string) {}
+
+// vanished reports a file or directory under a repository's objects/
+// that went between the walk listing it and reading it: a pack or loose
+// object a concurrent gc or receive.autogc removed. The walk skips it.
+// Refs archived earlier reach only objects that are still reachable, and
+// a repack writes those into a new pack before removing the old one; if
+// one is lost regardless, verify's fsck reports it.
+func vanished(err error, rel string) bool {
+	if !errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if strings.HasSuffix(parts[i], ".git") && parts[i+1] == "objects" {
+			return true
+		}
+	}
+	return false
+}
+
 // syncDir makes a rename in dir durable.
 func syncDir(dir string) error {
 	d, err := os.Open(dir)
@@ -313,8 +346,15 @@ func snapshotDB(st *store.Store, dest string) error {
 	return err
 }
 
+// addFile opens before writing the header, so a file removed after the
+// walk listed it fails before the archive has a member for it.
 func addFile(tw *tar.Writer, path, name string) error {
-	info, err := os.Stat(path)
+	src, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	info, err := src.Stat()
 	if err != nil {
 		return err
 	}
@@ -326,12 +366,7 @@ func addFile(tw *tar.Writer, path, name string) error {
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}
-	src, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-	_, err = io.Copy(tw, src)
+	_, err = io.CopyN(tw, src, hdr.Size)
 	return err
 }
 

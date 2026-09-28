@@ -456,9 +456,12 @@ missing repository or a missing object.
 
 A full backup holds =<root>/backup.lock= from its database snapshot to
 its last repository. While it runs, =repo delete=, =repo rename=,
-=repo transfer=, =admin repo delete= and =org rename= refuse with "a
-backup is running"; retry when it finishes. Database-only backups take
-no lock.
+=repo transfer=, =admin repo delete=, =org rename=, =admin mr prune=
+and =gitbayd admin gc= refuse with "a backup is running"; retry when it
+finishes. Database-only backups take no lock. A pack that git's own
+automatic gc removes during the walk is skipped; each repository's refs
+are archived before its objects, so the refs still find their objects,
+and =--verify= reports it if one does not.
 
 Verifying an archive of unknown origin is safe as an unprivileged
 user: the connectivity check runs git against the archived

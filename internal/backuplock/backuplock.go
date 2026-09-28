@@ -1,9 +1,9 @@
-// Package backuplock keeps repository deletes, renames and transfers
-// out of a full backup's way (#259). The backup runs in its own process
-// (gitbayd admin backup) and a delete in the daemon's, so the lock is
-// flock(2) on a file under server.root: the backup holds it exclusively
-// from its database snapshot until the last repository is archived, and
-// each delete or move holds it shared while it runs.
+// Package backuplock keeps repository deletes, renames, transfers and
+// prunes out of a full backup's way (#259). The backup runs in its own
+// process (gitbayd admin backup) and a delete in the daemon's, so the
+// lock is flock(2) on a file under server.root: the backup holds it
+// exclusively from its database snapshot until the last repository is
+// archived, and each delete, move or prune holds it shared while it runs.
 package backuplock
 
 import (
@@ -17,7 +17,7 @@ import (
 const Name = "backup.lock"
 
 // ErrBusy is TryShared's answer while a backup holds the lock.
-var ErrBusy = errors.New("a backup is running; repositories cannot be deleted, renamed or moved until it finishes, usually within minutes")
+var ErrBusy = errors.New("a backup is running; repositories cannot be deleted, renamed, moved or pruned until it finishes, usually within minutes")
 
 // open opens the lock file read-only, which is all flock needs, so the
 // daemon's user can lock a file a root-run backup created. O_NOFOLLOW

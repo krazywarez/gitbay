@@ -38,3 +38,20 @@ func TestRepoDeleteAndRenameRefusedDuringBackup(t *testing.T) {
 		t.Fatalf("delete after the backup: exit %d, %s", code, errOut)
 	}
 }
+
+func TestAdminMRPruneRefusedDuringBackup(t *testing.T) {
+	st, repo, root, headSHA := prunedRepo(t)
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	release, err := backuplock.Hold(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	c, errOut := pruneCtx(st, root, rootUser(t, st))
+	if code := Dispatch(c, []string{"admin", "mr", "prune", repo.Path(), "1", "--yes"}); code != protocol.ExitFailure || !strings.Contains(errOut.String(), "a backup is running") {
+		t.Fatalf("prune during a backup: exit %d, %s", code, errOut)
+	}
+	if !refExists(dir, mrHeadRef(1)) || !objectExists(dir, headSHA) {
+		t.Fatal("prune during a backup changed the repository")
+	}
+}

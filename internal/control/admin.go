@@ -655,6 +655,14 @@ func runAdminMRPrune(c *Ctx, args []string) int {
 		mrs = append(mrs, mr)
 	}
 
+	// The prune would remove objects a running full backup has listed
+	// and not yet read.
+	release, code := holdOffBackup(c)
+	if code >= 0 {
+		return code
+	}
+	defer release()
+
 	// The record is written as each ref goes, not after the gc: a failure
 	// past this point leaves refs deleted, and the audit log and the MR
 	// thread must say so. Re-running the same command finishes the job.

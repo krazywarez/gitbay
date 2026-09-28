@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -547,4 +548,81 @@ func TestBackupArchivesRefsBeforeObjects(t *testing.T) {
 		t.Errorf("archived main is %s, want %s from before the push", got, first)
 	}
 	gitIn(t, repo, "cat-file", "-e", second)
+}
+
+// A pack removed between the walk listing it and reading it is skipped,
+// and verify's fsck then reports what it held; a vanished file outside
+// objects/ still fails the backup.
+func TestBackupSkipsVanishedObjects(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	gitIn(t, work, "clone", "-q", "--bare", work, dir)
+	gitIn(t, dir, "repack", "-q", "-a", "-d")
+
+	removed := ""
+	beforeAdd = func(path string) {
+		if removed == "" && strings.HasSuffix(path, ".pack") {
+			removed = path
+			os.Remove(path)
+		}
+	}
+	t.Cleanup(func() { beforeAdd = func(string) {} })
+	archive := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, archive, false); err != nil {
+		t.Fatalf("backup with a vanished pack: %v", err)
+	}
+	if removed == "" {
+		t.Fatal("no pack was archived")
+	}
+	for _, n := range members(t, archive) {
+		if strings.HasSuffix(n, ".pack") {
+			t.Errorf("archive carries %s", n)
+		}
+	}
+	if err := verifyBackup(archive, ""); err == nil || !strings.Contains(err.Error(), "connectivity") {
+		t.Errorf("verify of an archive missing its pack: %v", err)
+	}
+
+	beforeAdd = func(path string) {
+		if strings.HasSuffix(path, filepath.Join("thing.git", "config")) {
+			os.Remove(path)
+		}
+	}
+	err = runBackup(cfg, filepath.Join(t.TempDir(), "c.tar.gz"), false)
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("backup with a vanished config: %v, want not-exist", err)
+	}
+}
+
+// gc refuses while a full backup holds the lock.
+func TestGCRefusedDuringBackup(t *testing.T) {
+	cfg := testConfig(t)
+	release, err := backuplock.Hold(cfg.Server.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if err := runGC(cfg, "", false, false); !errors.Is(err, backuplock.ErrBusy) {
+		t.Fatalf("gc during a backup: %v", err)
+	}
 }
