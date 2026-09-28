@@ -242,7 +242,8 @@ func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.Server.Root = root
-	cfg.Server.SiteURL = "https://forge.test"
+	// The settings link keeps the site URL's scheme and port.
+	cfg.Server.SiteURL = "http://forge.test:8080/"
 	cfg.Registration.Mode = "open"
 	srv, err := New(cfg, st)
 	if err != nil {
@@ -289,7 +290,7 @@ func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
 	}
 
 	fp := ssh.FingerprintSHA256(signer.PublicKey())
-	for _, want := range []string{fp, "forge.test", "https://forge.test/settings#keys", "ssh git@forge.test register"} {
+	for _, want := range []string{fp, "forge.test", "add it at http://forge.test:8080/settings#keys\n", "ssh git@forge.test register"} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("message missing %q:\n%s", want, stderr.String())
 		}

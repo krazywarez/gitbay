@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -447,9 +448,9 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 		flag := map[string]string{"open": "--email <address>", "invite": "--invite <code>"}[s.cfg.Registration.Mode]
 		fmt.Fprintf(ch.Stderr(),
 			"this key (%s) is not registered on %s.\n"+
-				"already have an account? add it at https://%s/settings#keys\n"+
+				"already have an account? add it at %s/settings#keys\n"+
 				"new here? ssh git@%s register --username <name> %s\n",
-			fp, host, host, host, flag)
+			fp, host, strings.TrimSuffix(s.cfg.Server.SiteURL, "/"), host, flag)
 		return protocol.ExitDenied
 	}
 	return control.RunRegister(s.cfg, s.st, pub, argv, ch, ch.Stderr())
