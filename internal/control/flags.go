@@ -92,6 +92,21 @@ func parseFlags(args []string, spec flagSpec) (flags, error) {
 	return f, nil
 }
 
+// parseArgs is parseFlags for the running command, with the usage line
+// printed the way a usage refusal prints it (cmdUsage): the program in
+// front and the CLI's own path where it differs (#267). spec.Usage stays
+// the text, since some commands spell their flags out more fully there
+// than in the registered Usage.
+func (c *Ctx) parseArgs(args []string, spec flagSpec) (flags, error) {
+	usage := strings.TrimPrefix(spec.Usage, "usage: ")
+	spec.Usage = ""
+	f, err := parseFlags(args, spec)
+	if err != nil && usage != "" {
+		err = fmt.Errorf("%v\nusage: %s %s", err, c.program(), c.usageShape(c.Cmd.Path, usage))
+	}
+	return f, err
+}
+
 // pos is the nth positional argument, or "" when absent.
 func (f flags) pos(n int) string {
 	if n < len(f.Pos) {

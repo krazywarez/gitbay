@@ -110,7 +110,7 @@ func runRepoRefs(c *Ctx, args []string) int {
 const BlameSpan = 1000
 
 func runRepoBlame(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--from", "--to"}, MaxPos: -1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref", "--from", "--to"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -220,7 +220,7 @@ func runRepoBlame(c *Ctx, args []string) int {
 // off argv. Positionals are returned in order so each command can name them
 // in its own usage message.
 func readArgs(c *Ctx, args []string, usage string, maxPos int) (pos []string, ref string, code int) {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: maxPos, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref"}, MaxPos: maxPos, Usage: c.Cmd.Usage})
 	if err != nil {
 		return nil, "", c.fail(protocol.ExitUsage, "%v", err)
 	}

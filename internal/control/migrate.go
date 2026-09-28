@@ -155,7 +155,7 @@ func migAttribution(src, kind, author, date string, n int64) string {
 // the git push that follows cannot be refused by them. Resumable: markers
 // skip everything already imported.
 func runAccountImportBundle(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--source"}, MaxPos: 0, Usage: "account import-bundle [--source <host>] < bundle.json"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--source"}, MaxPos: 0, Usage: "account import-bundle [--source <host>] < bundle.json"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

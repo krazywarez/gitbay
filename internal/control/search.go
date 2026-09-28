@@ -84,7 +84,7 @@ func Search(st *store.Store, root string, userID int64, q string, kinds []string
 }
 
 func runSearch(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Multi: []string{"--kind"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Multi: []string{"--kind"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

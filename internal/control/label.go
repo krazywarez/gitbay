@@ -68,7 +68,7 @@ func runLabelList(c *Ctx, args []string) int {
 }
 
 func runLabelSet(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: -1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--color"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

@@ -137,7 +137,7 @@ func runAdminUserList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 0,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--state"}, MaxPos: 0,
 		Usage: "admin user list [--state active|pending|disabled|admin] [--limit <n>] [--cursor <c>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -410,7 +410,7 @@ func runAdminRepoList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Values: []string{"--owner", "--visibility"}, MaxPos: 0,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--owner", "--visibility"}, MaxPos: 0,
 		Usage: "admin repo list [--owner <name>] [--visibility public|private] [--limit <n>] [--cursor <c>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)

@@ -99,6 +99,9 @@ func TestWithCLIPath(t *testing.T) {
 	if got := withCLIPath("keys remove", "keys remove", argv); !slices.Equal(got, argv) {
 		t.Errorf("matching path: %v", got)
 	}
+	if got := withCLIPath("", "keys remove", argv); !slices.Equal(got, argv) {
+		t.Errorf("empty cliPath: %v", got)
+	}
 	got := withCLIPath("auth keys remove", "keys remove", argv)
 	want := []string{"--path=auth keys remove", "keys", "remove", "abc"}
 	if !slices.Equal(got, want) {

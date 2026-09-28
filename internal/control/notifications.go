@@ -285,7 +285,7 @@ func runNotificationsSettingsPush(c *Ctx, args []string) int {
 const maxDeviceTokenBytes = 512
 
 func runNotificationsDeviceAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--label"}, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--label"}, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -389,7 +389,7 @@ func runNotificationsList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	fl, err := parseFlags(rest, flagSpec{Bools: []string{"--all"}, Usage: c.Cmd.Usage})
+	fl, err := c.parseArgs(rest, flagSpec{Bools: []string{"--all"}, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -443,7 +443,7 @@ func runNotificationsList(c *Ctx, args []string) int {
 }
 
 func runNotificationsRead(c *Ctx, args []string) int {
-	fl, err := parseFlags(args, flagSpec{Bools: []string{"--all"}, MaxPos: -1, Usage: c.Cmd.Usage})
+	fl, err := c.parseArgs(args, flagSpec{Bools: []string{"--all"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

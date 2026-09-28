@@ -214,7 +214,7 @@ func runOrgDelete(c *Ctx, args []string) int {
 }
 
 func runOrgMembersAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--role"}, MaxPos: -1, Usage: "org members add <org> <user> [--role member|admin]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--role"}, MaxPos: -1, Usage: "org members add <org> <user> [--role member|admin]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

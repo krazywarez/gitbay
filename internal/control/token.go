@@ -65,7 +65,7 @@ func (c *Ctx) ttlFlag(f flags) (*time.Time, int) {
 }
 
 func runTokenCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -128,7 +128,7 @@ func runTokenList(c *Ctx, args []string) int {
 }
 
 func runTokenRevoke(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Bools: []string{"--created"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Bools: []string{"--created"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

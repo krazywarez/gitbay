@@ -158,7 +158,7 @@ func runBuildList(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref", "--status", "--job"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref", "--status", "--job"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -238,7 +238,7 @@ func runBuildShow(c *Ctx, args []string) int {
 }
 
 func runBuildLog(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Bools: []string{"--follow"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Bools: []string{"--follow"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -465,7 +465,7 @@ func runRunnerNext(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Bools: []string{"--untrusted"}, MaxPos: -1,
+	f, err := c.parseArgs(args, flagSpec{Bools: []string{"--untrusted"}, MaxPos: -1,
 		Usage: "runner next [--untrusted] [<owner/name>...]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)

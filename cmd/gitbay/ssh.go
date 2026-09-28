@@ -174,11 +174,11 @@ func cliPathOf(cmd *cobra.Command) string {
 }
 
 // withCLIPath prepends --path=<cliPath> to a server command line when the
-// CLI path differs from the server path it dispatches, so usage and help
-// print a command the caller can run (#267). Dispatch strips it before
-// Lookup, as it does --term=.
+// CLI path is set and differs from the server path it dispatches, so
+// usage and help print a command the caller can run (#267). Dispatch
+// strips it before Lookup, as it does --term=.
 func withCLIPath(cliPath, server string, argv []string) []string {
-	if cliPath == server {
+	if cliPath == "" || cliPath == server {
 		return argv
 	}
 	return append([]string{"--path=" + cliPath}, argv...)

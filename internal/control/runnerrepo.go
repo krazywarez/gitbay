@@ -37,7 +37,7 @@ func init() {
 }
 
 func runRepoRunnerAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{MaxPos: 1, Usage: "repo runner add <owner/name> < key.pub"})
+	f, err := c.parseArgs(args, flagSpec{MaxPos: 1, Usage: "repo runner add <owner/name> < key.pub"})
 	if err != nil || len(f.Pos) != 1 {
 		return c.usage()
 	}

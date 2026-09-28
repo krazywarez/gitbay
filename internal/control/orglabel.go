@@ -86,7 +86,7 @@ func orgReader(c *Ctx, name string) (store.Org, []int64, int) {
 }
 
 func runOrgLabelSet(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--color"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--color"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -180,7 +180,7 @@ func runOrgLabelRemove(c *Ctx, args []string) int {
 }
 
 func runOrgMilestoneCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -212,7 +212,7 @@ func runOrgMilestoneCreate(c *Ctx, args []string) int {
 }
 
 func runOrgMilestoneList(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "org milestone list <org> [--state open|closed|all]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "org milestone list <org> [--state open|closed|all]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

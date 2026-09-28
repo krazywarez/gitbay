@@ -307,6 +307,32 @@ func TestArgumentRefusalsNameTheUsage(t *testing.T) {
 	}
 }
 
+// TestFlagRefusalsNameTheUsage: a bad flag prints its usage the same way
+// a missing positional does, program and CLI path included (#267).
+func TestFlagRefusalsNameTheUsage(t *testing.T) {
+	cases := []struct {
+		name string
+		argv []string
+		want string
+	}{
+		{"cli", []string{"--path=auth token create", "token", "create", "--bogus"}, "unknown flag \"--bogus\"\nusage: gitbay auth token create --name <n>"},
+		{"stock ssh", []string{"token", "create", "--bogus"}, "unknown flag \"--bogus\"\nusage: ssh git@forge.test token create --name <n>"},
+		{"cli, repo", []string{"--term=80", "issue", "list", "a/b", "--bogus"}, "usage: gitbay issue list [<owner/name>]"},
+	}
+	for _, tc := range cases {
+		var out, errOut bytes.Buffer
+		c := &Ctx{Scope: "full", Stdout: &out, Stderr: &errOut}
+		c.Cfg.Server.SiteURL = "https://forge.test"
+		if code := Dispatch(c, tc.argv); code != protocol.ExitUsage {
+			t.Errorf("%s: exit %d, want %d (%s)", tc.name, code, protocol.ExitUsage, errOut.String())
+			continue
+		}
+		if !strings.Contains(errOut.String(), tc.want) {
+			t.Errorf("%s: got %q, want it to contain %q", tc.name, errOut.String(), tc.want)
+		}
+	}
+}
+
 // TestTermArgument: --term= is read only as the first argument, and
 // never over HTTP.
 func TestTermArgument(t *testing.T) {

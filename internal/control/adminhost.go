@@ -77,7 +77,7 @@ func runAdminUserCreate(c *Ctx, args []string) int {
 	if code := requireInstanceAdmin(c); code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Values: []string{"--email", "--key"}, Bools: []string{"--admin", "--verified"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--email", "--key"}, Bools: []string{"--admin", "--verified"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

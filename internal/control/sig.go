@@ -141,7 +141,7 @@ func VerifyCommitCached(st *store.Store, repo store.Repo, parsed *sig.Commit, sh
 }
 
 func runRepoLog(c *Ctx, args []string) int {
-	f, perr := parseFlags(args, flagSpec{Values: []string{"--ref", "--limit", "--path"}, MaxPos: 1, Usage: "repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]"})
+	f, perr := c.parseArgs(args, flagSpec{Values: []string{"--ref", "--limit", "--path"}, MaxPos: 1, Usage: "repo log <owner/name> [--ref <r>] [--limit n] [--path <file>]"})
 	if perr != nil {
 		return c.fail(protocol.ExitUsage, "%v", perr)
 	}

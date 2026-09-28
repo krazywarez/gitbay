@@ -39,7 +39,7 @@ esac
 `
 
 func runRepoImport(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--from"}, Bools: []string{"--private", "--token-stdin"}, MaxPos: 1,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--from"}, Bools: []string{"--private", "--token-stdin"}, MaxPos: 1,
 		Usage: "repo import <owner/name> --from <url> [--private] [--token-stdin]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)

@@ -95,7 +95,7 @@ func runExplore(c *Ctx, args []string) int {
 // release asset get writes an asset. The web's /archive route is the
 // same bytes with a Content-Disposition on them.
 func runRepoDownload(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: -1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref"}, MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

@@ -50,7 +50,7 @@ func init() {
 }
 
 func runDiffComment(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"},
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"},
 		Bools: []string{"--old", "--pending"}, MaxPos: -1,
 		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]"})
 	if err != nil {

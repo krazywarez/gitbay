@@ -152,7 +152,7 @@ func expiresText(t *time.Time, now time.Time) string {
 }
 
 func runKeysAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--scope", "--label", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--scope", "--label", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

@@ -178,7 +178,7 @@ func issueToOut(i store.Issue, withBody bool) issueOut {
 }
 
 func runIssueCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--format", "--title", "--body", "--file"}, MaxPos: 1,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--format", "--title", "--body", "--file"}, MaxPos: 1,
 		Usage: "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -231,7 +231,7 @@ func runIssueList(c *Ctx, args []string) int {
 		return code
 	}
 	f := store.IssueFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	fl, err := c.parseArgs(args, flagSpec{Values: []string{"--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -371,7 +371,7 @@ func setIssueState(c *Ctx, args []string, state string) int {
 // they are accepted and reported in the returned flags, and count toward
 // "at least one edit was given" alongside title/body/format.
 func editText(c *Ctx, args []string, kind string, extra ...string) (rest []string, title, body, format *string, f flags, code int) {
-	f, err := parseFlags(args, flagSpec{Values: append([]string{"--title", "--body", "--file", "--format"}, extra...), MaxPos: -1,
+	f, err := c.parseArgs(args, flagSpec{Values: append([]string{"--title", "--body", "--file", "--format"}, extra...), MaxPos: -1,
 		Usage: kind + " edit <owner/name> <n> [--title <t>] [--body <b> | --file -] [--format md|org]"})
 	if err != nil {
 		return nil, nil, nil, nil, flags{}, c.fail(protocol.ExitUsage, "%v", err)

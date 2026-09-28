@@ -111,7 +111,7 @@ func releaseRef(c *Ctx, args []string, perm func(store.User, store.Repo, string)
 }
 
 func runReleaseCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -183,7 +183,7 @@ func releaseToOut(r store.Release, withNotes bool) releaseOut {
 }
 
 func runReleaseEdit(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--title", "--notes", "--file", "--format"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

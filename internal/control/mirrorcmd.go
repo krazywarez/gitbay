@@ -43,7 +43,7 @@ func init() {
 }
 
 func runMirrorAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--direction", "--username"}, Bools: []string{"--token-stdin"}, MaxPos: 2,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--direction", "--username"}, Bools: []string{"--token-stdin"}, MaxPos: 2,
 		Usage: "repo mirror add <owner/name> <url> --direction push|pull [--username <u>] [--token-stdin]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)

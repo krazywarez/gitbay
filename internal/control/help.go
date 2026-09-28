@@ -168,11 +168,11 @@ func (c *Ctx) shownBelow(registered, other string) string {
 	return joinPath(append(slices.Clip(cli[:len(cli)-1]), o[len(reg)-1:]...))
 }
 
-// usageShape is cmd's registered usage as this caller should see it: the
-// CLI's path in place of the registered one where they differ, and a
-// leading <owner/name> optional for the CLI.
-func (c *Ctx) usageShape(cmd Command) string {
-	shape := c.shownAs(joinPath(cmd.Path), cmd.Usage)
+// usageShape is a usage line for the command registered at path as this
+// caller should see it: the CLI's path in place of the registered one
+// where they differ, and a leading <owner/name> optional for the CLI.
+func (c *Ctx) usageShape(path []string, usage string) string {
+	shape := c.shownAs(joinPath(path), usage)
 	if c.viaCLI() {
 		shape = cliUsage(shape)
 	}
@@ -182,7 +182,7 @@ func (c *Ctx) usageShape(cmd Command) string {
 // cmdUsage is the running command's usage with the program in front, as
 // a usage refusal prints it.
 func (c *Ctx) cmdUsage() string {
-	return c.program() + " " + c.usageShape(c.Cmd)
+	return c.program() + " " + c.usageShape(c.Cmd.Path, c.Cmd.Usage)
 }
 
 func (c *Ctx) heading(w io.Writer, s string) {
@@ -217,7 +217,7 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 	// (notifications read <id>... | --all) has no " [--" to cut at, so
 	// the usage prints whole.
 	registered := joinPath(cmd.Path)
-	shape := c.usageShape(cmd)
+	shape := c.usageShape(cmd.Path, cmd.Usage)
 	if i := strings.Index(shape, " [--"); i >= 0 {
 		shape = shape[:i] + " [flags]"
 	}

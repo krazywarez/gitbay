@@ -207,7 +207,7 @@ type ForkOut struct {
 }
 
 func runRepoFork(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--owner"}, MaxPos: 1, Usage: "repo fork <owner/name> [--owner <o>] [--name <n>]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--name", "--owner"}, MaxPos: 1, Usage: "repo fork <owner/name> [--owner <o>] [--name <n>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -393,7 +393,7 @@ func mrRef(c *Ctx, args []string, perm func(store.User, store.Repo, string) bool
 func mrHeadRef(n int64) string { return fmt.Sprintf("refs/merge-requests/%d/head", n) }
 
 func runMRCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--source", "--target", "--title", "--body", "--file", "--format"},
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--source", "--target", "--title", "--body", "--file", "--format"},
 		Bools: []string{"--draft"}, MaxPos: 1,
 		Usage: "mr create <target owner/name> --source [owner/name:]<branch> --target <branch> --title <t> [--draft]"})
 	if err != nil {
@@ -566,7 +566,7 @@ func runMRList(c *Ctx, args []string) int {
 		return code
 	}
 	f := store.MRFilter{State: "open"}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--state", "--label", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	fl, err := c.parseArgs(args, flagSpec{Values: []string{"--state", "--label", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1205,7 +1205,7 @@ func runMRLabel(c *Ctx, args []string) int {
 }
 
 func runMRMerge(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--strategy"}, MaxPos: -1, Usage: "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--strategy"}, MaxPos: -1, Usage: "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1775,7 +1775,7 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 }
 
 func runMRClose(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--by"}, MaxPos: 2,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--by"}, MaxPos: 2,
 		Usage: "mr close <owner/name> <n> [--by <m>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -1907,7 +1907,7 @@ func runMRRevisions(c *Ctx, args []string) int {
 }
 
 func runMRRangeDiff(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--to"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--from", "--to"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

@@ -29,7 +29,7 @@ func runAudit(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitDenied, "the audit log is for instance admins; ask one")
 	}
 	f := store.AuditFilter{Limit: 100}
-	fl, err := parseFlags(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: c.Cmd.Usage})
+	fl, err := c.parseArgs(args, flagSpec{Values: []string{"--limit", "--actor", "--action", "--since"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

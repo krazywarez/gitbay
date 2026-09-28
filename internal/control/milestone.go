@@ -62,7 +62,7 @@ func init() {
 var duePat = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 func runMilestoneCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--description", "--due"}, MaxPos: 2,
 		Usage: "milestone create <owner/name> <title> [--description <d>] [--due YYYY-MM-DD]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
@@ -93,7 +93,7 @@ func runMilestoneCreate(c *Ctx, args []string) int {
 }
 
 func runMilestoneList(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "milestone list <owner/name> [--state open|closed|all]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--state"}, MaxPos: 1, Usage: "milestone list <owner/name> [--state open|closed|all]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

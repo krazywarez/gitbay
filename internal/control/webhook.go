@@ -45,7 +45,7 @@ func init() {
 }
 
 func runWebhookAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--secret", "--events"}, MaxPos: 2, Usage: "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--secret", "--events"}, MaxPos: 2, Usage: "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -136,7 +136,7 @@ func runWebhookRemove(c *Ctx, args []string) int {
 }
 
 func runWebhookDeliveries(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--limit"}, MaxPos: 1, Usage: "webhook deliveries <owner/name> [--limit n]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--limit"}, MaxPos: 1, Usage: "webhook deliveries <owner/name> [--limit n]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

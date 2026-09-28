@@ -148,7 +148,7 @@ func attribution(src string, n int64, kind, login, date string) string {
 }
 
 func runImportIssues(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--from", "--api-base"}, Bools: []string{"--token-stdin"}, MaxPos: 1,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--from", "--api-base"}, Bools: []string{"--token-stdin"}, MaxPos: 1,
 		Usage: "repo import-issues <owner/name> --from <owner/repo> [--api-base <url>] [--token-stdin]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)

@@ -158,7 +158,7 @@ func newSnippetID() string {
 }
 
 func runSnippetCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -287,7 +287,7 @@ func runSnippetList(c *Ctx, args []string) int {
 }
 
 func runSnippetEdit(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--description", "--visibility"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

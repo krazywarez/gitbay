@@ -249,7 +249,7 @@ func resolveRepo(c *Ctx, path string, check func(store.User, store.Repo, string)
 }
 
 func runRepoCreate(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--description"}, Bools: []string{"--private"}, MaxPos: 1, Usage: "repo create <owner/name> [--private] [--description <text>]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--description"}, Bools: []string{"--private"}, MaxPos: 1, Usage: "repo create <owner/name> [--private] [--description <text>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1020,7 +1020,7 @@ func MatchesRepo(q, path, desc string, topics []string) bool {
 }
 
 func runRepoGrep(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--ref"}, MaxPos: 2, Usage: "repo grep <owner/name> <query> [--ref <ref>]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref"}, MaxPos: 2, Usage: "repo grep <owner/name> <query> [--ref <ref>]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1246,7 +1246,7 @@ func setProtect(c *Ctx, args []string, protect bool) int {
 // base, measured from their merge base the way a merge request diff is,
 // so a base that moved on does not show up as removals (#118).
 func runRepoDiff(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{MaxPos: 3, Usage: "repo diff <owner/name> <base> <head>"})
+	f, err := c.parseArgs(args, flagSpec{MaxPos: 3, Usage: "repo diff <owner/name> <base> <head>"})
 	if err != nil || len(f.Pos) != 3 {
 		return c.usage()
 	}

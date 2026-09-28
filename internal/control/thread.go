@@ -77,7 +77,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 	add func(id, userID int64, body, format string) error,
 	participants func(id int64) ([]int64, error),
 ) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--message", "--file", "--format"}, MaxPos: -1,
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--message", "--file", "--format"}, MaxPos: -1,
 		Usage: noun + " comment <owner/name> <n> [--message <m> | --file -] [--format md|org]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
