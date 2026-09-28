@@ -238,14 +238,53 @@ func TestSuccessBuildForTree(t *testing.T) {
 	if err := s.FinishBuild(b["unit"].ID, "success"); err != nil {
 		t.Fatal(err)
 	}
-	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit"); !ok || prev.SHA != "aaa" {
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", ""); !ok || prev.SHA != "aaa" {
 		t.Fatalf("success not found by tree: ok=%v prev=%+v", ok, prev)
 	}
-	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "other"); ok {
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "other", ""); ok {
 		t.Error("matched a different job")
 	}
-	if _, ok, _ := s.SuccessBuildForTree(repoID, "", "unit"); ok {
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "", "unit", ""); ok {
 		t.Error("an empty tree matched")
+	}
+}
+
+// A result stands for another commit only when it came from a trusted
+// build on the same image: a fork's green build, or one on an image the
+// job has since left, proves nothing about the repository's own (#258).
+func TestSuccessReuseNeedsTrustAndImage(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := s.CreateUser("cmc", true)
+	repoID, _ := s.CreateRepo("user", uid, "app", "public")
+	for _, b := range []struct {
+		sha, image string
+		trusted    bool
+	}{
+		{"aaa", "", false},
+		{"bbb", "localhost/old:1", true},
+	} {
+		if _, err := s.CreateBuild(repoID, "unit", b.sha, "main", `["true"]`, b.image, "tree1", b.trusted); err != nil {
+			t.Fatal(err)
+		}
+		claimed, ok, err := s.ClaimBuild([]int64{repoID}, true)
+		if err != nil || !ok {
+			t.Fatalf("claim: ok=%v err=%v", ok, err)
+		}
+		if err := s.FinishBuild(claimed.ID, "success"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", ""); ok {
+		t.Fatalf("reused build %d: untrusted, or on another image", prev.Number)
+	}
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", "localhost/old:1"); !ok || prev.SHA != "bbb" {
+		t.Fatalf("trusted build on the same image not found: ok=%v prev=%+v", ok, prev)
+	}
+	if _, ok, _ := s.SuccessBuildFor(repoID, "aaa", "unit"); ok {
+		t.Error("an untrusted success stood for its commit")
 	}
 }
 

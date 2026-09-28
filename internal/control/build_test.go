@@ -669,3 +669,50 @@ func TestBuildListFlagsFilter(t *testing.T) {
 		t.Fatalf("bad --status error does not name the valid states: %s", errOut.String())
 	}
 }
+
+// A fork's green build of a commit does not stand for the repository's
+// own: the same commit landing on a branch, or a commit with the same
+// tree, is built again as trusted (#258).
+func TestQueueBranchBuildsRebuildsWhatOnlyAForkBuilt(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	src := filepath.Join(root, "src")
+	os.MkdirAll(filepath.Join(src, ".gitbay"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte(
+		"jobs:\n  unit:\n    steps:\n      - echo hi\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "base")
+	first := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+	git(src, "commit", "-q", "--allow-empty", "-m", "same tree")
+	second := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+
+	// A fork's merge request head, built untrusted and green.
+	QueueMRBuilds(st, root, "https://x.test", repo, uid, 1, first)
+	b, ok, err := st.ClaimBuild([]int64{repo.ID}, true)
+	if err != nil || !ok || b.Trusted {
+		t.Fatalf("claim: ok=%v trusted=%v err=%v", ok, b.Trusted, err)
+	}
+	if err := st.FinishBuild(b.ID, "success"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The same commit lands on main, then a commit with the same tree.
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", "", first, time.Now())
+	QueueBranchBuilds(st, root, "https://x.test", repo, uid, "main", first, second, time.Now())
+	pending, _ := st.ListBuilds(repo.ID, store.BuildFilter{Status: "pending"}, 10)
+	if len(pending) != 2 {
+		t.Fatalf("queued %d builds, want 2 (one per commit): %+v", len(pending), pending)
+	}
+	for _, p := range pending {
+		if !p.Trusted {
+			t.Errorf("build %d queued untrusted on a branch push", p.Number)
+		}
+	}
+}

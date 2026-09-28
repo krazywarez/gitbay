@@ -450,26 +450,31 @@ func (s *Store) CancelBuild(id int64) error {
 	return nil
 }
 
-// SuccessBuildFor finds a passed build of the commit for the job, on any
-// ref: what a cancelled duplicate can point back at.
-// SuccessBuildForTree is SuccessBuildFor keyed by tree rather than
-// commit: a rebase that changes nothing in the tree has already been
-// built (#177). An empty tree never matches.
-func (s *Store) SuccessBuildForTree(repoID int64, tree, job string) (Build, bool, error) {
+// SuccessBuildForTree finds a passed build of the job for a tree rather
+// than a commit: a rebase that changes nothing in the tree has already
+// been built (#177). Only a trusted build on the image the job names
+// counts: a fork's result, or one from an image the job has left, does
+// not stand for the repository's own (#258). A job naming no image
+// matches builds that named none, whichever default the runner used;
+// the CI wiki page says so. An empty tree never matches.
+func (s *Store) SuccessBuildForTree(repoID int64, tree, job, image string) (Build, bool, error) {
 	if tree == "" {
 		return Build{}, false, nil
 	}
 	b, err := scanBuild(s.DB.QueryRow(buildSelect+
-		" WHERE repo_id = ? AND tree = ? AND job = ? AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, tree, job))
+		" WHERE repo_id = ? AND tree = ? AND job = ? AND image = ? AND trusted = 1 AND status = 'success'"+
+		" ORDER BY number DESC LIMIT 1", repoID, tree, job, image))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Build{}, false, nil
 	}
 	return b, err == nil, err
 }
 
+// SuccessBuildFor finds a passed trusted build of the commit for the job,
+// on any ref: what a cancelled duplicate can point back at.
 func (s *Store) SuccessBuildFor(repoID int64, sha, job string) (Build, bool, error) {
 	b, err := scanBuild(s.DB.QueryRow(buildSelect+
-		" WHERE repo_id = ? AND sha = ? AND job = ? AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, sha, job))
+		" WHERE repo_id = ? AND sha = ? AND job = ? AND trusted = 1 AND status = 'success' ORDER BY number DESC LIMIT 1", repoID, sha, job))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Build{}, false, nil
 	}

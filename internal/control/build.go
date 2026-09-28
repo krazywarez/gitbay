@@ -857,10 +857,15 @@ func queueJobs(
 		if j.Tags != "" {
 			continue
 		}
-		if b, ok := built[j.Name]; ok && (b.Status == "success" || b.Status == "pending" || b.Status == "running") {
+		// A build of this commit that passed, or is queued or running,
+		// stands for it — unless this queue is trusted and that build was
+		// not: a fork's head that lands on a branch is built again as the
+		// repository's own (#258).
+		if b, ok := built[j.Name]; ok && (b.Trusted || !trusted) &&
+			(b.Status == "success" || b.Status == "pending" || b.Status == "running") {
 			continue
 		}
-		if prev, ok, _ := st.SuccessBuildForTree(repo.ID, tree, j.Name); ok && prev.SHA != sha {
+		if prev, ok, _ := st.SuccessBuildForTree(repo.ID, tree, j.Name, j.Image); ok && prev.SHA != sha {
 			url := fmt.Sprintf("%s/%s/builds/%d", siteURL, repo.Path(), prev.Number)
 			st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "success",
 				fmt.Sprintf("passed in build %d as %.10s, same tree", prev.Number, prev.SHA), url, userID)
