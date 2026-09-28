@@ -6,7 +6,8 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
-Credentials: revocation, delegation and expiry (#256, #257, #277).
+Credentials and sessions: revocation, delegation, expiry and an idle
+timeout (#256, #257, #276, #277).
 
 *Upgrade note.* =token create= makes a =read= token unless given
 =--scope full=. A script that mints a token and then writes with it
