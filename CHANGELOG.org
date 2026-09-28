@@ -123,6 +123,16 @@ for the eighteen commands whose CLI path differs from the registry's
   browser (#269).
 - Untrusted builds (merge requests from forks) get a fresh HOME removed after the build and no secrets; trusted builds keep a per-repository home under =<workdir>/trusted-home=. Deploy gitbayd before the runner; the old shared homes under the runner's workdir can be deleted. (#255)
 - =status set= refuses =ci/= contexts, which belong to the instance's builds. Build results are reused only from trusted builds on the same image. =repo settings require-contexts= names status contexts that must report green; setting any turns require-checks on, and one not yet reported counts as pending. (#258)
+- Untrusted builds (merge requests from forks) get a fresh HOME
+  removed after the build and no secrets; trusted builds keep a
+  per-repository home under =<workdir>/trusted-home=. Deploy gitbayd
+  before the runner; the old shared homes under the runner's workdir
+  can be deleted. (#255)
+- =status set= refuses =ci/= contexts, which belong to the instance's
+  builds. Build results are reused only from trusted builds on the
+  same image. =repo settings require-contexts= names status contexts
+  that must report green; setting any turns require-checks on, and one
+  not yet reported counts as pending. (#258)
 
 * v1.36.0 — 2026-09-23
 

@@ -5,17 +5,20 @@ Three mechanisms decide what a push does to CI, and they interact:
 - *Dedupe.* A job's result is a property of the commit's tree. A commit
   that already has a passed, queued or running build for a job is not
   queued again; a commit whose tree already passed a job gets that
-  result as its status, naming the build it came from (#177). Only a trusted build counts, and for tree reuse only one on the
-  image the job names: a fork's green build does not stand for the
-  repository's own, so its commit is built again when it lands on a
-  branch (#258). A job that names no =image:= is compared as naming
-  none: its reuse does not notice the runner's default image changing,
-  because reuse is decided when the push is queued, before any runner
-  claims the build, and runners can differ in their default. Name the
-  image in =ci.yml= to tie reuse to it; after an operator changes a
-  runner's =-image=, =build trigger= builds a job afresh, since a
-  triggered build is never reused. A failed,
-  cancelled or abandoned build does not count: that commit runs again.
+  result as its status, naming the build it came from (#177). Only a
+  trusted build counts, and for tree reuse only one on the image the
+  job names: a fork's green build does not stand for the repository's
+  own, so its commit is built again when it lands on a branch (#258). A
+  job that names no =image:= is compared as naming none: its reuse does
+  not notice the runner's default image changing, because reuse is
+  decided when the push is queued, before any runner claims the build,
+  and runners can differ in their default. Name the image in =ci.yml=
+  to tie reuse to it; after an operator changes a runner's =-image=,
+  =build trigger= builds a job afresh, since a triggered build is never
+  reused. When a trusted and an untrusted build of the same commit both
+  run, the one that finishes last sets =ci/<job>= on that commit. A
+  failed, cancelled or abandoned build does not count: that commit runs
+  again.
 - *Path filters.* =paths= and =paths-ignore= on a job are evaluated
   against the files the push changed. The diff base is the old tip when
   it is an ancestor of the new one, and the merge base with the default
@@ -136,6 +139,9 @@ Rows worth a second look:
   branch push, no merge-base fallback: every job runs, without secrets.
   Filtering a head down to no jobs would make it unmergeable under
   =require-checks= (#172).
+- A context named in =repo settings require-contexts= must be one that
+  reports on merge request heads. A schedule-only or tag-only job never
+  reports there, so the gate stays pending (#258).
 
 =TestPushShapes= in =internal/hookd= runs every row against real git
 and the store, and =TestPushShapesTableOnWiki= checks that this page
