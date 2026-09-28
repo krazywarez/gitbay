@@ -286,3 +286,63 @@ func TestFetchKilledWhenClientStopsReading(t *testing.T) {
 	// The 32MB pack cannot fit in the socket buffers; nothing is read.
 	ended(t, s, finished, 20*time.Second)
 }
+
+func getArchive(s *Server, w http.ResponseWriter, r *http.Request) {
+	r.SetPathValue("owner", "alice")
+	r.SetPathValue("repo", "app")
+	r.SetPathValue("file", "main.tar.gz")
+	s.archive(w, r)
+}
+
+// A web archive takes a pack slot: busy is 503, and the slot is free
+// again once the archive is written.
+func TestArchiveTakesASlot(t *testing.T) {
+	s := limitedServer(t)
+	seed(t, s, 10)
+	hold, err := s.packs.Acquire(nil, "ip:elsewhere")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	getArchive(s, w, httptest.NewRequest("GET", "/alice/app/archive/main.tar.gz", nil))
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("busy: status %d, Retry-After %q", w.Code, w.Header().Get("Retry-After"))
+	}
+	hold()
+	w = httptest.NewRecorder()
+	getArchive(s, w, httptest.NewRequest("GET", "/alice/app/archive/main.tar.gz", nil))
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/gzip" || w.Body.Len() == 0 {
+		t.Fatalf("free: status %d, type %q, %d bytes", w.Code, w.Header().Get("Content-Type"), w.Body.Len())
+	}
+	hold, err = s.packs.Acquire(nil, "ip:elsewhere")
+	if err != nil {
+		t.Fatalf("slot not released after the archive: %v", err)
+	}
+	hold()
+}
+
+// An archive whose client stops reading is cut after StallDeadline.
+func TestArchiveKilledWhenClientStopsReading(t *testing.T) {
+	stallAfter(t, 500*time.Millisecond)
+	s := limitedServer(t)
+	sizes := make([]int, 16)
+	for i := range sizes {
+		sizes[i] = 2 << 20
+	}
+	seed(t, s, sizes...)
+	finished := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		getArchive(s, w, r)
+		close(finished)
+	}))
+	defer srv.Close()
+	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.(*net.TCPConn).SetReadBuffer(4096)
+	fmt.Fprintf(conn, "GET /alice/app/archive/main.tar.gz HTTP/1.1\r\nHost: x\r\n\r\n")
+	// The 32MB archive cannot fit in the socket buffers; nothing is read.
+	ended(t, s, finished, 20*time.Second)
+}

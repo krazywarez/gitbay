@@ -2340,10 +2340,15 @@ func (s *Server) archive(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
+	out, kill, finish, ok := s.packSlot(w, r)
+	if !ok {
+		return
+	}
+	defer finish()
 	prefix := fmt.Sprintf("%s-%s", p.Repo.Name, ref)
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", prefix+".tar.gz"))
-	gitutil.Archive(p.Dir, ref, prefix, w)
+	gitutil.ArchiveUntil(p.Dir, ref, prefix, out, kill)
 }
 
 func policyCanAdmin(u store.User, repo store.Repo, grant string) bool {

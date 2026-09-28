@@ -224,12 +224,15 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   "the server is busy…" and exits 1, HTTP gets 503 with
   =Retry-After: 30=, and git:// gets an =ERR= line. *Operators:* the
   defaults are tuned for a four-core host; set the three counts to -1
-  to turn the limit off. Ref listings, pushes and web archives are
+  to turn the limit off. Ref listings, pushes and =repo download= are
   unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
   since each session is its own process (#262).
 - Anonymous clones are counted per IPv4 address or IPv6 /64, and
   together hold at most =pack_concurrency= − 1 slots, so a signed-in
   client can always get the last one (#262).
+- Web archive downloads (=/{owner}/{repo}/archive/{ref}.tar.gz=) take
+  a pack slot, answer 503 with =Retry-After: 30= when none is free, and
+  are killed when the client leaves or stops reading (#262).
 
 * v1.36.0 — 2026-09-23
 

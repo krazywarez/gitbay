@@ -146,52 +146,14 @@ func (s *Server) uploadPack(w http.ResponseWriter, r *http.Request) {
 	cancel := r.Context().Done()
 	out := io.Writer(w)
 	if !lsRefs(br) {
-		// A queued clone waits at most the limiter's wait, and Stop ends
-		// the wait so it does not hold up a restart's drain. net/http
-		// notices a departed client only after the body is read, so
-		// that rarely ends it.
-		release, err := s.packs.Acquire(s.until(r), s.packPrincipal(r))
-		if err != nil {
-			msg := "the server is restarting; try again in a minute"
-			if errors.Is(err, packlimit.ErrBusy) {
-				msg = "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute"
-			}
-			w.Header().Set("Retry-After", "30")
-			http.Error(w, msg, http.StatusServiceUnavailable)
+		o, kill, finish, ok := s.packSlot(w, r)
+		if !ok {
 			return
 		}
 		// Deferred before git runs, so it fires after git has exited
 		// and been waited for.
-		defer release()
-		var stalled <-chan struct{}
-		var unwatch func()
-		out, stalled, unwatch = s.packs.Watch(w)
-		defer unwatch()
-		kill := make(chan struct{})
-		finished := make(chan struct{})
-		exited := make(chan struct{})
-		// The watcher must not touch w once the handler has returned.
-		defer func() {
-			close(finished)
-			<-exited
-		}()
-		go func() {
-			defer close(exited)
-			select {
-			case <-finished:
-				return
-			case <-r.Context().Done():
-			case <-stalled:
-				// A write blocked on a client that stopped reading, or a
-				// read of a body it stopped sending, outlives git;
-				// expired deadlines end both copies, so Wait returns.
-				rc := http.NewResponseController(w)
-				rc.SetReadDeadline(time.Now())
-				rc.SetWriteDeadline(time.Now())
-			}
-			close(kill)
-		}()
-		cancel = kill
+		defer finish()
+		out, cancel = o, kill
 	}
 	w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -201,6 +163,54 @@ func (s *Server) uploadPack(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdin = br
 	cmd.Stdout = out
 	gitutil.RunUntil(cmd, cancel)
+}
+
+// packSlot takes a pack-generation slot for r, answering 503 with
+// Retry-After when none comes free. A queued request waits at most the
+// limiter's wait, and Stop ends the wait so it does not hold up a
+// restart's drain; net/http notices a departed client only after the
+// body is read, so that rarely ends it. On success out is w watched for
+// stalls, kill closes when git must stop — the client left, or no write
+// to it completed for packlimit.StallDeadline — and finish, called once
+// git has exited, releases the slot.
+func (s *Server) packSlot(w http.ResponseWriter, r *http.Request) (out io.Writer, kill <-chan struct{}, finish func(), ok bool) {
+	release, err := s.packs.Acquire(s.until(r), s.packPrincipal(r))
+	if err != nil {
+		msg := "the server is restarting; try again in a minute"
+		if errors.Is(err, packlimit.ErrBusy) {
+			msg = "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute"
+		}
+		w.Header().Set("Retry-After", "30")
+		http.Error(w, msg, http.StatusServiceUnavailable)
+		return nil, nil, nil, false
+	}
+	out, stalled, unwatch := s.packs.Watch(w)
+	killed := make(chan struct{})
+	finished := make(chan struct{})
+	exited := make(chan struct{})
+	go func() {
+		defer close(exited)
+		select {
+		case <-finished:
+			return
+		case <-r.Context().Done():
+		case <-stalled:
+			// A write blocked on a client that stopped reading, or a
+			// read of a body it stopped sending, outlives git;
+			// expired deadlines end both copies, so Wait returns.
+			rc := http.NewResponseController(w)
+			rc.SetReadDeadline(time.Now())
+			rc.SetWriteDeadline(time.Now())
+		}
+		close(killed)
+	}()
+	return out, killed, func() {
+		// The watcher must not touch w once the handler has returned.
+		close(finished)
+		<-exited
+		unwatch()
+		release()
+	}, true
 }
 
 // lsRefs reports whether a protocol v2 request is a ref listing, which

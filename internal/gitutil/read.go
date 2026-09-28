@@ -132,12 +132,17 @@ var ErrArchiveTooLarge = errors.New("archive exceeds the size limit")
 // Archive streams a tar.gz of ref to w, within archiveTimeout and
 // MaxArchiveBytes. Past either, git is killed and the error says which.
 func Archive(dir, ref, prefix string, w io.Writer) error {
+	return ArchiveUntil(dir, ref, prefix, w, nil)
+}
+
+// ArchiveUntil is Archive, killing git when stop closes.
+func ArchiveUntil(dir, ref, prefix string, w io.Writer, stop <-chan struct{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), archiveTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "archive", "--format=tar.gz", "--prefix="+prefix+"/", "--end-of-options", ref)
 	lw := &cappedWriter{w: w, left: MaxArchiveBytes, stop: cancel}
 	cmd.Stdout = lw
-	err := cmd.Run()
+	err := RunUntil(cmd, stop)
 	switch {
 	case lw.exceeded:
 		return ErrArchiveTooLarge

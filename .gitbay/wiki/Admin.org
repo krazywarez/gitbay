@@ -210,7 +210,8 @@ push=.
   repositories may take; a push may be no larger than what is left.
 - =pack_concurrency= (3), =pack_per_principal= (2), =pack_queue= (32),
   =pack_queue_wait= (="60s"=) — git pack generation (clones, fetches,
-  =git archive --remote=) over SSH, smart HTTP and git:// shares one
+  =git archive --remote=, web archive downloads) over SSH, smart HTTP
+  and git:// shares one
   budget: this many at once, this many per account (per client
   address when anonymous: an IPv4 address, or an IPv6 /64), and this
   many waiting for at most the wait. Anonymous clients together hold
@@ -220,7 +221,7 @@ push=.
   gets 503 with =Retry-After: 30=, git:// an =ERR= line. A queued
   client that disconnects leaves the queue; a running clone whose
   client disconnects is killed. Ref listings (info/refs, protocol v2
-  =ls-refs=), pushes and web archives are outside the budget. For the
+  =ls-refs=), pushes and =repo download= are outside the budget. For the
   three counts 0 means the default and a negative value turns that
   bound off. The defaults suit a four-core host; see [[Performance]].
   With =ssh.mode = "system"= each SSH session is its own process and
