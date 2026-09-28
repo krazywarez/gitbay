@@ -47,7 +47,7 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 		}
 		if service == "git-upload-pack" {
 			// Keepalives while pack-objects is still counting keep a
-			// healthy clone writing; sshd kills one that goes quiet.
+			// healthy clone writing; a limited transport kills one that goes quiet.
 			args = []string{"-c", "uploadpack.keepAlive=5"}
 		}
 		args = append(args, strings.TrimPrefix(service, "git-"), repoPath)
@@ -59,6 +59,13 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = errW
+	return RunUntil(cmd, cancel)
+}
+
+// RunUntil runs cmd in its own process group. Closing cancel kills the
+// group; RunUntil returns only once cmd has been waited for. A nil
+// cancel never fires.
+func RunUntil(cmd *exec.Cmd, cancel <-chan struct{}) error {
 	ownProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		return err

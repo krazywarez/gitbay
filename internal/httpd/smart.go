@@ -6,18 +6,24 @@
 package httpd
 
 import (
+	"bufio"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/toolpath"
 )
@@ -25,15 +31,16 @@ import (
 type Server struct {
 	cfg      config.Config
 	st       *store.Store
+	packs    *packlimit.Limiter
 	apiLimit *apiLimiter
 	proxies  []*net.IPNet  // http.trusted_proxies, parsed once
 	stopping chan struct{} // closed by Stop
 	stopOnce sync.Once
 }
 
-func New(cfg config.Config, st *store.Store) *Server {
+func New(cfg config.Config, st *store.Store, packs *packlimit.Limiter) *Server {
 	proxies, _ := cfg.HTTP.TrustedProxyNets() // validated at config load
-	return &Server{cfg: cfg, st: st, apiLimit: newAPILimiter(cfg.Limits.APIRate), proxies: proxies,
+	return &Server{cfg: cfg, st: st, packs: packs, apiLimit: newAPILimiter(cfg.Limits.APIRate), proxies: proxies,
 		stopping: make(chan struct{})}
 }
 
@@ -135,14 +142,89 @@ func (s *Server) uploadPack(w http.ResponseWriter, r *http.Request) {
 		defer gz.Close()
 		body = gz
 	}
+	br := bufio.NewReader(body)
+	cancel := r.Context().Done()
+	out := io.Writer(w)
+	if !lsRefs(br) {
+		// A queued clone waits at most the limiter's wait, and Stop ends
+		// the wait so it does not hold up a restart's drain. net/http
+		// notices a departed client only after the body is read, so
+		// that rarely ends it.
+		release, err := s.packs.Acquire(s.until(r), s.packPrincipal(r))
+		if err != nil {
+			msg := "the server is restarting; try again in a minute"
+			if errors.Is(err, packlimit.ErrBusy) {
+				msg = "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute"
+			}
+			w.Header().Set("Retry-After", "30")
+			http.Error(w, msg, http.StatusServiceUnavailable)
+			return
+		}
+		// Deferred before git runs, so it fires after git has exited
+		// and been waited for.
+		defer release()
+		var stalled <-chan struct{}
+		var unwatch func()
+		out, stalled, unwatch = s.packs.Watch(w)
+		defer unwatch()
+		kill := make(chan struct{})
+		finished := make(chan struct{})
+		exited := make(chan struct{})
+		// The watcher must not touch w once the handler has returned.
+		defer func() {
+			close(finished)
+			<-exited
+		}()
+		go func() {
+			defer close(exited)
+			select {
+			case <-finished:
+				return
+			case <-r.Context().Done():
+			case <-stalled:
+				// A write blocked on a client that stopped reading, or a
+				// read of a body it stopped sending, outlives git;
+				// expired deadlines end both copies, so Wait returns.
+				rc := http.NewResponseController(w)
+				rc.SetReadDeadline(time.Now())
+				rc.SetWriteDeadline(time.Now())
+			}
+			close(kill)
+		}()
+		cancel = kill
+	}
 	w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
 	w.Header().Set("Cache-Control", "no-cache")
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	cmd := exec.CommandContext(r.Context(), toolpath.Look("git"), "upload-pack", "--stateless-rpc", dir)
+	cmd := exec.Command(toolpath.Look("git"), "-c", "uploadpack.keepAlive=5", "upload-pack", "--stateless-rpc", dir)
 	cmd.Env = append(os.Environ(), gitProtocolEnv(r)...)
-	cmd.Stdin = body
-	cmd.Stdout = w
-	cmd.Run()
+	cmd.Stdin = br
+	cmd.Stdout = out
+	gitutil.RunUntil(cmd, cancel)
+}
+
+// lsRefs reports whether a protocol v2 request is a ref listing, which
+// generates no pack. Its first pkt-line is "command=ls-refs".
+func lsRefs(br *bufio.Reader) bool {
+	const want = "command=ls-refs"
+	head, err := br.Peek(4 + len(want))
+	return err == nil && string(head[4:]) == want
+}
+
+// packPrincipal is who a fetch is counted against: the account when the
+// request carries a valid bearer token or web session, the same key SSH
+// uses, so switching transport buys no extra slots; otherwise the
+// client address.
+func (s *Server) packPrincipal(r *http.Request) string {
+	if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(tok) != "" {
+		if u, _, err := s.st.APITokenUser(store.HashToken(strings.TrimSpace(tok))); err == nil {
+			return "user:" + strconv.FormatInt(u.ID, 10)
+		}
+	}
+	if u := s.viewer(r); u.ID != 0 {
+		return "user:" + strconv.FormatInt(u.ID, 10)
+	}
+	return "ip:" + s.clientIP(r)
 }
 
 // gitProtocolEnv forwards the client's protocol negotiation header so

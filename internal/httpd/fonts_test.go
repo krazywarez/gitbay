@@ -17,7 +17,7 @@ import (
 // and the @font-face URLs were once maintained by hand and drifted, so
 // gitbay.org served no web font at all (#102).
 func TestStylesheetFontsAreServed(t *testing.T) {
-	s := New(config.Default(), nil)
+	s := New(config.Default(), nil, nil)
 	byPattern := map[string]http.HandlerFunc{}
 	for _, r := range s.Routes() {
 		if r.Method == "GET" {
@@ -49,7 +49,7 @@ func TestStylesheetFontsAreServed(t *testing.T) {
 // TestLandingImagesAreServed: every file under static/img has a route
 // that answers 200 with an image or video type, and a video answers Range.
 func TestLandingImagesAreServed(t *testing.T) {
-	s := New(config.Default(), nil)
+	s := New(config.Default(), nil, nil)
 	byPattern := map[string]http.HandlerFunc{}
 	for _, r := range s.Routes() {
 		if r.Method == "GET" {

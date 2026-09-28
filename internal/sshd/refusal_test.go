@@ -192,11 +192,11 @@ func TestCloneKilledWhenKeyRevoked(t *testing.T) {
 	killedClone(t, io.Discard, nil, closed(), closed())
 }
 
-// A client that stops reading is cut after stallDeadline.
+// A client that stops reading is cut after packlimit.StallDeadline.
 func TestCloneKilledWhenClientStopsReading(t *testing.T) {
-	old := stallDeadline
-	stallDeadline = 200 * time.Millisecond
-	t.Cleanup(func() { stallDeadline = old })
+	old := packlimit.StallDeadline
+	packlimit.StallDeadline = 200 * time.Millisecond
+	t.Cleanup(func() { packlimit.StallDeadline = old })
 	r, w := io.Pipe()
 	t.Cleanup(func() { r.Close() })
 	killedClone(t, w, nil, nil, nil)

@@ -7,24 +7,26 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/store"
-	"gitbay.org/gitbay/internal/toolpath"
 )
 
 type Server struct {
-	cfg config.Config
-	st  *store.Store
+	cfg   config.Config
+	st    *store.Store
+	packs *packlimit.Limiter
 }
 
-func New(cfg config.Config, st *store.Store) *Server { return &Server{cfg: cfg, st: st} }
+func New(cfg config.Config, st *store.Store, packs *packlimit.Limiter) *Server {
+	return &Server{cfg: cfg, st: st, packs: packs}
+}
 
 func (s *Server) Serve(ln net.Listener) error {
 	for {
@@ -68,13 +70,35 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 
+	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	// A nil done: a queued client that leaves, or a restart, does not
+	// end the wait; only the limiter's wait does.
+	release, err := s.packs.Acquire(nil, "ip:"+host)
+	if err != nil {
+		writeErr(conn, err.Error())
+		return
+	}
+	// Deferred before git runs, so it fires after git has exited and
+	// been waited for.
+	defer release()
+	out, stalled, unwatch := s.packs.Watch(conn)
+	defer unwatch()
+	kill := make(chan struct{})
+	finished := make(chan struct{})
+	defer close(finished)
+	go func() {
+		select {
+		case <-finished:
+		case <-stalled:
+			close(kill)
+			// A write blocked on a client that stopped reading outlives
+			// git; closing the connection ends it and the stdin copy.
+			conn.Close()
+		}
+	}()
+
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	cmd := exec.Command(toolpath.Look("git"), "upload-pack", dir)
-	cmd.Env = append(os.Environ(), protoEnv...)
-	cmd.Stdin = conn
-	cmd.Stdout = conn
-	cmd.Stderr = io.Discard
-	cmd.Run()
+	gitutil.Transport("git-upload-pack", dir, conn, out, io.Discard, protoEnv, 0, kill)
 }
 
 func readPktLine(r io.Reader) (string, error) {

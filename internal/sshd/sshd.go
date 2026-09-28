@@ -516,25 +516,6 @@ func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user sto
 	return control.Dispatch(ctx, argv)
 }
 
-// stallDeadline is how long a limited transport may go without writing
-// to its client before it is killed. upload-pack sends a keepalive
-// every five seconds while it prepares a pack.
-var stallDeadline = 2 * time.Minute
-
-// progressWriter records when a write to the client last completed.
-type progressWriter struct {
-	w    io.Writer
-	last atomic.Int64 // unix nanoseconds
-}
-
-func (p *progressWriter) Write(b []byte) (int, error) {
-	n, err := p.w.Write(b)
-	if n > 0 {
-		p.last.Store(time.Now().UnixNano())
-	}
-	return n, err
-}
-
 // runGit streams a git transport service after access checks.
 func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user store.User, scope string, argv []string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
@@ -641,18 +622,12 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 		// exited and been waited for.
 		defer release()
 		// A client that stops reading would hold its slot for as long
-		// as its channel stays open. With a limit in force, a transport
-		// that writes nothing for stallDeadline is killed.
-		var pw *progressWriter
-		var tick <-chan time.Time
-		if packs != nil {
-			pw = &progressWriter{w: stdout}
-			pw.last.Store(time.Now().UnixNano())
-			stdout = pw
-			t := time.NewTicker(stallDeadline / 4)
-			defer t.Stop()
-			tick = t.C
-		}
+		// as its channel stays open.
+		client := stdout
+		var stalled <-chan struct{}
+		var unwatch func()
+		stdout, stalled, unwatch = packs.Watch(client)
+		defer unwatch()
 		kill := make(chan struct{})
 		finished := make(chan struct{})
 		defer close(finished)
@@ -673,15 +648,12 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 						continue
 					default:
 					}
-				case <-tick:
-					if time.Since(time.Unix(0, pw.last.Load())) < stallDeadline {
-						continue
-					}
+				case <-stalled:
 					close(kill)
 					// A write blocked on the client's window outlives
 					// git; closing the channel ends it and the stdin copy,
 					// so Transport's Wait returns.
-					if c, ok := pw.w.(io.Closer); ok {
+					if c, ok := client.(io.Closer); ok {
 						c.Close()
 					}
 					return

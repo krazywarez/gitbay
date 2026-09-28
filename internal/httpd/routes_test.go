@@ -14,7 +14,7 @@ import (
 func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
 	cfg := config.Default()
 	cfg.Web.Mode = "view_only"
-	s := New(cfg, nil)
+	s := New(cfg, nil, nil)
 
 	for _, r := range s.Routes() {
 		if r.Mutating {
@@ -38,7 +38,7 @@ func TestViewOnlyHasNoMutatingRoutes(t *testing.T) {
 // TestAPIRouteGating: the API route exists only when [api] enabled = true.
 func TestAPIRouteGating(t *testing.T) {
 	has := func(cfg config.Config) bool {
-		for _, r := range New(cfg, nil).Routes() {
+		for _, r := range New(cfg, nil, nil).Routes() {
 			if r.Pattern == "/api/v1/cmd" {
 				return true
 			}
@@ -60,7 +60,7 @@ func TestAPIRouteGating(t *testing.T) {
 func TestAccountsModeHasLoginRoute(t *testing.T) {
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, nil)
+	s := New(cfg, nil, nil)
 	found := false
 	for _, r := range s.Routes() {
 		if r.Pattern == "/login" {
@@ -82,7 +82,7 @@ func TestTopLevelRouteWordsAreReserved(t *testing.T) {
 	// (config.Default() leaves it "closed"); open it so this walk actually
 	// reaches the route the production instance runs with.
 	cfg.Registration.Mode = "open"
-	s := New(cfg, nil)
+	s := New(cfg, nil, nil)
 	for _, r := range s.Routes() {
 		seg := strings.TrimPrefix(r.Pattern, "/")
 		seg, _, _ = strings.Cut(seg, "/")

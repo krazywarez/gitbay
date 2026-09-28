@@ -28,7 +28,7 @@ func TestClientIPBehindProxy(t *testing.T) {
 	for _, tc := range cases {
 		cfg := config.Default()
 		cfg.HTTP.TrustedProxies = tc.proxies
-		s := New(cfg, nil)
+		s := New(cfg, nil, nil)
 		r := httptest.NewRequest("GET", "/api/v1/read", nil)
 		r.RemoteAddr = tc.remote
 		if tc.xff != "" {

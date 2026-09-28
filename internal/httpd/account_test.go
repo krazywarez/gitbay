@@ -34,7 +34,7 @@ func TestAccountPagePushToggleAndDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/settings", nil)
 	s.accountPage(rr, req, store.User{ID: uid, Username: "alice"})
@@ -78,7 +78,7 @@ func TestAccountSubmitNotifyPush(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := store.User{ID: uid, Username: "alice"}
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 
 	rr := submitAccountForm(t, s, u, url.Values{"field": {"notify-push"}, "push": {"on"}})
 	if rr.Code != http.StatusSeeOther {
@@ -117,7 +117,7 @@ func TestAccountSubmitDeviceRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 
 	idStr := strconv.FormatInt(id, 10)
 
@@ -158,7 +158,7 @@ func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	rr := httptest.NewRecorder()
 	s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), store.User{ID: uid, Username: "alice"})
 

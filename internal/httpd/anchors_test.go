@@ -26,7 +26,7 @@ func TestMarkdownHeadingAnchors(t *testing.T) {
 // The stylesheet carries an ETag and a cache lifetime; a revalidation
 // with the same tag is a 304 with no body (#132).
 func TestStylesheetRevalidates(t *testing.T) {
-	s := New(config.Default(), nil)
+	s := New(config.Default(), nil, nil)
 	first := httptest.NewRecorder()
 	s.stylesheet(first, httptest.NewRequest("GET", "/static/style.css", nil))
 	tag := first.Header().Get("ETag")
@@ -69,7 +69,7 @@ func TestStylesheetURLCarriesTheBuildHash(t *testing.T) {
 		t.Errorf("the page does not link %s", want)
 	}
 
-	s := New(config.Default(), nil)
+	s := New(config.Default(), nil, nil)
 	versioned := httptest.NewRecorder()
 	s.stylesheet(versioned, httptest.NewRequest("GET", "/static/style.css?v="+stylesheetHash, nil))
 	if cc := versioned.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {

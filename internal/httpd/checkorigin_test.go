@@ -40,7 +40,7 @@ func TestMutatingRoutesRequireCheckOrigin(t *testing.T) {
 	// there is no second code path in routes.go for looping over both to
 	// reach; "open" alone matches production and is enough.
 	cfg.Registration.Mode = "open"
-	s := New(cfg, nil)
+	s := New(cfg, nil, nil)
 
 	for _, r := range s.Routes() {
 		if !r.Mutating {

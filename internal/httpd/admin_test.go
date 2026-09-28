@@ -48,7 +48,7 @@ func TestAdminPageShowsThePushQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	rr := httptest.NewRecorder()
 	s.adminPage(rr, httptest.NewRequest("GET", "/admin", nil), store.User{ID: uid, Username: "root", IsAdmin: true})
 	if rr.Code != http.StatusOK {

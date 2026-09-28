@@ -249,7 +249,7 @@ func serveCmd() *cobra.Command {
 				slog.Info("ssh handled by host sshd (ssh.mode = system)")
 			}
 
-			web := httpd.New(cfg, st)
+			web := httpd.New(cfg, st, nil)
 			// Header and idle timeouts bound what an idle or slow client can
 			// hold open. No write timeout: archives and upload-pack stream
 			// for as long as they take (#104).
@@ -338,7 +338,7 @@ func serveCmd() *cobra.Command {
 				}
 				slog.Info("git-daemon listening", "addr", gln.Addr())
 				gitLn = gln
-				go func() { errCh <- gitd.New(cfg, st).Serve(gln) }()
+				go func() { errCh <- gitd.New(cfg, st, nil).Serve(gln) }()
 			}
 
 			select {
