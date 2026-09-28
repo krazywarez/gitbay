@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"filippo.io/age"
+	"time"
 )
 
 func writeConfig(t *testing.T, body string) string {
@@ -52,6 +53,11 @@ func TestContradictions(t *testing.T) {
 		body    string
 		wantErr string
 	}{
+		{
+			"bad pack_queue_wait",
+			minimal + "\n[limits]\npack_queue_wait = \"soon\"\n",
+			"limits.pack_queue_wait",
+		},
 		{
 			"registration open without smtp",
 			minimal + "\n[registration]\nmode = \"open\"\n",
@@ -387,5 +393,20 @@ func TestBackupRecipients(t *testing.T) {
 	}
 	if cfg, err := Load(writeConfig(t, minimal)); err != nil || len(cfg.Backup.AgeRecipients) != 0 {
 		t.Fatalf("default: %v, %v", cfg.Backup, err)
+	}
+}
+
+func TestPackLimits(t *testing.T) {
+	max, per, queue, wait := Limits{}.PackLimits()
+	if max != DefaultPackConcurrency || per != DefaultPackPerPrincipal || queue != DefaultPackQueue || wait != DefaultPackQueueWait {
+		t.Fatalf("defaults: %d %d %d %s", max, per, queue, wait)
+	}
+	max, per, queue, wait = Limits{PackConcurrency: -1, PackPerPrincipal: -1, PackQueue: -1, PackQueueWait: "5s"}.PackLimits()
+	if max != 0 || per != 0 || queue != 0 || wait != 5*time.Second {
+		t.Fatalf("off: %d %d %d %s", max, per, queue, wait)
+	}
+	max, per, queue, _ = Limits{PackConcurrency: 8, PackPerPrincipal: 3, PackQueue: 64}.PackLimits()
+	if max != 8 || per != 3 || queue != 64 {
+		t.Fatalf("set: %d %d %d", max, per, queue)
 	}
 }

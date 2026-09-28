@@ -24,6 +24,15 @@ import (
 // and webhook deliveries.
 const DefaultWriteRate = 60
 
+// Pack generation defaults for a four-core host: a full clone of a large
+// repository runs git at about 1.5 cores (Performance wiki page).
+const (
+	DefaultPackConcurrency  = 3
+	DefaultPackPerPrincipal = 2
+	DefaultPackQueue        = 32
+	DefaultPackQueueWait    = time.Minute
+)
+
 type Config struct {
 	Server       Server       `toml:"server"`
 	SSH          SSH          `toml:"ssh"`
@@ -214,6 +223,37 @@ type Limits struct {
 	// account.
 	MaxReposPerUser int   `toml:"max_repos_per_user"`
 	MaxBytesPerUser int64 `toml:"max_bytes_per_user"`
+	// PackConcurrency caps git pack generation (upload-pack and
+	// upload-archive) running at once across SSH, smart HTTP and git://.
+	// PackPerPrincipal caps it per account, or per client address on the
+	// anonymous transports. PackQueue is how many may wait for a slot,
+	// for at most PackQueueWait ("60s"). For the three counts 0 takes the
+	// default and a negative value turns that bound off.
+	PackConcurrency  int    `toml:"pack_concurrency"`
+	PackPerPrincipal int    `toml:"pack_per_principal"`
+	PackQueue        int    `toml:"pack_queue"`
+	PackQueueWait    string `toml:"pack_queue_wait"`
+}
+
+// PackLimits resolves the pack_* settings for packlimit.New. A zero
+// count is no bound.
+func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
+	pick := func(v, def int) int {
+		switch {
+		case v == 0:
+			return def
+		case v < 0:
+			return 0
+		}
+		return v
+	}
+	wait = DefaultPackQueueWait
+	if d, err := time.ParseDuration(l.PackQueueWait); err == nil && d > 0 {
+		wait = d
+	}
+	return pick(l.PackConcurrency, DefaultPackConcurrency),
+		pick(l.PackPerPrincipal, DefaultPackPerPrincipal),
+		pick(l.PackQueue, DefaultPackQueue), wait
 }
 
 type Mail struct {
@@ -443,6 +483,11 @@ func (c Config) Validate() error {
 	}
 	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 {
 		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user and max_snippets_per_user must not be negative"))
+	}
+	if w := c.Limits.PackQueueWait; w != "" {
+		if d, err := time.ParseDuration(w); err != nil || d <= 0 {
+			errs = append(errs, fmt.Errorf("limits.pack_queue_wait %q must be a positive duration such as 60s", w))
+		}
 	}
 	if c.Push.Enabled {
 		for _, f := range []struct{ name, val string }{
