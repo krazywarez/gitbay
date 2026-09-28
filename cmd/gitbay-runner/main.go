@@ -11,6 +11,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -274,11 +275,12 @@ func (r *runner) step() (bool, error) {
 	}
 	j := env.Data
 	log.Printf("build %d: %s %s @ %.10s", j.ID, j.Repo, j.Job, j.SHA)
-	status := "failure"
-	if r.run(j) {
-		status = "success"
+	f := r.run(j)
+	status := "success"
+	if f != nil {
+		status = "failure"
 	}
-	if err := r.reportDone(j.ID, status); err != nil {
+	if err := r.reportDone(j.ID, status, f); err != nil {
 		return true, err
 	}
 	log.Printf("build %d: %s", j.ID, status)
@@ -315,16 +317,36 @@ func (s *logSink) broken() bool {
 	return s.w == nil
 }
 
+// failure says where a build stopped: Step is the 1-based step that
+// failed, 0 when the build stopped before its first step (the clone, the
+// container), and Reason is one short line (#266).
+type failure struct {
+	Step   int
+	Reason string
+}
+
+// exitReason is how a finished command's failure reads in a build's log
+// and on the build: "exit 1" for a command that exited, the error
+// otherwise (a signal, a start failure).
+func exitReason(err error) string {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() >= 0 {
+		return fmt.Sprintf("exit %d", ee.ExitCode())
+	}
+	return err.Error()
+}
+
 // run clones, checks out, and executes the steps, streaming output to the
-// server. Returns whether every step succeeded.
-func (r *runner) run(j job) bool {
+// server. Returns nil when every step succeeded, else where the build
+// stopped.
+func (r *runner) run(j job) *failure {
 	dir := filepath.Join(r.workdir, fmt.Sprintf("build-%d", j.ID))
 	defer os.RemoveAll(dir)
 
 	home, doneHome, err := buildHome(r.workdir, j)
 	if err != nil {
 		log.Printf("build %d: build home: %v", j.ID, err)
-		return false
+		return &failure{Reason: "preparing the build home failed"}
 	}
 	defer doneHome()
 
@@ -333,13 +355,13 @@ func (r *runner) run(j job) bool {
 	pipe, err := logCmd.StdinPipe()
 	if err != nil {
 		log.Printf("build %d: log pipe: %v", j.ID, err)
-		return false
+		return &failure{Reason: "opening the log stream failed"}
 	}
 	sink := &logSink{w: pipe}
 	logCmd.Stdout, logCmd.Stderr = io.Discard, io.Discard
 	if err := logCmd.Start(); err != nil {
 		log.Printf("build %d: log stream: %v", j.ID, err)
-		return false
+		return &failure{Reason: "opening the log stream failed"}
 	}
 	// The server ends the log session with exit 3 when the build is
 	// cancelled; any other end is a lost stream, which the sink absorbs.
@@ -384,7 +406,7 @@ func (r *runner) run(j job) bool {
 		select {
 		case err := <-done:
 			if err != nil {
-				return false, fmt.Sprintf("step failed: %v", err)
+				return false, exitReason(err)
 			}
 			return true, ""
 		case <-cancelled:
@@ -425,7 +447,7 @@ func (r *runner) run(j job) bool {
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
 			fmt.Fprintf(sink, "git %s: %s\n", args[0], why)
-			return false
+			return &failure{Reason: "git " + args[0] + ": " + why}
 		}
 	}
 

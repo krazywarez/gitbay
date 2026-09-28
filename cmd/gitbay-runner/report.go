@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,10 +18,28 @@ import (
 // Only a connection-level failure is retried — ssh exits 255 for those.
 // Any other exit is the server's answer, and asking again would not
 // change it. Four retries over about thirty seconds outlasts a restart.
-func (r *runner) reportDone(id int64, status string) error {
+func (r *runner) reportDone(id int64, status string, f *failure) error {
+	args := doneArgs(id, status, f)
 	return reportWithRetry(func() (string, error) {
-		return r.ssh(nil, "runner", "done", fmt.Sprint(id), status)
+		return r.ssh(nil, args...)
 	}, id, retryDelays)
+}
+
+// doneArgs is the runner done command for a build's outcome. The reason
+// is single-quoted: ssh joins arguments with spaces, and the server
+// splits the line again with POSIX rules.
+func doneArgs(id int64, status string, f *failure) []string {
+	args := []string{"runner", "done", fmt.Sprint(id), status}
+	if f == nil {
+		return args
+	}
+	if f.Step > 0 {
+		args = append(args, "--step", strconv.Itoa(f.Step))
+	}
+	if f.Reason != "" {
+		args = append(args, "--reason", "'"+strings.ReplaceAll(f.Reason, "'", `'\''`)+"'")
+	}
+	return args
 }
 
 var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second}

@@ -76,25 +76,25 @@ func (r *runner) checkIsolation() error {
 	}
 }
 
-// runSteps executes a job's steps and reports whether all succeeded. The
-// clone has already happened, outside any container and with the runner's
-// key: the container never sees GIT_SSH_COMMAND, the key, or the runner's
-// environment — it gets the workspace and nothing else.
+// runSteps executes a job's steps. Returns nil when every step succeeded.
+// The clone has already happened, outside any container and with the
+// runner's key: the container never sees GIT_SSH_COMMAND, the key, or the
+// runner's environment — it gets the workspace and nothing else.
 type stepRunner func(cmd *exec.Cmd, deadline time.Time) (bool, string)
 
-func (r *runner) runSteps(j job, dir string, env []string, sink io.Writer, deadline time.Time, runStep stepRunner) bool {
+func (r *runner) runSteps(j job, dir string, env []string, sink io.Writer, deadline time.Time, runStep stepRunner) *failure {
 	if r.isolation == isolationNone {
-		for _, step := range j.Steps {
+		for i, step := range j.Steps {
 			fmt.Fprintf(sink, "$ %s\n", step)
 			cmd := exec.Command(toolpath.Look("sh"), "-c", step)
 			cmd.Dir, cmd.Env = dir, env
 			cmd.Stdout, cmd.Stderr = sink, sink
 			if ok, why := runStep(cmd, deadline); !ok {
-				fmt.Fprintf(sink, "%s\n", why)
-				return false
+				fmt.Fprintf(sink, "step %d/%d failed: %s\n", i+1, len(j.Steps), why)
+				return &failure{Step: i + 1, Reason: why}
 			}
 		}
-		return true
+		return nil
 	}
 	return r.runStepsPodman(j, dir, env, sink, deadline, runStep)
 }
@@ -103,7 +103,7 @@ func (r *runner) runSteps(j job, dir string, env []string, sink io.Writer, deadl
 // step in it with `podman exec`. One container per job, not per step,
 // because steps share state — a build step writes what a test step reads
 // — and per-step containers would break that.
-func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer, deadline time.Time, runStep stepRunner) bool {
+func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer, deadline time.Time, runStep stepRunner) *failure {
 	podman := toolpath.Look("podman")
 	image := j.Image
 	if image == "" {
@@ -124,7 +124,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	envFile := filepath.Join(r.workdir, fmt.Sprintf("env-%d", j.ID))
 	if err := writeEnvFile(envFile, fileEnv); err != nil {
 		fmt.Fprintf(sink, "preparing the build environment: %v\n", err)
-		return false
+		return &failure{Reason: "preparing the build environment failed"}
 	}
 	defer os.Remove(envFile)
 
@@ -137,7 +137,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 		dir, f, err := r.cgroups.create(j.ID, r.memory, r.cpus)
 		if err != nil {
 			fmt.Fprintf(sink, "preparing the build cgroup: %v\n", err)
-			return false
+			return &failure{Reason: "preparing the build cgroup failed"}
 		}
 		cgroupFD = f
 		defer f.Close()
@@ -179,22 +179,22 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 			fmt.Fprintf(sink, "\nThis runner does not pull images. Ask an operator to provision %s "+
 				"on the runner host (podman pull, or podman build) before a job names it.\n", image)
 		}
-		return false
+		return &failure{Reason: "starting the build container failed"}
 	}
 	defer exec.Command(podman, append(r.podmanGlobal(), "rm", "--force", name)...).Run()
 
-	for _, step := range j.Steps {
+	for i, step := range j.Steps {
 		fmt.Fprintf(sink, "$ %s\n", step)
 		cmd := exec.Command(podman, append(r.podmanGlobal(), "exec", "--workdir", "/workspace", name, "sh", "-c", step)...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.podmanHome()}
 		intoCgroup(cmd, cgroupFD)
 		cmd.Stdout, cmd.Stderr = sink, sink
 		if ok, why := runStep(cmd, deadline); !ok {
-			fmt.Fprintf(sink, "%s\n", why)
-			return false
+			fmt.Fprintf(sink, "step %d/%d failed: %s\n", i+1, len(j.Steps), why)
+			return &failure{Step: i + 1, Reason: why}
 		}
 	}
-	return true
+	return nil
 }
 
 // podmanGlobal are the flags every podman invocation needs, before the

@@ -144,7 +144,7 @@ func TestCI(t *testing.T) {
 		t.Fatalf("ok log:\n%s", out)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "build", "log", "alice/app", brokenN)
-	if !strings.Contains(out, "step failed") {
+	if !strings.Contains(out, "step 1/1 failed: exit 1") {
 		t.Fatalf("broken log:\n%s", out)
 	}
 	// Statuses resolved, with target URLs pointing at the build pages.
