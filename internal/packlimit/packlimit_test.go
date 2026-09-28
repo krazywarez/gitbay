@@ -222,3 +222,63 @@ func TestUnboundedQueue(t *testing.T) {
 	waitQueued(t, l, 64)
 	r1()
 }
+
+// Anonymous clients cannot hold every slot: with max 3 and "ip:" capped
+// at 2, a third anonymous request queues and an account still gets in.
+func TestClassCap(t *testing.T) {
+	l := New(3, 0, 4, 5*time.Second)
+	l.CapClass("ip:", 2)
+	r1, err1 := l.Acquire(nil, "ip:192.0.2.1")
+	r2, err2 := l.Acquire(nil, "ip:192.0.2.2")
+	if err1 != nil || err2 != nil {
+		t.Fatal(err1, err2)
+	}
+	got := make(chan error, 1)
+	go func() {
+		r, err := l.Acquire(nil, "ip:192.0.2.3")
+		if err == nil {
+			r()
+		}
+		got <- err
+	}()
+	waitQueued(t, l, 1)
+	ru, err := l.Acquire(nil, "user:1")
+	if err != nil {
+		t.Fatalf("account refused the free slot: %v", err)
+	}
+	select {
+	case err := <-got:
+		t.Fatalf("third anonymous request did not queue: %v", err)
+	default:
+	}
+	r1()
+	select {
+	case err := <-got:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queued anonymous request never got the freed slot")
+	}
+	r2()
+	ru()
+	assertHeldEmpty(t, l)
+	if l.classHeld != 0 {
+		t.Fatalf("classHeld = %d after every release", l.classHeld)
+	}
+}
+
+func TestAddrPrincipal(t *testing.T) {
+	for in, want := range map[string]string{
+		"192.0.2.7":            "ip:192.0.2.7",
+		"::ffff:192.0.2.7":     "ip:192.0.2.7",
+		"2001:db8:1:2:3:4:5:6": "ip:2001:db8:1:2::/64",
+		"2001:db8:1:2:ffff::1": "ip:2001:db8:1:2::/64",
+		"fe80::1%en0":          "ip:fe80::/64",
+		"not-an-address":       "ip:not-an-address",
+	} {
+		if got := AddrPrincipal(in); got != want {
+			t.Errorf("AddrPrincipal(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

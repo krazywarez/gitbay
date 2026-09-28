@@ -214,7 +214,7 @@ func lsRefs(br *bufio.Reader) bool {
 // packPrincipal is who a fetch is counted against: the account when the
 // request carries a valid bearer token or web session, the same key SSH
 // uses, so switching transport buys no extra slots; otherwise the
-// client address.
+// client address, an IPv6 one by its /64.
 func (s *Server) packPrincipal(r *http.Request) string {
 	if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(tok) != "" {
 		if u, _, err := s.st.APITokenUser(store.HashToken(strings.TrimSpace(tok))); err == nil {
@@ -224,7 +224,7 @@ func (s *Server) packPrincipal(r *http.Request) string {
 	if u := s.viewer(r); u.ID != 0 {
 		return "user:" + strconv.FormatInt(u.ID, 10)
 	}
-	return "ip:" + s.clientIP(r)
+	return packlimit.AddrPrincipal(s.clientIP(r))
 }
 
 // gitProtocolEnv forwards the client's protocol negotiation header so

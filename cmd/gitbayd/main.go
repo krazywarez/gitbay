@@ -230,7 +230,13 @@ func serveCmd() *cobra.Command {
 			}, buildinfo.String()).Run(whCtx)
 
 			// One pack-generation budget for SSH, smart HTTP and git://.
-			packs := packlimit.New(cfg.Limits.PackLimits())
+			// Anonymous clients ("ip:" principals) share all but one
+			// slot, so an account can always get the last.
+			packMax, packPer, packQueue, packWait := cfg.Limits.PackLimits()
+			packs := packlimit.New(packMax, packPer, packQueue, packWait)
+			if packMax > 1 {
+				packs.CapClass("ip:", packMax-1)
+			}
 
 			errCh := make(chan error, 3)
 			var sshSrv *sshd.Server

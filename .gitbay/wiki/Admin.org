@@ -212,7 +212,10 @@ push=.
   =pack_queue_wait= (="60s"=) — git pack generation (clones, fetches,
   =git archive --remote=) over SSH, smart HTTP and git:// shares one
   budget: this many at once, this many per account (per client
-  address when anonymous), and this many waiting for at most the wait.
+  address when anonymous: an IPv4 address, or an IPv6 /64), and this
+  many waiting for at most the wait. Anonymous clients together hold
+  at most =pack_concurrency= − 1 slots when it is above 1, so a signed-in
+  client (SSH key, bearer token or web session) can always get the last.
   Past that an SSH client gets "the server is busy…" and exit 1, HTTP
   gets 503 with =Retry-After: 30=, git:// an =ERR= line. A queued
   client that disconnects leaves the queue; a running clone whose

@@ -9,6 +9,8 @@ package packlimit
 
 import (
 	"errors"
+	"net/netip"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,12 +24,18 @@ type Limiter struct {
 	max, per, queue int
 	wait            time.Duration
 
-	mu      sync.Mutex
-	running int
-	queued  int
-	held    map[string]int // running, per principal
-	waiting map[string]int // queued, per principal
-	changed chan struct{}  // closed and replaced on every release
+	// Principals starting with class may hold at most classCap slots
+	// between them; classCap 0 is no class cap.
+	class    string
+	classCap int
+
+	mu        sync.Mutex
+	running   int
+	classHeld int
+	queued    int
+	held      map[string]int // running, per principal
+	waiting   map[string]int // queued, per principal
+	changed   chan struct{}  // closed and replaced on every release
 }
 
 // New returns a limiter, or nil — no limit — when max is not positive.
@@ -37,6 +45,31 @@ func New(max, per, queue int, wait time.Duration) *Limiter {
 	}
 	return &Limiter{max: max, per: per, queue: queue, wait: wait,
 		held: map[string]int{}, waiting: map[string]int{}, changed: make(chan struct{})}
+}
+
+// CapClass caps the slots that principals starting with prefix may hold
+// between them. Call it before the limiter is in use.
+func (l *Limiter) CapClass(prefix string, n int) {
+	if l == nil {
+		return
+	}
+	l.class, l.classCap = prefix, n
+}
+
+// AddrPrincipal is the principal for an unauthenticated client at addr:
+// an IPv4 address as is, an IPv6 address by its /64, since one host
+// commonly holds a whole /64. An address that does not parse is used
+// as given.
+func AddrPrincipal(addr string) string {
+	a, err := netip.ParseAddr(addr)
+	if err != nil {
+		return "ip:" + addr
+	}
+	a = a.WithZone("").Unmap()
+	if a.Is4() {
+		return "ip:" + a.String()
+	}
+	return "ip:" + netip.PrefixFrom(a, 64).Masked().String()
 }
 
 // Acquire takes a slot for principal, queueing when none is free.
@@ -106,12 +139,22 @@ func (l *Limiter) Acquire(done <-chan struct{}, principal string) (release func(
 }
 
 func (l *Limiter) fits(principal string) bool {
+	if l.inClass(principal) && l.classHeld >= l.classCap {
+		return false
+	}
 	return l.running < l.max && (l.per <= 0 || l.held[principal] < l.per)
+}
+
+func (l *Limiter) inClass(principal string) bool {
+	return l.classCap > 0 && strings.HasPrefix(principal, l.class)
 }
 
 func (l *Limiter) take(principal string) {
 	l.running++
 	l.held[principal]++
+	if l.inClass(principal) {
+		l.classHeld++
+	}
 }
 
 func (l *Limiter) releaser(principal string) func() {
@@ -121,6 +164,9 @@ func (l *Limiter) releaser(principal string) func() {
 			l.mu.Lock()
 			defer l.mu.Unlock()
 			l.running--
+			if l.inClass(principal) {
+				l.classHeld--
+			}
 			if l.held[principal]--; l.held[principal] == 0 {
 				delete(l.held, principal)
 			}

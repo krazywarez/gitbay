@@ -70,10 +70,9 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 
-	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	// A nil done: a queued client that leaves, or a restart, does not
 	// end the wait; only the limiter's wait does.
-	release, err := s.packs.Acquire(nil, "ip:"+host)
+	release, err := s.packs.Acquire(nil, principal(conn.RemoteAddr()))
 	if err != nil {
 		writeErr(conn, err.Error())
 		return
@@ -99,6 +98,12 @@ func (s *Server) handle(conn net.Conn) {
 
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
 	gitutil.Transport("git-upload-pack", dir, conn, out, io.Discard, protoEnv, 0, kill)
+}
+
+// principal is the pack-limit principal for a client at addr.
+func principal(addr net.Addr) string {
+	host, _, _ := net.SplitHostPort(addr.String())
+	return packlimit.AddrPrincipal(host)
 }
 
 func readPktLine(r io.Reader) (string, error) {

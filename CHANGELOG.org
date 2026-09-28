@@ -227,6 +227,9 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   to turn the limit off. Ref listings, pushes and web archives are
   unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
   since each session is its own process (#262).
+- Anonymous clones are counted per IPv4 address or IPv6 /64, and
+  together hold at most =pack_concurrency= − 1 slots, so a signed-in
+  client can always get the last one (#262).
 
 * v1.36.0 — 2026-09-23
 

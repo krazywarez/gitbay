@@ -95,6 +95,11 @@ func TestPackPrincipal(t *testing.T) {
 	if got := s.packPrincipal(r); got != "ip:192.0.2.7" {
 		t.Fatalf("bad token: %q", got)
 	}
+	r6 := httptest.NewRequest("POST", "/alice/app/git-upload-pack", nil)
+	r6.RemoteAddr = "[2001:db8:1:2:3:4:5:6]:4000"
+	if got := s.packPrincipal(r6); got != "ip:2001:db8:1:2::/64" {
+		t.Fatalf("anonymous IPv6: %q", got)
+	}
 	want := "user:" + strconv.FormatInt(alice.ID, 10)
 	r.Header.Set("Authorization", "Bearer secret")
 	if got := s.packPrincipal(r); got != want {

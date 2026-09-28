@@ -49,3 +49,14 @@ func TestBusyAnswersERR(t *testing.T) {
 		t.Fatalf("got %q, %v", line, err)
 	}
 }
+
+func TestPrincipal(t *testing.T) {
+	for addr, want := range map[net.Addr]string{
+		&net.TCPAddr{IP: net.ParseIP("192.0.2.7"), Port: 9418}:            "ip:192.0.2.7",
+		&net.TCPAddr{IP: net.ParseIP("2001:db8:1:2:3:4:5:6"), Port: 9418}: "ip:2001:db8:1:2::/64",
+	} {
+		if got := principal(addr); got != want {
+			t.Errorf("principal(%v) = %q, want %q", addr, got, want)
+		}
+	}
+}
