@@ -72,8 +72,10 @@ func (s *Server) handle(conn net.Conn) {
 
 	// A nil done: a queued client that leaves, or a restart, does not
 	// end the wait; only the limiter's wait does.
-	release, err := s.packs.Acquire(nil, principal(conn.RemoteAddr()))
+	p := principal(conn.RemoteAddr())
+	release, err := s.packs.Acquire(nil, p)
 	if err != nil {
+		s.packs.Refused("git", p, err)
 		writeErr(conn, err.Error())
 		return
 	}

@@ -240,6 +240,9 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
 - Anonymous clones are counted per IPv4 address or IPv6 /64, and
   together hold at most =pack_concurrency= − 1 slots, so a signed-in
   client can always get the last one (#262).
+- A request turned away by the pack limit logs a warning naming the
+  transport and whether the client was signed in, never its address,
+  at most once a minute per transport (#262).
 - Web archive downloads (=/{owner}/{repo}/archive/{ref}.tar.gz=) take
   a pack slot, answer 503 with =Retry-After: 30= when none is free, and
   are killed when the client leaves or stops reading (#262).

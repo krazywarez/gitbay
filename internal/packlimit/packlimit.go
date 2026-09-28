@@ -9,6 +9,7 @@ package packlimit
 
 import (
 	"errors"
+	"log/slog"
 	"net/netip"
 	"strings"
 	"sync"
@@ -33,9 +34,10 @@ type Limiter struct {
 	running   int
 	classHeld int
 	queued    int
-	held      map[string]int // running, per principal
-	waiting   map[string]int // queued, per principal
-	changed   chan struct{}  // closed and replaced on every release
+	held      map[string]int       // running, per principal
+	waiting   map[string]int       // queued, per principal
+	changed   chan struct{}        // closed and replaced on every release
+	warned    map[string]time.Time // last refusal logged, per transport
 }
 
 // New returns a limiter, or nil — no limit — when max is not positive.
@@ -44,7 +46,33 @@ func New(max, per, queue int, wait time.Duration) *Limiter {
 		return nil
 	}
 	return &Limiter{max: max, per: per, queue: queue, wait: wait,
-		held: map[string]int{}, waiting: map[string]int{}, changed: make(chan struct{})}
+		held: map[string]int{}, waiting: map[string]int{}, changed: make(chan struct{}),
+		warned: map[string]time.Time{}}
+}
+
+// Refused logs that a request on transport was turned away with err, at
+// most once a minute per transport. It names the principal's class
+// (user or ip), never the principal: an address is personal data.
+func (l *Limiter) Refused(transport, principal string, err error) {
+	if l == nil {
+		return
+	}
+	now := time.Now()
+	l.mu.Lock()
+	last, seen := l.warned[transport]
+	if seen && now.Sub(last) < time.Minute {
+		l.mu.Unlock()
+		return
+	}
+	l.warned[transport] = now
+	l.mu.Unlock()
+	class, _, _ := strings.Cut(principal, ":")
+	reason := "busy"
+	if errors.Is(err, ErrGone) {
+		reason = "gone"
+	}
+	slog.Warn("pack limit: request turned away (logged at most once a minute per transport)",
+		"transport", transport, "class", class, "reason", reason)
 }
 
 // CapClass caps the slots that principals starting with prefix may hold

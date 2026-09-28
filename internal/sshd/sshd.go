@@ -608,7 +608,11 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 		// Pack generation shares one budget with smart HTTP and git://.
 		// receive-pack stays outside it: its post-receive runs after the
 		// client has its report, and must not be queued or killed.
-		release, err := packs.Acquire(done, "user:"+strconv.FormatInt(user.ID, 10))
+		principal := "user:" + strconv.FormatInt(user.ID, 10)
+		release, err := packs.Acquire(done, principal)
+		if err != nil {
+			packs.Refused("ssh", principal, err)
+		}
 		if errors.Is(err, packlimit.ErrBusy) {
 			fmt.Fprintln(stderr, "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
 			return protocol.ExitFailure

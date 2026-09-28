@@ -174,8 +174,10 @@ func (s *Server) uploadPack(w http.ResponseWriter, r *http.Request) {
 // to it completed for packlimit.StallDeadline — and finish, called once
 // git has exited, releases the slot.
 func (s *Server) packSlot(w http.ResponseWriter, r *http.Request) (out io.Writer, kill <-chan struct{}, finish func(), ok bool) {
-	release, err := s.packs.Acquire(s.until(r), s.packPrincipal(r))
+	principal := s.packPrincipal(r)
+	release, err := s.packs.Acquire(s.until(r), principal)
 	if err != nil {
+		s.packs.Refused("http", principal, err)
 		msg := "the server is restarting; try again in a minute"
 		if errors.Is(err, packlimit.ErrBusy) {
 			msg = "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute"

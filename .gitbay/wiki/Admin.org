@@ -218,7 +218,9 @@ push=.
   at most =pack_concurrency= − 1 slots when it is above 1, so a signed-in
   client (SSH key, bearer token or web session) can always get the last.
   Past that an SSH client gets "the server is busy…" and exit 1, HTTP
-  gets 503 with =Retry-After: 30=, git:// an =ERR= line. An SSH client
+  gets 503 with =Retry-After: 30=, git:// an =ERR= line; the daemon
+  logs a =pack limit= warning naming the transport and whether the
+  client was signed in, at most once a minute per transport. An SSH client
   that disconnects while queued leaves the queue; an HTTP or git:// one
   keeps its place until the wait runs out. A running clone is killed
   when its client disconnects, or when no write to the client completes

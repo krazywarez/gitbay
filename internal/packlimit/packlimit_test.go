@@ -1,8 +1,11 @@
 package packlimit
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -281,4 +284,32 @@ func TestAddrPrincipal(t *testing.T) {
 			t.Errorf("AddrPrincipal(%q) = %q, want %q", in, got, want)
 		}
 	}
+}
+
+// A refusal is logged once a minute per transport, with the principal's
+// class and never its address.
+func TestRefusedLogsOncePerTransport(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	l := New(1, 0, 0, time.Second)
+	l.Refused("http", "ip:192.0.2.7", ErrBusy)
+	l.Refused("http", "ip:192.0.2.8", ErrBusy)
+	l.Refused("ssh", "user:4", ErrGone)
+	out := buf.String()
+	if n := strings.Count(out, "\n"); n != 2 {
+		t.Fatalf("%d lines, want 2:\n%s", n, out)
+	}
+	for _, want := range []string{"transport=http class=ip reason=busy", "transport=ssh class=user reason=gone"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "192.0.2") || strings.Contains(out, "user:4") {
+		t.Fatalf("principal logged:\n%s", out)
+	}
+	var none *Limiter
+	none.Refused("git", "ip:x", ErrBusy)
 }
