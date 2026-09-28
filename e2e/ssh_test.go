@@ -24,6 +24,7 @@ type instance struct {
 	gitPort  int
 	proc     *exec.Cmd
 	sshDir   string // per-user client keys live here
+	keyFile  string // server.secret_key_file, outside root
 }
 
 // nextPort hands out candidate ports. Seeded randomly so two test processes
@@ -89,11 +90,13 @@ func startInstanceWith(t *testing.T, extra string) *instance {
 		gitPort:  ports[2],
 		sshDir:   t.TempDir(),
 	}
+	inst.keyFile = filepath.Join(t.TempDir(), "secret.key")
 	inst.config = filepath.Join(inst.root, "config.toml")
 	cfg := fmt.Sprintf(`
 [server]
 root = %q
 site_url = "https://gitbay.test"
+secret_key_file = %q
 [ssh]
 port = %d
 [http]
@@ -102,11 +105,13 @@ tls = "off"
 [git_daemon]
 enabled = true
 port = %d
-`, inst.root, inst.port, inst.httpPort, inst.gitPort)
+`, inst.root, inst.keyFile, inst.port, inst.httpPort, inst.gitPort)
 	cfg += extra + "\n"
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	inst.admin(t, "admin", "secrets", "init")
 
 	inst.proc = exec.Command(inst.gitbayd, "--config", inst.config, "serve")
 	inst.proc.Stderr = os.Stderr

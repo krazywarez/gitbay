@@ -1,15 +1,22 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 )
+
+// secretsCheckOneSealed matches "admin secrets check" reporting the one
+// build secret set in TestAdminBackup as sealed under some key, e.g.
+// "build_secrets.value: key 98e412e4 1".
+var secretsCheckOneSealed = regexp.MustCompile(`build_secrets\.value: key \S+ 1`)
 
 func TestAdminBackup(t *testing.T) {
 	t.Parallel()
@@ -34,6 +41,11 @@ func TestAdminBackup(t *testing.T) {
 	mustGit(t, dir, env, "push", "-q", "origin", "main", "v1")
 	if _, _, code := inst.ssh(t, aliceKey, "", "issue", "create", "alice/keep", "--title", "'survives backup'"); code != 0 {
 		t.Fatal("issue create failed")
+	}
+	// A build secret, to show the archive carries it sealed and the key
+	// file not at all.
+	if _, errOut, code := inst.ssh(t, aliceKey, "hunter2-at-rest", "repo", "secret", "set", "alice/keep", "DEPLOY_TOKEN"); code != 0 {
+		t.Fatalf("secret set: %s", errOut)
 	}
 
 	// Back up while the daemon is running.
@@ -64,6 +76,16 @@ func TestAdminBackup(t *testing.T) {
 			}
 		}
 	}
+	if strings.Contains(names, "secret.key") {
+		t.Fatalf("archive carries the key file:\n%s", names)
+	}
+	db, err := exec.Command("tar", "-xzOf", archive, "gitbay.db").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(db, []byte("hunter2-at-rest")) {
+		t.Fatal("the archived database carries the build secret in clear")
+	}
 
 	// Restore: extract into a fresh root and serve from it.
 	root2 := t.TempDir()
@@ -77,12 +99,13 @@ func TestAdminBackup(t *testing.T) {
 [server]
 root = %q
 site_url = "https://gitbay.test"
+secret_key_file = %q
 [ssh]
 port = %d
 [http]
 addr = "127.0.0.1:%d"
 tls = "off"
-`, root2, port2, httpPort2)
+`, root2, inst.keyFile, port2, httpPort2)
 	if err := os.WriteFile(config2, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +171,23 @@ tls = "off"
 	out2, errOut, code := ssh2("whoami")
 	if code != 0 || strings.TrimSpace(out2) != "alice" {
 		t.Fatalf("whoami on restored instance: exit %d, %q, %s", code, out2, errOut)
+	}
+	// With the original key the restored secrets open; with another key
+	// they do not.
+	if out, err := exec.Command(inst.gitbayd, "--config", config2, "admin", "secrets", "check").CombinedOutput(); err != nil || !secretsCheckOneSealed.Match(out) {
+		t.Fatalf("secrets check on the restored instance: %v\n%s", err, out)
+	}
+	config3 := filepath.Join(root2, "config-wrong-key.toml")
+	wrong := strings.Replace(cfg, fmt.Sprintf("secret_key_file = %q", inst.keyFile),
+		fmt.Sprintf("secret_key_file = %q", filepath.Join(t.TempDir(), "other.key")), 1)
+	if err := os.WriteFile(config3, []byte(wrong), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(inst.gitbayd, "--config", config3, "admin", "secrets", "init").CombinedOutput(); err != nil {
+		t.Fatalf("init the wrong key: %v\n%s", err, out)
+	}
+	if out, err := exec.Command(inst.gitbayd, "--config", config3, "admin", "secrets", "check").CombinedOutput(); err == nil || !strings.Contains(string(out), "does not hold") {
+		t.Fatalf("secrets check with the wrong key: %v\n%s", err, out)
 	}
 	if out2, _, code = ssh2("repo", "log", "alice/keep"); code != 0 || !strings.Contains(out2, "keep me") {
 		t.Fatalf("restored log: %d\n%s", code, out2)

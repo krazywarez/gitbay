@@ -29,6 +29,7 @@ func TestACMEServe(t *testing.T) {
 [server]
 root = %q
 site_url = "https://gitbay.example"
+secret_key_file = %q
 [ssh]
 port = %d
 [http]
@@ -36,7 +37,7 @@ addr = "127.0.0.1:%d"
 tls = "acme"
 acme_email = "noreply@gitbay.example"
 acme_http_addr = "127.0.0.1:%d"
-`, inst.root, inst.port, httpsPort, acmeHTTPPort)
+`, inst.root, inst.keyFile, inst.port, httpsPort, acmeHTTPPort)
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}

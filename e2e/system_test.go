@@ -33,12 +33,13 @@ func TestSystemSSHMode(t *testing.T) {
 [server]
 root = %q
 site_url = "https://gitbay.test"
+secret_key_file = %q
 [ssh]
 mode = "system"
 [http]
 addr = "127.0.0.1:%d"
 tls = "off"
-`, inst.root, inst.httpPort)
+`, inst.root, inst.keyFile, inst.httpPort)
 	if err := os.WriteFile(inst.config, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
