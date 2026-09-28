@@ -50,6 +50,20 @@ func parseTTL(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
+// ttlFlag reads --ttl as an expiry; nil when the flag is absent. The
+// code is -1 when the caller may go on.
+func (c *Ctx) ttlFlag(f flags) (*time.Time, int) {
+	if !f.Has("--ttl") {
+		return nil, -1
+	}
+	d, err := parseTTL(f.Value("--ttl"))
+	if err != nil || d <= 0 {
+		return nil, c.fail(protocol.ExitUsage, "bad ttl %q: give a duration such as 30d or 720h", f.Value("--ttl"))
+	}
+	t := time.Now().Add(d)
+	return &t, -1
+}
+
 func runTokenCreate(c *Ctx, args []string) int {
 	f, err := parseFlags(args, flagSpec{Values: []string{"--name", "--scope", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {

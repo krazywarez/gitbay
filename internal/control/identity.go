@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/crypto/ssh"
@@ -33,12 +34,13 @@ func init() {
 	register(Command{
 		Path:    []string{"keys", "add"},
 		Summary: "register an SSH public key (authorized_keys format)",
-		Usage:   "keys add [--scope full|git|runner] [--label <text>] < key.pub",
+		Usage:   "keys add [--scope full|git|runner] [--label <text>] [--ttl 30d|720h] < key.pub",
 		Flags: []Flag{
 			{"--scope", "full|git|runner", "what the key may do", "full"},
 			{"--label", "<text>", "a name for the key", ""},
+			{"--ttl", "30d|720h", "how long the key authenticates; an expiring key cannot mint credentials", "never expires"},
 		},
-		Examples:        []string{"keys add --label laptop < key.pub"},
+		Examples:        []string{"keys add --label laptop < key.pub", "keys add --scope git --ttl 90d < ci.pub"},
 		ReadsStdin:      true,
 		MintsCredential: true,
 		Run:             runKeysAdd,
@@ -83,20 +85,24 @@ func runKeysList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "listing keys: %v", err)
 	}
 	type out struct {
-		Fingerprint string `json:"fingerprint"`
-		Algo        string `json:"algo"`
-		Scope       string `json:"scope"`
-		Label       string `json:"label"`
-		CreatedBy   string `json:"created_by,omitempty"`
+		Fingerprint string     `json:"fingerprint"`
+		Algo        string     `json:"algo"`
+		Scope       string     `json:"scope"`
+		Label       string     `json:"label"`
+		CreatedBy   string     `json:"created_by,omitempty"`
+		LastUsedAt  string     `json:"last_used_at,omitempty"`
+		ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	}
 	var ds []out
 	for _, k := range keys {
-		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedBy})
+		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedBy, k.LastUsedAt, k.ExpiresAt})
 	}
+	now := time.Now()
 	return c.emit(ds, func(w io.Writer) {
-		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL")
+		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
-			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label))
+			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label),
+				cText(c.usedText(d.LastUsedAt)), cText(expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})
@@ -121,8 +127,32 @@ func keyLabel(s string) (string, error) {
 	return s, nil
 }
 
+// usedText is a key's last use as a list shows it.
+func (c *Ctx) usedText(ts string) string {
+	switch {
+	case ts == "":
+		return "never used"
+	case c.Term.Cols == 0:
+		return "used " + stamp(ts)
+	}
+	return "used " + relAge(ts, termNow())
+}
+
+// expiresText is a credential's expiry as a list shows it. It is
+// absolute at a terminal too: relAge reads only the past.
+func expiresText(t *time.Time, now time.Time) string {
+	if t == nil {
+		return "never expires"
+	}
+	s := stamp(t.UTC().Format(time.RFC3339Nano))
+	if !t.After(now) {
+		return "expired " + s
+	}
+	return "expires " + s
+}
+
 func runKeysAdd(c *Ctx, args []string) int {
-	f, err := parseFlags(args, flagSpec{Values: []string{"--scope", "--label"}, MaxPos: 0, Usage: "keys add [--scope full|git|runner] [--label <text>] < key.pub"})
+	f, err := parseFlags(args, flagSpec{Values: []string{"--scope", "--label", "--ttl"}, MaxPos: 0, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -133,6 +163,10 @@ func runKeysAdd(c *Ctx, args []string) int {
 	if scope != "full" && scope != "git" && scope != "runner" {
 		// deploy:* scopes are granted via repo settings, not self-service.
 		return c.fail(protocol.ExitUsage, "scope must be full, git or runner")
+	}
+	expires, code := c.ttlFlag(f)
+	if code >= 0 {
+		return code
 	}
 	raw, err := io.ReadAll(io.LimitReader(c.Stdin, 64<<10))
 	if err != nil {
@@ -151,24 +185,28 @@ func runKeysAdd(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	fp := ssh.FingerprintSHA256(pub)
-	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
+	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID, ExpiresAt: expires}); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "adding key: %v", err)
 	}
 	type out struct {
-		Fingerprint string `json:"fingerprint"`
-		Scope       string `json:"scope"`
-		Label       string `json:"label"`
+		Fingerprint string     `json:"fingerprint"`
+		Scope       string     `json:"scope"`
+		Label       string     `json:"label"`
+		ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	}
-	d := out{fp, scope, label}
+	d := out{fp, scope, label, expires}
 	return c.emit(d, func(w io.Writer) {
+		line := fmt.Sprintf("added %s (%s)", d.Fingerprint, d.Scope)
 		if d.Label != "" {
-			fmt.Fprintf(w, "added %s (%s) %s\n", d.Fingerprint, d.Scope, d.Label)
-			return
+			line += " " + d.Label
 		}
-		fmt.Fprintf(w, "added %s (%s)\n", d.Fingerprint, d.Scope)
+		if d.ExpiresAt != nil {
+			line += ", " + expiresText(d.ExpiresAt, time.Now())
+		}
+		fmt.Fprintln(w, line)
 	})
 }
 

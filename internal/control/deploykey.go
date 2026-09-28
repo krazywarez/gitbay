@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -15,11 +16,12 @@ import (
 func init() {
 	register(Command{Path: []string{"repo", "deploy-key", "add"},
 		Summary: "bind a read-only (or --rw) key to one repository",
-		Usage:   "repo deploy-key add <owner/name> [--rw] < key.pub",
+		Usage:   "repo deploy-key add <owner/name> [--rw] [--ttl 30d|720h] < key.pub",
 		Flags: []Flag{
 			{"--rw", "", "the key may push, not just fetch", ""},
+			{"--ttl", "30d|720h", "how long the key authenticates", "never expires"},
 		},
-		Examples:        []string{"repo deploy-key add krz/gitbay < key.pub"},
+		Examples:        []string{"repo deploy-key add krz/gitbay < key.pub", "repo deploy-key add krz/gitbay --ttl 30d < key.pub"},
 		ReadsStdin:      true,
 		MintsCredential: true, Run: runDeployKeyAdd})
 	register(Command{Path: []string{"repo", "deploy-key", "list"},
@@ -35,21 +37,21 @@ func init() {
 }
 
 func runDeployKeyAdd(c *Ctx, args []string) int {
-	mode := "ro"
-	var path string
-	for _, a := range args {
-		switch a {
-		case "--rw":
-			mode = "rw"
-		default:
-			if path != "" {
-				return c.usage()
-			}
-			path = a
-		}
+	f, err := parseFlags(args, flagSpec{Values: []string{"--ttl"}, Bools: []string{"--rw"}, MaxPos: 1, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	path := f.pos(0)
 	if path == "" {
 		return c.usage()
+	}
+	mode := "ro"
+	if f.Has("--rw") {
+		mode = "rw"
+	}
+	expires, code := c.ttlFlag(f)
+	if code >= 0 {
+		return code
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -69,14 +71,22 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	}
 	fp := ssh.FingerprintSHA256(pub)
 	scope := fmt.Sprintf("deploy:%d:%s", repo.ID, mode)
-	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID}); err != nil {
+	if err := c.Store.AddSSHKeyFrom(c.User.ID, fp, pub.Type(), pub.Marshal(), scope, label, store.KeyOrigin{CreatedByToken: c.TokenID, ExpiresAt: expires}); err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return c.failErr(err)
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]string{"fingerprint": fp, "mode": mode}, func(w io.Writer) {
-		fmt.Fprintf(w, "deploy key %s (%s) bound to %s\n", fp, mode, repo.Path())
+	d := map[string]any{"fingerprint": fp, "mode": mode}
+	if expires != nil {
+		d["expires_at"] = expires
+	}
+	return c.emit(d, func(w io.Writer) {
+		line := fmt.Sprintf("deploy key %s (%s) bound to %s", fp, mode, repo.Path())
+		if expires != nil {
+			line += ", " + expiresText(expires, time.Now())
+		}
+		fmt.Fprintln(w, line)
 	})
 }
 
@@ -93,10 +103,12 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	type out struct {
-		Fingerprint string `json:"fingerprint"`
-		Algo        string `json:"algo"`
-		Mode        string `json:"mode"`
-		Label       string `json:"label"`
+		Fingerprint string     `json:"fingerprint"`
+		Algo        string     `json:"algo"`
+		Mode        string     `json:"mode"`
+		Label       string     `json:"label"`
+		LastUsedAt  string     `json:"last_used_at,omitempty"`
+		ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	}
 	var ds []out
 	for _, k := range keys {
@@ -104,12 +116,14 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		if policy.DeployScopeAllows(k.Scope, repo.ID, true) {
 			mode = "rw"
 		}
-		ds = append(ds, out{k.Fingerprint, k.Algo, mode, k.Label})
+		ds = append(ds, out{k.Fingerprint, k.Algo, mode, k.Label, k.LastUsedAt, k.ExpiresAt})
 	}
+	now := time.Now()
 	return c.emit(ds, func(w io.Writer) {
-		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL")
+		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
-			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label))
+			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label),
+				cText(c.usedText(d.LastUsedAt)), cText(expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})

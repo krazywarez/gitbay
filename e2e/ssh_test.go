@@ -265,7 +265,7 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 		t.Fatalf("keys list exit %d:\n%s", code, out)
 	}
 	// The key's comment (ssh-keygen -C) is its label; keys label renames it.
-	if !strings.Contains(out, "\tgit\talice2\n") {
+	if !strings.Contains(out, "\tgit\talice2\t") {
 		t.Fatalf("keys list lacks the comment as label:\n%s", out)
 	}
 	secondFP := strings.Fields(strings.Split(strings.TrimSpace(out), "\n")[1])[0]
@@ -273,7 +273,7 @@ func TestControlPlaneOverBareSSH(t *testing.T) {
 		t.Fatalf("keys label exit %d, stderr: %s", code, errOut)
 	}
 	out, _, _ = inst.ssh(t, aliceKey, "", "keys", "list")
-	if !strings.Contains(out, "\tgit\tbuild box\n") {
+	if !strings.Contains(out, "\tgit\tbuild box\t") {
 		t.Fatalf("keys list after label:\n%s", out)
 	}
 
