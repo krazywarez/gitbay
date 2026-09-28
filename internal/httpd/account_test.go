@@ -212,7 +212,7 @@ func TestPinToggleDispatchesRepoPin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	req := httptest.NewRequest("POST", "/alice/app/pin", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "app")
@@ -261,7 +261,7 @@ func TestWatchToggleCyclesThroughMuted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	req := httptest.NewRequest("POST", "/alice/app/watch", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "app")

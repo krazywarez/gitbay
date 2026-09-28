@@ -79,7 +79,7 @@ func TestIssueCreateFormHasMilestoneAndAssigneeForWriter(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 	req := httptest.NewRequest("GET", "/alice/app/issues/new", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "app")
@@ -125,7 +125,7 @@ func TestIssueCreateFormHidesMilestoneAndAssigneeForReader(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 	req := httptest.NewRequest("GET", "/alice/app/issues/new", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "app")
@@ -198,7 +198,7 @@ func TestIssueCreateSubmitReaderLabelIsDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	form := url.Values{
 		"title":  {"a bug"},
 		"body":   {"steps"},
@@ -254,7 +254,7 @@ func TestIssueCreateSubmitSetsMilestoneAndAssignee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	form := url.Values{
 		"title":     {"needs a fix"},
 		"body":      {"details"},
@@ -308,7 +308,7 @@ func TestIssueCreateSubmitBadAssigneeCreatesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	form := url.Values{
 		"title":    {"needs a fix"},
 		"body":     {"details"},

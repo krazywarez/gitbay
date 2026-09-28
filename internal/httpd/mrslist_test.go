@@ -37,7 +37,7 @@ func TestMRsListContributionHintByAccess(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 
 	// mrs reads the viewer through s.viewer(r), which resolves a
 	// session cookie (internal/httpd/accounts.go:37-47) rather than

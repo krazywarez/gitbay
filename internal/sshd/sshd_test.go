@@ -245,7 +245,7 @@ func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
 	// The settings link keeps the site URL's scheme and port.
 	cfg.Server.SiteURL = "http://forge.test:8080/"
 	cfg.Registration.Mode = "open"
-	srv, err := New(cfg, st)
+	srv, err := New(cfg, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

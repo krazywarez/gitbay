@@ -52,7 +52,7 @@ func TestLoginNoStoreHeader(t *testing.T) {
 	if err := st.MigrateUp(); err != nil {
 		t.Fatal(err)
 	}
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/login?token=bogus", nil)
 	s.login(rr, req)

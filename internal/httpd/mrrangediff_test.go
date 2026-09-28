@@ -36,7 +36,7 @@ func TestMRRangeDiffPageRendersCommandOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	req := httptest.NewRequest("GET", "/alice/app/mrs/1/range-diff", nil)
 	req.SetPathValue("owner", "alice")
 	req.SetPathValue("repo", "app")
@@ -180,7 +180,7 @@ func loginCookie(t *testing.T, st *store.Store, userID int64) *http.Cookie {
 // user with no access (#269).
 func TestMRRangeDiffPagePrivateRepo(t *testing.T) {
 	st, cfg, alice, bob, repo, n, _, _, title := rangeDiffFixture(t)
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 
 	newReq := func(cookie *http.Cookie) (*httptest.ResponseRecorder, *http.Request) {
 		req := httptest.NewRequest("GET", "/alice/secret/mrs/"+strconv.FormatInt(n, 10)+"/range-diff", nil)
@@ -232,7 +232,7 @@ func TestMRRangeDiffPagePrivateRepo(t *testing.T) {
 // range-diff between exactly those two.
 func TestMRRangeDiffPageFromToQuery(t *testing.T) {
 	st, cfg, alice, _, repo, n, v1, v2, _ := rangeDiffFixture(t)
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 	cookie := loginCookie(t, st, alice.ID)
 
 	newReq := func(query string) (*httptest.ResponseRecorder, *http.Request) {
