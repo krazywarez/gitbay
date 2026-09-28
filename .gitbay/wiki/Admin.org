@@ -444,7 +444,11 @@ One archive: a consistent SQLite snapshot (taken *before* the
 repositories are read, so the database never references objects the
 archive missed), every repository, and the SSH host keys. Excluded:
 hook socket, regenerated hook scripts, WAL files. Safe to run against a
-live daemon.
+live daemon. =--out= must be outside =server.root=, or the next full
+backup would carry the archive. Each run removes the snapshot
+directories (=.gitbay-snap-*=) and temporary archives (=.*.tmp-*=) a
+killed run left beside its archive once they are a day old, and prints
+each one it removes.
 
 =--verify= reads an archive back: the snapshot must pass SQLite's
 integrity check, every repository the snapshot names must be in the

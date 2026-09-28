@@ -653,3 +653,67 @@ func TestBackupNeedsNoKeyFile(t *testing.T) {
 		t.Fatalf("verify without the key file: %v", err)
 	}
 }
+
+// A run removes what a killed run left beside the archive once it is a
+// day old, and leaves younger ones, which may belong to a run under way.
+func TestBackupRemovesStaleTemporaries(t *testing.T) {
+	cfg := testConfig(t)
+	s, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	dir := t.TempDir()
+	old := time.Now().Add(-25 * time.Hour)
+	mk := func(name string, isDir bool, mtime time.Time) {
+		p := filepath.Join(dir, name)
+		if isDir {
+			if err := os.Mkdir(p, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		} else if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, mtime, mtime); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk(".gitbay-snap-old", true, old)
+	mk(".b.tar.gz.tmp-old", false, old)
+	mk(".gitbay-snap-new", true, time.Now())
+	mk(".b.tar.gz.tmp-new", false, time.Now())
+	mk(".keep", false, old)
+	if err := runBackup(cfg, filepath.Join(dir, "b.tar.gz"), true); err != nil {
+		t.Fatal(err)
+	}
+	got := leftovers(t, dir)
+	want := []string{".b.tar.gz.tmp-new", ".gitbay-snap-new", ".keep"}
+	sort.Strings(got)
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("left %v, want %v", got, want)
+	}
+}
+
+// An archive written under server.root, directly or through a symlink,
+// would be in the next full backup, so it is refused.
+func TestBackupRefusesOutputInsideRoot(t *testing.T) {
+	cfg := testConfig(t)
+	s, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(cfg.Server.Root, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, out := range []string{
+		filepath.Join(cfg.Server.Root, "b.tar.gz"),
+		filepath.Join(cfg.Server.Root, "backups", "b.tar.gz"),
+		filepath.Join(link, "b.tar.gz"),
+	} {
+		if err := runBackup(cfg, out, true); err == nil || !strings.Contains(err.Error(), "inside server.root") {
+			t.Errorf("%s: %v", out, err)
+		}
+	}
+}

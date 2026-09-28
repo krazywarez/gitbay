@@ -359,12 +359,12 @@ func Load(path string) (Config, error) {
 	return cfg, cfg.Validate()
 }
 
-// within reports whether path is dir or below it. Both are compared as
+// Within reports whether path is dir or below it. Both are compared as
 // cleaned absolute paths (a relative path resolves against the working
 // directory, same as every other path in this config), with symlinks
 // resolved where the path exists on disk, so a path that reaches into dir
 // through a symlink, or through "..", is still reported as inside.
-func within(dir, path string) bool {
+func Within(dir, path string) bool {
 	dir, path = resolvePath(dir), resolvePath(path)
 	rel, err := filepath.Rel(dir, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
@@ -430,7 +430,7 @@ func (c Config) Validate() error {
 	switch {
 	case c.Server.SecretKeyFile == "":
 		errs = append(errs, errors.New("server.secret_key_file is required"))
-	case within(c.Server.Root, c.Server.SecretKeyFile):
+	case Within(c.Server.Root, c.Server.SecretKeyFile):
 		errs = append(errs, fmt.Errorf("server.secret_key_file %q is inside server.root: backups of the root would carry the key beside the values it seals", c.Server.SecretKeyFile))
 	}
 	if err := oneOf("ssh.mode", c.SSH.Mode, "embedded", "system"); err != nil {

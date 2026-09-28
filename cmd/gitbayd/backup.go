@@ -97,6 +97,13 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 		return fmt.Errorf("%s ends in .age but [backup] age_recipients is not set, so the archive would not be encrypted", out)
 	}
 
+	dir := filepath.Dir(out)
+	// An archive under the root would be in the next full backup's walk.
+	if config.Within(cfg.Server.Root, dir) {
+		return fmt.Errorf("%s is inside server.root %s; write the archive elsewhere", out, cfg.Server.Root)
+	}
+	removeStale(dir, time.Now().Add(-staleAge))
+
 	// Deletes, renames and transfers wait until the walk finishes, so
 	// every repository the snapshot names is still on disk when the walk
 	// reaches it (#259). A database-only archive reads no repository.
@@ -123,7 +130,6 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 
 	// 1. Consistent database snapshot, before any repository is read. It
 	// goes in a fresh 0700 directory beside the archive.
-	dir := filepath.Dir(out)
 	snapDir, err := os.MkdirTemp(dir, ".gitbay-snap-")
 	if err != nil {
 		return err
@@ -264,6 +270,38 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	}
 	fmt.Printf("wrote %s (%d repositories, %.1f MB)\n", out, repoCount, float64(info.Size())/1e6)
 	return nil
+}
+
+// staleAge is how old a snapshot directory or temporary archive must be
+// before a later run removes it. A run that is still writing one is
+// younger than this.
+const staleAge = 24 * time.Hour
+
+// removeStale removes what a killed run left in dir: snapshot
+// directories and temporary archives last modified before cutoff.
+func removeStale(dir string, cutoff time.Time) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		name := e.Name()
+		snap := e.IsDir() && strings.HasPrefix(name, ".gitbay-snap-")
+		tmp := e.Type().IsRegular() && strings.HasPrefix(name, ".") && strings.Contains(name, ".tmp-")
+		if !snap && !tmp {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || !info.ModTime().Before(cutoff) {
+			continue
+		}
+		p := filepath.Join(dir, name)
+		if err := os.RemoveAll(p); err != nil {
+			fmt.Fprintf(os.Stderr, "removing stale %s: %v\n", p, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "removed stale %s\n", p)
+	}
 }
 
 // refNames are what a repository's refs are read from. WalkDir would
