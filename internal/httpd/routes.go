@@ -100,6 +100,7 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/issues/{n}", Handler: s.issue},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs", Handler: s.mrs},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs/{n}", Handler: s.mr},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/mrs/{n}/range-diff", Handler: s.mrRangeDiff},
 	)
 
 	// The JSON API is its own opt-in surface, independent of web.mode.

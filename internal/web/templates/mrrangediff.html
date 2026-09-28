@@ -1,0 +1,9 @@
+{{define "width"}}wide{{end}}
+{{define "title"}}range-diff · !{{.MR.Number}} · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+<h1>Range-diff <span class="issuenumber">!{{.MR.Number}}</span></h1>
+<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/{{.MR.Number}}">back to !{{.MR.Number}} {{.MR.Title}}</a></p>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>
+{{else if .Diff}}<pre class="code buildlog" tabindex="0">{{.Diff}}</pre>
+{{else}}<p class="empty-note">Nothing to compare: this merge request has one revision.</p>{{end}}
+{{end}}
