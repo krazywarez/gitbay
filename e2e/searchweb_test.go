@@ -91,7 +91,7 @@ func TestGlobalSearchAndNotificationsWeb(t *testing.T) {
 		t.Fatalf("mark all read: %d", status)
 	}
 	_, body = browserGet(t, browser, inst.base()+"/notifications")
-	if !strings.Contains(body, "nothing unread") {
+	if !strings.Contains(body, "no unread notifications") {
 		t.Fatalf("unread list after sweep:\n%s", body)
 	}
 	_, body = browserGet(t, browser, inst.base()+"/notifications?all=1")
