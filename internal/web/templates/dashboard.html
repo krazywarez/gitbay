@@ -46,7 +46,7 @@
 
 <aside class="feedcol" aria-label="Recent activity">
   <h2 class="colhead">Recent activity</h2>
-  {{range .Feed}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
+  {{range .Feed}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a>{{if .Extra}} {{.Extra}}{{end}}<br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
   {{else}}<p class="none">No activity yet</p>{{end}}
 </aside>
 

@@ -158,6 +158,35 @@ func TestFeedLinesParsesWhenT(t *testing.T) {
 	}
 }
 
+// A labelled issue names which labels were added, not just "issue
+// labeled": the sentence is otherwise silent about what changed.
+func TestFeedLinesNamesTheLabelsOnALabelledIssue(t *testing.T) {
+	events := []store.FeedEvent{
+		{RepoPath: "krz/gitbay", Actor: "cmc", Kind: "issue.labeled",
+			Data: `{"number":262,"labels":["ops","security"]}`},
+	}
+	lines := FeedLines(events)
+	if len(lines) != 1 {
+		t.Fatalf("FeedLines returned %d lines, want 1", len(lines))
+	}
+	l := lines[0]
+	if l.Verb != "labelled" || l.Ref != "#262" || l.Extra != "ops, security" {
+		t.Errorf("got %+v", l)
+	}
+}
+
+// Same for a labelled merge request.
+func TestFeedLinesNamesTheLabelsOnALabelledMR(t *testing.T) {
+	events := []store.FeedEvent{
+		{RepoPath: "krz/gitbay", Actor: "cmc", Kind: "mr.labeled",
+			Data: `{"number":471,"labels":["review"]}`},
+	}
+	lines := FeedLines(events)
+	if len(lines) != 1 || lines[0].Verb != "labelled" || lines[0].Ref != "!471" || lines[0].Extra != "review" {
+		t.Errorf("got %+v", lines)
+	}
+}
+
 // A scheduled job firing daily on an unchanged tip is a separate event
 // each tick, not another job of one run (#240): a repeated job name starts
 // a new line, so three days read as three lines rather than "ran 3 jobs on"

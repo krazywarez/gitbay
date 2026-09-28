@@ -36,7 +36,7 @@
      that goes back. */}}
 {{if .Log}}<h3 class="logsub">recent</h3>
 <div class="ownerlog">
-{{range .Log}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a><br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
+{{range .Log}}<p class="feedline"><a href="/{{.Actor}}">{{.Actor}}</a> {{.Verb}} <a href="{{.URL}}"{{if .Jobs}} title="{{join .Jobs ", "}}"{{end}}>{{.Ref}}</a>{{if .Extra}} {{.Extra}}{{end}}<br><span class="none">{{.Repo}} · <span title="{{whenT .WhenT}}">{{ago .WhenT}}</span></span></p>
 {{end}}
 </div>
 <p class="meta"><a href="{{.Feed}}">activity feed</a></p>

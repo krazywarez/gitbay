@@ -21,7 +21,10 @@ type FeedLine struct {
 	WhenT time.Time // parsed from When, for ago/whenT rendering
 	State string    // a build run's combined status; empty for anything else
 	Jobs  []string  // job names folded into a build run
-	sha   string    // the commit a build event fired on, for fold-matching
+	// Extra is trailing detail shown after the ref: the label list on a
+	// labelled event, empty for everything else.
+	Extra string
+	sha   string // the commit a build event fired on, for fold-matching
 }
 
 // FeedLines turns stored events into readable lines. An unknown kind
@@ -41,10 +44,11 @@ func FeedLines(events []store.FeedEvent) []FeedLine {
 	statuses := make([][]string, 0, len(events))
 	for _, e := range events {
 		var d struct {
-			Number int64  `json:"number"`
-			Job    string `json:"job"`
-			Tag    string `json:"tag"`
-			SHA    string `json:"sha"`
+			Number int64    `json:"number"`
+			Job    string   `json:"job"`
+			Tag    string   `json:"tag"`
+			SHA    string   `json:"sha"`
+			Labels []string `json:"labels"`
 		}
 		json.Unmarshal([]byte(e.Data), &d)
 		kind, rest, _ := strings.Cut(e.Kind, ".")
@@ -72,9 +76,15 @@ func FeedLines(events []store.FeedEvent) []FeedLine {
 		case "issue":
 			l.Verb, l.Ref = issueVerb(rest), fmt.Sprintf("#%d", d.Number)
 			l.URL = fmt.Sprintf("/%s/issues/%d", e.RepoPath, d.Number)
+			if rest == "labeled" {
+				l.Extra = strings.Join(d.Labels, ", ")
+			}
 		case "mr":
 			l.Verb, l.Ref = mrVerb(rest), fmt.Sprintf("!%d", d.Number)
 			l.URL = fmt.Sprintf("/%s/mrs/%d", e.RepoPath, d.Number)
+			if rest == "labeled" {
+				l.Extra = strings.Join(d.Labels, ", ")
+			}
 		case "build":
 			l.Verb, l.Ref = "build "+rest, d.Job
 			l.URL = fmt.Sprintf("/%s/builds/%d", e.RepoPath, d.Number)
@@ -148,6 +158,8 @@ func issueVerb(s string) string {
 		return "reopened issue"
 	case "commented":
 		return "commented on"
+	case "labeled":
+		return "labelled"
 	}
 	return "issue " + s
 }
@@ -162,6 +174,8 @@ func mrVerb(s string) string {
 		return "commented on"
 	case "closed":
 		return "closed merge request"
+	case "labeled":
+		return "labelled"
 	}
 	return "merge request " + s
 }
