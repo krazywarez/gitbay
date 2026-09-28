@@ -327,6 +327,7 @@ is for the author or anyone with write; labels and assignees need write.
 
 #+begin_src sh
 gitbay issue create --title "it breaks" [--body "..." | --file -]
+    [--label bug]... [--milestone v1.0] [--assignee alice]...  # these need write
 gitbay issue list [--state open|closed|all]
 gitbay issue show 4
 gitbay issue comment 4 --message "same here"
