@@ -81,12 +81,12 @@ fifth state, so every =state = 'open'= rule still means what it did.
 =mr revisions= lists the heads a merge request has had; the web page
 lists them beside the reviews they staled, and the iOS client has a
 Revisions section. =mr range-diff= compares two heads: the iOS client shows it from a
-revision to the one before, as text; the web has no view yet
-(krz/gitbay#269). Batched review — draft diff comments held with
-=mr comment --pending= and sent together with =--comment=/=--discard=
-or a verdict — is built and the web uses it: composing review
-comments before publishing them is the same round trip as the CLI's
-=--pending= flag.
+revision to the one before, as text; the web renders the same view, with
+a "compare to previous" link on each revision after the first. Batched
+review — draft diff comments held with =mr comment --pending= and sent
+together with =--comment=/=--discard= or a verdict — is built and the
+web uses it: composing review comments before publishing them is the same
+round trip as the CLI's =--pending= flag.
 
 =mr review request --add <user>= asks a *particular* person, who then
 carries the merge request in their queue and is notified; =--remove=
