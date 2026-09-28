@@ -240,16 +240,20 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 	http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)
 }
 
-// pinToggle pins or unpins the repo for the logged-in viewer.
+// pinToggle pins or unpins the repo for the logged-in viewer, through
+// repo pin/repo unpin — the same commands the CLI runs — rather than
+// writing the store directly (#261).
 func (s *Server) pinToggle(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
 	if !ok {
 		return
 	}
+	verb := "pin"
 	if s.st.IsPinned(u.ID, repo.ID) {
-		s.st.UnpinRepo(u.ID, repo.ID)
-	} else {
-		s.st.PinRepo(u.ID, repo.ID)
+		verb = "unpin"
+	}
+	if _, msg, ok := s.runControl(u, []string{"repo", verb, repo.Path()}); !ok {
+		s.setFlash(w, msg)
 	}
 	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }

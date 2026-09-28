@@ -175,3 +175,112 @@ func TestAccountPageMasksAShortDeviceToken(t *testing.T) {
 		t.Fatalf("the device table has no id column:\n%s", body)
 	}
 }
+
+// assertAudited fails the test unless an audit row with the given action
+// prefix exists — proof a handler dispatched through the control
+// registry rather than writing the store directly, since only Dispatch
+// itself calls Store.Audit.
+func assertAudited(t *testing.T, st *store.Store, prefix string) {
+	t.Helper()
+	entries, err := st.AuditEntries(store.AuditFilter{ActionPrefix: prefix, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatalf("no audit row with action prefix %q", prefix)
+	}
+}
+
+// Pinning writes through the repo pin command, not the store directly,
+// so it carries the same audit trail and write budget as every other
+// mutating command (#261).
+func TestPinToggleDispatchesRepoPin(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	if _, err := st.CreateRepo("user", uid, "app", "public"); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(config.Default(), st)
+	req := httptest.NewRequest("POST", "/alice/app/pin", nil)
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "app")
+	rr := httptest.NewRecorder()
+	s.pinToggle(rr, req, u)
+
+	repo, err := st.RepoByPath("alice/app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.IsPinned(uid, repo.ID) {
+		t.Fatal("pin did not take effect")
+	}
+	assertAudited(t, st, "cmd repo pin")
+
+	rr2 := httptest.NewRecorder()
+	s.pinToggle(rr2, req, u)
+	if st.IsPinned(uid, repo.ID) {
+		t.Fatal("second toggle should have unpinned")
+	}
+	assertAudited(t, st, "cmd repo unpin")
+}
+
+// The watch button cycles default, watching, muted — the three states
+// repo watch/repo mute/repo unwatch already support — rather than the
+// two the store-writing version offered (#261, #271).
+func TestWatchToggleCyclesThroughMuted(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	if _, err := st.CreateRepo("user", uid, "app", "public"); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := st.RepoByPath("alice/app")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(config.Default(), st)
+	req := httptest.NewRequest("POST", "/alice/app/watch", nil)
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "app")
+
+	click := func() string {
+		rr := httptest.NewRecorder()
+		s.watchToggle(rr, req, u)
+		return st.RepoWatchState(repo.ID, uid)
+	}
+	if got := click(); got != "watching" {
+		t.Fatalf("first click: got %q, want watching", got)
+	}
+	assertAudited(t, st, "cmd repo watch")
+	if got := click(); got != "muted" {
+		t.Fatalf("second click: got %q, want muted", got)
+	}
+	assertAudited(t, st, "cmd repo mute")
+	if got := click(); got != "" {
+		t.Fatalf("third click: got %q, want default (unwatched)", got)
+	}
+	assertAudited(t, st, "cmd repo unwatch")
+}

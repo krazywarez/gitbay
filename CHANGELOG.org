@@ -102,6 +102,11 @@ for the eighteen commands whose CLI path differs from the registry's
   inside the migration's own transaction, before commit, so a
   violation rolls the migration back instead of leaving the bad
   schema and =user_version= already persisted (#261).
+- The web pin and watch buttons dispatch through =repo pin=/=unpin=
+  and =repo watch=/=mute=/=unwatch= instead of writing the store
+  directly, so a refusal reaches the viewer as a message instead of
+  being dropped. The watch button now cycles three states — default,
+  watching, muted — instead of two (#261).
 
 * v1.36.0 — 2026-09-23
 

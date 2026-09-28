@@ -56,17 +56,18 @@ func (s *Server) notificationsRead(w http.ResponseWriter, r *http.Request, u sto
 	http.Redirect(w, r, "/notifications", http.StatusSeeOther)
 }
 
-// watchToggle turns watching a repository on and off from its header,
-// the way the pin button does.
+// watchToggle cycles the viewer's watch state on a repository: default,
+// watching, muted, back to default — through repo watch/repo mute/repo
+// unwatch, the same commands the CLI runs (#261, #271).
 func (s *Server) watchToggle(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo, ok := s.repoForUser(w, r, u, policy.CanRead)
 	if !ok {
 		return
 	}
-	if s.st.RepoWatchState(repo.ID, u.ID) == "watching" {
-		s.st.ClearRepoWatch(repo.ID, u.ID)
-	} else {
-		s.st.SetRepoWatch(repo.ID, u.ID, "watching")
+	next := map[string]string{"": "watch", "watching": "mute", "muted": "unwatch"}
+	verb := next[s.st.RepoWatchState(repo.ID, u.ID)]
+	if _, msg, ok := s.runControl(u, []string{"repo", verb, repo.Path()}); !ok {
+		s.setFlash(w, msg)
 	}
 	http.Redirect(w, r, "/"+repo.Path(), http.StatusSeeOther)
 }
