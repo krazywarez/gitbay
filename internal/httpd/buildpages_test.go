@@ -317,3 +317,17 @@ func TestBuildPageStepSummaryIsFirstLine(t *testing.T) {
 		t.Errorf("summary shows the whole multi-line step")
 	}
 }
+
+// The Live note says the page updates itself, in plain words, rather
+// than the more technical "streams here" (#271).
+func TestBuildPageLiveNoteSaysItUpdatesItself(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "build.html", buildView{
+		repoPage: testRepoPage(), Live: true,
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "This page updates itself") {
+		t.Error(`Live note does not say the page updates itself`)
+	}
+}
