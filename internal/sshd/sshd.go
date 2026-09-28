@@ -29,6 +29,7 @@ import (
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/hookd"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -37,6 +38,7 @@ import (
 type Server struct {
 	cfg         config.Config
 	st          *store.Store
+	packs       *packlimit.Limiter
 	sshCfg      *ssh.ServerConfig
 	authLimiter *rateLimiter
 	sessions    sync.WaitGroup // accepted connections still being served
@@ -68,8 +70,8 @@ func (c *conn) cut() {
 	c.net.Close()
 }
 
-func New(cfg config.Config, st *store.Store) (*Server, error) {
-	s := &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}, stopping: make(chan struct{})}
+func New(cfg config.Config, st *store.Store, packs *packlimit.Limiter) (*Server, error) {
+	s := &Server{cfg: cfg, st: st, packs: packs, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}, stopping: make(chan struct{})}
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
@@ -423,7 +425,7 @@ func (s *Server) runExec(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, term co
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
+	return Exec(s.cfg, s.st, s.packs, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -459,7 +461,7 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell). Closing revoked kills a git transport.
-func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey, term control.Term, cmdline string,
+func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user store.User, key store.SSHKey, term control.Term, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
@@ -477,7 +479,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey,
 			if user.Pending {
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 			} else {
-				code = runGit(cfg, st, user, key.Scope, argv, stdin, stdout, stderr, revoked)
+				code = runGit(cfg, st, packs, user, key.Scope, argv, stdin, stdout, stderr, done, stopping, revoked)
 			}
 			// A refused push is a refused write, audited like one. runGit
 			// refuses only with the path as the one argument, so argv[1:]
@@ -514,9 +516,28 @@ func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey,
 	return control.Dispatch(ctx, argv)
 }
 
+// stallDeadline is how long a limited transport may go without writing
+// to its client before it is killed. upload-pack sends a keepalive
+// every five seconds while it prepares a pack.
+var stallDeadline = 2 * time.Minute
+
+// progressWriter records when a write to the client last completed.
+type progressWriter struct {
+	w    io.Writer
+	last atomic.Int64 // unix nanoseconds
+}
+
+func (p *progressWriter) Write(b []byte) (int, error) {
+	n, err := p.w.Write(b)
+	if n > 0 {
+		p.last.Store(time.Now().UnixNano())
+	}
+	return n, err
+}
+
 // runGit streams a git transport service after access checks.
-func runGit(cfg config.Config, st *store.Store, user store.User, scope string, argv []string,
-	stdin io.Reader, stdout, stderr io.Writer, revoked <-chan struct{}) int {
+func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user store.User, scope string, argv []string,
+	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
 	service := argv[0]
 	if len(argv) != 2 {
 		fmt.Fprintf(stderr, "usage: %s <path>\n", service)
@@ -601,7 +622,77 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 		defer st.DeletePushToken(token)
 		env = append(env, hookd.EnvToken+"="+token)
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, revoked); err != nil {
+	cancel := revoked
+	if !write {
+		// Pack generation shares one budget with smart HTTP and git://.
+		// receive-pack stays outside it: its post-receive runs after the
+		// client has its report, and must not be queued or killed.
+		release, err := packs.Acquire(done, "user:"+strconv.FormatInt(user.ID, 10))
+		if errors.Is(err, packlimit.ErrBusy) {
+			fmt.Fprintln(stderr, "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
+			return protocol.ExitFailure
+		}
+		if err != nil {
+			// ErrGone: the client left, or the server is restarting.
+			fmt.Fprintln(stderr, "the server is restarting; try again in a minute")
+			return protocol.ExitFailure
+		}
+		// Deferred before Transport runs, so it fires after git has
+		// exited and been waited for.
+		defer release()
+		// A client that stops reading would hold its slot for as long
+		// as its channel stays open. With a limit in force, a transport
+		// that writes nothing for stallDeadline is killed.
+		var pw *progressWriter
+		var tick <-chan time.Time
+		if packs != nil {
+			pw = &progressWriter{w: stdout}
+			pw.last.Store(time.Now().UnixNano())
+			stdout = pw
+			t := time.NewTicker(stallDeadline / 4)
+			defer t.Stop()
+			tick = t.C
+		}
+		kill := make(chan struct{})
+		finished := make(chan struct{})
+		defer close(finished)
+		go func() {
+			left := done
+			for {
+				select {
+				case <-finished:
+					return
+				case <-revoked:
+				case <-left:
+					select {
+					case <-stopping:
+						// done closes on a restart too; a clone already
+						// running finishes then. Only a departed client
+						// ends it.
+						left = nil
+						continue
+					default:
+					}
+				case <-tick:
+					if time.Since(time.Unix(0, pw.last.Load())) < stallDeadline {
+						continue
+					}
+					close(kill)
+					// A write blocked on the client's window outlives
+					// git; closing the channel ends it and the stdin copy,
+					// so Transport's Wait returns.
+					if c, ok := pw.w.(io.Closer); ok {
+						c.Close()
+					}
+					return
+				}
+				close(kill)
+				return
+			}
+		}()
+		cancel = kill
+	}
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, cancel); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK

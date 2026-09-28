@@ -99,7 +99,9 @@ func shellCmd() *cobra.Command {
 				fmt.Fprintf(os.Stderr, "gitbay control plane: interactive shells are not available.\nTry: ssh <host> help\n")
 				os.Exit(protocol.ExitUsage)
 			}
-			code := sshd.Exec(cfg, st, user, key, control.ParseTerm(os.Getenv("GITBAY_TERM")), cmdline, os.Stdin, os.Stdout, os.Stderr, nil, nil, nil)
+			// Each forced command is its own process, so there is no
+			// shared pack budget in system mode.
+			code := sshd.Exec(cfg, st, nil, user, key, control.ParseTerm(os.Getenv("GITBAY_TERM")), cmdline, os.Stdin, os.Stdout, os.Stderr, nil, nil, nil)
 			st.Close()
 			os.Exit(code)
 			return nil

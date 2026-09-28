@@ -45,6 +45,11 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 		if service == "git-receive-pack" && maxPack > 0 {
 			args = []string{"-c", fmt.Sprintf("receive.maxInputSize=%d", maxPack)}
 		}
+		if service == "git-upload-pack" {
+			// Keepalives while pack-objects is still counting keep a
+			// healthy clone writing; sshd kills one that goes quiet.
+			args = []string{"-c", "uploadpack.keepAlive=5"}
+		}
 		args = append(args, strings.TrimPrefix(service, "git-"), repoPath)
 	default:
 		return fmt.Errorf("unknown service %q", service)

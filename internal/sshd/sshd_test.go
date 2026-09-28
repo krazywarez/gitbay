@@ -64,7 +64,7 @@ func newTestServer(t *testing.T) testServer {
 
 	cfg := config.Default()
 	cfg.Server.Root = root
-	srv, err := New(cfg, st)
+	srv, err := New(cfg, st, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -232,7 +232,7 @@ func serveCmd() *cobra.Command {
 			var sshSrv *sshd.Server
 			var sshLn, gitLn net.Listener
 			if cfg.SSH.Mode == "embedded" {
-				srv, err := sshd.New(cfg, st)
+				srv, err := sshd.New(cfg, st, nil)
 				if err != nil {
 					return err
 				}
