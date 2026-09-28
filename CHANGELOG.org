@@ -217,6 +217,16 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   repository on the host. (#259)
 - =gitbayd admin secrets init= and =rotate= hold an flock on =<key
   file>.lock=, so two runs at once serialize. (#273)
+- Git pack generation (clones, fetches, =git archive --remote=) over
+  SSH, smart HTTP and git:// now shares one concurrency budget:
+  =limits.pack_concurrency= (3), =pack_per_principal= (2), =pack_queue=
+  (32) and =pack_queue_wait= (60s). Past the queue an SSH client sees
+  "the server is busy…" and exits 1, HTTP gets 503 with
+  =Retry-After: 30=, and git:// gets an =ERR= line. *Operators:* the
+  defaults are tuned for a four-core host; set the three counts to -1
+  to turn the limit off. Ref listings, pushes and web archives are
+  unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
+  since each session is its own process (#262).
 
 * v1.36.0 — 2026-09-23
 

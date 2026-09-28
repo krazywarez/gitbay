@@ -96,7 +96,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | Rate limits on API and writes               | in place | [[file:05-Identity-and-Access.org][5. Rate limits]]                         |
-| Concurrency limit on git pack generation    | gap      | #262                                                             |
+| Concurrency limit on git pack generation    | in place | global, per-principal, bounded queue across SSH, HTTP and git:// (=internal/packlimit=); not in system SSH mode |
 | Service hardening                           | in place | systemd sandboxing ([[file:03-Deployment.org][3]])                                     |
 | Backups offsite and append-only             | in place | restic with append-only credentials (documented)                 |
 | Restore tested                              | gap      | #259                                                             |

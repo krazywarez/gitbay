@@ -208,6 +208,20 @@ push=.
   Organizations are not capped.
 - =max_bytes_per_user= (0, unlimited) — disk the account's own
   repositories may take; a push may be no larger than what is left.
+- =pack_concurrency= (3), =pack_per_principal= (2), =pack_queue= (32),
+  =pack_queue_wait= (="60s"=) — git pack generation (clones, fetches,
+  =git archive --remote=) over SSH, smart HTTP and git:// shares one
+  budget: this many at once, this many per account (per client
+  address when anonymous), and this many waiting for at most the wait.
+  Past that an SSH client gets "the server is busy…" and exit 1, HTTP
+  gets 503 with =Retry-After: 30=, git:// an =ERR= line. A queued
+  client that disconnects leaves the queue; a running clone whose
+  client disconnects is killed. Ref listings (info/refs, protocol v2
+  =ls-refs=), pushes and web archives are outside the budget. For the
+  three counts 0 means the default and a negative value turns that
+  bound off. The defaults suit a four-core host; see [[Performance]].
+  With =ssh.mode = "system"= each SSH session is its own process and
+  SSH clones are not counted.
 - =max_pack_bytes=, =ssh_auth_rate= — reserved, not yet enforced.
 
 ** [git_daemon]

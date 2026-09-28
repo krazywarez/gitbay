@@ -45,5 +45,15 @@ this scale never appears in a profile.
 
 The practical ceiling on this hardware is concurrent pack generation:
 full clones of large repositories are CPU-bound in git itself (the 17s
-clone ran git at ~156% CPU). A busier instance would scale that with
-cores, not with changes to gitbay.
+clone ran git at ~156% CPU). =limits.pack_concurrency= bounds how many
+run at once across SSH, HTTP and git://, with a queue behind it (see
+[[Admin]], =[limits]=); the measurements below set its default.
+
+* Concurrent clones
+
+Measured with =deploy/clonebench.sh https://gitbay.org/krz/gitbay.git <n>=
+from a machine outside bay1 (four cores), before and after the pack
+limit was deployed with its defaults (=pack_concurrency= 3,
+=pack_per_principal= 2, =pack_queue= 32, =pack_queue_wait= 60s). All
+clones in one run come from one address, so the per-principal cap
+applies to them; the "limit off" run sets the counts to -1.

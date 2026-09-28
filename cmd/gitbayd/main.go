@@ -32,6 +32,7 @@ import (
 	"gitbay.org/gitbay/internal/httpd"
 	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/push"
 	"gitbay.org/gitbay/internal/seal"
 	"gitbay.org/gitbay/internal/sshd"
@@ -228,11 +229,14 @@ func serveCmd() *cobra.Command {
 				return control.RepoDir(cfg.Server.Root, owner, name)
 			}, buildinfo.String()).Run(whCtx)
 
+			// One pack-generation budget for SSH, smart HTTP and git://.
+			packs := packlimit.New(cfg.Limits.PackLimits())
+
 			errCh := make(chan error, 3)
 			var sshSrv *sshd.Server
 			var sshLn, gitLn net.Listener
 			if cfg.SSH.Mode == "embedded" {
-				srv, err := sshd.New(cfg, st, nil)
+				srv, err := sshd.New(cfg, st, packs)
 				if err != nil {
 					return err
 				}
@@ -249,7 +253,7 @@ func serveCmd() *cobra.Command {
 				slog.Info("ssh handled by host sshd (ssh.mode = system)")
 			}
 
-			web := httpd.New(cfg, st, nil)
+			web := httpd.New(cfg, st, packs)
 			// Header and idle timeouts bound what an idle or slow client can
 			// hold open. No write timeout: archives and upload-pack stream
 			// for as long as they take (#104).
@@ -338,7 +342,7 @@ func serveCmd() *cobra.Command {
 				}
 				slog.Info("git-daemon listening", "addr", gln.Addr())
 				gitLn = gln
-				go func() { errCh <- gitd.New(cfg, st, nil).Serve(gln) }()
+				go func() { errCh <- gitd.New(cfg, st, packs).Serve(gln) }()
 			}
 
 			select {
