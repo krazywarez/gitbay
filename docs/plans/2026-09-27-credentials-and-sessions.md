@@ -24,8 +24,8 @@ cap.
 client for e2e.
 
 **Spec:** issues #256, #257, #276, #277, #278 on krz/gitbay (the
-decisions on #256 and #257 are recorded there), and the brief
-`/private/tmp/claude-501/-Users-cmc-git-krz-gitbay/7b2f1ea4-aab6-44e2-b2ad-d4ec6852ce42/scratchpad/brief.md`.
+decisions on #256 and #257 are recorded there, and the later ones in
+"Decisions" at the end of this plan).
 
 ## Global constraints
 
@@ -3512,45 +3512,30 @@ gitbay mr create --source weblogin-limit --target main --title "web login over S
 
 ---
 
-## Open questions
+## Decisions (2026-09-28)
 
-1. **Expiring SSH keys and minting.** #277 says to consider it with
-   #257; this plan treats an expiring key like an expiring token and
-   refuses it the nine minting commands (MR 3, Task 3.2). One effect:
-   a person whose only key has a TTL cannot run `web login`, and must
-   use the mailed link. Confirm, or drop `Expires: key.ExpiresAt` from
-   `Exec` and `TestExpiringKeyCannotMint`.
-2. **Which commands mint.** The issue names token create, keys add,
-   repo deploy-key add, admin invite and web login. The plan adds
-   `repo runner add` (creates or attaches a key that claims builds),
-   `admin user create` (with `--key` or a verified address it is a way
-   in), `email verify` and `admin email verify` (a verified address
-   receives login links, so a token could plant a lasting way in).
-   `TestMintingCommandsMarked` pins the list.
-3. **LFS transfer tokens.** `git-lfs-authenticate` hands out an HMAC
-   token valid for an hour (`internal/lfs`), not stored, revocable only
-   by expiry. A key removed after minting one leaves LFS access for up
-   to an hour. Not in any of these issues; file separately?
-4. **System mode.** With `ssh.mode = "system"`, each exec is its own
-   forced-command process: the per-exec check applies, a running one is
-   not cut. bay1 runs embedded. Closing it would take a poll in
-   `gitbayd shell`; the plan documents the limit instead.
-5. **Commands already past dispatch.** "Running commands included" is
-   implemented as: git transports are killed, commands watching `Done`
-   stop, and a control command already inside its store write finishes
-   it with its output lost. Cancelling arbitrary control commands would
-   need a context threaded through every handler.
-6. **Removing the key you are on.** `keys remove <the key this session
-   uses>` cuts its own connection, so the CLI reports a connection
-   error instead of "removed". The removal has committed. Acceptable,
-   or should `revoke` skip the connection running the removal?
-7. **Idle window as a constant.** 12 hours is `store.WebSessionIdle`,
-   repeated in migration 0062. Should it be configurable?
+1. **Expiring SSH keys and minting.** Confirmed: an expiring key is
+   refused the minting commands like an expiring token (MR 3,
+   Task 3.2).
+2. **Which commands mint.** Confirmed: the issue's five plus
+   `repo runner add`, `admin user create`, `email verify` and
+   `admin email verify`, pinned by `TestMintingCommandsMarked`.
+3. **LFS transfer tokens.** Filed as #285; not in this plan.
+4. **Removing the key you are on.** Confirmed: the session's own
+   connection is cut after the removal commits.
+5. **Idle window.** A constant (`store.WebSessionIdle`, 12 h); make it
+   configurable only when someone needs another value.
 
-Noticed, not in scope: `token list` at a terminal shows a future
-expiry through `relAge`, which clamps to zero and prints "just now"
-(`internal/control/token.go:112-116`). `expiresText` (MR 3) would fix
-it if applied there.
+Documented limits, stated on the Threat-Model page in MR 1:
+
+- With `ssh.mode = "system"` each exec is its own forced-command
+  process; the per-exec check applies, a running one is not cut. bay1
+  runs embedded.
+- A control command already inside its store write when the key is
+  revoked finishes the write and its output is lost; git transports are
+  killed and commands watching `Done` stop.
+
+The `token list` future-expiry display is #286.
 
 ## Self-review
 

@@ -5,22 +5,27 @@
 **Goal:** Untrusted builds get a disposable home and never feed a
 trusted build (#255, #258); `ci/*` statuses belong to the build
 subsystem and merges can wait on named contexts (#258); a build can no
-longer share the runner's source address (#260); a failed build names
-its step, exit and duration on the CLI and the web (#266).
+longer share the runner's source address, and reaches no port on the
+runner's host but the forge's public 22, 80 and 443 (#260); a failed
+build names its step, exit and duration on the CLI and the web (#266).
 
 **Architecture:** The claim payload gains an explicit `trusted` flag and
-the instance's public ssh destination. The runner picks the build home
-by trust (persistent per repository for trusted builds, fresh and
-removed for untrusted ones), keeps a loopback runner's builds off the
-host's loopback, and reports the failed step on `runner done`. The
-server refuses `ci/` contexts in `status set`, restricts tree and commit
-reuse to trusted builds on the same image, adds a `required_contexts`
-repository setting that `MergeGates` treats as pending until reported,
-stores the failed step and reason on the build, and cuts the log at its
-`$ <step>` lines for `build log --step` and the build page.
+the instance's public ssh destination (with the port when it is not
+22). The runner picks the build home by trust (persistent per
+repository for trusted builds, fresh and removed for untrusted ones),
+keeps a loopback runner's builds off the host's loopback, and reports
+the failed step on `runner done`. An nftables table on the runner host,
+loaded by a oneshot unit the runner service requires, limits what the
+runner's uid may reach on the host itself. The server refuses `ci/`
+contexts in `status set`, restricts tree and commit reuse to trusted
+builds on the same declared image, adds a `required_contexts`
+repository setting that turns `require_checks` on and that `MergeGates`
+treats as pending until reported, stores the failed step and reason on
+the build, and cuts the log at its `$ <step>` lines for `build log
+--step` and the build page.
 
 **Tech Stack:** Go, SQLite (hand-written SQL), `html/template`, rootless
-podman with pasta, systemd.
+podman with pasta, nftables, systemd.
 
 **Spec:** the issues themselves: krz/gitbay#255, #258, #260, #266 (texts
 in the session's `issues.txt`), plus the decisions recorded under
@@ -102,11 +107,30 @@ in the session's `issues.txt`), plus the decisions recorded under
   untrusted queue: a fork head that lands on a branch by fast-forward is
   built again as trusted. `required_contexts` is a list in the
   repository's settings JSON (no migration), set by
-  `repo settings require-contexts <owner/name> [<context>...]` (no
-  contexts clears it); it applies only while `require_checks` is on, and
-  the command says so on stderr when it is off. A missing required
-  context makes the combined check `pending` and appears as
-  `<context>=missing` in the unmet sentence and in `checks_missing`.
+  `repo settings require-contexts <owner/name> [<context>...]`. Setting
+  a non-empty list also turns `require_checks` on, in the same settings
+  update; setting it empty clears the list and leaves `require_checks`
+  as it was. `require-checks off` keeps the list, which then does
+  nothing until the gate is on again. `repo settings show` prints
+  `require checks` and `required contexts` side by side (today it prints
+  neither), and on the web settings page the required-checks box is
+  ticked after contexts are saved and its hint lists them. The gate
+  itself only ever reads `require_checks`. A missing required context
+  makes the combined check `pending` and appears as `<context>=missing`
+  in the unmet sentence and in `checks_missing`.
+- **#258, default image.** Tree reuse keys on the job's declared
+  `image:`. A job naming none is stored with `image = ''` and matches
+  other such builds whatever the runner defaulted to; bumping a runner's
+  `-image` does not invalidate them. This is documented on the CI page
+  rather than fixed. Reuse is decided at queue time in `queueJobs`,
+  before any runner is chosen, and the default image belongs to
+  whichever runner claims the build: bay1 and the laptop runner already
+  have different defaults. Reporting the resolved image on claim or
+  `runner done` would record it after the fact, but a queue-time
+  comparison would still have nothing to compare against, so jobs
+  without an image would never be reused at all. The remedy is on the
+  repository's side (name the image in `ci.yml`) or the operator's
+  (`build trigger`, which never reuses, after bumping `-image`).
 - **#260.** Reading the code: the bay1 runner polls `git@127.0.0.1`
   (`deploy/gitbay-runner.override.conf:78`); `buildSSH`
   (`cmd/gitbay-runner/main.go:471-486`) sends podman builds to
@@ -119,25 +143,57 @@ in the session's `issues.txt`), plus the decisions recorded under
   runner stays on loopback and its builds lose loopback: under podman,
   when the runner's remote is loopback, containers run with
   `--network pasta:--no-map-gw`, and `GITBAY_SSH` is the instance's
-  public destination (`git@<site host>`), which the server sends in the
-  claim as `ssh`. A build then reaches the host only as an internet
-  client does. **Egress policy:** builds, trusted or not, keep outbound
-  internet access (a fork's merge request to a Go repository must fetch
-  its modules); they get no host loopback; they reach the forge's
-  public ports (22, 80, 443, and the admin sshd on 2222) exactly as
-  anyone on the internet can. No nftables rules. `-isolation none`
-  builds run on the host and share its loopback; that mode is for
-  instances where every repository is trusted and says so already.
-- **Finding for #260, recorded for the runbook.** On gitbay.org the
-  limiter's failure count is unreachable by an unknown key:
-  `authenticate` admits an unknown key as an anonymous `register`
-  session whenever `registration.mode` is not `closed`
-  (`internal/sshd/sshd.go:136-143`), and `fail` is only called on the
-  closed path (`sshd.go:145`). gitbay.org runs `registration = "open"`,
-  so the throttling test on bay1 is expected to show no throttling at
-  all; the separation matters for closed-registration instances. The
-  runbook still measures source addresses on bay1, which is the part of
-  #260 that holds on every instance.
+  public destination, which the server sends in the claim as `ssh`. A
+  build then reaches the host only as an internet client does.
+- **#260, `GITBAY_SSH` form.** `git@<site host>` when `[ssh] port` is 22
+  (or unset, which config validation treats as 22), and
+  `git@<site host>:<port>` otherwise, built with `net.JoinHostPort` so
+  an IPv6 literal is bracketed. hutch and orgo build
+  `ssh://$GITBAY_SSH/<owner>/<name>.git`, which is a valid URL in both
+  forms, so nothing changes for them on 22 and they work unchanged on
+  another port. A script that runs a command uses `ssh
+  ssh://$GITBAY_SSH …`, which OpenSSH accepts with or without the port;
+  the Users page says so. The port is the daemon's `[ssh] port`, the
+  one it listens on; an instance behind a port-mapping NAT is not
+  modelled.
+- **#260, host egress.** Under rootless podman with pasta, a build's
+  connections are made by pasta on the host from sockets owned by the
+  runner's uid (`ci-runner`), the same uid the runner's own ssh runs as.
+  An nftables table (`deploy/gitbay-runner-egress.nft`, loaded by
+  `gitbay-runner-egress.service`, which `gitbay-runner.service`
+  requires) matches output packets with `meta skuid "ci-runner"` that
+  leave through `lo` — every packet to one of the host's own addresses,
+  loopback or public, does — and allows only 127.0.0.1:22 (the runner's
+  poll, clone and log stream), port 53 on loopback (the host resolver
+  pasta forwards a build's DNS to), and 22, 80 and 443 on the public
+  addresses. Everything else on the host is rejected: the admin sshd on
+  2222 on every address, and every service bound to loopback. Traffic
+  to other hosts is not matched, so outbound internet stays open (a
+  fork's merge request to a Go repository must fetch its modules). The
+  rule applies to all builds, trusted and untrusted, and to
+  `-isolation none` builds too, since they run as the same uid. uid
+  alone cannot tell a build from its runner, so 127.0.0.1:22 stays open
+  to the uid; `--no-map-gw` is what keeps builds off loopback. The two
+  are separate layers and both ship. The runner does not start without
+  the rule (`Requires=`), following `runner-podman-setup.sh`'s rule that
+  a host that is not ready fails rather than runs builds unconfined;
+  `make deploy-runner` loads the rule and checks, as `ci-runner`, that
+  127.0.0.1:22 answers and 2222 does not, before restarting the runner.
+  The laptop runner (macOS, brew) is not covered.
+- **Finding for #260.** On gitbay.org the limiter's failure count is
+  unreachable by an unknown key: `authenticate` admits an unknown key as
+  an anonymous `register` session whenever `registration.mode` is not
+  `closed` (`internal/sshd/sshd.go:139-144`), and `fail` is only called
+  on the closed path (`sshd.go:145`). With registration closed,
+  `authenticate` checks `allow` before it looks at the key
+  (`sshd.go:123-129`), so once an address has `ssh_auth_rate` failures
+  in the window every key from it is refused, the runner's included, and
+  `success` (`sshd.go:149`) is never reached to clear the count; below
+  the limit a success clears it. A unit test in `internal/sshd` records
+  both modes (Task 3.3). No throttling test runs on production; the
+  runbook measures, from inside a scratch build, the source address the
+  forge sees and that 2222 and 127.0.0.1 are unreachable, and #260
+  closes when that is recorded on the CI wiki page.
 - **#266.** Duration is not stored: `Build.Elapsed()`
   (`internal/store/builds.go:420`) already derives it from `started_at`
   and `finished_at`. Migration 0065 adds `failed_step` (1-based, 0 for
@@ -161,7 +217,7 @@ in the session's `issues.txt`), plus the decisions recorded under
 |---|---|---|---|---|
 | 1 | `ci-untrusted-home` | #255 | — | — |
 | 2 | `ci-status-trust` | #258 | — | — |
-| 3 | `runner-source-address` | Ref #260 (closed by the runbook result commit) | — | Part 1 merged (both edit `runRunnerNext`'s payload and `stepEnv`) |
+| 3 | `runner-source-address` | Ref #260 (closed by the runbook result commit on the CI page) | — | Part 1 merged (both edit `runRunnerNext`'s payload and `stepEnv`) |
 | 4 | `build-failure-report` | #266 | 0065 | Part 1 merged (both change `run()`); Part 3 merged (both change `runStepsPodman`) |
 
 #255 goes first. Parts 1–4 land and deploy in order; each runner deploy
@@ -179,10 +235,15 @@ Other plans (all `docs/plans/2026-09-27-*.md`):
 - Plan 5 (web-ux, #261) covers documentation drift. Two items seen here
   and left alone: `deploy/gitbay-runner.override.conf:27-30` names
   `cmc/ci-smoke`, which no longer exists; `cmd/gitbay-runner/main.go:513`
-  repeats its comment line.
+  repeats its comment line. Part 3 adds a `[Unit]` section at the top of
+  the same drop-in; if plan 5 edits its comment, whoever lands second
+  rebases.
 - Plan 1 (credentials-and-sessions, #256) closes a removed key's
   connections; the runner's `runner log` session is one such
-  connection, and no code here depends on it.
+  connection, and no code here depends on it. Plan 1's key expiry
+  (#277) may add a check to `authenticate`; Part 3's sshd test uses an
+  unexpiring key and asserts only the limiter's behaviour, so it holds
+  either way.
 
 ## File map
 
@@ -192,7 +253,7 @@ Other plans (all `docs/plans/2026-09-27-*.md`):
 | `internal/control/buildlog.go` (create) | 4 | `LogSection`, `SplitBuildLog`, `FailedSection`, `tailLines` |
 | `internal/control/status.go` | 2 | `ci/` refusal |
 | `internal/control/mr.go`, `output.go` | 2 | `require-contexts`, `MergeGates`, `GatesOut.ChecksMissing` |
-| `internal/control/repo.go` | 2 | `repo settings show` prints required contexts |
+| `internal/control/repo.go` | 2 | `repo settings show` prints require checks and required contexts |
 | `internal/store/builds.go` | 2, 4 | trust and image on reuse; failed step columns |
 | `internal/store/repos.go` | 2 | `RepoSettings.RequiredContexts` |
 | `internal/store/migrations/0065_build_failure.{up,down}.sql` | 4 | columns |
@@ -204,6 +265,9 @@ Other plans (all `docs/plans/2026-09-27-*.md`):
 | `internal/web/templates/build.html`, `mr.html`, `settings.html` | 2, 4 | steps, gates row, form |
 | `internal/web/static/style.css` | 4 | `pre.buildlog` wraps; step folds |
 | `e2e/readonly_test.go`, `e2e/mrweb_test.go`, `e2e/status_test.go`, `e2e/settingsweb_test.go`, `e2e/ci_test.go` | 2, 4 | contexts off `ci/`; refusal; settings; failed step |
+| `internal/sshd/sshd_test.go` | 3 | limiter behaviour by registration mode |
+| `deploy/gitbay-runner-egress.nft` (create), `deploy/gitbay-runner-egress.service` (create), `deploy/runner-egress-check.sh` (create) | 3 | host egress rule, its unit, the post-load check |
+| `deploy/gitbay-runner.override.conf`, `deploy/runner-podman-setup.sh`, `Makefile` | 3 | runner requires the rule; nftables installed; `deploy-runner` ships, loads and checks it |
 | `.gitbay/wiki/…` | all | as listed per task |
 
 ---
@@ -930,8 +994,9 @@ Replace `internal/store/builds.go:453-477` with:
 // than a commit: a rebase that changes nothing in the tree has already
 // been built (#177). Only a trusted build on the image the job names
 // counts: a fork's result, or one from an image the job has left, does
-// not stand for the repository's own (#258). An empty tree never
-// matches.
+// not stand for the repository's own (#258). A job naming no image
+// matches builds that named none, whichever default the runner used;
+// the CI wiki page says so. An empty tree never matches.
 func (s *Store) SuccessBuildForTree(repoID int64, tree, job, image string) (Build, bool, error) {
 	if tree == "" {
 		return Build{}, false, nil
@@ -1000,14 +1065,20 @@ Ref #258"
 - Modify: `internal/control/checksgate_test.go` (helper refactor, two tests)
 - Test: `internal/control/mr_test.go` (append)
 - Modify: `cmd/gitbay/main.go:580` (add a `pass`), `cmd/gitbay/summaries_gen.go` (regenerated)
-- Modify: `internal/httpd/settings.go:106-107`, `:228-229`; `internal/web/templates/settings.html:73-78`; `internal/web/templates/mr.html:124`
-- Modify: `internal/httpd/mrpage_test.go` (`TestMRGatesRender`), `e2e/settingsweb_test.go`
+- Modify: `internal/httpd/settings.go:106-107`, `:228-229`; `internal/web/templates/settings.html:73-78` (the require-checks form, its hint at line 75); `internal/web/templates/mr.html:124`
+- Modify: `internal/httpd/mrpage_test.go` (`TestMRGatesRender`), `e2e/settingsweb_test.go:58`
 
 **Interfaces:**
 - Produces:
   - `RepoSettings.RequiredContexts []string` (`json:"required_contexts,omitempty"`)
   - `GatesOut.ChecksMissing []string` (`json:"checks_missing,omitempty"`)
-  - command `repo settings require-contexts <owner/name> [<context>...]`
+  - command `repo settings require-contexts <owner/name> [<context>...]`:
+    a non-empty list is stored and sets `RequireChecks = true` in the
+    same update; an empty list clears the contexts and leaves
+    `RequireChecks` alone.
+  - `repo settings show` human output gains `require checks` and
+    `required contexts` rows (JSON already carries `require_checks` and
+    gains `required_contexts`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1122,42 +1193,88 @@ func TestRequiredContextsReportedPass(t *testing.T) {
 }
 ```
 
-Append to `internal/control/mr_test.go` (add imports `slices`,
-`protocol`, `store` if absent):
+Append to `internal/control/mr_test.go` (add `"slices"` to its imports;
+`mrTestCtx` is that file's helper):
 
 ```go
-// require-contexts stores a deduplicated list, refuses a context with
-// whitespace, and clears with no contexts (#258).
+// require-contexts stores a deduplicated list and turns require_checks
+// on with it; an empty list clears the contexts and leaves
+// require_checks as it was. A context with whitespace is refused (#258).
 func TestRequireContextsSetsAndClears(t *testing.T) {
 	st, repo, uid := newQueueTestRepo(t)
 	alice := store.User{ID: uid, Username: "alice"}
-	run := func(args ...string) int {
+	dispatch := func(args ...string) int {
 		t.Helper()
-		c, _ := pruneCtx(st, t.TempDir(), alice)
-		return Dispatch(c, append([]string{"repo", "settings", "require-contexts", repo.Path()}, args...))
+		c, _, _ := mrTestCtx(st, alice)
+		return Dispatch(c, args)
 	}
-	if code := run("lint", "ext/deploy", "lint"); code != protocol.ExitOK {
+	contexts := func(names ...string) int {
+		t.Helper()
+		return dispatch(append([]string{"repo", "settings", "require-contexts", repo.Path()}, names...)...)
+	}
+	settings := func() store.RepoSettings {
+		t.Helper()
+		got, err := st.RepoByID(repo.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.Settings
+	}
+
+	if settings().RequireChecks {
+		t.Fatal("require_checks on in a new repository")
+	}
+	if code := contexts("lint", "ext/deploy", "lint"); code != protocol.ExitOK {
 		t.Fatalf("set: exit %d", code)
 	}
-	got, _ := st.RepoByID(repo.ID)
-	if !slices.Equal(got.Settings.RequiredContexts, []string{"lint", "ext/deploy"}) {
-		t.Fatalf("stored %v", got.Settings.RequiredContexts)
+	if s := settings(); !slices.Equal(s.RequiredContexts, []string{"lint", "ext/deploy"}) || !s.RequireChecks {
+		t.Fatalf("stored %v, require_checks %v; want [lint ext/deploy], on", s.RequiredContexts, s.RequireChecks)
 	}
-	if code := run("bad context"); code != protocol.ExitUsage {
+	if code := contexts("bad context"); code != protocol.ExitUsage {
 		t.Fatalf("a context with a space: exit %d", code)
 	}
-	if code := run(); code != protocol.ExitOK {
+	if code := contexts(); code != protocol.ExitOK {
 		t.Fatalf("clear: exit %d", code)
 	}
-	if got, _ := st.RepoByID(repo.ID); len(got.Settings.RequiredContexts) != 0 {
-		t.Fatalf("not cleared: %v", got.Settings.RequiredContexts)
+	if s := settings(); len(s.RequiredContexts) != 0 || !s.RequireChecks {
+		t.Fatalf("after clearing: contexts %v, require_checks %v; want none, still on", s.RequiredContexts, s.RequireChecks)
+	}
+	if code := dispatch("repo", "settings", "require-checks", repo.Path(), "off"); code != protocol.ExitOK {
+		t.Fatalf("require-checks off: exit %d", code)
+	}
+	if code := contexts(); code != protocol.ExitOK {
+		t.Fatalf("clear again: exit %d", code)
+	}
+	if settings().RequireChecks {
+		t.Fatal("clearing the list turned require_checks on")
+	}
+}
+
+// settings show prints the checks gate beside the contexts it waits for,
+// so a list that turned the gate on is visible where the gate is (#258).
+func TestSettingsShowRequiredContexts(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	alice := store.User{ID: uid, Username: "alice"}
+	c, _, _ := mrTestCtx(st, alice)
+	if code := Dispatch(c, []string{"repo", "settings", "require-contexts", repo.Path(), "ext/deploy", "lint"}); code != protocol.ExitOK {
+		t.Fatalf("require-contexts: exit %d", code)
+	}
+	c, out, _ := mrTestCtx(st, alice)
+	if code := Dispatch(c, []string{"repo", "settings", "show", repo.Path()}); code != protocol.ExitOK {
+		t.Fatalf("settings show: exit %d", code)
+	}
+	got := strings.Join(strings.Fields(out.String()), " ")
+	for _, want := range []string{"require checks true", "required contexts ext/deploy, lint"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("settings show lacks %q:\n%s", want, out.String())
+		}
 	}
 }
 ```
 
 - [ ] **Step 2: Run them and see them fail**
 
-Run: `go test ./internal/control -run 'TestRequire|TestRequiredContext' -count=1`
+Run: `go test ./internal/control -run 'TestRequire|TestRequiredContext|TestSettingsShowRequiredContexts' -count=1`
 Expected: build failure (`s.RequiredContexts undefined`).
 
 - [ ] **Step 3: Store and output types**
@@ -1167,7 +1284,8 @@ Expected: build failure (`s.RequiredContexts undefined`).
 ```go
 	RequireChecks        bool     `json:"require_checks,omitempty"`
 	// RequiredContexts are statuses require_checks waits for whether or
-	// not they have reported; one that has not is pending (#258).
+	// not they have reported; one that has not is pending. Setting a
+	// non-empty list turns RequireChecks on (#258).
 	RequiredContexts     []string `json:"required_contexts,omitempty"`
 ```
 
@@ -1184,8 +1302,8 @@ Registration, after `require-checks` at `mr.go:49`:
 
 ```go
 	register(Command{Path: []string{"repo", "settings", "require-contexts"},
-		Summary:  "name the statuses require-checks waits for, reported or not",
-		Usage:    "repo settings require-contexts <owner/name> [<context>...] (none clears)",
+		Summary:  "name the statuses the checks gate waits for, and turn the gate on",
+		Usage:    "repo settings require-contexts <owner/name> [<context>...] (none clears the list)",
 		Examples: []string{"repo settings require-contexts krz/gitbay ci/build ci/test"},
 		Run:      runRequireContexts})
 ```
@@ -1217,19 +1335,27 @@ func runRequireContexts(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequiredContexts = contexts })
+	// Naming contexts asks for the gate, so it turns require_checks on in
+	// the same update. Clearing the list leaves the gate as it was.
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) {
+		s.RequiredContexts = contexts
+		if len(contexts) > 0 {
+			s.RequireChecks = true
+		}
+	})
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
-		if len(contexts) == 0 {
-			fmt.Fprintf(w, "required contexts cleared on %s\n", repo.Path())
+		if len(contexts) > 0 {
+			fmt.Fprintf(w, "required contexts on %s: %s; require_checks on\n", repo.Path(), strings.Join(contexts, ", "))
 			return
 		}
-		fmt.Fprintf(w, "required contexts on %s: %s\n", repo.Path(), strings.Join(contexts, ", "))
-		if !s.RequireChecks {
-			fmt.Fprintf(c.Stderr, "they apply once require-checks is on: gitbay repo settings require-checks %s on\n", repo.Path())
+		gate := "off"
+		if s.RequireChecks {
+			gate = "on"
 		}
+		fmt.Fprintf(w, "required contexts cleared on %s; require_checks %s\n", repo.Path(), gate)
 	})
 }
 ```
@@ -1243,7 +1369,8 @@ the end of `if set.RequireChecks { … }`) with:
 	// Checks: with require_checks, every status the head carries must be
 	// green, a head something was going to report on must carry some, and
 	// every required context must have reported: one that has not is
-	// pending whatever the others say (#258).
+	// pending whatever the others say (#258). Setting contexts turns
+	// require_checks on; turned off again, the list is kept and unread.
 	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
 	if err != nil {
 		return g, err
@@ -1283,11 +1410,19 @@ the end of `if set.RequireChecks { … }`) with:
 	}
 ```
 
-`repo.go:710-717`, add a field after `"protected tags"`:
+`repo.go:710-717`, the `repo settings show` fields: today they print
+neither the checks gate nor anything about it. Add two rows after
+`"require mr"` (line 713), so the gate and the list that turned it on
+read together:
 
 ```go
+			"require mr", strconv.FormatBool(repo.Settings.RequireMR),
+			"require checks", strconv.FormatBool(repo.Settings.RequireChecks),
 			"required contexts", strings.Join(repo.Settings.RequiredContexts, ", "),
 ```
+
+(`fields` skips a row whose value is empty, so a repository with no
+contexts shows no `required contexts` row.)
 
 - [ ] **Step 6: Run the control tests**
 
@@ -1320,13 +1455,20 @@ and in `fieldLabel` after `require-checks`:
 		return "required contexts"
 ```
 
-`internal/web/templates/settings.html`, after the `require-checks`
-form (line 78):
+`internal/web/templates/settings.html`: the require-checks hint (line
+75) names the contexts the gate waits for, so a box ticked by saving
+contexts says why:
+
+```html
+  <div><label for="require-checks">Required checks</label><p class="hint">Requires CI to succeed.{{with .Repo.Settings.RequiredContexts}} Also waits for {{range $i, $c := .}}{{if $i}}, {{end}}<code>{{$c}}</code>{{end}} until they report{{if not $.Repo.Settings.RequireChecks}}, once this is on{{end}}.{{end}}</p></div>
+```
+
+and after the `require-checks` form (line 78):
 
 ```html
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="require-contexts">
-  <div><label for="contexts">Required contexts</label><p class="hint">Statuses the checks gate waits for until they report, separated by spaces. Applies with required checks on.</p></div>
+  <div><label for="contexts">Required contexts</label><p class="hint">Statuses the checks gate waits for until they report, separated by spaces. Saving any turns required checks on; saving none leaves it as it is.</p></div>
   <div><input type="text" id="contexts" name="contexts" value="{{range $i, $c := .Repo.Settings.RequiredContexts}}{{if $i}} {{end}}{{$c}}{{end}}" autocomplete="off"></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
@@ -1348,15 +1490,23 @@ first `for` loop:
 	}
 ```
 
-In `e2e/settingsweb_test.go`, after
-`post(url.Values{"field": {"require-checks"}, …})`:
+In `e2e/settingsweb_test.go`, replace line 58,
+`post(url.Values{"field": {"require-checks"}, "require-checks": {"on"}})`,
+with a contexts post, so the `"require_checks":true` the test already
+expects from `settings show --json` (line 69) now comes from the
+contexts turning the gate on:
 
 ```go
-	post(url.Values{"field": {"require-contexts"}, "contexts": {"ext/deploy lint"}})
+	// Saving required contexts turns the checks gate on, and the page
+	// shows it ticked with the contexts in its hint (#258).
+	if body := post(url.Values{"field": {"require-contexts"}, "contexts": {"ext/deploy lint"}}); !strings.Contains(body, `id="require-checks" name="require-checks" value="on" checked`) ||
+		!strings.Contains(body, `Also waits for <code>ext/deploy</code>, <code>lint</code> until they report.`) {
+		t.Fatalf("required contexts did not show as turning required checks on:\n%s", body)
+	}
 ```
 
 and add `` `"required_contexts":["ext/deploy","lint"]` `` to the
-`settings show --json` want list.
+`settings show --json` want list at line 69.
 
 Run: `go test ./internal/httpd ./internal/web -count=1 && go test ./e2e -run TestRepoSettingsWeb -count=1`
 Expected: PASS.
@@ -1365,7 +1515,7 @@ Expected: PASS.
 
 ```bash
 git add internal/store/repos.go internal/control cmd/gitbay internal/httpd internal/web e2e/settingsweb_test.go
-git commit -S -m "repo settings: required contexts, pending until reported
+git commit -S -m "repo settings: required contexts turn the checks gate on, pending until reported
 
 Ref #258"
 ```
@@ -1391,8 +1541,11 @@ passed. Report under another prefix, such as =ext/=.
 =repo settings require-contexts <repo> ext/deploy ci/test= names
 statuses the checks gate waits for whether or not they have reported:
 one that has not is =pending=, and =mr show= lists it as
-=ext/deploy=missing=. It applies while =require-checks= is on; with no
-contexts it clears the list.
+=ext/deploy=missing=. Naming any context turns =require-checks= on;
+with no contexts the command clears the list and leaves
+=require-checks= as it was. =require-checks off= keeps the list, which
+waits for nothing until the gate is on again. =repo settings show=
+prints both.
 ```
 
 - [ ] **Step 2: CI.org**
@@ -1401,13 +1554,20 @@ In the *Dedupe* bullet, after "…naming the build it came from (#177).",
 add: "Only a trusted build counts, and for tree reuse only one on the
 image the job names: a fork's green build does not stand for the
 repository's own, so its commit is built again when it lands on a
-branch (#258)."
+branch (#258). A job that names no =image:= is compared as naming
+none: its reuse does not notice the runner's default image changing,
+because reuse is decided when the push is queued, before any runner
+claims the build, and runners can differ in their default. Name the
+image in =ci.yml= to tie reuse to it; after an operator changes a
+runner's =-image=, =build trigger= builds a job afresh, since a
+triggered build is never reused."
 
 - [ ] **Step 3: Users.org**
 
 After "…a =ci/<job>= commit status, which =repo settings
 require-checks= can gate merges on." add: "=repo settings
-require-contexts= names statuses the gate waits for until they report."
+require-contexts= names statuses the gate waits for until they report,
+and turns the gate on."
 
 - [ ] **Step 4: Parity.org**
 
@@ -1459,57 +1619,83 @@ with `--strategy ff` once CI is green; delete the branch both places.
 
 ---
 
-# Part 3: separate the runner's source address from its builds (branch `runner-source-address`, #260)
+# Part 3: separate the runner's source address from its builds, and limit what builds reach on its host (branch `runner-source-address`, #260)
 
 ### Task 3.1: the claim carries the instance's public ssh destination
 
 **Files:**
-- Modify: `internal/control/build.go` (the payload from Task 1.1; a helper beside `runRunnerNext`)
+- Modify: `internal/control/build.go` (imports; the payload from Task 1.1; a helper beside `runRunnerNext`)
 - Test: `internal/control/runnernext_test.go` (append)
 
 **Interfaces:**
-- Produces: `runner next --json` payload `"ssh": "git@<site host>"`, omitted when `site_url` is empty.
+- Produces: `runner next --json` payload `"ssh": "git@<site host>"`, or
+  `"git@<site host>:<port>"` when `[ssh] port` is neither 0 nor 22;
+  omitted when `site_url` is empty.
 
 - [ ] **Step 1: Write the failing test**
 
 ```go
 // A build on the daemon's own host is given the public destination, not
-// the loopback address its runner polls (#260).
+// the loopback address its runner polls. The port rides along only when
+// it is not 22, so ssh://$GITBAY_SSH/<owner>/<name>.git is a valid URL
+// either way (#260).
 func TestRunnerNextCarriesPublicSSH(t *testing.T) {
 	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
-	if _, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", true); err != nil {
-		t.Fatal(err)
-	}
-	c, out := runnerCtx(st, uid, root) // site_url https://x.test
-	c.JSON = true
-	if code := runRunnerNext(c, nil); code != protocol.ExitOK {
-		t.Fatalf("runner next: exit %d, output:\n%s", code, out.String())
-	}
-	if !strings.Contains(out.String(), `"ssh":"git@x.test"`) {
-		t.Fatalf("claim lacks the public destination:\n%s", out.String())
+	for _, tc := range []struct {
+		port int
+		want string
+	}{
+		{0, `"ssh":"git@x.test"`},
+		{22, `"ssh":"git@x.test"`},
+		{2022, `"ssh":"git@x.test:2022"`},
+	} {
+		if _, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", true); err != nil {
+			t.Fatal(err)
+		}
+		c, out := runnerCtx(st, uid, root) // site_url https://x.test
+		c.Cfg.SSH.Port = tc.port
+		c.JSON = true
+		if code := runRunnerNext(c, nil); code != protocol.ExitOK {
+			t.Fatalf("port %d: runner next: exit %d, output:\n%s", tc.port, code, out.String())
+		}
+		if !strings.Contains(out.String(), tc.want) {
+			t.Fatalf("port %d: claim lacks %s:\n%s", tc.port, tc.want, out.String())
+		}
 	}
 }
 ```
 
+Each pass queues one build and claims it, as in Task 1.1's test.
+`runnerCtx` builds its `config.Config` by hand, so `SSH.Port` starts at
+0; config validation refuses 0 on a real instance (`config.go:367`),
+and 0 is read as 22.
+
 - [ ] **Step 2: Run it and see it fail**
 
 Run: `go test ./internal/control -run TestRunnerNextCarriesPublicSSH -count=1`
-Expected: FAIL, `claim lacks the public destination`.
+Expected: FAIL, `port 0: claim lacks "ssh":"git@x.test"`.
 
 - [ ] **Step 3: Implement**
 
-Add after `maxOrphanSkip`:
+Add `"net"` to `build.go`'s imports (`strconv` is already there), and
+after `maxOrphanSkip`:
 
 ```go
 // publicSSH is the instance's ssh destination as anyone outside reaches
 // it. A runner on the daemon's own host polls over loopback and hands
 // its builds this instead, so no build connects from the runner's source
-// address (#260). Empty when site_url is not set.
+// address (#260). The port is added only when it is not 22: hutch and
+// orgo build ssh://$GITBAY_SSH/... URLs, valid in both forms. Empty when
+// site_url is not set.
 func publicSSH(c *Ctx) string {
-	if host := c.Cfg.SiteHost(); host != "" {
-		return "git@" + host
+	host := c.Cfg.SiteHost()
+	if host == "" {
+		return ""
 	}
-	return ""
+	if p := c.Cfg.SSH.Port; p != 0 && p != 22 {
+		return "git@" + net.JoinHostPort(host, strconv.Itoa(p))
+	}
+	return "git@" + host
 }
 ```
 
@@ -1560,7 +1746,8 @@ Replace `TestStepEnvCarriesInstanceAddress` (`env_test.go:190-212`) with:
 // A build that talks back to the instance needs an address that works
 // from where it runs. A runner polling over loopback keeps its podman
 // builds off the host's loopback, so they get the instance's public
-// destination from the claim; any other remote is used as it is (#260).
+// destination from the claim, port included when it is not 22; any other
+// remote is used as it is (#260).
 func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 	env := stepEnv(job{}, "/tmp/buildhome", "git@gitbay.org")
 	if !containsEnv(env, "GITBAY_SSH=git@gitbay.org") {
@@ -1569,6 +1756,7 @@ func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 	for _, tc := range []struct{ remote, isolation, public, want string }{
 		{"git@127.0.0.1", isolationNone, "git@gitbay.org", "git@127.0.0.1"},
 		{"git@127.0.0.1", isolationPodman, "git@gitbay.org", "git@gitbay.org"},
+		{"git@127.0.0.1", isolationPodman, "git@gitbay.test:2022", "git@gitbay.test:2022"},
 		{"git@localhost", isolationPodman, "git@gitbay.org", "git@gitbay.org"},
 		{"git@127.0.0.1", isolationPodman, "", "git@127.0.0.1"},
 		{"git@gitbay.org", isolationPodman, "git@other.test", "git@gitbay.org"},
@@ -1648,7 +1836,10 @@ func (r *runner) buildSSH(public string) string {
 // source address, so a build sharing the runner's could throttle its
 // polling (#260). --no-map-gw removes the mapping: the build reaches the
 // host only at its public address, as any client on the internet does,
-// and keeps its outbound access.
+// and keeps its outbound access. The host's nftables table
+// (deploy/gitbay-runner-egress.nft) then limits it to 22, 80 and 443
+// there; it cannot tell a build from the runner by uid, so it leaves
+// 127.0.0.1:22 open, and this flag is what keeps builds off it.
 func (r *runner) buildNetwork() []string {
 	if !r.loopbackRemote() {
 		return nil
@@ -1679,13 +1870,413 @@ git commit -S -m "runner: builds off the host's loopback when the runner polls o
 Ref #260"
 ```
 
-### Task 3.3: egress policy in the wiki, and the MR
+### Task 3.3: the limiter's behaviour, by registration mode
+
+This test records what the code does today (see "Finding for #260"
+under Decisions), so it passes on its first run. It is the evidence the
+issue's on-production throttling test was meant to give, without
+touching production. If it fails, the limiter differs from what
+Decisions and the wiki say: stop and correct that text, not the test.
 
 **Files:**
-- Modify: `.gitbay/wiki/Threat-Model.org` ("The CI runner", after the *Images* bullet)
-- Modify: `.gitbay/wiki/CI.org` (new section before "* The table")
-- Modify: `.gitbay/wiki/Users.org:550-555` (the `GITBAY_SSH` sentence)
-- Modify: `.gitbay/wiki/Architecture/07-CI-and-Supply-Chain.org` (Network row), `04-Trust-Boundaries.org` (TB7), `09-Controls.org:91`
+- Test: `internal/sshd/sshd_test.go` (append; every import it needs is already in the file)
+
+**Interfaces:**
+- Consumes: `(*Server).authenticate`, `rateLimiter.seen` (package-internal).
+
+- [ ] **Step 1: Write the test**
+
+Append to `internal/sshd/sshd_test.go`:
+
+```go
+// authMeta is the connection metadata authenticate reads: only the
+// remote address.
+type authMeta struct {
+	ssh.ConnMetadata
+	addr net.Addr
+}
+
+func (m authMeta) RemoteAddr() net.Addr { return m.addr }
+
+func authKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// authServer is a Server holding what authenticate uses: a store with a
+// runner account's key, the registration mode, and a limiter of three
+// failures a minute.
+func authServer(t *testing.T, mode string) (*Server, ssh.PublicKey) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "gitbay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("ci", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := authKey(t)
+	if err := st.AddSSHKey(uid, ssh.FingerprintSHA256(runner), runner.Type(), runner.Marshal(), "runner", ""); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.Registration.Mode = mode
+	return &Server{cfg: cfg, st: st, authLimiter: newRateLimiter(3, time.Minute)}, runner
+}
+
+var (
+	fromLoopback = authMeta{addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}}
+	fromPublic   = authMeta{addr: &net.TCPAddr{IP: net.IPv4(203, 0, 113, 7), Port: 40000}}
+)
+
+// With registration closed an unknown key counts against its address.
+// Below the limit a known key's success clears the count. At the limit
+// authenticate refuses before it looks at the key, so the runner's own
+// key from that address is refused too and its success never runs to
+// clear anything, until the window passes. Another address is not
+// affected. This is why a build must not share the runner's source
+// address (#260).
+func TestAuthLockoutHoldsAgainstTheRunnersKey(t *testing.T) {
+	s, runner := authServer(t, "closed")
+	stranger := authKey(t)
+	failTimes := func(n int) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			if _, err := s.authenticate(fromLoopback, stranger); err == nil {
+				t.Fatal("unknown key admitted with registration closed")
+			}
+		}
+	}
+
+	failTimes(2)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner below the limit: %v", err)
+	}
+	failTimes(2)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner after its success cleared the count: %v", err)
+	}
+
+	failTimes(3)
+	for i := 0; i < 2; i++ {
+		if _, err := s.authenticate(fromLoopback, runner); err == nil || !strings.Contains(err.Error(), "too many") {
+			t.Fatalf("attempt %d from a locked-out address: %v, want refused", i+1, err)
+		}
+	}
+	if _, err := s.authenticate(fromPublic, runner); err != nil {
+		t.Fatalf("another address was locked out too: %v", err)
+	}
+
+	s.authLimiter.seen["127.0.0.1"].start = time.Now().Add(-2 * time.Minute)
+	if _, err := s.authenticate(fromLoopback, runner); err != nil {
+		t.Fatalf("runner after the window passed: %v", err)
+	}
+}
+
+// With registration open or by invite, an unknown key is admitted to run
+// register and never counts, so no number of unknown-key attempts locks
+// the runner's address out. gitbay.org runs open registration (#260).
+func TestAuthUnknownKeyCountsOnlyWhenClosed(t *testing.T) {
+	for _, mode := range []string{"open", "invite"} {
+		s, runner := authServer(t, mode)
+		for i := 0; i < 10; i++ {
+			p, err := s.authenticate(fromLoopback, authKey(t))
+			if err != nil || p.Extensions["anon-key"] == "" {
+				t.Fatalf("%s: unknown key %d: %v %+v", mode, i+1, err, p)
+			}
+		}
+		if _, err := s.authenticate(fromLoopback, runner); err != nil {
+			t.Fatalf("%s: runner refused after unknown keys: %v", mode, err)
+		}
+	}
+}
+```
+
+- [ ] **Step 2: Run it**
+
+Run: `go vet ./internal/sshd && go test ./internal/sshd -run 'TestAuth' -count=1`
+Expected: PASS.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add internal/sshd/sshd_test.go
+git commit -S -m "sshd: test the auth limiter's lockout by registration mode
+
+Ref #260"
+```
+
+### Task 3.4: host egress rule for the runner's uid
+
+No Go code. The check script is the test: `make deploy-runner` runs it
+after loading the rule and before restarting the runner, and runbook R3
+runs the whole path against the scratch repository before merge.
+
+**Files:**
+- Create: `deploy/gitbay-runner-egress.nft`, `deploy/gitbay-runner-egress.service`, `deploy/runner-egress-check.sh`
+- Modify: `deploy/gitbay-runner.override.conf` (a `[Unit]` section before `[Service]` at line 25)
+- Modify: `deploy/runner-podman-setup.sh` (after `podman --version`, line 29)
+- Modify: `Makefile:69-85` (`deploy-runner`)
+
+**Interfaces:**
+- Produces: nftables table `inet gitbay_runner`; unit
+  `gitbay-runner-egress.service`, required by `gitbay-runner.service`;
+  rule file at `/etc/gitbay-runner/egress.nft` on the runner host.
+
+- [ ] **Step 1: The rule**
+
+Create `deploy/gitbay-runner-egress.nft`:
+
+```
+#!/usr/sbin/nft -f
+# Host egress for CI builds (#260). Loaded by gitbay-runner-egress.service,
+# which gitbay-runner.service requires, so the runner does not start
+# without it. `make deploy-runner` installs it as
+# /etc/gitbay-runner/egress.nft.
+#
+# Under rootless podman with pasta, a build's connections are made by
+# pasta on the host, from sockets owned by the runner's user, ci-runner.
+# nftables sees them exactly as it sees the runner's own ssh, so this
+# table cannot tell a build from its runner. It limits what that user
+# reaches on this host, and the runner needs little: 127.0.0.1:22, to
+# poll, clone and stream logs.
+#
+# Every packet to one of the host's own addresses, loopback or public,
+# leaves through lo, so the output hook sees host-bound traffic as
+# oifname "lo". Traffic to other hosts is not matched: builds keep
+# outbound internet access, trusted or not (go mod download needs it).
+#
+# What ci-runner may reach on this host:
+#   127.0.0.1:22      the forge over loopback, for the runner. Builds do
+#                     not reach loopback at all: the runner starts them
+#                     with pasta's gateway mapping off (--no-map-gw).
+#   loopback :53      the host's resolver, which pasta forwards a
+#                     build's DNS to when the host's nameserver is a
+#                     loopback address.
+#   public 22/80/443  the forge, as anyone on the internet reaches it.
+# Everything else is rejected: the admin sshd on 2222 on every address,
+# and any service bound to loopback. -isolation none builds run as the
+# same user and get the same rule.
+#
+# The account name is resolved when the file is loaded. A restart of
+# nftables.service (flush ruleset) removes this table; `systemctl
+# reload gitbay-runner-egress` puts it back.
+
+table inet gitbay_runner
+delete table inet gitbay_runner
+
+table inet gitbay_runner {
+	chain output {
+		type filter hook output priority filter; policy accept;
+		oifname "lo" meta skuid "ci-runner" jump host
+	}
+
+	chain host {
+		ip daddr 127.0.0.1 tcp dport 22 accept
+		ip daddr 127.0.0.0/8 meta l4proto { tcp, udp } th dport 53 accept
+		ip6 daddr ::1 meta l4proto { tcp, udp } th dport 53 accept
+		ip daddr != 127.0.0.0/8 tcp dport { 22, 80, 443 } accept
+		ip6 daddr != ::1 tcp dport { 22, 80, 443 } accept
+		counter reject
+	}
+}
+```
+
+The first `table` line creates the table if it is missing so the
+`delete` never fails; the file then replaces it in one transaction, so
+a reload never leaves a moment without the rule. The uid match is in
+the base chain's one rule rather than a `!=` accept, because a packet
+with no socket (a kernel-sent reset) matches neither `==` nor `!=` on
+`skuid` and would otherwise fall through to the reject.
+
+- [ ] **Step 2: The unit**
+
+Create `deploy/gitbay-runner-egress.service`:
+
+```
+# Loads the CI runner's host egress rule (#260,
+# deploy/gitbay-runner-egress.nft). gitbay-runner.service requires this
+# unit, so the runner starts only with the rule in force; stopping this
+# unit removes the table and stops the runner with it.
+#
+# Ordered after nftables.service and ufw.service: either may rewrite the
+# ruleset at boot, and nftables.service's default config starts with
+# flush ruleset. A missing unit in After= is ignored.
+#
+# Reload re-reads the file and replaces the table in one transaction; it
+# does not restart the runner, which a restart of this unit would
+# (Requires= propagates restarts). `make deploy-runner` reloads.
+[Unit]
+Description=Host egress rule for CI builds
+After=nftables.service ufw.service
+Before=gitbay-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
+ExecReload=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
+ExecStop=/usr/sbin/nft delete table inet gitbay_runner
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- [ ] **Step 3: The runner requires it**
+
+In `deploy/gitbay-runner.override.conf`, insert before `[Service]`
+(line 25):
+
+```
+[Unit]
+# The host egress rule (#260, gitbay-runner-egress.nft) limits what this
+# unit's user reaches on the host: 127.0.0.1:22 for the runner, the
+# forge's public 22, 80 and 443 for builds, nothing else. Required, so
+# the runner does not start without it: a table that failed to load must
+# not mean builds reach the admin sshd.
+Requires=gitbay-runner-egress.service
+After=gitbay-runner-egress.service
+```
+
+- [ ] **Step 4: The check**
+
+Create `deploy/runner-egress-check.sh`:
+
+```sh
+#!/bin/sh
+# Check the CI runner's host egress rule (#260) as the runner's user:
+# the forge over loopback on 22 must answer (the runner polls there),
+# and the admin sshd on 2222 must not, on loopback or the public
+# address. `make deploy-runner` runs this after loading the rule and
+# before restarting the runner, and stops on a failure.
+#
+#   ssh -p 2222 root@bay1 'sh -s' < deploy/runner-egress-check.sh
+set -eu
+
+RUNNER_USER="${RUNNER_USER:-ci-runner}"
+public=$(hostname -I | awk '{print $1}')
+
+probe() {
+    su -s /bin/bash "$RUNNER_USER" -c "timeout 5 bash -c 'exec 3<>/dev/tcp/$1/$2'" 2>/dev/null
+}
+
+nft list table inet gitbay_runner >/dev/null
+
+for dest in 127.0.0.1:22 "$public:22"; do
+    if ! probe "${dest%:*}" "${dest##*:}"; then
+        echo "$RUNNER_USER cannot reach $dest: the egress rule would stop the runner" >&2
+        exit 1
+    fi
+done
+for dest in 127.0.0.1:2222 "$public:2222"; do
+    if probe "${dest%:*}" "${dest##*:}"; then
+        echo "$RUNNER_USER reaches $dest: the egress rule is not in force" >&2
+        exit 1
+    fi
+done
+echo "egress for $RUNNER_USER: 127.0.0.1:22 and $public:22 open, 2222 refused"
+```
+
+`hostname -I` lists the host's addresses, IPv4 first on bay1; the
+first is the public one there.
+
+- [ ] **Step 5: nftables on the host**
+
+In `deploy/runner-podman-setup.sh`, after the podman install block
+(after `podman --version`, line 29):
+
+```sh
+# nft loads the runner's host egress rule (#260,
+# deploy/gitbay-runner-egress.nft), which `make deploy-runner` ships and
+# the runner's unit requires. Without nft the runner does not start.
+echo "==> installing nftables"
+if ! command -v nft >/dev/null 2>&1; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nftables
+fi
+nft --version
+```
+
+- [ ] **Step 6: `make deploy-runner` ships, loads and checks it**
+
+Replace `Makefile:69-85` with:
+
+```make
+deploy-runner: preflight
+	@echo "==> building $(RUNNER_BIN)"
+	$(CROSS) go build -trimpath -ldflags='$(LDFLAGS)' -o $(RUNNER_BIN) ./cmd/gitbay-runner
+	@echo "==> pushing runner to $(HOST)"
+	./deploy/copy.sh $(HOST) $(PORT) $(RUNNER_BIN) /usr/local/bin/gitbay-runner.new
+	ssh -p $(PORT) root@$(HOST) 'mkdir -p /etc/systemd/system/gitbay-runner.service.d /etc/gitbay-runner'
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner.override.conf /etc/systemd/system/gitbay-runner.service.d/override.conf
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.service /etc/systemd/system/gitbay-runner-prune.service
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.timer /etc/systemd/system/gitbay-runner-prune.timer
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.nft /etc/gitbay-runner/egress.nft
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.service /etc/systemd/system/gitbay-runner-egress.service
+	@echo "==> loading the egress rule"
+	ssh -p $(PORT) root@$(HOST) 'set -eu; \
+	  nft -c -f /etc/gitbay-runner/egress.nft; \
+	  systemctl daemon-reload; \
+	  systemctl enable gitbay-runner-egress.service; \
+	  systemctl reload-or-restart gitbay-runner-egress.service'
+	ssh -p $(PORT) root@$(HOST) 'sh -s' < deploy/runner-egress-check.sh
+	ssh -p $(PORT) root@$(HOST) 'set -eu; \
+	  chmod 755 /usr/local/bin/gitbay-runner.new; \
+	  mv /usr/local/bin/gitbay-runner.new /usr/local/bin/gitbay-runner; \
+	  systemctl enable --now gitbay-runner-prune.timer; \
+	  systemctl restart gitbay-runner; \
+	  systemctl --no-pager --lines=3 status gitbay-runner; \
+	  systemctl --no-pager list-timers gitbay-runner-prune.timer'
+```
+
+`nft -c` checks the file without applying it, so a syntax error stops
+the deploy with the old table and the old runner in place. On the first
+deploy `reload-or-restart` starts the unit, and starting a required unit
+does not restart the runner that requires it; later deploys reload it.
+The check runs before the runner restarts, so a failure stops the
+deploy with the old binary in place, but the new table is already
+loaded and applies to the running runner too. If the check says the
+rule blocks 127.0.0.1:22, remove the table with `ssh -p 2222
+root@gitbay.org nft delete table inet gitbay_runner` (the unit stays
+active, so the runner is not stopped with it), fix the rule, and deploy
+again. Runbook R3 runs this path on the scratch runner before merge.
+
+- [ ] **Step 7: Verify locally**
+
+Run: `sh -n deploy/runner-egress-check.sh && sh -n deploy/runner-podman-setup.sh && make -n deploy-runner HOST=example.test`
+Expected: no syntax errors; the dry run lists the two new copies, the
+`nft -c` / `reload-or-restart` block, the check, then the runner block.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add deploy/gitbay-runner-egress.nft deploy/gitbay-runner-egress.service deploy/runner-egress-check.sh deploy/gitbay-runner.override.conf deploy/runner-podman-setup.sh Makefile
+git commit -S -m "runner host: builds reach only the forge's public ports on it
+
+Ref #260"
+```
+
+### Task 3.5: egress policy in the wiki, and the MR
+
+**Files:**
+- Modify: `.gitbay/wiki/Threat-Model.org` ("The CI runner", after the *Images* bullet at line 169)
+- Modify: `.gitbay/wiki/CI.org` (new section before "* The table", line 55)
+- Modify: `.gitbay/wiki/Users.org:551-555` (the `GITBAY_SSH` sentence)
+- Modify: `.gitbay/wiki/Admin.org` (after "It is idempotent.", line 668)
+- Modify: `.gitbay/wiki/Architecture/07-CI-and-Supply-Chain.org:70` (Network row), `04-Trust-Boundaries.org:27` (TB7), `09-Controls.org:91`
 
 - [ ] **Step 1: Threat-Model**
 
@@ -1693,18 +2284,27 @@ Add a bullet after *Images are provisioned…*:
 
 ```org
 - *What a build can reach.* Outbound internet, trusted or not: a fork's
-  merge request to a Go repository has to fetch its modules. Not the
-  host's loopback: a runner that polls the daemon over loopback starts
-  its containers with pasta's gateway mapping off, so a build reaches
-  the host only at its public address, as anyone on the internet does,
-  and =GITBAY_SSH= names that address. That keeps the runner's source
-  address, =127.0.0.1=, one no build can connect from; the SSH auth
-  limiter counts failures per address, and a build sharing the runner's
-  could throttle its polling (krz/gitbay#260). The forge's public ports
-  — 22, 80, 443 and the operator's sshd — are reachable from a build
-  exactly as from the internet. Under =-isolation none= a build runs on
-  the host and shares its loopback; that mode is for instances where
-  every repository is trusted.
+  merge request to a Go repository has to fetch its modules. On the
+  runner's host, only the forge's public ports 22, 80 and 443, exactly
+  as anyone on the internet reaches them. Two layers keep it there. A
+  runner that polls the daemon over loopback starts its containers with
+  pasta's gateway mapping off, so a build does not reach the host's
+  loopback, and =GITBAY_SSH= names the public address; that keeps the
+  runner's source address, =127.0.0.1=, one no build connects from. And
+  an nftables table (=deploy/gitbay-runner-egress.nft=) rejects every
+  connection the runner's user makes to the host's own addresses except
+  =127.0.0.1:22=, DNS on loopback, and 22, 80 and 443 on the public
+  address: the operator's sshd on 2222 and anything bound to loopback
+  are closed to builds. Under rootless podman a build's connections are
+  made by pasta as the runner's user, so the table cannot tell a build
+  from its runner and leaves =127.0.0.1:22= open; the gateway mapping
+  is what closes it to builds. The runner does not start without the
+  table. The SSH auth limiter counts failures per source address and,
+  once an address is over the limit, refuses every key from it until
+  the window passes, the runner's included; with registration open or
+  by invite an unknown key never counts (krz/gitbay#260). Under
+  =-isolation none= a build runs on the host and shares its loopback;
+  the table still applies, since it runs as the same user.
 ```
 
 - [ ] **Step 2: CI.org**
@@ -1714,11 +2314,12 @@ Add before `* The table`:
 ```org
 * What a build can reach
 
-Builds have outbound internet access, trusted and untrusted alike, and
-no access to the runner host's loopback when the runner polls the
-daemon over it: the forge is reached at its public address, the one in
-=GITBAY_SSH=. See the Threat-Model page, "What a build can reach", for
-why (krz/gitbay#260).
+Builds have outbound internet access, trusted and untrusted alike. On
+the runner's host they reach only the forge's public ports 22, 80 and
+443: not the host's loopback, not the operator's sshd. The forge is
+reached at its public address, the one in =GITBAY_SSH=. See the
+Threat-Model page, "What a build can reach", for how and why
+(krz/gitbay#260).
 ```
 
 - [ ] **Step 3: Users.org**
@@ -1727,30 +2328,50 @@ Replace "(=git@gitbay.org= from a runner elsewhere; inside a container
 on the server's own runner the host is at a private address the runner
 fills in)" with "(=git@gitbay.org=, the instance's public address, from
 a runner elsewhere and from a container on the server's own runner
-alike)".
+alike; =git@host:port= on an instance whose ssh is not on 22, so use it
+as =ssh://$GITBAY_SSH/owner/name.git= or =ssh ssh://$GITBAY_SSH …=,
+which work in both forms)".
 
-- [ ] **Step 4: Architecture**
+- [ ] **Step 4: Admin.org**
 
-`07-CI-and-Supply-Chain.org` Network row:
+After "…verifies rootless podman actually runs as that user. It is
+idempotent." add:
 
 ```org
-| Network                    | pasta; outbound open; a loopback runner's builds run with =--no-map-gw= and reach the host only at its public address (=main.go=, #260) |
+It also installs nftables. =make deploy-runner= ships
+=deploy/gitbay-runner-egress.nft= to =/etc/gitbay-runner/egress.nft=
+with =gitbay-runner-egress.service=, which loads it and which the
+runner's unit requires; it checks the file with =nft -c=, reloads the
+unit, and runs =deploy/runner-egress-check.sh= as =ci-runner= before
+restarting the runner: =127.0.0.1:22= and the public 22 must answer,
+2222 must not. The table limits the runner's user to =127.0.0.1:22=,
+DNS on loopback, and 22, 80 and 443 on the host's public address; the
+Threat-Model page says why. A restart of =nftables.service= flushes it;
+=systemctl reload gitbay-runner-egress= restores it.
 ```
 
-`04-Trust-Boundaries.org` TB7: replace "the network is open (#260)"
-with "outbound is open and the host's loopback is not reachable
+- [ ] **Step 5: Architecture**
+
+`07-CI-and-Supply-Chain.org:70` Network row:
+
+```org
+| Network                    | pasta; outbound open; a loopback runner's builds run with =--no-map-gw= (=main.go=); on the host only public 22/80/443 (=gitbay-runner-egress.nft=, #260) |
+```
+
+`04-Trust-Boundaries.org:27` TB7: replace "the network is open (#260)"
+with "outbound is open; on the host only the forge's public ports
 (#260)". `09-Controls.org:91`:
 
 ```org
-| Build network egress restricted             | partial  | host loopback closed to builds; outbound open by decision (#260) |
+| Build network egress restricted             | partial  | host: loopback closed, public 22/80/443 only (=gitbay-runner-egress.nft=); internet outbound open by decision (#260) |
 ```
 
 The Known-Gaps row for #260 and its "What can a build reach…" question
-stay until the runbook's R3 results are recorded.
+stay until the runbook's R3 results are recorded on the CI page.
 
-- [ ] **Step 5: Verify, commit, MR**
+- [ ] **Step 6: Verify, commit, MR**
 
-Run: `go build ./... && go vet ./... && go test ./cmd/gitbay-runner ./internal/control -count=1`
+Run: `go build ./... && go vet ./... && go test ./cmd/gitbay-runner ./internal/control ./internal/sshd -count=1`
 Expected: PASS.
 
 ```bash
@@ -1759,7 +2380,7 @@ git commit -S -m "wiki: what a build can reach
 
 Ref #260"
 git push -u origin runner-source-address
-gitbay mr create --source runner-source-address --target main --title "runner: keep builds off the runner's source address"
+gitbay mr create --source runner-source-address --target main --title "runner: keep builds off the runner's source address and the host's other ports"
 ```
 
 Before merging, run the runbook's R3 on the scratch repository. Merge
@@ -3031,33 +3652,11 @@ with `--strategy ff` and delete the branch both places.
    pasta exposes the host at `169.254.1.2` as its `--map-host-loopback`
    default; newer podman instead passes `--map-guest-addr 169.254.1.2`,
    which maps to the host's public address. Which one bay1's podman
-   does is not in the repository. Runbook R0 measures it before Part 3
-   deploys; if `--no-map-gw` is refused or leaves `127.0.0.1` reachable,
-   stop and revisit Part 3 before merging.
-2. **Default image and tree reuse.** Tree reuse now keys on the job's
-   declared `image:`. A job that names none runs on the runner's
-   `-image`, which the server does not know; bumping `-image`
-   (`gitbay-ci:2` → `:3`) does not invalidate reuse for such jobs.
-   Covering it would need the runner to report the image it resolved
-   (and its digest) on `runner done`, and reuse to compare that. Not
-   planned; confirm that the declared image is enough.
-3. **Non-22 ssh ports.** `GITBAY_SSH` is `user@host` — hutch and orgo
-   build URLs as `ssh://$GITBAY_SSH/...` — so the claim's `ssh` carries
-   no port. An instance with `[ssh] port` other than 22 and a loopback
-   runner gives its builds a destination without the port. gitbay.org
-   is on 22. Should the field carry the port (and the builds' scripts
-   change), or is this left to such an instance's own ssh config?
-4. **Required contexts without require-checks.** Decided here as "the
-   list applies only while require-checks is on, and the command says
-   so". The alternative is that setting contexts turns the gate on.
-   Confirm.
-5. **Throttling test on gitbay.org.** Under open registration the
-   limiter never counts an unknown key's attempt (see Decisions), so
-   the issue's throttling test on bay1 is expected to show nothing. R3
-   runs it as the issue asks and records that; a closed-registration
-   scratch daemon on bay1 would be needed to show the limiter itself
-   separating the two addresses. Is the source-address measurement
-   enough to close #260?
+   does is not in the repository. Runbook R3 step 0 measures it before
+   Part 3 deploys; if `--no-map-gw` is refused or leaves `127.0.0.1`
+   reachable, stop and revisit Part 3 before merging. The nftables
+   table does not cover this path: a build's connection to 127.0.0.1:22
+   through pasta is ci-runner's, like the runner's own poll.
 
 ---
 
@@ -3140,20 +3739,31 @@ not poll with several ssh calls a tick. Operator ssh is
    before runners, and that `<workdir>/home` can be deleted after the
    runner upgrade. Nothing further in the wiki; Part 1's MR updated it.
 
-### R3. Part 3 (#260): pasta check, source addresses, throttling
+### R3. Part 3 (#260): pasta check, egress rule, measurement from a build
 
-0. Before merging Part 3, on bay1 as the runner user:
+No throttling test runs on production; Task 3.3's unit test covers the
+limiter. What is measured here is what a build sees.
+
+0. Before merging Part 3, on bay1: re-run the host setup (idempotent;
+   it now installs nftables), then check pasta as the runner user:
 
    ```sh
-   ssh -p 2222 root@gitbay.org "podman --version; pasta --version | head -1"
+   ssh -p 2222 root@gitbay.org 'sh -s' < deploy/runner-podman-setup.sh
+   ssh -p 2222 root@gitbay.org "podman --version; pasta --version | head -1; nft --version; hostname -I"
    ssh -p 2222 root@gitbay.org "su - ci-runner -s /bin/sh -c 'podman --cgroup-manager=cgroupfs run --rm --pull=never --network pasta:--no-map-gw --entrypoint sh localhost/gitbay-ci:2 -c \"getent hosts proxy.golang.org; timeout 5 bash -c \\\"exec 3<>/dev/tcp/gitbay.org/22\\\" && echo public-ok; cat /proc/net/route\"'"
    ```
 
-   Expected: `proxy.golang.org` resolves, `public-ok` prints. If podman
-   rejects the option, stop (open question 1).
+   Expected: `proxy.golang.org` resolves, `public-ok` prints, and
+   `hostname -I` lists the public IPv4 address first (the check script
+   takes the first). If podman rejects the option, stop (open question
+   1).
 1. `make deploy` from the Part 3 branch, the R1 drop-in, then
-   `make deploy-runner`.
-2. On `cmc/ci-scratch` `main`, a probe job (keep the step under 4096
+   `make deploy-runner`. Its output shows `==> loading the egress rule`
+   and then `egress for ci-runner: 127.0.0.1:22 and <public>:22 open,
+   2222 refused` before the runner restarts. If the check fails, follow
+   Task 3.4 Step 6 (remove the table, fix, deploy again) before
+   anything else: the running runner is under the new table.
+2. On `cmc/ci-scratch` `main`, a probe job (keep each step under 4096
    bytes):
 
    ```yaml
@@ -3162,12 +3772,10 @@ not poll with several ssh calls a tick. Operator ssh is
        steps:
          - echo "GITBAY_SSH=$GITBAY_SSH"
          - |
-           gw=$(awk '$2=="00000000"{print $3}' /proc/net/route | head -1)
-           echo "gateway (hex, little-endian): $gw"
-           for a in 127.0.0.1 169.254.1.2; do timeout 5 bash -c "exec 3<>/dev/tcp/$a/22" && echo "reach $a:22" || echo "no $a:22"; done
-         - |
-           ssh-keygen -q -t ed25519 -N '' -f /tmp/k
-           for i in $(seq 1 30); do ssh -F /dev/null -i /tmp/k -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=5 "$GITBAY_SSH" whoami; done
+           host=${GITBAY_SSH#*@}; host=${host%:*}
+           for t in 127.0.0.1:22 127.0.0.1:2222 169.254.1.2:22 $host:22 $host:80 $host:443 $host:2222 proxy.golang.org:443; do
+             timeout 5 bash -c "exec 3<>/dev/tcp/${t%:*}/${t##*:}" 2>/dev/null && echo "open $t" || echo "closed $t"
+           done
          - bash -c 'exec 3<>/dev/tcp/${GITBAY_SSH#*@}/22; sleep 90'
    ```
 
@@ -3177,26 +3785,29 @@ not poll with several ssh calls a tick. Operator ssh is
    ssh -p 2222 root@gitbay.org "ss -tn state established '( sport = :22 )'"
    ```
 
-   Record the peer address of the build's connection and of the
-   runner's `runner log` session (`127.0.0.1`). Expected: the build's
-   peer is the host's public address, never `127.0.0.1`.
-4. `gitbay audit --json` (admin): look for `auth.throttled` rows since
-   the build started. Expected: none, since registration is open (see
-   Decisions); the runner kept claiming (`gitbay admin runners` shows a
-   recent poll).
-5. Expected build log: `GITBAY_SSH=git@gitbay.org`, `no 127.0.0.1:22`,
-   the `169.254.1.2` result as measured, the `whoami` loop answering
-   from an anonymous session.
+   Note the peer address of the build's connection and of the runner's
+   `runner log` session. Expected: the runner's is `127.0.0.1`, the
+   build's is the host's public address, never `127.0.0.1`.
+4. Expected build log: `GITBAY_SSH=git@gitbay.org`; `closed
+   127.0.0.1:22`, `closed 127.0.0.1:2222`; `169.254.1.2:22` as
+   measured (open only if podman maps that address to the public one);
+   `open gitbay.org:22`, `:80`, `:443`; `closed gitbay.org:2222`;
+   `open proxy.golang.org:443`.
+5. The runner kept polling: `gitbay admin runners` shows a recent poll
+   for the bay1 key, and the probe build finished with its log.
 6. Remove the R1 drop-in. Trigger one real trusted job that talks back
    (`gitbay build trigger krz/orgo <its release or pages job>` only if
    one is due; otherwise wait for the next hutch/orgo scheduled job) and
    check it reached `git@gitbay.org`.
-7. Record in the wiki, one commit on a branch `wiki-260-results`
-   (`Closes #260`): the measured source addresses and the pasta/podman
-   versions under Threat-Model "What a build can reach"; the Known-Gaps
-   question "What can a build reach on the host's network?" answered
-   with the date and result, and the `#260` row removed; `09-Controls`
-   row status left `partial` (outbound is open by decision).
+7. Record the result, one commit on a branch `wiki-260-results` with
+   `Closes #260`: in CI.org under "What a build can reach", a dated
+   paragraph with the podman, pasta and nft versions, the source
+   address the forge saw for a build and for the runner (step 3), and
+   the reachability list from step 4. In
+   `Architecture/10-Known-Gaps.org`, remove the `#260` row and answer
+   "What can a build reach on the host's network?" with the date and a
+   pointer to the CI page. `09-Controls` stays `partial` (outbound is
+   open by decision). MR, `--strategy ff`, delete the branch.
 
 ### R4. Part 4 (#266): validate the failure report
 
@@ -3229,11 +3840,16 @@ not poll with several ssh calls a tick. Operator ssh is
 
 - **Coverage.** #255: explicit trust (1.1), disposable untrusted home
   and trusted-only caches (1.2), the discard (R2.7), wiki (1.3). #258:
-  `ci/` refused (2.1), reuse by trust and image (2.2), required contexts
-  with missing as pending in `MergeGates` (2.3), wiki (2.4). #260: code
-  (3.1, 3.2), egress policy in Threat-Model and CI (3.3), throttling
-  test and source-address measurement in the runbook (R3), with the
-  scratch-repository rule (R1). #266: runner names the step (4.3), stored
+  `ci/` refused (2.1), reuse by trust and declared image, the default
+  image's limit documented (2.2, 2.4), required contexts turning the
+  gate on, shown by `settings show` and the web page, missing as
+  pending in `MergeGates` (2.3), wiki (2.4). #260: public destination
+  with the port off 22 (3.1), builds off loopback (3.2), the limiter's
+  lockout as a unit test instead of a production test (3.3), the host
+  egress table with its unit, check and deploy wiring (3.4), egress
+  policy in Threat-Model, CI and Admin (3.5), the source address and
+  reachability measured from a scratch build and recorded on the CI
+  page (R3), with the scratch-repository rule (R1). #266: runner names the step (4.3), stored
   step and duration (4.1; duration derived), `build show` (4.4),
   `build log --step`/`--tail` (4.4), web `<details>` per step with the
   failed one open, `id="failed"`, "Jump to failure", duration beside
@@ -3248,3 +3864,7 @@ not poll with several ssh calls a tick. Operator ssh is
   `LogSection` (4.4) are used by `logSteps` (4.5). `SuccessBuildForTree`
   gains `image` in 2.2 and its one caller changes there.
   `GatesOut.ChecksMissing` (2.3) is rendered in `mr.html` (2.3).
+  `publicSSH` (3.1) fills the claim's `ssh`, read as `job.SSH` (3.2).
+  The table name `inet gitbay_runner` and the path
+  `/etc/gitbay-runner/egress.nft` match across the rule, the unit, the
+  check script and the Makefile (3.4).

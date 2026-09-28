@@ -5,8 +5,10 @@
 **Goal:** Seal the four secret columns under a key file outside the
 database (#273), encrypt backup archives to an age recipient (#274),
 and make `--verify` check git connectivity while repository moves and
-deletions wait for a running backup (#259), ending with a restore drill
-the operator runs and records.
+deletions wait for a running backup (#259). The operator runbook moves
+the offsite copy from Scaleway to Cloudflare R2 under bucket locks,
+adds a separate keys repository for `apns.p8` and the secret key file,
+and holds the restore drill, which is deferred.
 
 **Architecture:** A new `internal/seal` package holds AES-256-GCM keys
 read from `server.secret_key_file` (default `/etc/gitbay/secret.key`,
@@ -30,7 +32,11 @@ decisions recorded in the brief: AES-GCM, key file under `/etc/gitbay`
 mode 0600 excluded from backups, key id prefix on each value, rotation
 command, re-encryption of existing rows; age recipients, `--verify`
 takes an identity file; the clean-host drill is an operator runbook
-recorded on the Admin wiki page.
+recorded on the Admin wiki page, deferred by the operator (#259 stays
+open), repeated quarterly and after any backup code change; the
+offsite restic repository moves to Cloudflare R2, and `apns.p8` and
+`secret.key` go to a separate small restic repository on R2 with its
+own bucket and password.
 
 ## Global Constraints
 
@@ -79,8 +85,9 @@ recorded on the Admin wiki page.
     comments; the last key seals, all keys open. Mode must be 0600 or
     stricter; anything group- or world-readable is refused.
   - `server.secret_key_file` must not be inside `server.root`
-    (validation error), so neither the archive nor the restic snapshot
-    of `/var/lib/gitbay` can carry it.
+    (validation error), so neither the archive nor the main restic
+    snapshot of `/var/lib/gitbay` can carry it. Its offsite copy is the
+    separate keys repository (runbook D), never the main one.
   - A missing key file is fatal for every process that opens the
     database through `openStore` (serve, shell, authorized-keys, host
     admin commands), with a message naming the path and
@@ -95,7 +102,18 @@ recorded on the Admin wiki page.
 | 1 | `secrets-at-rest` | Closes #273 | `internal/seal`, `server.secret_key_file`, store sealing, migration 0072, reseal at startup, `admin secrets init/rotate/check`, install.sh, e2e harness key, wiki |
 | 2 | `backup-age` | Closes #274 | `[backup] age_recipients`, age-wrapped archives, `--verify --identity`, backup script globs, wiki |
 | 3 | `backup-verify-lock` | Ref #259 | `gitutil.FsckConnectivity`, `--verify` extracts and checks each repository, `internal/backuplock`, delete/rename/transfer/org rename refused during a full backup, drill procedure and record table on the Admin page |
-| — | `restore-drill-record` (operator) | Closes #259 | the first drill's numbers in the Admin page, Known-Gaps and Controls rows closed |
+| — | `offsite-r2-wiki` (operator) | Ref the R2 move issue (runbook D.1) | Admin, Threat-Model and Architecture pages describe R2 with bucket locks and the keys repository, after Scaleway is retired |
+| — | `restore-drill-record` (operator, deferred) | Closes #259 | the first drill's numbers in the Admin page, Known-Gaps and Controls rows closed |
+
+#259 stays open after MR 3: its commits say `Ref #259`, and only the
+drill record closes it. The operator has deferred the drill.
+
+The offsite job is not in the repository. `/usr/local/bin/gitbay-offsite`
+and its `gitbay-offsite.service`/`.timer` exist only on bay1;
+`deploy/cloud-init.yaml` does not template them (its
+`gitbay-backup.sh` carries only the comment "To ship offsite, add an
+rclone/s3 upload of $out here."). The move to R2 is therefore a
+runbook section (D) with the script edits written out, not a code MR.
 
 MR 2 and MR 3 both edit `cmd/gitbayd/backup.go`; land them in order.
 MR 2's `testConfig` helper comes from MR 1.
@@ -1834,9 +1852,11 @@ stored sealed: AES-256-GCM under a key in =server.secret_key_file=,
 each value prefixed with the id of the key that sealed it
 (=gbs1:<id>:=). The key file is not in the database, not under
 =server.root=, and therefore in neither the local archives nor the
-restic snapshots. Keep a copy off the host; without it a restored
-database's secrets cannot be opened, and gitbayd refuses to start
-against them.
+main restic repository. Its offsite copy is a separate restic
+repository that holds only keys (see "Offsite copies"), with its own
+bucket and password, so a leak of the main backup does not expose the
+key that opens its secrets. Without the key a restored database's
+secrets cannot be opened, and gitbayd refuses to start against them.
 
 #+begin_src sh
 gitbayd admin secrets init     # once; deploy/install.sh does it on first install
@@ -1853,11 +1873,16 @@ gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
   in clear and logs =sealed secret values=.
 - Rotation: =rotate= adds a key, reseals every value under it in one
   transaction, then removes the old keys. The daemon re-reads the file
-  when it changes, so it needs no restart. Copy the new file off the
-  host afterwards.
+  when it changes, so it needs no restart. Back the new file up to the
+  keys repository afterwards.
 - Push devices are looked up by the SHA-256 of their token
   (=push_devices.token_hash=), since two seals of one token differ.
 ```
+
+If runbook D (the keys repository) has not run when this MR lands,
+leave out the sentences naming the keys repository here and in
+`06-Data-and-Cryptography.org` below; the `offsite-r2-wiki` MR adds
+them.
 
 - [ ] **Step 3: Architecture pages**
 
@@ -1878,7 +1903,8 @@ and replace the paragraph "The code base contains no symmetric encryption. ..." 
 ```org
 The database file or a backup read by anyone other than the =gitbay=
 user discloses no CI secret, webhook secret, mirror token or device
-token without the key file, which neither carries. Rotation:
+token without the key file, which neither carries; the key file's
+only offsite copy is a separate keys repository. Rotation:
 =gitbayd admin secrets rotate= (Admin wiki).
 ```
 
@@ -1894,7 +1920,7 @@ Update line 5's migration count to the number of files in
 `09-Controls.org:59`:
 
 ```org
-| Secrets encrypted at rest                   | in place | AES-256-GCM, key file outside the database and backups (=internal/seal=) |
+| Secrets encrypted at rest                   | in place | AES-256-GCM, key file outside the database and the main backups (=internal/seal=) |
 ```
 
 `10-Known-Gaps.org`: delete the `#273` row.
@@ -1909,7 +1935,8 @@ If the file has no `* Unreleased` heading above the latest version, add one unde
 replacing the binary, run =gitbayd admin secrets init= as root and
 =chown gitbay:gitbay /etc/gitbay/secret.key= (=deploy/install.sh= does
 both when the file is missing). The first start seals the stored
-secrets. Copy the key file off the host: backups do not carry it.
+secrets. Back the key file up separately: =admin backup= archives do
+not carry it (see the Admin wiki, "Secret key").
 
 - CI secrets, webhook secrets, mirror tokens and push device tokens are
   stored sealed with AES-256-GCM (#273). =gitbayd admin secrets
@@ -2308,8 +2335,9 @@ New `** [backup]` section after `** [push]`:
   =admin backup= encrypts every archive to them and appends =.age= to
   its name. Generate the pair off the host with =age-keygen=; only the
   public key goes here, so the host writes archives it cannot read.
-  The restic copy is unaffected: it snapshots =/var/lib/gitbay=, not
-  the archives.
+  The restic copy is unaffected: the offsite job stages its own
+  =VACUUM INTO= of the live database and snapshots =/var/lib/gitbay=,
+  not the archives.
 ```
 
 In `* Backup and restore`, after the `--verify` paragraph:
@@ -2333,7 +2361,7 @@ or on a restore host.
 `06-Data-and-Cryptography.org`, At rest, Backups row:
 
 ```org
-| Backups                               | local archives age-encrypted when =[backup] age_recipients= is set; restic encrypts the offsite copy; neither carries the secret key file |
+| Backups                               | local archives age-encrypted when =[backup] age_recipients= is set; restic encrypts the offsite copy; neither carries the secret key file, whose offsite copy is a separate keys repository |
 ```
 
 `08-Operations.org`, Full archive and Database only rows: append `; age-encrypted when =[backup] age_recipients= is set` to Contents.
@@ -3085,12 +3113,15 @@ Add a new subsection after `** Secret key`:
 ```org
 ** Restore drill
 
-A restore onto a clean host, run on a schedule and recorded below.
-The disaster it rehearses is losing bay1, so the local archives are
-gone with it and the sources are the offsite restic repository and
-what the operator keeps off the host (=~/.config/gitbay/=: =offsite.env=,
-=secret.key=, =config.toml=, =backup-identity.txt=). The steps are in
-the data-at-rest plan's operator runbook
+A restore onto a clean host, run quarterly and after any change to the
+backup code (=cmd/gitbayd/backup.go=, the offsite job), and recorded
+below. The disaster it rehearses is losing bay1, so the local archives
+are gone with it and the sources are the main offsite restic
+repository (repositories, LFS, the staged database, =config.toml=),
+the keys repository (=secret.key=, =apns.p8=), and the operator's
+password manager (=offsite.env=, the keys repository's password and
+token, =backup-identity.txt=). The steps are in the data-at-rest
+plan's operator runbook
 (=docs/plans/2026-09-27-data-at-rest-and-backup.md=).
 
 Time to service runs from the clean host's first root login to the
@@ -3101,7 +3132,11 @@ the time of the newest restic snapshot restored.
 |------+------+-------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|
 ```
 
-- [ ] **Step 2: Architecture/08 and Threat-Model**
+- [ ] **Step 2: Architecture/08, Known-Gaps and Threat-Model**
+
+`10-Known-Gaps.org:17`, the `#259` row's description becomes
+`No restore has been exercised; the drill is written (Admin wiki) and not yet run`.
+The row stays until the drill is recorded.
 
 `08-Operations.org`: replace the `--verify` bullet (lines 60-62) with:
 
@@ -3131,7 +3166,7 @@ Replace the "Recovery time" bullet with:
 
 ```bash
 git add .gitbay/wiki
-git commit -S -m "wiki: backup verify, backup lock, restore drill record
+git commit -S -m "wiki: backup verify, backup lock, restore drill procedure
 
 Ref #259"
 git push -u origin backup-verify-lock
@@ -3139,14 +3174,19 @@ gitbay mr create --source backup-verify-lock --target main --title "Backup verif
 ```
 
 Merge with `--strategy ff` after CI, delete the branch both places.
-#259 stays open until the drill below is recorded.
+#259 stays open after this MR: every commit in it says `Ref #259`, and
+only the drill record (runbook C, deferred) closes it.
 
 ---
 
 # Operator runbook (cmc)
 
-Run on bay1 and a clean host. Nothing here is automated by the MRs.
-One forge write per shell call; bay1 root is `ssh -p 2222 root@gitbay.org`.
+Run on bay1, the laptop and (for C) a clean host. Nothing here is
+automated by the MRs. One forge write per shell call; bay1 root is
+`ssh -p 2222 root@gitbay.org`.
+
+D does not depend on any MR and can run first; A.3 and C use the keys
+repository it creates.
 
 ## A. After MR 1 deploys
 
@@ -3156,16 +3196,18 @@ One forge write per shell call; bay1 root is `ssh -p 2222 root@gitbay.org`.
    → mode `-rw-------`, owner `gitbay gitbay`, one log line with a count.
 2. `ssh -p 2222 root@gitbay.org 'gitbayd --config /etc/gitbay/config.toml admin secrets check'`
    → one `key <id>: N sealed` line, no `clear:` line.
-3. Escrow: `scp -P 2222 root@gitbay.org:/etc/gitbay/secret.key ~/.config/gitbay/secret.key && chmod 600 ~/.config/gitbay/secret.key`.
-   Also copy `/etc/gitbay/config.toml` to `~/.config/gitbay/config.toml`
-   (mode 600) if no copy exists off the host; the drill needs it.
+3. Back the key up to the keys repository (D.9) with `secret.key` as
+   the file and `secret-key` as the tag. If D has not run yet, do D.2,
+   D.3 (keys bucket), D.4 (keys token) and D.9 first. After every
+   `admin secrets rotate`, repeat this step.
 4. Check CI builds that use secrets (blotter, hutch, orgo) still run,
    and a webhook delivery still verifies.
 
 ## B. After MR 2 deploys
 
 1. On the laptop: `age-keygen -o ~/.config/gitbay/backup-identity.txt`
-   (mode 600). Note the printed `age1...` public key.
+   (mode 600). Note the printed `age1...` public key. Put a copy of the
+   identity in the password manager.
 2. On bay1, add to `/etc/gitbay/config.toml`:
    ```toml
    [backup]
@@ -3176,12 +3218,10 @@ One forge write per shell call; bay1 root is `ssh -p 2222 root@gitbay.org`.
    `/usr/local/bin/gitbay-db-backup.sh` and `/usr/local/bin/gitbay-monitor.sh`
    predate the cloud-init change (cloud-init runs once). Apply the same
    glob edits as Task 2.3 Step 1 by hand.
-4. Before relying on encryption, find how `/var/lib/gitbay-stage` (the
-   staged database restic copies) is produced. If it reads a local
-   archive, it must decrypt, which the host cannot; switch it to its own
-   `VACUUM INTO` or an unencrypted database-only snapshot kept under
-   `/var/lib/gitbay-stage` only. If it snapshots the live database
-   directly, nothing changes.
+4. The offsite job needs no change. `/usr/local/bin/gitbay-offsite`
+   builds `/var/lib/gitbay-stage` from live data (`sqlite3 gitbay.db
+   "VACUUM INTO ..."` and `cp -a /etc/gitbay/config.toml`), not from the
+   local archives, so encrypting the archives does not reach restic.
 5. After the next hourly run: `ls -l /var/backups/gitbay/db | tail -2`
    shows `.tar.gz.age`; the monitor's `db_snapshot_h` stays under 2.
    Copy one archive to the laptop and run
@@ -3189,32 +3229,46 @@ One forge write per shell call; bay1 root is `ssh -p 2222 root@gitbay.org`.
    (a local gitbayd build; `--verify` reads no config).
 6. Old unencrypted archives age out of the 7/48 rotation on their own.
 
-## C. Restore drill (after MR 3 deploys; closes #259)
+## C. Restore drill (deferred; closes #259)
+
+Deferred by the operator. Run it after MR 3 deploys and D is complete,
+then quarterly, and after any change to `cmd/gitbayd/backup.go` or the
+offsite job (`/usr/local/bin/gitbay-offsite`, its env file, the R2 lock
+rules). Each run adds a row to the Admin page's table; the first one
+closes #259.
 
 Record every timestamp as you go. Start the clock at step 2.
 
-1. Pick the snapshot: `set -a; . ~/.config/gitbay/offsite.env; set +a; restic $RESTIC_OPTS snapshots --latest 1`.
-   Note its time (recovery point). `restic $RESTIC_OPTS ls latest /var/lib/gitbay-stage`
-   to find the staged database file name.
+1. On the laptop, export the `gitbay r2-prune` variables from the
+   password manager (D.5), then:
+   `restic snapshots --tag gitbay --latest 1`. Note its time (recovery
+   point). `restic ls latest /var/lib/gitbay-stage` shows the staged
+   database's file name and `config.toml`.
 2. Provision a clean Ubuntu 24.04 host (throwaway VPS or local VM) with
    `deploy/cloud-init.yaml`. First root login: **clock starts**.
 3. Before gitbayd ever starts, block outbound traffic so the restored
    instance cannot send mail, deliver webhooks, push mirrors or call
-   APNs: `ufw default deny outgoing; ufw allow out 53; ufw allow out to <restic endpoint> port 443; ufw reload`.
-   (Allow the restic endpoint only for the restore, then remove it.)
-4. Install restic, restore: `restic $RESTIC_OPTS restore latest --target / --include /var/lib/gitbay --include /var/lib/gitbay-stage`.
-   Replace `/var/lib/gitbay/gitbay.db` with the staged copy (the live
-   file in the snapshot may be mid-write); remove any `gitbay.db-wal`
-   and `gitbay.db-shm`. `chown -R gitbay:gitbay /var/lib/gitbay`.
-5. Config and key: copy `~/.config/gitbay/config.toml` to
-   `/etc/gitbay/config.toml` and `~/.config/gitbay/secret.key` to
-   `/etc/gitbay/secret.key` (`chown gitbay:gitbay`, mode 600). In the
-   config for the drill only: `site_url` to `http://<drill-ip>:8080`,
+   APNs: `ufw default deny outgoing; ufw allow out 53; ufw allow out to <account-id>.r2.cloudflarestorage.com port 443; ufw reload`.
+   (ufw resolves the name once; allow R2 only for the restore, then
+   remove the rule.)
+4. Install restic, and with the same variables exported on the drill
+   host: `restic restore latest --target / --include /var/lib/gitbay --include /var/lib/gitbay-stage`.
+   The snapshot excludes `gitbay.db`, `gitbay.db-wal`, `gitbay.db-shm`
+   and `hook.sock`: copy the staged database from
+   `/var/lib/gitbay-stage/` to `/var/lib/gitbay/gitbay.db`.
+   `chown -R gitbay:gitbay /var/lib/gitbay`. LFS objects are under
+   `/var/lib/gitbay/lfs` (inside `server.root`) and come back with it.
+5. Config and keys: copy `/var/lib/gitbay-stage/config.toml` to
+   `/etc/gitbay/config.toml`. From the laptop, with the `gitbay r2-keys`
+   variables exported (D.5):
+   ```sh
+   restic dump --tag secret-key latest /secret.key | ssh root@<drill-ip> -p 2222 'umask 077; cat > /etc/gitbay/secret.key; chown gitbay:gitbay /etc/gitbay/secret.key'
+   restic dump --tag apns latest /apns.p8 | ssh root@<drill-ip> -p 2222 'umask 077; cat > /etc/gitbay/apns.p8; chown gitbay:gitbay /etc/gitbay/apns.p8'
+   ```
+   In the config for the drill only: `site_url` to `http://<drill-ip>:8080`,
    `[http] addr = ":8080"`, `tls = "off"`, remove `[mail]`, set
    `registration.mode = "closed"`, `[push] enabled = false`, remove
-   `[backup]` (step 7's archive is local and read back at once). If
-   `[lfs] root` is set outside `server.root`, note it: neither the
-   archive nor this restore carries those objects.
+   `[backup]` (step 7's archive is local and read back at once).
 6. Install the gitbayd binary of the tag bay1 runs (`/healthz` names the
    commit) with `deploy/install.sh <drill-ip> 2222`; it will not create
    a key because one is present.
@@ -3226,7 +3280,8 @@ Record every timestamp as you go. Start the clock at step 2.
      snapshot.
    - Secrets: `gitbayd --config /etc/gitbay/config.toml admin secrets check`
      → every value under one key, no error. The journal shows no
-     `sealing secrets` failure.
+     `sealing secrets` failure. `sha256sum /etc/gitbay/apns.p8` equals
+     bay1's.
    - LFS: `cd /var/lib/gitbay/lfs && find . -type f | while read f; do [ "$(sha256sum < "$f" | cut -c1-64)" = "$(basename "$f")" ] || echo "BAD $f"; done` → no output; object count against bay1's.
    - Release assets: every row's file exists with its digest:
      ```sh
@@ -3251,33 +3306,322 @@ Record every timestamp as you go. Start the clock at step 2.
    - `Architecture/08-Operations.org`: the "Recovery time" bullet names
      the figure.
    Branch `restore-drill-record`, one signed commit ending
-   `Closes #259`, MR, ff merge, delete the branch.
-10. Destroy the drill host. Repeat the drill every quarter and after
-    any change to `cmd/gitbayd/backup.go` or the restic job, adding a
-    row each time.
+   `Closes #259`, MR, ff merge, delete the branch. Later drills add a
+   row with `Ref #259`.
+10. Destroy the drill host.
+
+## D. Offsite backup to Cloudflare R2; keys repository
+
+Today: `gitbay-offsite.service` (timer nightly, about 00:19 UTC) runs
+`/usr/local/bin/gitbay-offsite`, which sources `/etc/gitbay/offsite.env`
+(`RESTIC_REPOSITORY` and the rest), builds `/var/lib/gitbay-stage`
+with `sqlite3 gitbay.db "VACUUM INTO ..."` and `cp -a
+/etc/gitbay/config.toml`, runs `restic backup --tag gitbay` of the stage
+and `/var/lib/gitbay` excluding `gitbay.db`, `gitbay.db-wal`,
+`gitbay.db-shm` and `hook.sock`, then `restic check` up to three
+attempts. The target is Scaleway `fr-par` with append-only credentials;
+forget and prune run from the laptop. `/etc/gitbay/apns.p8` and
+`/etc/gitbay/offsite.env` are in no restic repository.
+
+After D:
+
+- The main repository is on R2, bucket `gitbay-offsite`. `config.toml`
+  stays in it through the stage, as today.
+- `apns.p8` and `secret.key` are in a separate restic repository,
+  bucket `gitbay-keys`, with its own password and token. Neither the
+  password nor the token is ever on bay1: the laptop streams the files
+  out of bay1 into it, so a leak of the main backup or of bay1's
+  `offsite.env` does not reach the key that opens the sealed secrets.
+- `offsite.env` stays on bay1 because the nightly job sources it. Its
+  only copy off bay1 is the password manager; neither repository
+  carries it. The keys repository's password and token exist only in
+  the password manager.
+
+What protects history changes. R2 has no append-only token (token
+permissions are Admin R/W, Admin R, Object R/W, Object R, optionally
+scoped to buckets), and restic needs to write and delete under
+`locks/`, so the host holds Object R/W on its bucket. Bucket lock
+rules refuse deletion and overwrite of matching objects for a period or
+indefinitely, whatever the token, and changing them needs an Admin
+token or the dashboard, neither of which is on bay1. So a compromised
+host cannot delete or overwrite anything younger than the retention
+period `RET`; unlike the Scaleway key, it can delete snapshots and data
+older than `RET`. Prune from the laptop can likewise only remove what
+is past `RET`.
+
+`RET` is 90 days in the commands below (open question 1). The lock
+rules:
+
+| Prefix | Rule | Why |
+|---|---|---|
+| `data/` | `RET` days | pack files; prune deletes unused ones once past `RET` |
+| `index/` | `RET` days | prune replaces index files (see D.6) |
+| `snapshots/` | `RET` days | forget deletes snapshot files once past `RET` |
+| `keys/` | indefinite | restic deletes a key file only on `restic key remove` |
+| `config` | indefinite | written once at `restic init`; the repository cannot be opened without it |
+| `locks/` | none | restic creates and deletes a lock on every command |
+
+`config` is not in the four prefixes named when this was decided; it
+is one object that restic never deletes and without which nothing in
+the repository opens, so it is locked too. With `keys/` indefinite, a
+repository password change adds a key but cannot remove the old one.
+
+The keys bucket uses `--retention-indefinite` on every prefix except
+`locks/` and is never forgotten or pruned: a retired secret key still
+opens the database in every main snapshot sealed under it, and the
+snapshots are a few hundred bytes.
+
+1. File the issue the wiki MR (D.14) references:
+   `gitbay issue create krz/gitbay --title "Offsite backup: move from Scaleway to Cloudflare R2" --body "Runbook D of docs/plans/2026-09-27-data-at-rest-and-backup.md: R2 with bucket lock rules, a separate keys repository, Scaleway retired after 30 nights in parallel."`
+   Note the number.
+2. Buckets, from the laptop (`wrangler login` as the account owner):
+   ```sh
+   npx wrangler r2 bucket create gitbay-offsite-scratch --location weur
+   npx wrangler r2 bucket create gitbay-offsite --location weur
+   npx wrangler r2 bucket create gitbay-keys --location weur
+   ```
+   `weur` is a location hint that keeps the data in western Europe as
+   Scaleway `fr-par` did.
+3. Lock rules. Scratch uses one day so D.6 can see a rule expire;
+   `gitbay-offsite` uses `RET`:
+   ```sh
+   lock() { # bucket retention-flag...
+     b=$1; shift
+     for p in data index snapshots; do
+       npx wrangler r2 bucket lock add "$b" --name "restic-$p" --prefix "$p/" "$@"
+     done
+     npx wrangler r2 bucket lock add "$b" --name restic-keys --prefix keys/ --retention-indefinite
+     npx wrangler r2 bucket lock add "$b" --name restic-config --prefix config --retention-indefinite
+     npx wrangler r2 bucket lock list "$b"
+   }
+   lock gitbay-offsite-scratch --retention-days 1
+   lock gitbay-offsite --retention-days 90
+   lock gitbay-keys --retention-indefinite
+   ```
+   → five rules on each bucket, none covering `locks/`. No other object
+   in a restic repository starts with `config`, so that prefix matches
+   the one object.
+4. Tokens, in the dashboard (R2 → Manage API tokens), each "Object Read
+   & Write" and scoped to one bucket:
+   - `gitbay-host` → `gitbay-offsite`. Goes to bay1.
+   - `gitbay-prune` → `gitbay-offsite`. Laptop only: forget, prune,
+     check, restore.
+   - `gitbay-keys` → `gitbay-keys`. Laptop only.
+   - `gitbay-scratch` → `gitbay-offsite-scratch`. Laptop only; revoke
+     after D.6.
+   `gitbay-host` and `gitbay-prune` have the same rights; they are
+   separate so either can be revoked alone. The lock rules, not the
+   token, protect history. Store each access key id and secret in the
+   password manager.
+5. One password manager entry per repository, each holding the
+   variables restic reads:
+   ```sh
+   RESTIC_REPOSITORY=s3:https://<account-id>.r2.cloudflarestorage.com/<bucket>
+   RESTIC_PASSWORD=<openssl rand -base64 32, generated once per repository>
+   AWS_ACCESS_KEY_ID=<token access key id>
+   AWS_SECRET_ACCESS_KEY=<token secret access key>
+   AWS_DEFAULT_REGION=auto
+   ```
+   Entries: `gitbay r2-host` (bucket `gitbay-offsite`, token
+   `gitbay-host`), `gitbay r2-prune` (same bucket and password, token
+   `gitbay-prune`), `gitbay r2-keys` (bucket `gitbay-keys`, its own
+   password, token `gitbay-keys`), `gitbay r2-scratch`. If the current
+   `offsite.env` sets anything else (`RESTIC_OPTS`, which the Admin
+   wiki's commands use), carry it into `r2-host` and `r2-prune`. The
+   commands below assume the named entry's variables are exported in
+   the shell.
+6. Validate on the scratch bucket (`gitbay r2-scratch`), from the
+   laptop, before anything real depends on it. Record each result in
+   the issue from D.1.
+   ```sh
+   restic init
+   mkdir -p /tmp/r2t && head -c 50M /dev/urandom > /tmp/r2t/a
+   restic backup --tag gitbay /tmp/r2t                 # snapshot 1
+   head -c 50M /dev/urandom > /tmp/r2t/b
+   restic backup --tag gitbay /tmp/r2t                 # snapshot 2
+   rm /tmp/r2t/a
+   restic backup --tag gitbay /tmp/r2t                 # snapshot 3
+   restic check                                        # passes; lock files come and go
+   restic forget --keep-last 1                         # expect a refusal: snapshots 1-2 are younger than a day
+   restic check
+   restic prune --max-unused unlimited                 # record what it deletes or is refused
+   restic check
+   ```
+   Expected on day 0: backup and check succeed (locks/ is unlocked);
+   forget fails to delete the two snapshot files and says so; check
+   still passes afterwards. Record whether prune tries to delete an
+   index file and fails. After 24 hours:
+   ```sh
+   restic forget --keep-last 1
+   restic prune --max-unused unlimited
+   restic check --read-data
+   ```
+   → forget removes snapshots 1 and 2, prune removes the pack holding
+   only `a`'s data and the superseded index files, and `check
+   --read-data` passes. Then `restic unlock` succeeds on a stale lock
+   left by interrupting a backup with Ctrl-C.
+   If prune on day 0 or day 1 fails on an index file younger than the
+   rule, restic's index rewrite is deleting files the lock keeps, and
+   prune would fail every run on the real bucket. Stop there and bring
+   the result back: the choice is between an index rule shorter than
+   the data rule, running prune only when no index file is younger
+   than `RET`, or leaving `index/` unlocked (it can be rebuilt from
+   `data/` with `restic repair index`). Do not continue to D.7 until
+   one is chosen.
+   `--max-unused unlimited` keeps prune from repacking partly used
+   packs, since a repack deletes the old pack and that pack may be
+   younger than `RET`.
+7. Initialise the real repositories from the laptop:
+   `restic init` with `gitbay r2-prune` exported, and again with
+   `gitbay r2-keys`.
+8. Install the host env file and run both targets. On bay1, paste the
+   `gitbay r2-host` entry into the file over stdin (Ctrl-D ends it):
+   ```sh
+   ssh -p 2222 root@gitbay.org 'umask 077; cat > /etc/gitbay/offsite-r2.env'
+   ```
+   Keep the current script as `/usr/local/bin/gitbay-offsite.scaleway`
+   (`cp -a`). Edit `/usr/local/bin/gitbay-offsite`: leave the staging
+   lines (`VACUUM INTO`, `cp -a config.toml`) as they are and run once;
+   move the `. /etc/gitbay/offsite.env`, the `restic backup` and the
+   `restic check` retry loop into a function called once per env file,
+   each call in a subshell so one target's variables cannot reach the
+   other. With the flags the job uses today, the section after staging
+   reads:
+   ```sh
+   target() {
+     set -a; . "$1"; set +a
+     restic backup --tag gitbay \
+       --exclude /var/lib/gitbay/gitbay.db \
+       --exclude /var/lib/gitbay/gitbay.db-wal \
+       --exclude /var/lib/gitbay/gitbay.db-shm \
+       --exclude /var/lib/gitbay/hook.sock \
+       /var/lib/gitbay-stage /var/lib/gitbay || return 1
+     for i in 1 2 3; do
+       restic check && return 0
+     done
+     return 1
+   }
+   rc=0
+   (target /etc/gitbay/offsite.env) || rc=1
+   (target /etc/gitbay/offsite-r2.env) || rc=1
+   exit $rc
+   ```
+   Compare with `diff -u /usr/local/bin/gitbay-offsite.scaleway /usr/local/bin/gitbay-offsite`
+   and keep anything the current restic lines carry that this section
+   does not (`$RESTIC_OPTS`, a sleep between check attempts, the exact
+   exclude spelling). A failure on one target no longer stops the
+   other; the unit still fails if either did. The job now uploads
+   twice: check `TimeoutStartSec` in `systemctl cat gitbay-offsite.service`
+   against twice the last run's duration
+   (`journalctl -u gitbay-offsite -n 200`).
+9. Keys repository, from the laptop with `gitbay r2-keys` exported.
+   The file goes from bay1 to R2 through a pipe and is never written on
+   the laptop:
+   ```sh
+   ssh -p 2222 root@gitbay.org cat /etc/gitbay/apns.p8 | restic backup --stdin --stdin-filename apns.p8 --tag apns
+   restic dump --tag apns latest /apns.p8 | sha256sum
+   ssh -p 2222 root@gitbay.org sha256sum /etc/gitbay/apns.p8
+   ```
+   → the two digests match. After MR 1 deploys (A.3) and after every
+   rotation, the same with `secret.key` and `--tag secret-key`. After
+   an APNs key change, the same with `apns.p8`.
+10. First full backup: `ssh -p 2222 root@gitbay.org 'systemctl start gitbay-offsite.service; journalctl -u gitbay-offsite -n 50 --no-pager'`
+    → both targets back up and check. From the laptop with
+    `gitbay r2-prune`: `restic snapshots` shows one `gitbay` snapshot
+    with the stage and `/var/lib/gitbay`; `restic ls latest /var/lib/gitbay-stage`
+    lists the database copy and `config.toml`.
+11. Run both targets for 30 nights. Each week, from the laptop with
+    `gitbay r2-prune`: `restic snapshots --tag gitbay --latest 7` (one
+    per night) and `restic check --read-data-subset 1/4`, a different
+    quarter each week. At the end: `restic check --read-data` on R2
+    (R2 does not charge egress).
+12. Laptop forget and prune for R2, from the laptop with
+    `gitbay r2-prune`: the forget policy used for Scaleway today plus
+    `--keep-within 90d`, so no snapshot younger than `RET` is ever
+    forgotten, then `restic prune --max-unused unlimited` (or what D.6
+    settled on). Nothing is removable before day 90; the first prune
+    that deletes anything is after that.
+13. Retire Scaleway after the 30 nights and a clean `check --read-data`:
+    - On bay1: `mv /etc/gitbay/offsite-r2.env /etc/gitbay/offsite.env`
+      (the Scaleway file is replaced) and drop the second `target` call
+      from the script, so the job runs `(target /etc/gitbay/offsite.env)`
+      alone. Run the unit once and check the journal.
+    - Replace the `offsite.env` copy in the password manager with
+      `gitbay r2-host`; remove the Scaleway entries once the bucket is
+      gone.
+    - Revoke the Scaleway append-only key. Keep the Scaleway bucket
+      until R2 holds 90 days of snapshots, then delete it with the
+      Scaleway owner credentials from the laptop.
+    - Revoke `gitbay-scratch`. The scratch bucket's `keys/` and
+      `config` rules are indefinite: remove its five rules
+      (`npx wrangler r2 bucket lock remove gitbay-offsite-scratch --name <rule>`),
+      then empty and delete the bucket in the dashboard.
+14. Wiki MR, branch `offsite-r2-wiki`, commit ending `Ref #<D.1 issue>`
+    (and `Closes #<D.1 issue>` if the move is finished):
+    - `Admin.org`, `** Offsite copies`, the first paragraph becomes:
+      ```org
+      bay1 also takes a nightly restic snapshot of =/var/lib/gitbay= and
+      =/var/lib/gitbay-stage= (a =VACUUM INTO= copy of the database and
+      =config.toml=) to a Cloudflare R2 bucket. R2 has no append-only
+      token, so the host's token can write and delete objects; bucket
+      lock rules refuse deletion and overwrite of =data/=, =index/= and
+      =snapshots/= for 90 days, and of =keys/= and =config= for good,
+      whatever the token. Changing the rules needs an Admin token or
+      the dashboard, neither of which is on bay1. A compromised host
+      cannot remove anything younger than 90 days; it can remove older
+      snapshots. Forgetting, pruning and rewriting run from the
+      operator's machine, and can likewise only remove what is past 90
+      days.
+
+      =apns.p8= and =secret.key= are in a separate restic repository in
+      its own bucket, with its own password and token, neither of which
+      is on bay1; the operator streams the files into it from bay1. A
+      leak of the main backup therefore does not carry the key that
+      opens its secrets. =offsite.env= is in neither repository.
+      ```
+    - `Admin.org`, `*** Removing a repository's history from every
+      snapshot`: after the sentence ending "rather than forgetting the
+      snapshots: everything else in them stays restorable.", add
+      "Snapshots and packs younger than 90 days are locked:
+      =rewrite --forget= and =prune= cannot remove them until they
+      age out." The `~/.config/gitbay/offsite.env` sourcing line
+      becomes "export the =gitbay r2-prune= entry from the password
+      manager".
+    - `Architecture/08-Operations.org:53`: "to object storage" → "to
+      Cloudflare R2"; lines 63-65 become "The host's R2 token can
+      delete, but bucket lock rules keep everything younger than 90
+      days; the lock rules are changed only off the host
+      (documented: Admin wiki)."
+    - `Architecture/09-Controls.org:101`:
+      `| Backups offsite and delete-locked           | in place | restic to R2; bucket lock rules, 90 days on data, index and snapshots (documented) |`
+    - `Architecture/04-Trust-Boundaries.org:30`: "append-only offsite
+      backup credentials" → "offsite backup under R2 bucket locks".
+    - `Threat-Model.org:195`: "restic append-only credentials" →
+      "restic under R2 bucket locks".
+    - `Architecture/diagrams/diagrams.py:165`: `"restic · append-only key"`
+      → `"restic · R2 bucket locks"`; regenerate with
+      `python3 .gitbay/wiki/Architecture/diagrams/diagrams.py .gitbay/wiki/Architecture/diagrams`
+      and commit the SVGs.
+    - If MR 1 landed without the keys-repository sentences (Task 1.6),
+      add them to `Admin.org` `** Secret key` and
+      `Architecture/06-Data-and-Cryptography.org` here.
 
 ---
 
 ## Open questions
 
-1. How `/var/lib/gitbay-stage` is populated on bay1 is not in the
-   repository. If the staging step reads the local archives, enabling
-   `age_recipients` breaks the restic path (runbook B.4 checks this
-   before it matters).
-2. Is `/etc/gitbay/config.toml` kept anywhere off the host today? The
-   repository does not say; runbook A.3 creates a copy, and the drill
-   depends on it.
-3. Drill cadence: the plan proposes quarterly and after backup changes;
-   #259 says only "on a schedule".
-4. Where the clean host runs (throwaway VPS or local VM) is left to the
-   operator; the runbook works for either.
-5. `lfs.root` on bay1: if it points outside `server.root`, LFS objects
-   are in neither the archive nor the restic snapshot of
-   `/var/lib/gitbay`. The drill records it; fixing it is not in this
-   plan.
-6. Out of scope, noted while reading: `webhook add` takes `--secret`
+1. The lock retention `RET`: the runbook uses 90 days. It is the
+   window a compromised host cannot touch and the minimum age of
+   anything prune can remove, so it should be at least as long as the
+   shortest period the current forget policy keeps (that policy is on
+   the laptop, not in the repository).
+2. Out of scope, noted while reading: `webhook add` takes `--secret`
    on argv (`internal/control/webhook.go:16-23`), against the
    stdin-only rule for secrets.
+3. Out of scope: the offsite job (`/usr/local/bin/gitbay-offsite`, its
+   unit and timer) is not in the repository and `deploy/cloud-init.yaml`
+   does not template it, so a host built from cloud-init has no offsite
+   backup until the operator installs one by hand.
 
 ## Self-review
 
@@ -3286,14 +3630,23 @@ Record every timestamp as you go. Start the clock at step 2.
   `rotate`), existing clear rows sealed at startup (1.4 `serve`,
   `ResealSecrets`), missing key behaviour (1.4 `openStore`, documented
   1.6), backups do not carry it (validation 1.2, e2e 1.5), install
-  provisioning (1.6).
+  provisioning (1.6), offsite copy only in the separate keys repository
+  (runbook A.3, D.9).
 - #274: age recipients config (2.1), encryption (2.2), `--verify
-  --identity` (2.2), restic path unaffected by the archives and checked
-  for its staging step (runbook B.4), scripts (2.3).
+  --identity` (2.2), restic path unaffected by the archives because the
+  offsite job stages from live data (runbook B.4), scripts (2.3).
 - #259: `--verify` connectivity (3.1, 3.4), delete/rename/transfer held
   (3.2, 3.3, 3.4), drill covering database integrity, connectivity,
-  LFS, release assets, config, host keys, secrets and the key, with time
-  to service on the Admin page (3.5, runbook C).
+  LFS, release assets, config, host keys, secrets and the keys, with time
+  to service on the Admin page (3.5, runbook C). The drill is deferred;
+  MR 3 says `Ref #259` and #259 stays open until the first drill is
+  recorded. Cadence: quarterly and after any backup code change.
+- Offsite move: R2 buckets, bucket-scoped tokens for host, prune and
+  keys, lock rules on `data/`, `index/`, `snapshots/`, `keys/` (and
+  `config`) with `locks/` open, validation on a scratch bucket with the
+  same rules, both targets in parallel for 30 nights, Scaleway retired,
+  wiki MR (runbook D). No code MR: the offsite job is not in the
+  repository or in `deploy/cloud-init.yaml`.
 - Names used across tasks: `seal.Keyring`/`Load`/`Seal`/`Open`/
   `CurrentID`/`KeyID`/`IsSealed`/`NewKey`/`ReadKeys`/`WriteKeys`;
   `Store.SetKeyring`/`ResealSecrets`/`SecretKeyUse`; `testConfig`;

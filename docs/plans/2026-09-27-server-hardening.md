@@ -3636,28 +3636,29 @@ steps are run by hand. Operator ssh is `ssh -p 2222 root@gitbay.org`.
 - limits: new `pack_*` settings with non-zero defaults; a burst of
   clones now queues and, past the queue, is refused with 503 / exit 1.
 
-# Open questions
+# Decisions and remaining questions
+
+Decided 2026-09-28:
+
+- **receive-pack stays outside the pack limit.**
+- **bay1's relay and git**, checked: git 2.47.3 (`http.curloptResolve`
+  needs 2.37); relay is AWS mail manager on port 587 and negotiates
+  STARTTLS (TLS 1.3, certificate verified). MRs 2 and 3 are not blocked;
+  runbook steps 1 and 2 stay as the check for other operators.
+
+Remaining:
 
 1. **System SSH mode.** With `ssh.mode = "system"` every session is a
    separate `gitbayd shell` process, so (a) the pack limiter cannot
    count SSH clones across sessions — this plan passes `nil` and says
    so on the Admin page — and (b) audit rows written there are not
    copied to the journal, because that process's stderr is the SSH
-   client. The same applies to host `gitbayd admin …` commands (stderr
-   is the operator's terminal). Options: file-lock slots under
-   `<root>/packslots/` for (a), and `log/syslog` (journald collects it)
-   for (b). gitbay.org runs embedded mode, so neither is needed there.
-   Decide whether system mode needs them.
+   client. The same applies to host `gitbayd admin …` commands. gitbay.org
+   runs embedded mode; the plan documents the limit and adds nothing
+   for system mode.
 2. **Default pack limits.** 3 / 2 / 32 / 60s are an estimate from the
    one measured full clone (~1.5 cores). The runbook's benchmark
    decides whether they stand.
-3. **receive-pack and the limit.** index-pack on a large push is also
-   CPU-bound, but pushes need an account with write access and
-   killing or queueing receive-pack risks post-receive. This plan keeps
-   pushes outside the limit. Confirm.
-4. **bay1's mail relay and git version** are not visible from the
-   source tree; runbook steps 1 and 2 answer them before the matching
-   MRs merge.
 
 # Self-review
 
