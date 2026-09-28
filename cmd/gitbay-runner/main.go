@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -30,14 +31,18 @@ import (
 )
 
 type job struct {
-	ID      int64             `json:"id"`
-	Repo    string            `json:"repo"`
-	Number  int64             `json:"number"`
-	Job     string            `json:"job"`
-	SHA     string            `json:"sha"`
-	Ref     string            `json:"ref"`
-	Steps   []string          `json:"steps"`
-	Image   string            `json:"image"`
+	ID     int64    `json:"id"`
+	Repo   string   `json:"repo"`
+	Number int64    `json:"number"`
+	Job    string   `json:"job"`
+	SHA    string   `json:"sha"`
+	Ref    string   `json:"ref"`
+	Steps  []string `json:"steps"`
+	Image  string   `json:"image"`
+	// Trusted is false for a merge request head from a fork, and when the
+	// server did not say: such a build gets no secrets and a home of its
+	// own (#255).
+	Trusted bool              `json:"trusted"`
 	Secrets map[string]string `json:"secrets"`
 }
 
@@ -312,22 +317,12 @@ func (r *runner) run(j job) bool {
 	dir := filepath.Join(r.workdir, fmt.Sprintf("build-%d", j.ID))
 	defer os.RemoveAll(dir)
 
-	// A build's HOME. Not the workspace, which is removed after every
-	// build: the Go module cache, the sonar scanner and every other tool
-	// cache live under HOME, so a per-build one re-downloads the world
-	// each time. Not the runner's own home either, where its SSH key and
-	// credential dotfiles are. A directory beside the workspaces is
-	// neither.
-	//
-	// One per repository: shared across repositories, a step could poison
-	// the module cache or plant a .gitconfig that another repository's
-	// build would honour, and the container mounts the home read-write
-	// (#184).
-	buildHome, err := buildHomeFor(r.workdir, j.Repo)
+	home, doneHome, err := buildHome(r.workdir, j)
 	if err != nil {
 		log.Printf("build %d: build home: %v", j.ID, err)
 		return false
 	}
+	defer doneHome()
 
 	// One long-lived `runner log` session receives the whole stream.
 	logCmd := exec.Command(toolpath.Look("ssh"), append(r.sshOpts, r.remote, "runner", "log", fmt.Sprint(j.ID))...)
@@ -430,36 +425,62 @@ func (r *runner) run(j job) bool {
 		}
 	}
 
-	env := stepEnv(j, buildHome, r.buildSSH())
+	env := stepEnv(j, home, r.buildSSH())
 	return r.runSteps(j, dir, env, sink, deadline, runStep)
 }
 
-// stepEnv builds the environment a build step runs with. It is
-// constructed, not inherited: os.Environ() would hand repository content
-// the runner's entire environment, including anything an operator set on
-// the service (#144).
+// buildHome is a build's HOME and what to do with it when the build ends.
 //
-// HOME is the repository's build home, not the runner's own: tools read
-// credentials out of dotfiles — .netrc, .npmrc, .gitconfig — and a build
-// has no business finding the runner's. It is not the workspace either,
-// because the workspace is deleted after every build and every tool
-// cache lives under HOME.
+// Not the workspace, which is removed after every build: the Go module
+// cache and every other tool cache live under HOME. Not the runner's own
+// home either, where its SSH key and credential dotfiles are.
 //
-// PATH is the one thing carried over: without it a step cannot find the
-// tools the host was provisioned with.
-// buildHomeFor is the build home for one repository: <workdir>/home/<owner>/<name>,
-// created on first use. The repository path comes from the server, but a
-// home must still never resolve outside the home root.
-func buildHomeFor(workdir, repo string) (string, error) {
-	root := filepath.Join(workdir, "home")
-	dir := filepath.Join(root, filepath.FromSlash(repo))
+// A trusted build gets its repository's home,
+// <workdir>/trusted-home/<owner>/<name>, kept between builds so the
+// caches survive. One per repository: shared across repositories, a step
+// could poison a cache or plant a .gitconfig that another repository's
+// build would honour (#184). The root is not <workdir>/home, where homes
+// that untrusted builds could write were kept before #255, so none of
+// those is read again.
+//
+// An untrusted build gets <workdir>/build-<id>-home, new and empty,
+// removed when the build ends. The container mounts HOME read-write, so
+// a home a fork's build could write is a cache a stranger controls
+// (#255).
+func buildHome(workdir string, j job) (string, func(), error) {
+	if !j.Trusted {
+		dir := filepath.Join(workdir, fmt.Sprintf("build-%d-home", j.ID))
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			return "", nil, err
+		}
+		return dir, func() {
+			if err := removeTree(dir); err != nil {
+				log.Printf("build %d: removing its home: %v", j.ID, err)
+			}
+		}, nil
+	}
+	root := filepath.Join(workdir, "trusted-home")
+	dir := filepath.Join(root, filepath.FromSlash(j.Repo))
 	if rel, err := filepath.Rel(root, dir); err != nil || rel == "." || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("repository path %q escapes the build home root", repo)
+		return "", nil, fmt.Errorf("repository path %q escapes the build home root", j.Repo)
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return dir, nil
+	return dir, func() {}, nil
+}
+
+// removeTree deletes dir and everything under it. os.RemoveAll alone
+// fails on a directory without write permission, and the Go module cache
+// makes every directory it fills read-only.
+func removeTree(dir string) error {
+	filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			os.Chmod(p, 0o700)
+		}
+		return nil
+	})
+	return os.RemoveAll(dir)
 }
 
 // buildSSH is the instance's ssh destination as a build reaches it. Under
@@ -485,6 +506,17 @@ func (r *runner) buildSSH() string {
 	return "169.254.1.2"
 }
 
+// stepEnv builds the environment a build step runs with. It is
+// constructed, not inherited: os.Environ() would hand repository content
+// the runner's entire environment, including anything an operator set on
+// the service (#144).
+//
+// HOME is the build's home (buildHome), not the runner's own: tools read
+// credentials out of dotfiles — .netrc, .npmrc, .gitconfig — and a build
+// has no business finding the runner's.
+//
+// PATH is the one thing carried over: without it a step cannot find the
+// tools the host was provisioned with.
 func stepEnv(j job, home, sshDest string) []string {
 	path := os.Getenv("PATH")
 	if path == "" {
@@ -501,11 +533,12 @@ func stepEnv(j job, home, sshDest string) []string {
 		"GITBAY_JOB=" + j.Job,
 		"GITBAY_SSH=" + sshDest,
 	}
-	// The server sends secrets only for a trusted build — a merge request
-	// head from a fork arrives with none — so this loop is empty exactly
-	// when it should be.
-	for name, value := range j.Secrets {
-		env = append(env, name+"="+value)
+	// The server sends secrets only for a trusted build. The claim's
+	// trust flag decides here as well, not whether any arrived (#255).
+	if j.Trusted {
+		for name, value := range j.Secrets {
+			env = append(env, name+"="+value)
+		}
 	}
 	return env
 }

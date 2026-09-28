@@ -44,17 +44,20 @@ func TestStepEnvDoesNotInherit(t *testing.T) {
 	}
 }
 
-// Secrets are passed through when the server sent them, which it does
-// only for a trusted build.
+// Secrets reach a trusted build's steps and never an untrusted one's,
+// whatever the claim carried: the trust flag decides, not whether any
+// secrets arrived (#255).
 func TestStepEnvCarriesSecrets(t *testing.T) {
-	env := stepEnv(job{Secrets: map[string]string{"TOKEN": "s3cret"}}, "/tmp/buildhome", "git@x.test")
+	secrets := map[string]string{"TOKEN": "s3cret"}
+	env := stepEnv(job{Trusted: true, Secrets: secrets}, "/tmp/buildhome", "git@x.test")
 	if !containsEnv(env, "TOKEN=s3cret") {
 		t.Error("a trusted build's secret did not reach the step")
 	}
-	env = stepEnv(job{}, "/tmp/buildhome", "git@x.test")
-	for _, e := range env {
-		if strings.HasPrefix(e, "TOKEN=") {
-			t.Errorf("a secret appeared with none sent: %q", e)
+	for _, j := range []job{{}, {Secrets: secrets}} {
+		for _, e := range stepEnv(j, "/tmp/buildhome", "git@x.test") {
+			if strings.HasPrefix(e, "TOKEN=") {
+				t.Errorf("a secret reached an untrusted build: %q", e)
+			}
 		}
 	}
 }
