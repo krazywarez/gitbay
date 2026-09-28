@@ -179,6 +179,15 @@ anything. The delivery queue (a device's undelivered and attempted
 pushes) is capped the same way the mail queue is, by =[retention]
 push=.
 
+** [backup]
+- =age_recipients= (optional) — age public keys (=age1...=). When set,
+  =admin backup= encrypts every archive to them and appends =.age= to
+  its name. Generate the pair off the host with =age-keygen=; only the
+  public key goes here, so the host writes archives it cannot read.
+  The restic copy is unaffected: the offsite job stages its own
+  =VACUUM INTO= of the live database and snapshots =/var/lib/gitbay=,
+  not the archives.
+
 ** [api]
 - =enabled= (false) — the JSON API surface; see [[API]]. Off
   means no credential-bearing HTTP endpoint exists at all.
@@ -441,6 +450,18 @@ live daemon.
 integrity check, and every repository the snapshot names must be in the
 archive. A database-only archive is checked for integrity and says so.
 Exit is non-zero on damage or a missing repository.
+
+With =[backup] age_recipients= set the archive is =<name>.tar.gz.age=
+and =--verify= needs the private key:
+
+#+begin_src sh
+gitbayd admin backup --verify gitbay-20260927-090000.tar.gz.age --identity ~/.config/gitbay/backup-identity.txt
+age -d -i ~/.config/gitbay/backup-identity.txt gitbay-20260927-090000.tar.gz.age | tar -xz -C /new/root
+#+end_src
+
+The identity lives off the host (with the secret key file and the
+restic credentials), so verifying an encrypted archive happens there
+or on a restore host.
 
 Restore: extract into an empty directory, point =server.root= at it,
 start gitbayd. Host keys are preserved, so clients keep their

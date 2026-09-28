@@ -161,6 +161,9 @@ secret.
   older server refuses the runner's =--step= and =--reason= (exit 2),
   and its failed builds stay running until the reaper fails them.
   (#266)
+- =gitbayd admin backup= encrypts archives to =[backup] age_recipients=
+  when set (#274); =--verify= takes =--identity <file>=. Archive names
+  gain =.age=; the shipped backup scripts and monitor match both.
 
 * v1.36.0 — 2026-09-23
 

@@ -48,8 +48,8 @@ the product activity feed, not an audit trail.
 
 | Item            | Schedule | Kept | Contents                                                        |
 |-----------------+----------+------+-----------------------------------------------------------------|
-| Full archive    | nightly  | 7    | SQLite snapshot (=VACUUM INTO=), all repositories, LFS, SSH host keys |
-| Database only   | hourly   | 48   | SQLite snapshot                                                 |
+| Full archive    | nightly  | 7    | SQLite snapshot (=VACUUM INTO=), all repositories, LFS, SSH host keys; age-encrypted when =[backup] age_recipients= is set |
+| Database only   | hourly   | 48   | SQLite snapshot; age-encrypted when =[backup] age_recipients= is set |
 | Offsite (restic)| nightly  | per prune policy | =/var/lib/gitbay= and a staged database copy, to object storage |
 
 - The database snapshot is taken before repositories are read, so a

@@ -45,7 +45,7 @@ throttling (=internal/sshd/sshd.go=).
 | API tokens, sessions, login links, email codes, invites | SHA-256 of a 256-bit random value; the value is shown once and never stored (=internal/store/sessions.go=) |
 | CI secrets, webhook secrets, mirror tokens, APNs device tokens | AES-256-GCM under a key file outside the database and outside =server.root=; additional data binds table, column and row (=internal/seal=, =internal/store/secrets.go=) |
 | SQLite file                           | mode 0640, directory 0750                                      |
-| Backups                               | the local archive is not encrypted; restic encrypts the offsite copy |
+| Backups                               | local archives age-encrypted when =[backup] age_recipients= is set; restic encrypts the offsite copy; neither carries the secret key file, whose offsite copy is a separate keys repository |
 | Disk                                  | no application-level encryption; any disk encryption is the host's |
 
 The database file or a backup read by anyone other than the =gitbay=

@@ -96,7 +96,7 @@ write_files:
       # archive and the newest database snapshot, in hours.
       now=$(date -u +%s)
       age_h() {
-        f=$(ls -t "$1"/*.tar.gz 2>/dev/null | head -1)
+        f=$(ls -t "$1"/*.tar.gz "$1"/*.tar.gz.age 2>/dev/null | head -1)
         [ -n "$f" ] || { echo ""; return; }
         echo $(( (now - $(stat -c %Y "$f")) / 3600 ))
       }
@@ -251,12 +251,12 @@ write_files:
       # Nightly consistent backup; keeps the last 7 locally.
       # To ship offsite, add an rclone/s3 upload of $out here.
       set -eu
-      # The archive carries the database, so it gets the database's mode.
+      # gitbayd writes the archive 0600, owned by the backup user.
       umask 027
       dir=/var/backups/gitbay
       out="$dir/gitbay-$(date -u +%Y%m%d-%H%M%S).tar.gz"
       /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --out "$out"
-      ls -1t "$dir"/gitbay-*.tar.gz | tail -n +8 | xargs -r rm --
+      ls -1t "$dir"/gitbay-*.tar.gz* | tail -n +8 | xargs -r rm --
 
   # Hourly database-only snapshot. The nightly full backup below is the one
   # that can rebuild the host; this one exists because the database holds
@@ -267,14 +267,14 @@ write_files:
     content: |
       #!/bin/sh
       set -eu
-      # The archive is the whole database, so it gets the database's mode.
+      # gitbayd writes the archive 0600, owned by the backup user.
       umask 027
       dir=/var/backups/gitbay/db
       mkdir -p "$dir"
       chmod 0750 "$dir"
       out="$dir/gitbay-db-$(date -u +%Y%m%d-%H%M%S).tar.gz"
       /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin backup --db-only --out "$out"
-      ls -1t "$dir"/gitbay-db-*.tar.gz | tail -n +49 | xargs -r rm --
+      ls -1t "$dir"/gitbay-db-*.tar.gz* | tail -n +49 | xargs -r rm --
 
   - path: /etc/systemd/system/gitbay-db-backup.service
     content: |
