@@ -40,11 +40,13 @@ func init() {
 		ReadOnly: true, Run: runBuildShow})
 	register(Command{Path: []string{"build", "log"},
 		Summary: "print a build's log, or follow it until the build ends",
-		Usage:   "build log <owner/name> <n> [--follow]",
+		Usage:   "build log <owner/name> <n> [--follow] [--step <step>|failed] [--tail <lines>]",
 		Flags: []Flag{
 			{"--follow", "", "stream the log until the build ends", ""},
+			{"--step", "<step>|failed", "only one step's output: 0 for the setup, a step number, or the one that failed", ""},
+			{"--tail", "<lines>", "only the last lines", ""},
 		},
-		Examples: []string{"build log krz/gitbay 431 --follow"},
+		Examples: []string{"build log krz/gitbay 431 --follow", "build log krz/gitbay 431 --step failed --tail 40"},
 		ReadOnly: true, Run: runBuildLog})
 
 	register(Command{Path: []string{"build", "jobs"},
@@ -123,11 +125,22 @@ type BuildOut struct {
 	// names what it ran on rather than only its sha (#241). It is empty
 	// when the commit is no longer in the repository.
 	Subject string `json:"subject,omitempty"`
+	// FailedStep is the 1-based step a failed build stopped at, 0 when
+	// none; FailedReason says how ("exit 1") (#266).
+	FailedStep   int    `json:"failed_step,omitempty"`
+	FailedReason string `json:"failed_reason,omitempty"`
+	// DurationS is how long the build ran, once it has a start and a
+	// finish.
+	DurationS int64 `json:"duration_s,omitempty"`
+	// Steps are the job's commands; build show only.
+	Steps []string `json:"steps,omitempty"`
 }
 
 func buildToOut(b store.Build) BuildOut {
 	return BuildOut{Number: b.Number, Job: b.Job, Status: b.Status, SHA: b.SHA,
-		Ref: b.Ref, CreatedAt: b.CreatedAt, FinishedAt: b.FinishedAt}
+		Ref: b.Ref, CreatedAt: b.CreatedAt, FinishedAt: b.FinishedAt,
+		FailedStep: b.FailedStep, FailedReason: b.FailedReason,
+		DurationS: int64(b.Elapsed() / time.Second)}
 }
 
 func buildRef(c *Ctx, args []string) (store.Repo, store.Build, int) {
@@ -229,7 +242,22 @@ func runBuildShow(c *Ctx, args []string) int {
 		return code
 	}
 	d := buildToOut(b)
+	json.Unmarshal([]byte(b.Steps), &d.Steps)
 	return c.emit(d, func(w io.Writer) {
+		failedStep, failed := "", ""
+		if d.FailedStep > 0 && d.FailedStep <= len(d.Steps) {
+			step, _, _ := strings.Cut(d.Steps[d.FailedStep-1], "\n")
+			failedStep = fmt.Sprintf("%d/%d %s", d.FailedStep, len(d.Steps), step)
+			if d.FailedReason != "" {
+				failedStep += " (" + d.FailedReason + ")"
+			}
+		} else {
+			failed = d.FailedReason
+		}
+		duration := ""
+		if d.DurationS > 0 {
+			duration = (time.Duration(d.DurationS) * time.Second).String()
+		}
 		v := c.view(w)
 		v.title(fmt.Sprintf("#%d", d.Number), d.Job, d.Status)
 		v.fields(
@@ -237,13 +265,16 @@ func runBuildShow(c *Ctx, args []string) int {
 			"ref", d.Ref,
 			"queued", c.when(d.CreatedAt),
 			"finished", c.when(d.FinishedAt),
+			"duration", duration,
+			"failed step", failedStep,
+			"failed", failed,
 			"url", c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10)),
 		)
 	})
 }
 
 func runBuildLog(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{Bools: []string{"--follow"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	f, err := c.parseArgs(args, flagSpec{Bools: []string{"--follow"}, Values: []string{"--step", "--tail"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -252,11 +283,48 @@ func runBuildLog(c *Ctx, args []string) int {
 		return code
 	}
 	if f.Has("--follow") {
+		if f.Has("--step") || f.Has("--tail") {
+			return c.fail(protocol.ExitUsage, "--step and --tail read the stored log; drop --follow")
+		}
 		return followBuildLog(c, repo, b)
+	}
+	tail := 0
+	if f.Has("--tail") {
+		if tail, err = strconv.Atoi(f.Value("--tail")); err != nil || tail < 1 {
+			return c.fail(protocol.ExitUsage, "--tail takes a number of lines, 1 or more")
+		}
 	}
 	log, err := c.Store.BuildLog(b.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if f.Has("--step") {
+		var steps []string
+		json.Unmarshal([]byte(b.Steps), &steps)
+		sections := SplitBuildLog(string(log), steps)
+		at := -1
+		if want := f.Value("--step"); want == "failed" {
+			if at = FailedSection(sections, b.Status, b.FailedStep); at < 0 {
+				return c.fail(protocol.ExitNotFound, "build %d did not fail", b.Number)
+			}
+		} else {
+			n, err := strconv.Atoi(want)
+			if err != nil || n < 0 || n > len(steps) {
+				return c.fail(protocol.ExitUsage, "--step takes 0 (the setup) to %d, or failed", len(steps))
+			}
+			for i, s := range sections {
+				if s.N == n {
+					at = i
+				}
+			}
+			if at < 0 {
+				return c.fail(protocol.ExitNotFound, "build %d has no output for step %d", b.Number, n)
+			}
+		}
+		log = []byte(sections[at].Text)
+	}
+	if tail > 0 {
+		log = tailLines(log, tail)
 	}
 	c.Stdout.Write(log)
 	return protocol.ExitOK
