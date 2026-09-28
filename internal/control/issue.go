@@ -67,7 +67,7 @@ func init() {
 		},
 		ReadsStdin: true, Run: runIssueEdit})
 	register(Command{Path: []string{"issue", "comment"},
-		Summary: "comment",
+		Summary: "add a comment",
 		Usage:   "issue comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		Flags: []Flag{
 			{"--message", "<m>", "the comment's text", ""},
@@ -90,7 +90,7 @@ func init() {
 		Examples: []string{"issue reopen krz/gitbay 42"},
 		Run:      runIssueReopen})
 	register(Command{Path: []string{"issue", "label"},
-		Summary: "labels",
+		Summary: "add or remove labels",
 		Usage:   "issue label <owner/name> <n> [--add <l>]... [--remove <l>]...",
 		Flags: []Flag{
 			{"--add", "<l>", "label to add, may repeat", ""},
@@ -99,7 +99,7 @@ func init() {
 		Examples: []string{"issue label krz/gitbay 42 --add bug --remove needs-triage"},
 		Run:      runIssueLabel})
 	register(Command{Path: []string{"issue", "assign"},
-		Summary: "assignees",
+		Summary: "add or remove assignees",
 		Usage:   "issue assign <owner/name> <n> [--add <user>]... [--remove <user>]...",
 		Flags: []Flag{
 			{"--add", "<user>", "user to assign, may repeat", ""},

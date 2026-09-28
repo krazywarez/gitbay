@@ -143,7 +143,7 @@ func init() {
 		Examples: []string{"mr retarget krz/gitbay 431 main"},
 		Run:      runMRRetarget})
 	register(Command{Path: []string{"mr", "comment"},
-		Summary: "comment",
+		Summary: "add a comment",
 		Usage:   "mr comment <owner/name> <n> [--message <m> | --file -] [--format md|org]",
 		Flags: []Flag{
 			{"--message", "<m>", "the comment's text", ""},
@@ -153,7 +153,7 @@ func init() {
 		Examples:   []string{`mr comment krz/gitbay 431 --message "looks good"`},
 		ReadsStdin: true, Run: runMRComment})
 	register(Command{Path: []string{"mr", "review"},
-		Summary: "review",
+		Summary: "record a review verdict",
 		Usage:   "mr review <owner/name> <n> --approve|--request-changes|--comment|--discard",
 		Flags: []Flag{
 			{"--approve", "", "approve the merge request", ""},
@@ -173,7 +173,7 @@ func init() {
 		Examples: []string{"mr review request krz/gitbay 431 --add cmc"},
 		Run:      runMRReviewRequest})
 	register(Command{Path: []string{"mr", "label"},
-		Summary: "labels",
+		Summary: "add or remove labels",
 		Usage:   "mr label <owner/name> <n> [--add <l>]... [--remove <l>]...",
 		Flags: []Flag{
 			{"--add", "<l>", "label to add, may repeat", ""},
