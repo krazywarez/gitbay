@@ -52,7 +52,8 @@ matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Archite
   OpenSSH and fronted unchanged by the JSON API and the web. No command
   belongs to one surface (#234): what a caller may do is the account's
   rights narrowed by its credential's scope, decided in one place, so a
-  bearer token is worth exactly its scope and no more. Git transport
+  bearer token is worth exactly its scope and no more, and a credential
+  with an expiry cannot create one that outlives it. Git transport
   never runs over the API.
 - *Anonymous surfaces* — HTTPS clone of public repos, =git://= where
   enabled, the read-only web UI — carry no credentials and expose only

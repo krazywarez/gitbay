@@ -26,7 +26,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Session lifetime                            | partial  | 7 days absolute, no idle timeout (#276)                                  |
 | Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none (#277)                    |
 | Revocation takes effect immediately         | in place | removing a key or disabling an account closes its connections; every exec re-reads its key (=internal/sshd/sshd.go=) |
-| Delegation bounded by the delegating credential | gap  | expiring tokens can mint lasting credentials (#257)              |
+| Delegation bounded by the delegating credential | in place | expiring tokens refused on =MintsCredential= commands; credentials record their creating token (=internal/control/control.go=) |
 
 ** Access control (V4)
 

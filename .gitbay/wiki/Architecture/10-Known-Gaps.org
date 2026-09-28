@@ -11,7 +11,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | Issue | Area             | Gap                                                                   | Severity |
 |-------+------------------+-----------------------------------------------------------------------+----------|
 | #255  | CI isolation     | Untrusted and trusted builds of a repository share a writable build home | high  |
-| #257  | Credentials      | An expiring token can create credentials that outlive it; tokens default to full scope | high |
 | #258  | CI integrity     | Any writer can post a =ci/*= status; tree reuse ignores trust and image | high   |
 | #259  | Recovery         | No restore has been exercised; verification does not check git connectivity | high |
 | #260  | CI network       | Builds share the runner's source address; no egress policy            | medium   |
@@ -28,9 +27,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | #281  | TLS              | No explicit minimum TLS version                                       | low      |
 | #282  | Hook socket      | Anything that can open =hook.sock= can act as any user                | medium   |
 
-Decisions already taken on these: #257 refuses credential
-creation from expiring tokens, records which token created each
-credential, and makes =read= the default scope.
 
 * Questions an auditor will ask that have no answer yet
 

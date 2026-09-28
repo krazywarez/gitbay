@@ -4,17 +4,20 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* unreleased
+* Unreleased
 
-- Removing an SSH key, removing a deploy key, or disabling or deleting an
-  account closes every open connection using an affected key, git
-  transports included; every command re-reads its key (#256).
-- A request whose credential has an expiry cannot run a command that
-  mints another one — tokens, keys, login links, invites, accounts,
-  verified addresses (#257).
-- Tokens and SSH keys record the token that created them; `token create`
-  defaults to =--scope read=; `token revoke --created` also revokes what
-  a token made, at any depth (#257).
+*Upgrade note.* =token create= makes a =read= token unless given
+=--scope full=. A script that mints a token and then writes with it
+must add =--scope full=. Existing tokens keep their scope.
+
+- A token with a =--ttl= is refused on every command that creates a
+  credential: tokens, keys, deploy keys, runner keys, login links,
+  invites, accounts and verified addresses (#257).
+- Tokens and SSH keys record the token they were created through.
+  =token revoke <name>= lists what it created; =--created= revokes
+  those too.
+- Removing an SSH key, a deploy key, or disabling an account closes the
+  connections the key opened, a push in flight included (#256).
 
 * v1.36.0 — 2026-09-23
 

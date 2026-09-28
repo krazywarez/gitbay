@@ -14,17 +14,25 @@ enabled = true
 ** Tokens
 
 Tokens are minted wherever the registry is reached: over SSH, on the
-API, anywhere. A full-scope token can mint another, which is what full
-scope means; a read-scoped one cannot, because minting is a write. The
-controls here are scope, TTL and revocation, not which door a request
-arrived through (#234). Give a token the narrowest scope and shortest
+API, anywhere. =token create= makes a =read= token unless =--scope full=
+is given; a read token runs only commands marked read-only. A full-scope
+token can mint another, but a token with a =--ttl= cannot run any
+command that creates a credential — =token create=, =keys add=,
+=repo deploy-key add=, =repo runner add=, =web login=, =admin invite=,
+=admin user create=, =email verify=, =admin email verify= — since what
+it made would outlive it. Give a token the narrowest scope and shortest
 TTL that does its job, and revoke it when the job is over.
 
 #+begin_src sh
-gitbay auth token create --name ci [--scope full|read] [--ttl 30d]
+gitbay auth token create --name ci [--scope read|full] [--ttl 30d]
 gitbay auth token list
-gitbay auth token revoke ci
+gitbay auth token revoke ci [--created]
 #+end_src
+
+Tokens and keys record the token they were created through. =token
+revoke= prints what the token created, at any depth; with =--created=
+it revokes those too, and their SSH connections close. Without it they
+stay and the link is dropped.
 
 The token (prefix =gb_=, shown exactly once) is presented as
 =Authorization: Bearer gb_...=. Only a hash is stored server-side.
