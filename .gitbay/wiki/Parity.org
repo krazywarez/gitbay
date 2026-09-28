@@ -217,6 +217,9 @@ rather than the one the web page shows.
 | build show (one build)      | yes | yes | yes |
 | build log                   | yes | yes | yes |
 | build log follow (until it ends) | yes | yes | no  |
+| build failed step, duration | yes | yes | no  |
+| build log one step          | yes | yes | no  |
+| build log tail              | yes | no  | no  |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
 | build cancel                | yes | yes | yes |

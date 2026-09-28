@@ -39,7 +39,8 @@ commit instead of failing silently.
    (=cmd/gitbay-runner/isolate.go=).
 4. *Log.* =runner log <id>= streams stdin into the build row; the server
    ends the stream if the build is cancelled (=build.go=).
-5. *Result.* =runner done <id> success|failure= sets the status,
+5. *Result.* =runner done <id> success|failure [--step <n>] [--reason
+   <text>]= records where a failed build stopped, sets the status,
    records an event and mails the repository's watchers a log tail on
    failure (=build.go=).
 6. *Reap.* The scheduler fails a running build whose log stream closed

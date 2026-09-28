@@ -147,6 +147,16 @@ func TestCI(t *testing.T) {
 	if !strings.Contains(out, "step 1/1 failed: exit 1") {
 		t.Fatalf("broken log:\n%s", out)
 	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "build", "show", "alice/app", brokenN)
+	if !strings.Contains(out, "1/1 false (exit 1)") {
+		t.Fatalf("build show does not name the failed step:\n%s", out)
+	}
+	if out, _, _ = inst.ssh(t, aliceKey, "", "build", "log", "alice/app", brokenN, "--step", "failed"); strings.Contains(out, "git clone") || !strings.Contains(out, "exit 1") {
+		t.Fatalf("build log --step failed:\n%s", out)
+	}
+	if _, body := inst.get(t, "/alice/app/builds/"+brokenN); !strings.Contains(body, `id="failed" open`) {
+		t.Fatalf("build page does not open the failed step:\n%s", body)
+	}
 	// Statuses resolved, with target URLs pointing at the build pages.
 	out, _, _ = inst.ssh(t, aliceKey, "", "status", "list", "alice/app", sha, "--json")
 	if !strings.Contains(out, `"ci/ok","state":"success"`) && !strings.Contains(out, `"state":"success"`) {

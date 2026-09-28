@@ -64,6 +64,17 @@ seconds: a follower who loses it is told the repository is not found.
 A restart ends every open follow with a message saying so, rather
 than holding the drain; follow again once the daemon is back.
 
+A failed build names the step it stopped at: the log's last line reads
+=step 3/3 failed: exit 1=, and =build show= prints =failed step= (=3/3
+go test ./... (exit 1)=) and =duration=. =build log <owner/name> <n>
+--step failed= prints only that step's output, =--step 2= another one
+(=0= is the clone before the first step), and =--tail 40= the last forty
+lines of whichever was chosen; neither combines with =--follow=. The
+build page folds the finished log into one section per step, opens the
+failed one and links to it from the top as "Jump to failure". Builds
+from before this reported no step; their last section is taken as the
+failed one.
+
 * What a build can reach
 
 Builds have outbound internet access, trusted and untrusted alike. On

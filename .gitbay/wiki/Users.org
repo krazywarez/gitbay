@@ -558,7 +558,9 @@ require-contexts= names statuses the gate waits for until they report,
 and turns the gate on. =build list= takes =--ref=,
 =--status= and =--job= to narrow the listing, combinable; the builds
 tab reads the same flags from its =?ref=, =?status= and =?job= query
-parameters and groups the result into one row per commit. Steps run
+parameters and groups the result into one row per commit. =build show=
+names a failed build's step and how long it ran, and =build log= takes
+=--step <n>|failed= and =--tail <lines>=. Steps run
 with =sh -c= on the instance's runner, stopping at the first failure;
 a broken config surfaces as a failed =ci/config= status. Environment:
 =GITBAY_REPO=,
