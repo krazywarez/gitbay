@@ -41,9 +41,23 @@ func ValidateURL(raw string, allowLocal bool) error {
 	if err != nil {
 		return fmt.Errorf("cannot resolve %s: %w", u.Hostname(), err)
 	}
+	if err := CheckAddrs(u.Hostname(), ips, allowLocal); err != nil {
+		return fmt.Errorf("webhook target %s resolves to a private or local address; refusing (SSRF)", u.Hostname())
+	}
+	return nil
+}
+
+// CheckAddrs refuses host when any of its resolved addresses is
+// loopback, private or link-local, unless allowLocal. A caller resolves
+// immediately before connecting and connects only to the addresses it
+// checked.
+func CheckAddrs(host string, ips []net.IP, allowLocal bool) error {
+	if allowLocal {
+		return nil
+	}
 	for _, ip := range ips {
 		if isForbidden(ip) {
-			return fmt.Errorf("webhook target %s resolves to a private or local address; refusing (SSRF)", u.Hostname())
+			return fmt.Errorf("%s resolves to private or local address %s; refusing (SSRF)", host, ip)
 		}
 	}
 	return nil
