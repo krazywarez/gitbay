@@ -228,8 +228,8 @@ func TestMRRangeDiffPagePrivateRepo(t *testing.T) {
 }
 
 // --from/--to reach the control command as real argv: an unknown
-// revision is refused with not-found, and two real revisions render the
-// range-diff between exactly those two.
+// revision renders the command's refusal on the page, and two real
+// revisions render the range-diff between exactly those two.
 func TestMRRangeDiffPageFromToQuery(t *testing.T) {
 	st, cfg, alice, _, repo, n, v1, v2, _ := rangeDiffFixture(t)
 	s := New(cfg, st, nil)
@@ -244,11 +244,18 @@ func TestMRRangeDiffPageFromToQuery(t *testing.T) {
 		return httptest.NewRecorder(), req
 	}
 
-	t.Run("unknown revision is 404", func(t *testing.T) {
+	// A bad --from/--to is a query parameter, not an unknown merge
+	// request: it renders the command's refusal inline rather than
+	// 404ing the page, which is reserved for an MR that does not exist
+	// (#271).
+	t.Run("unknown revision renders the refusal inline", func(t *testing.T) {
 		rr, req := newReq("?from=0000000000000000000000000000000000000000")
 		s.mrRangeDiff(rr, req)
-		if rr.Code != 404 {
-			t.Fatalf("status %d, want 404, body %s", rr.Code, rr.Body.String())
+		if rr.Code != 200 {
+			t.Fatalf("status %d, want 200 (the refusal renders on the page), body %s", rr.Code, rr.Body.String())
+		}
+		if !strings.Contains(rr.Body.String(), "is not a revision of") {
+			t.Errorf("page does not show the refusal:\n%s", rr.Body.String())
 		}
 	})
 

@@ -14,18 +14,29 @@ anything beyond "replace the binary and restart" is needed.
 - A wiki link to an existing non-page file (an .svg, .txt, .pdf) now
   resolves to the raw route instead of 404ing against the page route
   (#283).
-
 - The new-issue form takes labels, milestone and assignee in one step
-  for writers; the watch button names watching, muted and default; a
-  Discussion heading sits before comment threads; the build page's
-  live note says the page updates itself; and the rail and the phone
-  More menu render from one list (#271).
-
+  for writers; a Discussion heading sits before comment threads; the
+  build page's live note says the page updates itself; and the rail
+  and the phone More menu render from one list (#271).
+- The new-issue form keeps milestone and assignee through preview and
+  a refused create, the way it already kept title, body and labels;
+  a refused create re-renders the form with the draft and the
+  refusal instead of an error page (#271).
+- The merge request range-diff page renders a bad =from=/=to== query
+  parameter inline instead of 404ing; only an unknown merge request
+  404s (#271).
 - Empty states on the web state the fact instead of a CLI command, and
   drop "yet" on a finished item; the merge request list offers a New
   merge request link, a fork link, or a sign-in prompt depending on
   what the visitor can do; and the search page's scope caption is
   always visible, not only before a first search (#270).
+- Issues, milestones, org milestones and releases drop the CLI command
+  from their empty states too, matching the rest of the register: a
+  link to the web form that does the thing when one exists, otherwise
+  just the fact (#270).
+- The merge request list and compare page offer New merge request to a
+  reader who owns a writable fork of the repository, not only to a
+  writer (#270).
 
 Credentials and sessions: revocation, delegation, expiry and an idle
 timeout (#256, #257, #276, #277).
@@ -148,18 +159,17 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
 - A =-- foreign_keys: off= migration's =foreign_key_check= now runs
   inside the migration's own transaction, before commit, so a
   violation rolls the migration back instead of leaving the bad
-  schema and =user_version= already persisted (#261).
-- The web pin and watch buttons dispatch through =repo pin=/=unpin=
-  and =repo watch=/=mute=/=unwatch= instead of writing the store
-  directly, so a refusal reaches the viewer as a message instead of
-  being dropped. The watch button now cycles three states — default,
-  watching, muted — instead of two (#261).
-- The response that consumes a login link's =?token== sends
-  =Cache-Control: no-store=, so no intermediary keeps a copy of the
-  single-use URL (#261).
-- Wiki documentation fixes: API.org clarifies token commands work on the
-  API, Parity.org documents batched review and web watch/pin dispatch,
-  Threat-Model.org documents the login-link URL exception (#261).
+  schema and =user_version= already persisted; the web pin and watch
+  buttons dispatch through =repo pin=/=unpin= and =repo
+  watch=/=mute=/=unwatch= instead of writing the store directly, so a
+  refusal reaches the viewer as a message instead of being dropped,
+  and the watch button now cycles three states — default, watching,
+  muted — instead of two; the response that consumes a login link's
+  =?token== sends =Cache-Control: no-store=, so no intermediary keeps
+  a copy of the single-use URL; and wiki documentation fixes:
+  API.org clarifies token commands work on the API, Parity.org
+  documents batched review and web watch/pin dispatch, Threat-Model.org
+  documents the login-link URL exception (#261).
 - The account settings page quotes the CLI and SSH command forms that
   actually resolve; a test runs every command a web page quotes against
   the CLI and control registries so a renamed command fails CI instead

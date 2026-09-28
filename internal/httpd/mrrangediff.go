@@ -37,11 +37,11 @@ func (s *Server) mrRangeDiff(w http.ResponseWriter, r *http.Request) {
 	if to := r.URL.Query().Get("to"); to != "" {
 		argv = append(argv, "--to", to)
 	}
+	// Only an unknown MR 404s (checked above). A bad --from/--to also
+	// resolves to nothing in git, which range-diff reports as
+	// ExitNotFound too, so that result renders on the page instead of
+	// turning a bad query parameter into a 404 (#271).
 	out, msg, code := s.runControlCode(viewer, argv)
-	if code == protocol.ExitNotFound {
-		s.notFound(w, r)
-		return
-	}
 	errMsg := ""
 	if code != protocol.ExitOK {
 		errMsg = msg

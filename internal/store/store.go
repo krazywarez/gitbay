@@ -284,7 +284,7 @@ func (s *Store) migrateStep(sqlText string, newVersion int, fkOff bool) (retErr 
 			return err
 		}
 		rows.Close()
-		return fmt.Errorf("foreign_key_check failed after migration: %s row %v", table, rowid)
+		return fmt.Errorf("foreign_key_check failed after migration: %s row %d", table, rowid.Int64)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()

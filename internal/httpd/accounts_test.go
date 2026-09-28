@@ -21,7 +21,7 @@ func TestRegisteredPageNumberedStepsAndTokenMention(t *testing.T) {
 	if !strings.Contains(out, "<ol>") {
 		t.Error("next steps are not a numbered list")
 	}
-	if !strings.Contains(out, "Settings → Tokens") {
-		t.Error("no mention of Settings → Tokens for the iOS app")
+	if !strings.Contains(out, "Settings → API tokens") {
+		t.Error("no mention of Settings → API tokens for the iOS app")
 	}
 }
