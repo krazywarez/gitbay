@@ -113,6 +113,10 @@ for the eighteen commands whose CLI path differs from the registry's
 - Wiki documentation fixes: API.org clarifies token commands work on the
   API, Parity.org documents batched review and web watch/pin dispatch,
   Threat-Model.org documents the login-link URL exception (#261).
+- The account settings page quotes the CLI and SSH command forms that
+  actually resolve; a test runs every command a web page quotes against
+  the CLI and control registries so a renamed command fails CI instead
+  of shipping a dead instruction (#263).
 
 * v1.36.0 — 2026-09-23
 
