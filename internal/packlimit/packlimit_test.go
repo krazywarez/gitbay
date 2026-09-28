@@ -2,6 +2,7 @@ package packlimit
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 )
@@ -206,4 +207,18 @@ func waitQueued(t *testing.T, l *Limiter, n int) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("queue never reached %d", n)
+}
+
+// config maps pack_queue = -1 to math.MaxInt: waiters are not turned
+// away for want of queue room.
+func TestUnboundedQueue(t *testing.T) {
+	l := New(1, 0, math.MaxInt, 5*time.Second)
+	r1, _ := l.Acquire(nil, "a")
+	done := make(chan struct{})
+	defer close(done)
+	for i := 0; i < 64; i++ {
+		go l.Acquire(done, "b")
+	}
+	waitQueued(t, l, 64)
+	r1()
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,21 @@ func TestLoadMinimal(t *testing.T) {
 	}
 	if cfg.Registration.Mode != "closed" {
 		t.Errorf("registration default wrong: %+v", cfg.Registration)
+	}
+}
+
+func TestPackLimits(t *testing.T) {
+	max, per, queue, wait := Limits{}.PackLimits()
+	if max != DefaultPackConcurrency || per != DefaultPackPerPrincipal || queue != DefaultPackQueue || wait != DefaultPackQueueWait {
+		t.Fatalf("defaults: %d %d %d %s", max, per, queue, wait)
+	}
+	max, per, queue, wait = Limits{PackConcurrency: -1, PackPerPrincipal: -1, PackQueue: -1, PackQueueWait: "5s"}.PackLimits()
+	if max != 0 || per != 0 || queue != math.MaxInt || wait != 5*time.Second {
+		t.Fatalf("off: %d %d %d %s", max, per, queue, wait)
+	}
+	max, per, queue, _ = Limits{PackConcurrency: 8, PackPerPrincipal: 3, PackQueue: 64}.PackLimits()
+	if max != 8 || per != 3 || queue != 64 {
+		t.Fatalf("set: %d %d %d", max, per, queue)
 	}
 }
 
@@ -393,20 +409,5 @@ func TestBackupRecipients(t *testing.T) {
 	}
 	if cfg, err := Load(writeConfig(t, minimal)); err != nil || len(cfg.Backup.AgeRecipients) != 0 {
 		t.Fatalf("default: %v, %v", cfg.Backup, err)
-	}
-}
-
-func TestPackLimits(t *testing.T) {
-	max, per, queue, wait := Limits{}.PackLimits()
-	if max != DefaultPackConcurrency || per != DefaultPackPerPrincipal || queue != DefaultPackQueue || wait != DefaultPackQueueWait {
-		t.Fatalf("defaults: %d %d %d %s", max, per, queue, wait)
-	}
-	max, per, queue, wait = Limits{PackConcurrency: -1, PackPerPrincipal: -1, PackQueue: -1, PackQueueWait: "5s"}.PackLimits()
-	if max != 0 || per != 0 || queue != 0 || wait != 5*time.Second {
-		t.Fatalf("off: %d %d %d %s", max, per, queue, wait)
-	}
-	max, per, queue, _ = Limits{PackConcurrency: 8, PackPerPrincipal: 3, PackQueue: 64}.PackLimits()
-	if max != 8 || per != 3 || queue != 64 {
-		t.Fatalf("set: %d %d %d", max, per, queue)
 	}
 }

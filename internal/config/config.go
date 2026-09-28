@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -236,7 +237,8 @@ type Limits struct {
 }
 
 // PackLimits resolves the pack_* settings for packlimit.New. A zero
-// count is no bound.
+// max or per is no bound; an unbounded queue is math.MaxInt, since
+// packlimit reads a zero queue as no queue at all.
 func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
 	pick := func(v, def int) int {
 		switch {
@@ -247,13 +249,16 @@ func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
 		}
 		return v
 	}
+	queue = pick(l.PackQueue, DefaultPackQueue)
+	if l.PackQueue < 0 {
+		queue = math.MaxInt
+	}
 	wait = DefaultPackQueueWait
 	if d, err := time.ParseDuration(l.PackQueueWait); err == nil && d > 0 {
 		wait = d
 	}
 	return pick(l.PackConcurrency, DefaultPackConcurrency),
-		pick(l.PackPerPrincipal, DefaultPackPerPrincipal),
-		pick(l.PackQueue, DefaultPackQueue), wait
+		pick(l.PackPerPrincipal, DefaultPackPerPrincipal), queue, wait
 }
 
 type Mail struct {
