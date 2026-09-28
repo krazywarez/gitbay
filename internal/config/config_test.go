@@ -66,6 +66,11 @@ func TestContradictions(t *testing.T) {
 			"requires registration.mode = \"closed\"",
 		},
 		{
+			"unknown mail.tls",
+			minimal + "\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"gitbay@example\"\ntls = \"ssl\"\n",
+			"mail.tls must be starttls or implicit",
+		},
+		{
 			"password auth in view_only",
 			minimal + "\n[web]\nmode = \"view_only\"\npassword_auth = true\n",
 			"password_auth",
@@ -247,5 +252,26 @@ func TestPushHost(t *testing.T) {
 	t.Setenv("GITBAY_APNS_HOST", "127.0.0.1:1234")
 	if got := (Push{Environment: "production"}).Host(); got != "127.0.0.1:1234" {
 		t.Fatalf("GITBAY_APNS_HOST ignored: %q", got)
+	}
+}
+
+func TestMailTLSRequired(t *testing.T) {
+	off, on := false, true
+	for _, tc := range []struct {
+		m    Mail
+		want bool
+	}{
+		{Mail{SMTPHost: "smtp.example.com:587"}, true},
+		{Mail{SMTPHost: "smtp.example.com"}, true},
+		{Mail{SMTPHost: "localhost:25"}, false},
+		{Mail{SMTPHost: "localhost"}, false},
+		{Mail{SMTPHost: "127.0.0.1:25"}, false},
+		{Mail{SMTPHost: "[::1]:25"}, false},
+		{Mail{SMTPHost: "smtp.example.com:587", RequireTLS: &off}, false},
+		{Mail{SMTPHost: "127.0.0.1:25", RequireTLS: &on}, true},
+	} {
+		if got := tc.m.TLSRequired(); got != tc.want {
+			t.Errorf("%+v: TLSRequired = %v, want %v", tc.m, got, tc.want)
+		}
 	}
 }

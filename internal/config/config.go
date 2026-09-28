@@ -209,10 +209,34 @@ type Limits struct {
 }
 
 type Mail struct {
-	SMTPHost string `toml:"smtp_host"` // host:port (port defaults to 587)
+	SMTPHost string `toml:"smtp_host"` // host:port (port defaults to 587, 465 with tls = "implicit")
 	From     string `toml:"from"`
 	SMTPUser string `toml:"smtp_user,omitempty"`
 	SMTPPass string `toml:"smtp_pass,omitempty"`
+	// RequireTLS fails delivery when the relay does not offer STARTTLS,
+	// instead of sending in clear. Unset, it is on for any relay but
+	// localhost or a loopback address (TLSRequired).
+	RequireTLS *bool `toml:"require_tls,omitempty"`
+	// TLS is "starttls" (the default, also when empty) or "implicit":
+	// TLS from the first byte, as relays on port 465 expect.
+	TLS string `toml:"tls,omitempty"`
+}
+
+// TLSRequired reports whether mail must not go to the relay in clear.
+func (m Mail) TLSRequired() bool {
+	if m.RequireTLS != nil {
+		return *m.RequireTLS
+	}
+	host := m.SMTPHost
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip == nil || !ip.IsLoopback()
 }
 
 // Push is APNs delivery to registered Apple devices. A key belongs to a
@@ -405,6 +429,9 @@ func (c Config) Validate() error {
 	// Contradictions.
 	if c.Mail.SMTPHost != "" && c.Mail.From == "" {
 		errs = append(errs, errors.New("[mail] from is required when smtp_host is set"))
+	}
+	if t := c.Mail.TLS; t != "" && t != "starttls" && t != "implicit" {
+		errs = append(errs, fmt.Errorf("mail.tls must be starttls or implicit, got %q", t))
 	}
 	if c.Registration.Mode != "closed" && c.Mail.SMTPHost == "" {
 		errs = append(errs, fmt.Errorf(
