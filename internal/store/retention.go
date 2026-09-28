@@ -51,6 +51,7 @@ func (s *Store) Sweep(r Retention, now time.Time) (Swept, error) {
 		{"web_sessions", "expires_at <= ?"},
 		{"login_tokens", "expires_at <= ?"},
 		{"email_tokens", "expires_at <= ?"},
+		{"push_tokens", "expires_at <= ?"},
 	}
 	for _, e := range expired {
 		n, err := s.deleteBy("DELETE FROM "+e.table+" WHERE "+e.where, fmtTime(now))
