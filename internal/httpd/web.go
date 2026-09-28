@@ -657,7 +657,7 @@ func (s *Server) renderTree(w http.ResponseWriter, r *http.Request, p repoPage, 
 	}
 
 	var readmeHTML template.HTML
-	readmeName := pickReadme(entries)
+	readmeName := control.PickReadme(entries)
 	if readmeName != "" {
 		if raw, err := gitutil.ReadBlob(p.Dir, p.Ref, prefix+readmeName, maxRenderBytes); err == nil {
 			readmeHTML = rewriteRelativeLinks(renderReadme(readmeName, raw), p, dirPath)
@@ -1180,33 +1180,6 @@ var imageTypes = map[string]string{
 	".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
 	".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif",
 	".svg": "image/svg+xml", ".ico": "image/x-icon",
-}
-
-// readmeRank orders competing README files: richer renderers win.
-var readmeRank = map[string]int{".md": 1, ".markdown": 1, ".org": 2, ".html": 3, ".htm": 3}
-
-// pickReadme returns the best README-ish blob in a tree listing: any file
-// named "readme" or "readme.<ext>" (case-insensitive), preferring formats
-// we can render richly.
-func pickReadme(entries []gitutil.TreeEntry) string {
-	best, bestRank := "", 1<<30
-	for _, e := range entries {
-		if e.Type != "blob" {
-			continue
-		}
-		lower := strings.ToLower(e.Name)
-		if lower != "readme" && !strings.HasPrefix(lower, "readme.") {
-			continue
-		}
-		rank, ok := readmeRank[path.Ext(lower)]
-		if !ok {
-			rank = 10 // plaintext fallback
-		}
-		if rank < bestRank {
-			best, bestRank = e.Name, rank
-		}
-	}
-	return best
 }
 
 // markdown is the shared renderer: GFM (tables, strikethrough, autolinks,

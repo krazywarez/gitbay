@@ -168,6 +168,7 @@ rather than the one the web page shows.
 |-----------------------------+-----+-----+-----|
 | browse files                | yes | yes | yes |
 | read a file                 | yes | yes | yes |
+| render a README             | yes | yes | yes |
 | commit log                  | yes | yes | yes |
 | commit log at a ref         | yes | yes | yes |
 | one commit with its patch   | yes | yes | yes |

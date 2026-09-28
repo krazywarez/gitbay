@@ -169,6 +169,7 @@ var summaries = map[string]string{
 	"repo mirror sync":                 "schedule an immediate sync",
 	"repo mute":                        "mute a repository, including work you are part of",
 	"repo pin":                         "pin a repository to your dashboard",
+	"repo readme":                      "print a repository's README",
 	"repo refs":                        "list branches and tags",
 	"repo rename":                      "rename a repository",
 	"repo runner add":                  "attach a runner's public key to a repository",

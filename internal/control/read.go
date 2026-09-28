@@ -52,6 +52,17 @@ func init() {
 		Run:      runRepoBlame,
 	})
 	register(Command{
+		Path:    []string{"repo", "readme"},
+		Summary: "print a repository's README",
+		Usage:   "repo readme <owner/name> [--ref <ref>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "branch, tag or commit to read", "the default branch"},
+		},
+		Examples: []string{"repo readme krz/gitbay"},
+		ReadOnly: true,
+		Run:      runRepoReadme,
+	})
+	register(Command{
 		Path:     []string{"repo", "refs"},
 		Summary:  "list branches and tags",
 		Usage:    "repo refs <owner/name>",
@@ -312,11 +323,105 @@ func runRepoTree(c *Ctx, args []string) int {
 	})
 }
 
+func runRepoReadme(c *Ctx, args []string) int {
+	pos, ref, code := readArgs(c, args, c.Cmd.Usage, 1)
+	if code >= 0 {
+		return code
+	}
+	if len(pos) != 1 {
+		return c.usage()
+	}
+	repo, code := resolveRepo(c, pos[0], policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if _, err := gitutil.ResolveRef(dir, ref); err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", ref, repo.Path())
+	}
+	entries, err := gitutil.ListTree(dir, ref, "")
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no such path in %s at %s", repo.Path(), ref)
+	}
+	name := PickReadme(entries)
+	if name == "" {
+		return c.fail(protocol.ExitNotFound, "%s has no README at %s", repo.Path(), ref)
+	}
+	limit := c.Cfg.Limits.MaxBlobBytes
+	data, err := gitutil.ReadBlob(dir, ref, name, limit+1)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	truncated := int64(len(data)) > limit
+	if truncated {
+		data = data[:limit]
+	}
+	binary := gitutil.IsBinary(data)
+
+	type out struct {
+		Path      string `json:"path"`
+		Ref       string `json:"ref"`
+		File      string `json:"file"`
+		Size      int    `json:"size"`
+		Binary    bool   `json:"binary"`
+		Truncated bool   `json:"truncated,omitempty"`
+		Content   string `json:"content,omitempty"`
+		Base64    string `json:"base64,omitempty"`
+	}
+	d := out{Path: repo.Path(), Ref: ref, File: name, Size: len(data),
+		Binary: binary, Truncated: truncated}
+	if binary {
+		d.Base64 = base64.StdEncoding.EncodeToString(data)
+	} else {
+		d.Content = string(data)
+	}
+	return c.emit(d, func(w io.Writer) {
+		if binary {
+			fmt.Fprintf(w, "%s: %d bytes of binary content (use --json for base64)\n", name, len(data))
+			return
+		}
+		w.Write(data)
+		if len(data) > 0 && data[len(data)-1] != '\n' {
+			fmt.Fprintln(w)
+		}
+	})
+}
+
 func sizeCol(e entryOut) string {
 	if e.Type == "tree" {
 		return "-"
 	}
 	return fmt.Sprintf("%d", e.Size)
+}
+
+// readmeRank orders competing README files: richer renderers win.
+var readmeRank = map[string]int{".md": 1, ".markdown": 1, ".org": 2, ".html": 3, ".htm": 3}
+
+// PickReadme returns the best README-ish blob in a tree listing: any
+// file named "readme" or "readme.<ext>" (case-insensitive), preferring
+// formats we can render richly.
+func PickReadme(entries []gitutil.TreeEntry) string {
+	best, bestRank := "", 1<<30
+	for _, e := range entries {
+		if e.Type != "blob" {
+			continue
+		}
+		lower := strings.ToLower(e.Name)
+		if lower != "readme" && !strings.HasPrefix(lower, "readme.") {
+			continue
+		}
+		rank, ok := readmeRank[path.Ext(lower)]
+		if !ok {
+			rank = 10 // plaintext fallback
+		}
+		if rank < bestRank {
+			best, bestRank = e.Name, rank
+		}
+	}
+	return best
 }
 
 func runRepoCat(c *Ctx, args []string) int {

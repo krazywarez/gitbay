@@ -546,6 +546,7 @@ func repoCmd() *cobra.Command {
 		pass("diff", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
 		pass("tree", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
 		pass("cat", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),
+		pass("readme", passOpts{server: []string{"repo", "readme"}, needsRepo: true}),
 		pass("blame", passOpts{server: []string{"repo", "blame"}, needsRepo: true}),
 		pass("commit", passOpts{server: []string{"repo", "commit"}, needsRepo: true}),
 		pass("commit-file", passOpts{server: []string{"repo", "commit-file"}, needsRepo: true, stdinOK: true}),

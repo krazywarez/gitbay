@@ -122,6 +122,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"repo settings show":          {"alice/app"},
 		"repo topics":                 {"alice/app"},
 		"repo refs":                   {"alice/app"},
+		"repo readme":                 {"alice/app"},
 		"repo log":                    {"alice/app"},
 		"repo tree":                   {"alice/app"},
 		"repo cat":                    {"alice/app", "f.go"},
