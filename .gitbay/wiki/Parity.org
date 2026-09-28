@@ -197,6 +197,7 @@ rather than the one the web page shows.
 | merge requests only         | yes | yes | yes |
 | protected tags              | yes | yes | yes |
 | require codeowners          | yes | yes | yes |
+| require contexts            | yes | yes | no  |
 | access grants               | yes | no  | yes |
 | effective access            | yes | no  | yes |
 | webhooks                    | yes | no  | yes |

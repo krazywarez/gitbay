@@ -553,7 +553,9 @@ queues nothing, so look there when a push builds nothing.
 
 Each job becomes a build (=build list=, =build log=, the builds tab on
 the web) and a =ci/<job>= commit status, which =repo settings
-require-checks= can gate merges on. =build list= takes =--ref=,
+require-checks= can gate merges on. =repo settings
+require-contexts= names statuses the gate waits for until they report,
+and turns the gate on. =build list= takes =--ref=,
 =--status= and =--job= to narrow the listing, combinable; the builds
 tab reads the same flags from its =?ref=, =?status= and =?job= query
 parameters and groups the result into one row per commit. Steps run

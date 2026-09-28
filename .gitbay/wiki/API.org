@@ -112,8 +112,8 @@ CI reports results through the same command surface (over SSH or the
 JSON API with a full-scope token; reporting requires write access):
 
 #+begin_src sh
-gitbay status set <owner/name> <sha> --context build --state pending
-gitbay status set <owner/name> <sha> --context build --state success --url https://ci.example/run/1
+gitbay status set <owner/name> <sha> --context ext/build --state pending
+gitbay status set <owner/name> <sha> --context ext/build --state success --url https://ci.example/run/1
 gitbay status list <owner/name> <sha> --json    # {"combined": "...", "statuses": [...]}
 #+end_src
 
@@ -129,6 +129,20 @@ repository that has recorded a status before, which is what reporting
 from outside through =status set= looks like. A repository where
 nothing has ever reported merges. Each
 report also emits a =status= event to webhooks.
+
+Contexts starting with =ci/= are the instance's own: its builds queue,
+reuse, skip and finish them, and =status set= refuses them with exit 4,
+so a writer cannot mark =ci/test= green on a head the build has not
+passed. Report under another prefix, such as =ext/=.
+
+=repo settings require-contexts <repo> ext/deploy ci/test= names
+statuses the checks gate waits for whether or not they have reported:
+one that has not is =pending=, and =mr show= lists it as
+=ext/deploy=missing=. Naming any context turns =require-checks= on;
+with no contexts the command clears the list and leaves
+=require-checks= as it was. =require-checks off= keeps the list, which
+waits for nothing until the gate is on again. =repo settings show=
+prints both.
 
 * Webhooks
 

@@ -36,7 +36,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Private resources indistinguishable from missing | in place | =resolveRepo= (=internal/control/repo.go=), =runGit=, smart HTTP |
 | Credential scopes narrow account rights     | in place | key and token scopes (=control.go=, =policy/access.go=) |
 | Server-side write protections              | in place | pre-receive =CheckPush=, signed commits (=internal/hookd/hookd.go=) |
-| Merge gates                                 | partial  | =MergeGates=; any writer can post a =ci/*= status (#258)         |
+| Merge gates                                 | in place | =MergeGates=; =ci/*= statuses written only by the build subsystem; required contexts |
 | Admin functions isolated                    | in place | =admin= noun gated in =Dispatch=; =audit= admin-only             |
 | CSRF protection                             | in place | SameSite=Lax plus =checkOrigin= (=accounts.go=)               |
 | Typed confirmation for destructive web actions | in place | =internal/httpd/confirm.go=                                  |
@@ -89,7 +89,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Runner limited to attached repositories     | in place | =runnerMayBuild= (=build.go=)                            |
 | Build images fixed by the operator          | in place | =--pull=never=                                                   |
 | Build network egress restricted             | gap      | #260                                                             |
-| Build results reused only across equal trust | gap     | tree reuse ignores trust and image (#258)                        |
+| Build results reused only across equal trust | in place | =SuccessBuildForTree=, =SuccessBuildFor= (=internal/store/builds.go=) |
 
 ** Availability and operations
 

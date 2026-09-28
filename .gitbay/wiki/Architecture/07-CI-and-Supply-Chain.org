@@ -23,7 +23,7 @@ commit instead of failing silently.
 1. *Queue.* The post-receive hook calls =queueJobs=
    (=internal/control/build.go=). Each job gets a =ci/<job>= status:
    =pending= when queued, =skipped= when path filters exclude it, or
-   =success= copied from an earlier build of the same tree (#177).
+   =success= copied from an earlier trusted build of the same tree on the same image (#177, #258).
    Merge requests from forks are queued against the target repository
    with =trusted = false=.
 2. *Claim.* A runner calls =runner next= over SSH
@@ -55,7 +55,7 @@ Who may do what:
 | =repo secret set/remove/list=      | admin on the repository                        |
 | =repo runner add/remove=           | admin on the repository                        |
 | =runner next/log/done=             | =runner= key attached to the repository, or admin |
-| =status set=                       | write on the repository (any context name; #258) |
+| =status set=                       | write on the repository; =ci/*= contexts refused (=status.go=) |
 
 * Runner isolation
 
