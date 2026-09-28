@@ -42,7 +42,10 @@ type job struct {
 	// Trusted is false for a merge request head from a fork, and when the
 	// server did not say: such a build gets no secrets and a home of its
 	// own (#255).
-	Trusted bool              `json:"trusted"`
+	Trusted bool `json:"trusted"`
+	// SSH is the instance's public ssh destination, for a build whose
+	// runner polls over loopback (#260).
+	SSH     string            `json:"ssh"`
 	Secrets map[string]string `json:"secrets"`
 }
 
@@ -425,7 +428,7 @@ func (r *runner) run(j job) bool {
 		}
 	}
 
-	env := stepEnv(j, home, r.buildSSH())
+	env := stepEnv(j, home, r.buildSSH(j.SSH))
 	return r.runSteps(j, dir, env, sink, deadline, runStep)
 }
 
@@ -483,27 +486,44 @@ func removeTree(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-// buildSSH is the instance's ssh destination as a build reaches it. Under
-// podman, pasta gives the container the host's own addresses, so a
-// loopback remote — the runner on the server itself — is unreachable by
-// that name; pasta exposes the host at 169.254.1.2, its
-// --map-host-loopback default. Any other remote is a real host elsewhere
-// and works as it is.
-func (r *runner) buildSSH() string {
-	if r.isolation != isolationPodman {
-		return r.remote
+// loopbackRemote reports whether the runner polls the daemon on its own
+// host over loopback.
+func (r *runner) loopbackRemote() bool {
+	_, host, ok := strings.Cut(r.remote, "@")
+	if !ok {
+		host = r.remote
 	}
-	user, host, hasUser := strings.Cut(r.remote, "@")
-	if !hasUser {
-		user, host = "", user
+	return host == "127.0.0.1" || host == "localhost" || host == "::1"
+}
+
+// buildSSH is the instance's ssh destination as a build reaches it. A
+// runner polling over loopback keeps its podman builds off the host's
+// loopback (buildNetwork), so they get the instance's public destination
+// from the claim. Any other remote is a real host elsewhere and works as
+// it is, and under -isolation none a build runs on the host itself.
+func (r *runner) buildSSH(public string) string {
+	if r.isolation == isolationPodman && r.loopbackRemote() && public != "" {
+		return public
 	}
-	if host != "127.0.0.1" && host != "localhost" && host != "::1" {
-		return r.remote
+	return r.remote
+}
+
+// buildNetwork is the podman network option for a build. pasta maps the
+// container's gateway address to the host's loopback, and a build's
+// connection through it arrives from 127.0.0.1 — the address a runner on
+// the daemon's host polls from. The SSH auth limiter counts failures per
+// source address, so a build sharing the runner's could throttle its
+// polling (#260). --no-map-gw removes the mapping: the build reaches the
+// host only at its public address, as any client on the internet does,
+// and keeps its outbound access. The host's nftables table
+// (deploy/gitbay-runner-egress.nft) then limits it to 22, 80 and 443
+// there; it cannot tell a build from the runner by uid, so it leaves
+// 127.0.0.1:22 open, and this flag is what keeps builds off it.
+func (r *runner) buildNetwork() []string {
+	if !r.loopbackRemote() {
+		return nil
 	}
-	if hasUser {
-		return user + "@169.254.1.2"
-	}
-	return "169.254.1.2"
+	return []string{"--network", "pasta:--no-map-gw"}
 }
 
 // stepEnv builds the environment a build step runs with. It is

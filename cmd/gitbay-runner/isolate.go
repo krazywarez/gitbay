@@ -151,6 +151,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	args = append(args,
 		"--name", name,
 		"--env-file", envFile)
+	args = append(args, r.buildNetwork()...)
 	args = append(args, inheritArgs(inherit)...)
 	args = append(args,
 		"--volume", dir+":/workspace:rw",
