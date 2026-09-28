@@ -48,6 +48,11 @@ func TestCommitStatuses(t *testing.T) {
 		t.Fatal("reader reported a status")
 	}
 
+	// ci/ is the instance's own: a writer is refused it (#258).
+	if _, errOut, code := inst.ssh(t, bobKey, "", "status", "set", "alice/svc", head, "--context", "ci/build", "--state", "success"); code != 4 || !strings.Contains(errOut, "reserved") {
+		t.Fatalf("writer posted a ci/ status: exit %d, %s", code, errOut)
+	}
+
 	// Bob (write) reports pending, then success: upsert, not duplicate.
 	if _, errOut, code := inst.ssh(t, bobKey, "", "status", "set", "alice/svc", head,
 		"--context", "build", "--state", "pending", "--description", "'compiling'"); code != 0 {

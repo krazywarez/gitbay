@@ -272,7 +272,7 @@ func TestMRListRows(t *testing.T) {
 		t.Fatalf("mr create: %s", errOut)
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "status", "set", "alice/lib", sha,
-		"--context", "ci/test", "--state", "success"); code != 0 {
+		"--context", "ext/test", "--state", "success"); code != 0 {
 		t.Fatalf("status set: %s", errOut)
 	}
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "comment", "alice/lib", "1",

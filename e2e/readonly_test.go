@@ -72,7 +72,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	must("", "milestone", "create", "alice/app", "m1")
 	must("", "mr", "create", "alice/app", "--source", "feat", "--target", "main", "--title", "change")
 	must("", "mr", "diff-comment", "alice/app", "1", "--path", "f.go", "--line", "3", "--message", "why")
-	must("", "status", "set", "alice/app", sha, "--context", "ci/x", "--state", "success")
+	must("", "status", "set", "alice/app", sha, "--context", "ext/x", "--state", "success")
 	must("", "release", "create", "alice/app", "v1", "--title", "first")
 	must("data\n", "release", "asset", "add", "alice/app", "v1", "a.txt")
 	snippetOut := must("hello\n", "snippet", "create", "a.txt", "--json")

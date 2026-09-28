@@ -16,13 +16,13 @@ func init() {
 		Summary: "report a commit status (CI)",
 		Usage:   "status set <owner/name> <sha> --context <c> --state pending|success|failure|error [--description <d>] [--url <u>]",
 		Flags: []Flag{
-			{"--context", "<c>", "the check this status reports for", ""},
+			{"--context", "<c>", "the check this status reports for; ci/ is reserved for the instance's builds", ""},
 			{"--state", "pending|success|failure|error", "the check's outcome", ""},
 			{"--description", "<d>", "short text shown beside the state", ""},
 			{"--url", "<u>", "link to the check's own output", ""},
 		},
 		Examples: []string{
-			"status set krz/gitbay a1b2c3d --context ci/build --state success",
+			"status set krz/gitbay a1b2c3d --context ext/lint --state success",
 		},
 		Run: runStatusSet})
 	register(Command{Path: []string{"status", "list"},
@@ -67,6 +67,14 @@ func runStatusSet(c *Ctx, args []string) int {
 	}
 	if path == "" || sha == "" || context == "" || !validStatusState[state] {
 		return c.usage()
+	}
+	// ci/<job> statuses are the build subsystem's: queued, reused,
+	// skipped and finished by the server itself. A writer who could post
+	// one could mark ci/test green on their own head before, or instead
+	// of, the build (#258). Case-folded, so CI/test is no way around it.
+	if strings.HasPrefix(strings.ToLower(context), "ci/") {
+		return c.fail(protocol.ExitDenied, "the ci/ prefix is reserved for the instance's builds; report under another name, such as ext/%s",
+			strings.TrimPrefix(strings.ToLower(context), "ci/"))
 	}
 	if url != "" && !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
 		return c.fail(protocol.ExitUsage, "--url must be http(s)")
