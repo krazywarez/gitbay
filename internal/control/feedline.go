@@ -28,9 +28,14 @@ type FeedLine struct {
 }
 
 // Sentence renders the line the way the CLI shows it: "<actor> <verb>
-// <repo><ref>", with Extra (a label list) appended when set.
+// <repo><ref>" for an issue or MR ("krz/gitbay#1"), "<repo> <ref>" for a
+// tag, job or sha, with Extra (a label list) appended when set.
 func (l FeedLine) Sentence() string {
-	s := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
+	ref := l.Ref
+	if ref != "" && ref[0] != '#' && ref[0] != '!' {
+		ref = " " + ref
+	}
+	s := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, ref)
 	if l.Extra != "" {
 		s += " " + l.Extra
 	}

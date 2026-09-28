@@ -242,4 +242,19 @@ func TestFeedLineSentence(t *testing.T) {
 	if got, want := l.Sentence(), "cmc opened issue krz/gitbay#1 ops, security"; got != want {
 		t.Errorf("Sentence() with Extra = %q, want %q", got, want)
 	}
+
+	for _, c := range []struct {
+		l    FeedLine
+		want string
+	}{
+		{FeedLine{Actor: "cmc", Verb: "released", Repo: "krz/gitbay", Ref: "v1.30.0"}, "cmc released krz/gitbay v1.30.0"},
+		{FeedLine{Actor: "cmc", Verb: "build success", Repo: "krz/gitbay", Ref: "test"}, "cmc build success krz/gitbay test"},
+		{FeedLine{Actor: "cmc", Verb: "ran 2 jobs on", Repo: "krz/gitbay", Ref: "0123456789"}, "cmc ran 2 jobs on krz/gitbay 0123456789"},
+		{FeedLine{Actor: "cmc", Verb: "merged", Repo: "krz/gitbay", Ref: "!3"}, "cmc merged krz/gitbay!3"},
+		{FeedLine{Actor: "cmc", Verb: "repository created", Repo: "krz/gitbay"}, "cmc repository created krz/gitbay"},
+	} {
+		if got := c.l.Sentence(); got != c.want {
+			t.Errorf("Sentence() = %q, want %q", got, c.want)
+		}
+	}
 }
