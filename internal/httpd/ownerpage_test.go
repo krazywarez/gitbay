@@ -55,7 +55,7 @@ func TestOwnerPageTabOrder(t *testing.T) {
 // it — not the whole history, which is what the atom feed is for.
 func TestOwnerPageAboutCarriesTheGraphAndLog(t *testing.T) {
 	d := ownerFixture()
-	d.Log = []feedLine{{Actor: "cmc", Verb: "opened issue", Ref: "#12", Repo: "krz/gitbay", URL: "/krz/gitbay/issues/12"}}
+	d.Log = []control.FeedLine{{Actor: "cmc", Verb: "opened issue", Ref: "#12", Repo: "krz/gitbay", URL: "/krz/gitbay/issues/12"}}
 	out := renderOwner(t, "about", d)
 	for _, want := range []string{"Christian Cleberg", "actgraph", "opened issue", "#12", "/cmc/activity.atom"} {
 		if !strings.Contains(out, want) {
@@ -149,7 +149,7 @@ type ownerFixtureData struct {
 	Self        bool
 	Snippets    int
 	Members     []control.ProfileMember
-	Log         []feedLine
+	Log         []control.FeedLine
 	Bookmarks   []control.BookmarkOut
 	SnippetRows []snippetRow
 }

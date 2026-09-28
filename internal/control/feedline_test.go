@@ -1,4 +1,4 @@
-package httpd
+package control
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func TestFeedLinesFoldsBuildRunsBySHA(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.failure",
 			Data: `{"number":2,"job":"lint","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 1 {
 		t.Fatalf("feedLines returned %d lines, want 1: %+v", len(lines), lines)
 	}
@@ -47,7 +47,7 @@ func TestFeedLinesSingleBuildGetsState(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
 			Data: `{"number":1,"job":"unit","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 1 {
 		t.Fatalf("feedLines returned %d lines, want 1", len(lines))
 	}
@@ -68,7 +68,7 @@ func TestFeedLinesDoesNotFoldAcrossDifferentSHAs(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
 			Data: `{"number":2,"job":"lint","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 2 {
 		t.Fatalf("feedLines returned %d lines, want 2: %+v", len(lines), lines)
 	}
@@ -82,7 +82,7 @@ func TestFeedLinesNoSHANeverFolds(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success", Data: `{"number":1,"job":"unit"}`},
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success", Data: `{"number":2,"job":"lint"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 2 {
 		t.Fatalf("feedLines returned %d lines, want 2: %+v", len(lines), lines)
 	}
@@ -101,7 +101,7 @@ func TestFeedLinesNonBuildEventBreaksFold(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.failure",
 			Data: `{"number":2,"job":"lint","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 3 {
 		t.Fatalf("feedLines returned %d lines, want 3: %+v", len(lines), lines)
 	}
@@ -127,7 +127,7 @@ func TestFeedLinesRunStatePrecedence(t *testing.T) {
 			events[i] = store.FeedEvent{RepoPath: "alice/app", Actor: "alice", Kind: "build." + s,
 				Data: fmt.Sprintf(`{"number":1,"job":"j%d","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, i)}
 		}
-		lines := feedLines(events)
+		lines := FeedLines(events)
 		if len(lines) != 1 || lines[0].State != tc.want {
 			t.Errorf("statuses %v: got %+v, want State %q", tc.statuses, lines, tc.want)
 		}
@@ -144,7 +144,7 @@ func TestFeedLinesParsesWhenT(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "issue.created",
 			Data: `{"number":2}`, CreatedAt: "not-a-time"},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	want, _ := time.Parse(time.RFC3339Nano, "2026-09-10T12:00:00Z")
 	if !lines[0].WhenT.Equal(want) {
 		t.Errorf("WhenT = %v, want %v", lines[0].WhenT, want)
@@ -169,7 +169,7 @@ func TestFeedLinesSplitsRepeatedJob(t *testing.T) {
 		events = append(events, store.FeedEvent{RepoPath: "alice/app", Actor: "alice",
 			Kind: "build." + status, Data: `{"number":1,"job":"instances","sha":"` + sha + `"}`})
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 3 {
 		t.Fatalf("feedLines returned %d lines, want 3: %+v", len(lines), lines)
 	}
@@ -194,7 +194,7 @@ func TestFeedLinesScheduleAbsorbsPushJobs(t *testing.T) {
 		{RepoPath: "alice/app", Actor: "alice", Kind: "build.success",
 			Data: `{"number":1,"job":"lint","sha":"` + sha + `"}`},
 	}
-	lines := feedLines(events)
+	lines := FeedLines(events)
 	if len(lines) != 2 {
 		t.Fatalf("feedLines returned %d lines, want 2: %+v", len(lines), lines)
 	}

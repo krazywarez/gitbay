@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/web"
 )
@@ -58,7 +59,7 @@ func TestStylesheetURLCarriesTheBuildHash(t *testing.T) {
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
-		Feed     []feedLine
+		Feed     []control.FeedLine
 	}{base, "dashboard", nil, nil, nil, nil, nil, nil})
 	if err != nil {
 		t.Fatal(err)

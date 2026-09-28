@@ -147,10 +147,6 @@ type buildRun struct {
 	Builds    []control.BuildOut
 }
 
-// runStatusPriority orders combinedStatus's worst-first check: a run reads
-// as its least finished or least successful build.
-var runStatusPriority = []string{"failure", "cancelled", "running", "pending"}
-
 // combinedStatus is the run's status: the worst of its builds' statuses,
 // success only when every one of them is.
 func combinedStatus(builds []control.BuildOut) string {
@@ -158,30 +154,7 @@ func combinedStatus(builds []control.BuildOut) string {
 	for i, b := range builds {
 		statuses[i] = b.Status
 	}
-	return worstStatus(statuses)
-}
-
-// worstStatus is combinedStatus's ordering rule, factored out so the
-// dashboard feed can apply the same worst-first precedence to a folded
-// build run (D04). A status outside runStatusPriority (a future state
-// such as "skipped") is still not "success": it is returned unchanged
-// rather than falling through and reading as green.
-func worstStatus(statuses []string) string {
-	has := map[string]bool{}
-	for _, s := range statuses {
-		has[s] = true
-	}
-	for _, s := range runStatusPriority {
-		if has[s] {
-			return s
-		}
-	}
-	for _, s := range statuses {
-		if s != "success" {
-			return s
-		}
-	}
-	return "success"
+	return control.WorstStatus(statuses)
 }
 
 // groupRuns folds consecutive builds of the same commit and the same

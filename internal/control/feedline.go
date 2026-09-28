@@ -1,4 +1,4 @@
-package httpd
+package control
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
-// feedLine is one activity entry, already phrased and linked.
-type feedLine struct {
+// FeedLine is one activity entry, already phrased and linked.
+type FeedLine struct {
 	Actor string
 	Verb  string // "opened issue", "merged", "ran 2 jobs on"
 	Ref   string // "#12", "!35", "v0.4.0", a short sha
@@ -24,11 +24,11 @@ type feedLine struct {
 	sha   string    // the commit a build event fired on, for fold-matching
 }
 
-// feedLines turns stored events into readable lines. An unknown kind
+// FeedLines turns stored events into readable lines. An unknown kind
 // still shows: the feed says what happened even for events added later.
 // Build events on the same commit, adjacent in the input, fold into one
 // "run" line (D04): its State is the worst of the folded jobs' outcomes,
-// via worstStatus — the same rule the builds tab uses for a run's status.
+// via WorstStatus — the same rule the builds tab uses for a run's status.
 // A repeated job name ends the line and starts the next, so a scheduled
 // job firing daily on an unchanged tip reads as one line a day rather than
 // "ran 9 jobs on" one commit (#240). groupRuns separates its runs by
@@ -36,8 +36,8 @@ type feedLine struct {
 // per job, so there is no queue moment here to key on. The cost is that
 // the oldest scheduled line on a commit folds in the push's jobs, which
 // have not been seen yet on that line.
-func feedLines(events []store.FeedEvent) []feedLine {
-	out := make([]feedLine, 0, len(events))
+func FeedLines(events []store.FeedEvent) []FeedLine {
+	out := make([]FeedLine, 0, len(events))
 	statuses := make([][]string, 0, len(events))
 	for _, e := range events {
 		var d struct {
@@ -58,12 +58,12 @@ func feedLines(events []store.FeedEvent) []feedLine {
 				out[i].Verb = fmt.Sprintf("ran %d jobs on", len(out[i].Jobs))
 				out[i].Ref = fmt.Sprintf("%.10s", d.SHA)
 				out[i].URL = fmt.Sprintf("/%s/commit/%s", e.RepoPath, d.SHA)
-				out[i].State = worstStatus(statuses[i])
+				out[i].State = WorstStatus(statuses[i])
 				continue
 			}
 		}
 
-		l := feedLine{Actor: e.Actor, Repo: e.RepoPath, When: e.CreatedAt, WhenT: parseEventTime(e.CreatedAt)}
+		l := FeedLine{Actor: e.Actor, Repo: e.RepoPath, When: e.CreatedAt, WhenT: parseEventTime(e.CreatedAt)}
 		if l.Actor == "" {
 			l.Actor = "gitbay"
 		}
@@ -98,6 +98,33 @@ func feedLines(events []store.FeedEvent) []feedLine {
 		statuses = append(statuses, st)
 	}
 	return out
+}
+
+// runStatusPriority orders WorstStatus's worst-first check: a run reads
+// as its least finished or least successful build.
+var runStatusPriority = []string{"failure", "cancelled", "running", "pending"}
+
+// WorstStatus is the worst of a set of build statuses, success only when
+// every one of them is. It backs both the builds tab's combinedStatus and
+// FeedLines' folded build run (D04). A status outside runStatusPriority (a
+// future state such as "skipped") is still not "success": it is returned
+// unchanged rather than falling through and reading as green.
+func WorstStatus(statuses []string) string {
+	has := map[string]bool{}
+	for _, s := range statuses {
+		has[s] = true
+	}
+	for _, s := range runStatusPriority {
+		if has[s] {
+			return s
+		}
+	}
+	for _, s := range statuses {
+		if s != "success" {
+			return s
+		}
+	}
+	return "success"
 }
 
 // parseEventTime parses a stored RFC3339 timestamp for ago/whenT

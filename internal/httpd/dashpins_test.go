@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/web"
 )
@@ -23,7 +24,7 @@ func TestDashboardTilesAndPins(t *testing.T) {
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
-		Feed     []feedLine
+		Feed     []control.FeedLine
 	}{base, "dashboard", []pinnedRow{
 		{Owner: "krz", Name: "gitbay", Issues: 3, MRs: 0, Build: "success"},
 		{Owner: "krz", Name: "old", Build: "cancelled"},

@@ -216,8 +216,8 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
-		Feed     []feedLine
-	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, feedLines(events)})
+		Feed     []control.FeedLine
+	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, control.FeedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
@@ -467,7 +467,7 @@ const profileEvents = 30
 // ActivityByDay and OrgActivityByDay respectively — a log that counted
 // something else would contradict the total printed over it. Only the
 // About tab renders it, so no other tab pays for the query.
-func (s *Server) ownerFeed(tab, kind, name string) []feedLine {
+func (s *Server) ownerFeed(tab, kind, name string) []control.FeedLine {
 	if tab != "about" {
 		return nil
 	}
@@ -490,7 +490,7 @@ func (s *Server) ownerFeed(tab, kind, name string) []feedLine {
 	if err != nil {
 		return nil
 	}
-	return feedLines(events)
+	return control.FeedLines(events)
 }
 
 // ownerPage is what owner.html renders against. It is a named type
@@ -508,7 +508,7 @@ type ownerPage struct {
 	Orgs          []control.ProfileMember
 	Activity      []activityWeek
 	ActivityTotal int
-	Log           []feedLine
+	Log           []control.FeedLine
 	Bookmarks     []control.BookmarkOut
 	SnippetRows   []snippetRow
 	SnippetsAll   bool
