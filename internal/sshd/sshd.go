@@ -442,8 +442,14 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 		return protocol.ExitUsage
 	}
 	if len(argv) == 0 || argv[0] != "register" {
-		fmt.Fprintf(ch.Stderr(), "this key is not registered here. Create an account with:\n  ssh <host> register --username <name> %s\n",
-			map[string]string{"open": "--email <address>", "invite": "--invite <code>"}[s.cfg.Registration.Mode])
+		host := s.cfg.SiteHost()
+		fp := ssh.FingerprintSHA256(pub)
+		flag := map[string]string{"open": "--email <address>", "invite": "--invite <code>"}[s.cfg.Registration.Mode]
+		fmt.Fprintf(ch.Stderr(),
+			"this key (%s) is not registered on %s.\n"+
+				"already have an account? add it at https://%s/settings#keys\n"+
+				"new here? ssh git@%s register --username <name> %s\n",
+			fp, host, host, host, flag)
 		return protocol.ExitDenied
 	}
 	return control.RunRegister(s.cfg, s.st, pub, argv, ch, ch.Stderr())

@@ -87,6 +87,8 @@ for the eighteen commands whose CLI path differs from the registry's
   usage line a wrong-argument refusal does. Outside the CLI a usage
   refusal reads =usage: ssh git@<host> ...= on every surface,
   including the error text of the web UI and the JSON API (#267).
+- An unregistered SSH key is refused with its own fingerprint and the
+  real host, and both the web and ssh paths to register (#268).
 
 * v1.36.0 — 2026-09-23
 

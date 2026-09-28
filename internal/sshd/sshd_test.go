@@ -226,3 +226,72 @@ func TestStopEndsFollow(t *testing.T) {
 		t.Errorf("stderr %q", stderr.String())
 	}
 }
+
+// An unregistered key is told its own fingerprint and the real host, and
+// offered both the web and the ssh path to register.
+func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
+	root := t.TempDir()
+	st, err := store.Open(filepath.Join(root, "gitbay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.Server.Root = root
+	cfg.Server.SiteURL = "https://forge.test"
+	cfg.Registration.Mode = "open"
+	srv, err := New(cfg, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go srv.Serve(ln)
+	t.Cleanup(func() { ln.Close() })
+
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := ssh.Dial("tcp", ln.Addr().String(), &ssh.ClientConfig{
+		User:            "git",
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         5 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+
+	sess, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sess.Close()
+	var stderr bytes.Buffer
+	sess.Stderr = &stderr
+
+	var exit *ssh.ExitError
+	if err := sess.Run("whoami"); !errors.As(err, &exit) || exit.ExitStatus() != 4 {
+		t.Fatalf("whoami ended with %v, want exit 4", err)
+	}
+
+	fp := ssh.FingerprintSHA256(signer.PublicKey())
+	for _, want := range []string{fp, "forge.test", "https://forge.test/settings#keys", "ssh git@forge.test register"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("message missing %q:\n%s", want, stderr.String())
+		}
+	}
+}
