@@ -36,6 +36,10 @@ const (
 	EnvRepoID = "GITBAY_REPO_ID"
 	EnvUserID = "GITBAY_USER_ID"
 	EnvScope  = "GITBAY_KEY_SCOPE"
+	// EnvToken names the receive-pack this hook runs under. sshd mints
+	// it per push; hookd answers only a request carrying a live one
+	// whose repository, account and scope match the request's.
+	EnvToken = "GITBAY_PUSH_TOKEN"
 )
 
 type Request struct {
@@ -46,6 +50,7 @@ type Request struct {
 	// the key belongs to, and a deploy key grants nothing outside its
 	// binding, so anything acting on another repository needs this too.
 	Scope   string             `json:"scope"`
+	Token   string             `json:"token"`
 	Updates []policy.RefUpdate `json:"updates"`
 }
 
@@ -94,6 +99,12 @@ func Serve(cfg config.Config, st *store.Store) (func() error, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Listen creates the socket under the process umask. Hooks run as
+	// the daemon's own user; nobody else has a reason to connect.
+	if err := os.Chmod(path, 0o600); err != nil {
+		ln.Close()
+		return nil, err
+	}
 	s := &Server{cfg: cfg, st: st}
 	go func() {
 		for {
@@ -111,9 +122,18 @@ func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 	dec := json.NewDecoder(conn)
 	enc := json.NewEncoder(conn)
+	if err := checkPeer(conn); err != nil {
+		slog.Warn("hook socket: refused connection", "err", err)
+		enc.Encode(Response{Allow: false, Message: "hook socket: " + err.Error()})
+		return
+	}
 	var req Request
 	if err := dec.Decode(&req); err != nil {
 		enc.Encode(Response{Allow: false, Message: "bad hook request"})
+		return
+	}
+	if msg := s.authorize(req); msg != "" {
+		enc.Encode(Response{Allow: false, Message: msg})
 		return
 	}
 	switch req.Hook {
@@ -125,6 +145,22 @@ func (s *Server) handle(conn net.Conn) {
 	default:
 		enc.Encode(Response{Allow: false, Message: fmt.Sprintf("unknown hook %q", req.Hook)})
 	}
+}
+
+// authorize ties a request to a receive-pack sshd started: its token
+// must be live and name the same repository, account and key scope.
+func (s *Server) authorize(req Request) string {
+	if req.Token == "" {
+		return "push not started by this server"
+	}
+	tok, err := s.st.PushTokenByHash(store.HashToken(req.Token))
+	if err != nil {
+		return "push not started by this server"
+	}
+	if tok.RepoID != req.RepoID || tok.UserID != req.UserID || tok.Scope != req.Scope {
+		return "push token does not match this request"
+	}
+	return ""
 }
 
 func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
