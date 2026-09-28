@@ -65,6 +65,11 @@ keeps its owner. Copy the new file off the host afterwards.`,
 // the owner of server.root, since the daemon reads it as that user.
 func initSecrets(cfg config.Config, w io.Writer) error {
 	path := cfg.Server.SecretKeyFile
+	unlock, err := lockKeyFile(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if _, err := os.Lstat(path); err == nil {
 		return fmt.Errorf("%s already exists; gitbayd admin secrets rotate replaces its key", path)
 	} else if !errors.Is(err, fs.ErrNotExist) {
@@ -108,6 +113,11 @@ func initSecrets(cfg config.Config, w io.Writer) error {
 // finishes the job.
 func rotateSecrets(cfg config.Config, w io.Writer) error {
 	path := cfg.Server.SecretKeyFile
+	unlock, err := lockKeyFile(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	old, err := seal.ReadKeys(path)
 	if err != nil {
 		return err
@@ -150,6 +160,23 @@ func rotateSecrets(cfg config.Config, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "key %s: resealed %d values; retired %s. Copy %s off this host.\n", next.ID, n, strings.Join(retired, ", "), path)
 	return nil
+}
+
+// lockKeyFile takes an exclusive flock on <path>.lock, waiting for
+// another init or rotate to finish. Two rotations interleaved would each
+// write a file without the other's new key, and values resealed under
+// the lost one would no longer open. O_NOFOLLOW refuses a symlink planted
+// at the lock's name.
+func lockKeyFile(path string) (func(), error) {
+	f, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("key file lock: %w", err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("key file lock: %w", err)
+	}
+	return func() { f.Close() }, nil
 }
 
 // checkSecrets opens every stored secret and prints, per column, how

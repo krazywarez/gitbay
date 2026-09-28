@@ -605,7 +605,9 @@ gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
   transaction, then removes the old keys. Run it as root, since it
   replaces the key file in =/etc/gitbay=; the file keeps its owner.
   The daemon re-reads the file when it changes, so it needs no
-  restart. Copy the new file off the host afterwards.
+  restart. Copy the new file off the host afterwards. =init= and
+  =rotate= hold an flock on =<key file>.lock= while they run, so a
+  second run waits for the first.
 - Push devices are looked up by the SHA-256 of their token
   (=push_devices.token_hash=), since two seals of one token differ.
 

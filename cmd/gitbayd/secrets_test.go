@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/seal"
@@ -172,5 +173,52 @@ func assertNoKeyMaterial(t *testing.T, out string, keys []seal.Key) {
 		if strings.Contains(out, base64.StdEncoding.EncodeToString(k.Secret)) {
 			t.Fatalf("output carries key %s's secret", k.ID)
 		}
+	}
+}
+
+// A rotate waits while another holds the key file's lock, and two run
+// at once both finish with every value still opening.
+func TestRotateSecretsSerializes(t *testing.T) {
+	cfg := testConfig(t)
+	st, repoID := storeWithSecret(t, cfg)
+	st.Close()
+
+	unlock, err := lockKeyFile(cfg.Server.SecretKeyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 2)
+	go func() { done <- rotateSecrets(cfg, &bytes.Buffer{}) }()
+	go func() { done <- rotateSecrets(cfg, &bytes.Buffer{}) }()
+	select {
+	case err := <-done:
+		t.Fatalf("rotate finished while the lock was held: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	unlock()
+	for range 2 {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("rotate: %v", err)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatal("rotate never finished")
+		}
+	}
+	keys, err := seal.ReadKeys(cfg.Server.SecretKeyFile)
+	if err != nil || len(keys) != 1 {
+		t.Fatalf("key file after two rotations: %v, %v", keys, err)
+	}
+	st, err = openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if got, err := st.BuildSecrets(repoID); err != nil || got["TOKEN"] != "v1" {
+		t.Fatalf("value after two rotations: %v, %v", got, err)
+	}
+	if fi, err := os.Lstat(cfg.Server.SecretKeyFile + ".lock"); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("lock file: %v, %v", fi, err)
 	}
 }
