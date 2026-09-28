@@ -162,6 +162,10 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Pe
 		s.st.Audit(0, "auth.failed", map[string]any{"ip": ip, "fingerprint": fp})
 		return nil, fmt.Errorf("unknown key %s", fp)
 	}
+	if key.Expired(time.Now()) {
+		s.st.Audit(key.UserID, "auth.expired", map[string]any{"ip": ip, "fingerprint": fp})
+		return nil, fmt.Errorf("key %s has expired", fp)
+	}
 	s.authLimiter.success(ip)
 	return &ssh.Permissions{Extensions: map[string]string{
 		"user-id": strconv.FormatInt(key.UserID, 10),
@@ -407,6 +411,10 @@ func (s *Server) runExec(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, term co
 		fmt.Fprintln(ch.Stderr(), "authentication temporarily unavailable")
 		return protocol.ExitFailure
 	}
+	if key.Expired(time.Now()) {
+		fmt.Fprintln(ch.Stderr(), "this key has expired; remove it and add a new one")
+		return protocol.ExitDenied
+	}
 	user, err := s.st.UserByID(userID)
 	if err != nil {
 		fmt.Fprintln(ch.Stderr(), "account no longer exists")
@@ -484,6 +492,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey,
 		Stderr:   stderr,
 		Done:     done,
 		Stopping: stopping,
+		Expires:  key.ExpiresAt,
 	}
 	return control.Dispatch(ctx, argv)
 }

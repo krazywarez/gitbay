@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
@@ -43,8 +44,8 @@ func authorizedKeysCmd() *cobra.Command {
 				return nil // unparseable key: no output, auth fails
 			}
 			key, err := st.SSHKeyByFingerprint(ssh.FingerprintSHA256(pub))
-			if err != nil {
-				return nil // unknown key: no output, auth fails
+			if err != nil || key.Expired(time.Now()) {
+				return nil // unknown or expired key: no output, auth fails
 			}
 			self, err := os.Executable()
 			if err != nil {
@@ -80,6 +81,10 @@ func shellCmd() *cobra.Command {
 			key, err := st.SSHKeyByID(keyID)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "key no longer registered")
+				os.Exit(protocol.ExitDenied)
+			}
+			if key.Expired(time.Now()) {
+				fmt.Fprintln(os.Stderr, "this key has expired; remove it and add a new one")
 				os.Exit(protocol.ExitDenied)
 			}
 			user, err := st.UserByID(key.UserID)

@@ -2,12 +2,16 @@ package sshd
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"gitbay.org/gitbay/internal/store"
 )
 
 // execStatus runs cmd on a new session and returns its exit status and
@@ -109,4 +113,57 @@ func TestSweepCutsOutOfProcessRevocation(t *testing.T) {
 	}
 	ts.srv.sweepOnce()
 	waitClosed(t, ts.client)
+}
+
+// A key that expires while connected: the next exec is refused, and
+// the sweep closes the connection.
+func TestExpiredKeyRefusedAndCut(t *testing.T) {
+	ts := newTestServer(t)
+	past := time.Now().Add(-time.Second).UTC().Format("2006-01-02T15:04:05.000Z")
+	if _, err := ts.st.DB.Exec("UPDATE ssh_keys SET expires_at = ? WHERE id = ?", past, ts.keyID); err != nil {
+		t.Fatal(err)
+	}
+	if code, errOut := execStatus(ts.client, "whoami"); code != 4 || !strings.Contains(errOut, "expired") {
+		t.Fatalf("whoami with an expired key: %d %q", code, errOut)
+	}
+	ts.srv.sweepOnce()
+	waitClosed(t, ts.client)
+}
+
+// An expiring key may not mint.
+func TestExpiringKeyCannotMint(t *testing.T) {
+	ts := newTestServer(t)
+	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02T15:04:05.000Z")
+	if _, err := ts.st.DB.Exec("UPDATE ssh_keys SET expires_at = ? WHERE id = ?", future, ts.keyID); err != nil {
+		t.Fatal(err)
+	}
+	if code, errOut := execStatus(ts.client, "token create --name x"); code != 4 || !strings.Contains(errOut, "expires") {
+		t.Fatalf("token create with an expiring key: %d %q", code, errOut)
+	}
+}
+
+func TestExpiredKeyRefusedAtAuth(t *testing.T) {
+	ts := newTestServer(t)
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := signer.PublicKey()
+	past := time.Now().Add(-time.Minute)
+	if err := ts.st.AddSSHKeyFrom(ts.uid, ssh.FingerprintSHA256(pub), pub.Type(), pub.Marshal(), "full", "", store.KeyOrigin{ExpiresAt: &past}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = ssh.Dial("tcp", ts.client.RemoteAddr().String(), &ssh.ClientConfig{
+		User:            "git",
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         5 * time.Second,
+	})
+	if err == nil {
+		t.Fatal("an expired key authenticated")
+	}
 }
