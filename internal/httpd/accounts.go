@@ -144,6 +144,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Seven days is the cap; the store ends it sooner after
+	// store.WebSessionIdle without a request.
 	if err := s.st.CreateWebSession(sessHash, userID, 7*24*time.Hour); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

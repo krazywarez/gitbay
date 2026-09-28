@@ -27,6 +27,9 @@ must add =--scope full=. Existing tokens keep their scope.
   =EXPIRES= columns, after the label (#277).
 - =token list= at a terminal shows a future expiry as a time, not
   "just now" (#286).
+- Browser sessions end after twelve hours without a request, and after
+  seven days as before. Sessions open at upgrade get a fresh twelve
+  hours. =web sessions list= shows when each was last used (#276).
 
 * v1.36.0 — 2026-09-23
 

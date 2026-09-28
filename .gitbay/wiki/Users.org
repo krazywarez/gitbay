@@ -682,9 +682,10 @@ and deletes through the commands above.
 
 * Browser sessions
 
-=gitbay web login= mints a one-time URL; the session it opens lasts
-seven days. =gitbay web sessions list= shows each of yours by a short
-id with its creation and expiry, and =gitbay web sessions revoke <id>=
+=gitbay web login= mints a one-time URL; the session it opens ends
+after twelve hours without a request, and after seven days in any case.
+=gitbay web sessions list= shows each of yours by a short id with its
+creation, expiry and last use, and =gitbay web sessions revoke <id>=
 or =--all= ends them from the terminal, which is where a lost laptop is
 handled.
 
