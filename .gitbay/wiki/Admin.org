@@ -447,9 +447,31 @@ hook socket, regenerated hook scripts, WAL files. Safe to run against a
 live daemon.
 
 =--verify= reads an archive back: the snapshot must pass SQLite's
-integrity check, and every repository the snapshot names must be in the
-archive. A database-only archive is checked for integrity and says so.
-Exit is non-zero on damage or a missing repository.
+integrity check, every repository the snapshot names must be in the
+archive, and each must pass =git fsck --connectivity-only=. It
+extracts the repositories to a temporary directory for that, so it
+needs free space the size of the repositories. A database-only archive
+is checked for integrity and says so. Exit is non-zero on damage, a
+missing repository or a missing object.
+
+A full backup holds =<root>/backup.lock= from its database snapshot to
+its last repository. While it runs, =repo delete=, =repo rename=,
+=repo transfer=, =admin repo delete= and =org rename= refuse with "a
+backup is running"; retry when it finishes. Database-only backups take
+no lock.
+
+Verifying an archive of unknown origin is safe as an unprivileged
+user: the connectivity check runs git against the archived
+repositories' own extracted copies, nothing under =server.root=.
+
+Archives carry a directory entry for every directory, including an
+empty one, so a bare repository whose refs are all packed restores as
+a repository. Archives written before this release do not: extracting
+one can leave a repository's =refs/= directory missing, which stops
+git from recognizing it as a repository at all. =gitbayd admin backup
+--verify <archive>= names the repositories this affects; the fix is
+=mkdir -p <root>/repos/<owner>/<name>.git/refs= for each one, after
+which it opens normally.
 
 With =[backup] age_recipients= set the archive is =<name>.tar.gz.age=
 and =--verify= needs the private key:
@@ -565,6 +587,30 @@ gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
   restart. Copy the new file off the host afterwards.
 - Push devices are looked up by the SHA-256 of their token
   (=push_devices.token_hash=), since two seals of one token differ.
+
+** Restore drill
+
+A restore onto a clean host, run quarterly and after any change to the
+backup code (=cmd/gitbayd/backup.go=, the offsite job), and recorded
+below. The disaster it rehearses is losing bay1, so the local archives
+are gone with it and the sources are the main offsite restic
+repository (repositories, LFS, the staged database, =config.toml=),
+the keys repository (=secret.key=, =apns.p8=), and the operator's
+password manager (=offsite.env=, the keys repository's password and
+token, =backup-identity.txt=). The steps are in the data-at-rest
+plan's operator runbook
+(=docs/plans/2026-09-27-data-at-rest-and-backup.md=).
+
+Time to service runs from the clean host's first root login to the
+first successful =git clone= over SSH from it. The recovery point is
+the time of the newest restic snapshot restored.
+
+No drill has been run yet; the procedure above is written but
+unexercised, and #259 stays open until the first row below is
+recorded.
+
+| Date | Host | Snapshot restored (UTC) | Time to service | DB integrity | Connectivity | LFS | Release assets | Host key | Secrets | Notes |
+|------+------+-------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|
 
 * Upgrades
 

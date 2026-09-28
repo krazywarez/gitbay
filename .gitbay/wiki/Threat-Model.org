@@ -262,9 +262,9 @@ assume has been checked.
   pixel against a viewer. A profile is the wider surface of the two: it
   is linked from every commit and issue its owner touches. Documented;
   proxying is future work.
-- Backups are consistent per the DB-snapshot-first ordering but are not a
-  single atomic snapshot; a few orphaned git objects are possible and
-  harmless (see [[Admin]]).
+- Backups are consistent per the DB-snapshot-first ordering, and
+  repository deletes and moves wait out a full backup; a push during
+  one leaves only unreferenced objects (see [[Admin]]).
 - The audit log lives in the database the daemon writes, so anyone with
   the daemon user's access can change it. The hash chain makes an edited
   or removed row show as a break under =gitbayd admin audit verify=,

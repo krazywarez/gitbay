@@ -10,7 +10,7 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 
 | Issue | Area             | Gap                                                                   | Severity |
 |-------+------------------+-----------------------------------------------------------------------+----------|
-| #259  | Recovery         | No restore has been exercised; verification does not check git connectivity | high |
+| #259  | Recovery         | No restore has been exercised; the drill is written (Admin wiki) and not yet run | high |
 | #260  | CI network       | Builds share the runner's source address; no egress policy            | medium   |
 | #261  | Various          | Migration foreign-key check after commit; three web writes bypass dispatch; documentation drift | medium |
 | #262  | Availability     | No limit on concurrent git pack generation                            | high     |

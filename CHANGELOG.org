@@ -180,6 +180,18 @@ secret.
 - =gitbayd admin backup= encrypts archives to =[backup] age_recipients=
   when set (#274); =--verify= takes =--identity <file>=. Archive names
   gain =.age=; the shipped backup scripts and monitor match both.
+- A full backup holds =<root>/backup.lock= from its database snapshot
+  to its last repository; =repo delete=, =repo rename=, =repo
+  transfer=, =admin repo delete= and =org rename= refuse with "a
+  backup is running" while it runs. =--verify= now also runs =git
+  fsck --connectivity-only= on each archived repository and names any
+  that fail. (#259)
+*Upgrade note.* Archives now carry a directory entry for every
+directory, so a bare repository whose refs are all packed restores as
+a repository. An archive written before this release lacks those
+entries; if extracting one leaves a repository's =refs/= directory
+missing, =gitbayd admin backup --verify <archive>= names it, and
+=mkdir -p <root>/repos/<owner>/<name>.git/refs= fixes it.
 
 * v1.36.0 — 2026-09-23
 

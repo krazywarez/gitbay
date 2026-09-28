@@ -57,16 +57,17 @@ the product activity feed, not an audit trail.
   (=cmd/gitbayd/backup.go=).
 - Excluded: WAL files, the hook socket, askpass scripts, generated
   hooks.
-- =gitbayd admin backup --verify= checks SQLite integrity and that every
-  repository the database names is present (=backup.go=). It does
-  not check git object connectivity.
+- =gitbayd admin backup --verify= checks SQLite integrity, that every
+  repository the database names is present, and =git fsck
+  --connectivity-only= on each (=backup.go=).
+- Repository deletes, renames and transfers refuse while a full backup
+  runs (=internal/backuplock=), so the snapshot and the walk agree.
 - The host's restic credentials are append-only; the key that can
   delete or prune snapshots is held off the host, so a compromised host
   cannot destroy its own history (documented: Admin wiki).
 - Recovery point: about one hour for database-only data (issues, merge
   requests, reviews), one day for repositories.
-- Recovery time: not measured. No restore onto a clean host has been
-  recorded (#259).
+- Recovery time: see the Admin wiki's Restore drill table.
 
 Restore procedure: extract the archive into an empty directory, point
 =server.root= at it, start =gitbayd=; hooks regenerate and the host key
