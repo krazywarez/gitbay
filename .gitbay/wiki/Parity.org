@@ -366,7 +366,7 @@ client has no use for one (krz/gitbay#57).
 | push device remove          | yes | yes | yes |
 | activity push on, off       | yes | yes | yes |
 | web colour scheme           | yes | yes | n/a |
-| API token mint              | yes | no  | no  |
+| API token mint              | yes | yes | no  |
 | API token revoke with what it created | yes | no  | no  |
 | account export bundle       | yes | yes | n/a |
 | profile set                 | yes | yes | yes |
@@ -470,8 +470,8 @@ thirty with the same cursors; iOS pages with them too.
 * CLI only, for now
 
 Build secrets, mirror configuration and tokens, custom domain claims,
-API token minting, web session listing and revocation, deploy keys,
-and instance administration have no page yet. Until #234 these were
+web session listing and revocation, deploy keys, and instance
+administration have no page yet. Until #234 these were
 refused outright on the other surfaces; the refusal is gone, so each is
 now a page waiting to be built rather than a rule. A credential still
 travels on stdin wherever it is set, since argv is world-readable in
