@@ -420,8 +420,9 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 			Template  string
 			Templates []control.IssueTemplate
 			Draft     *draft
+			CanWrite  bool
 		}{p, d.Body, d.Format, r.FormValue("title"), r.FormValue("labels"),
-			"", control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), d})
+			"", control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), d, s.canWriteRepoAs(u, p.Repo)})
 		return
 	}
 	templates := control.IssueTemplates(p.Dir, p.Repo.DefaultBranch)
@@ -455,7 +456,8 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 		Template  string
 		Templates []control.IssueTemplate
 		Draft     *draft
-	}{p, body, format, "", "", tplName, templates, nil})
+		CanWrite  bool
+	}{p, body, format, "", "", tplName, templates, nil, s.canWriteRepoAs(u, p.Repo)})
 }
 
 // Issue and merge request writes run the command the CLI runs, so the
@@ -472,17 +474,25 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 	}
 	var created control.Created
 	argv := []string{"issue", "create", repoPath, "--title", title, "--format", format, "--file", "-"}
+	// Labels, milestone and assignee go on the same dispatch issue create
+	// itself resolves and applies: a typo in any of them creates nothing,
+	// and the label/milestone/assign code paths run so notifications and
+	// events happen (#271). issue create refuses the whole create when any
+	// of them is set without write access, so a reader's hand-crafted POST
+	// carrying one is dropped here rather than failing the create.
+	if repo, err := s.st.RepoByPath(repoPath); err == nil && s.canWriteRepoAs(u, repo) {
+		argv = append(argv, fieldArgs("--label", r.FormValue("labels"))...)
+		if milestone := strings.TrimSpace(r.FormValue("milestone")); milestone != "" {
+			argv = append(argv, "--milestone", milestone)
+		}
+		argv = append(argv, fieldArgs("--assignee", r.FormValue("assignee"))...)
+	}
 	code, msg := s.dispatchIntoStdin(u, argv, r.FormValue("body"), &created)
 	if code != protocol.ExitOK {
 		http.Error(w, msg, statusForExit(code))
 		return
 	}
 	n := created.Number
-	// Labels need write access, matching the SSH rule; the command refuses
-	// otherwise and the issue stands without them.
-	if args := fieldArgs("--add", r.FormValue("labels")); len(args) > 0 {
-		s.runControl(u, append([]string{"issue", "label", repoPath, fmt.Sprint(n)}, args...))
-	}
 	http.Redirect(w, r, fmt.Sprintf("/%s/issues/%d", repoPath, n), http.StatusSeeOther)
 }
 

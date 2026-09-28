@@ -9,7 +9,11 @@
 <p><input type="text" name="title" aria-label="Title" placeholder="title" value="{{.Title}}" required></p>
 <p><textarea name="body" aria-label="Description" rows="12">{{.Body}}</textarea></p>
 {{template "formatpicker" .Format}}
-<p><input type="text" name="labels" aria-label="Labels" placeholder="labels, space-separated (write access)" value="{{.Labels}}"></p>
+{{if .CanWrite}}
+<p><input type="text" name="labels" aria-label="Labels" placeholder="labels, space-separated (optional)" value="{{.Labels}}"></p>
+<p><input type="text" name="milestone" aria-label="Milestone" placeholder="milestone (optional)"></p>
+<p><input type="text" name="assignee" aria-label="Assignee" placeholder="assignees, space-separated (optional)"></p>
+{{end}}
 <p><button type="submit">Open issue</button> {{template "previewbtn"}}</p>
 </form>
 {{end}}

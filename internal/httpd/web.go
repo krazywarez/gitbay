@@ -2003,6 +2003,13 @@ func (s *Server) canWriteRepo(r *http.Request, repo store.Repo) bool {
 	if u.ID == 0 {
 		return false
 	}
+	return s.canWriteRepoAs(u, repo)
+}
+
+// canWriteRepoAs is canWriteRepo for a handler that already has its
+// viewer as a parameter (behind requireUser) rather than needing to
+// resolve one from the request's session cookie.
+func (s *Server) canWriteRepoAs(u store.User, repo store.Repo) bool {
 	grant, _ := s.st.AccessRole(repo.ID, u.ID)
 	return policy.CanWrite(u, repo, grant)
 }
