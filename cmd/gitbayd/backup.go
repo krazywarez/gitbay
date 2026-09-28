@@ -15,7 +15,9 @@ import (
 	"filippo.io/age"
 	"github.com/spf13/cobra"
 
+	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -62,7 +64,7 @@ public keys and its name ends in .age. --verify then needs --identity
 	}
 	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz; .age is appended when [backup] age_recipients is set)")
 	cmd.Flags().BoolVar(&dbOnly, "db-only", false, "archive the database snapshot alone, without repositories")
-	cmd.Flags().StringVar(&verify, "verify", "", "check an archive instead of writing one: database integrity, and its repositories against the archive's")
+	cmd.Flags().StringVar(&verify, "verify", "", "check an archive instead of writing one: database integrity, its repositories against the archive's, and git connectivity of each")
 	cmd.Flags().StringVar(&identity, "identity", "", "with --verify: an age identity file that opens an encrypted archive")
 	return cmd
 }
@@ -88,6 +90,17 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 		}
 	} else if strings.HasSuffix(out, ".age") {
 		return fmt.Errorf("%s ends in .age but [backup] age_recipients is not set, so the archive would not be encrypted", out)
+	}
+
+	// Deletes, renames and transfers wait until the walk finishes, so
+	// every repository the snapshot names is still on disk when the walk
+	// reaches it (#259). A database-only archive reads no repository.
+	if !dbOnly {
+		release, err := backuplock.Hold(cfg.Server.Root)
+		if err != nil {
+			return fmt.Errorf("backup lock: %w", err)
+		}
+		defer release()
 	}
 
 	st, err := openStore(cfg)
@@ -142,6 +155,7 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	skip := map[string]bool{
 		"gitbay.db": true, "gitbay.db-wal": true, "gitbay.db-shm": true,
 		"hook.sock": true, "askpass.sh": true, "hooks": true,
+		backuplock.Name: true,
 	}
 	repoCount := 0
 	root := cfg.Server.Root
@@ -170,7 +184,11 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 				if strings.HasSuffix(rel, ".git") {
 					repoCount++
 				}
-				return nil // directories are implied by member paths
+				// A directory entry, even for one that holds no file (a
+				// bare repository's refs/heads and refs/tags once every
+				// ref is packed), so extraction recreates it: git's own
+				// repository discovery needs refs/ to exist.
+				return addDir(tw, path, filepath.ToSlash(rel))
 			}
 			return addFile(tw, path, filepath.ToSlash(rel))
 		})
@@ -252,11 +270,29 @@ func addFile(tw *tar.Writer, path, name string) error {
 	return err
 }
 
+// addDir writes a directory entry, so an empty directory survives
+// extraction. The mode never exceeds 0755, whatever the source directory
+// carries.
+func addDir(tw *tar.Writer, path, name string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	hdr, err := tar.FileInfoHeader(info, "")
+	if err != nil {
+		return err
+	}
+	hdr.Name = name + "/"
+	hdr.Mode = hdr.Mode&^0o777 | hdr.Mode&0o755
+	return tw.WriteHeader(hdr)
+}
+
 // verifyBackup reads an archive back, decrypting it with identity when it
-// is encrypted: the database snapshot must pass
-// SQLite's integrity check, and every repository it names must be in the
-// archive. A database-only archive is checked for integrity alone and
-// says so. Nothing is written except a temporary copy of the database.
+// is encrypted: the database snapshot must pass SQLite's integrity check,
+// every repository it names must be in the archive, and each of those
+// must pass git fsck --connectivity-only. A database-only archive is
+// checked for integrity alone and says so. Repositories are extracted to
+// a temporary directory for the check, so it needs free space for them.
 func verifyBackup(path, identity string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -292,20 +328,31 @@ func verifyBackup(path, identity string) error {
 		switch {
 		case h.Name == "gitbay.db":
 			dbPath = filepath.Join(tmp, "gitbay.db")
-			w, err := os.Create(dbPath)
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(w, tr); err != nil {
-				w.Close()
+			if err := extractTo(tr, dbPath); err != nil {
 				return fmt.Errorf("%s: extracting the database: %w", path, err)
 			}
-			w.Close()
 		case strings.HasPrefix(h.Name, "repos/"):
+			trimmed := strings.TrimSuffix(h.Name, "/")
 			// repos/<owner>/<name>.git/HEAD marks one repository present.
-			parts := strings.Split(h.Name, "/")
+			parts := strings.Split(trimmed, "/")
 			if len(parts) == 4 && parts[3] == "HEAD" && strings.HasSuffix(parts[2], ".git") {
 				inArchive[parts[1]+"/"+strings.TrimSuffix(parts[2], ".git")] = true
+			}
+			if !filepath.IsLocal(trimmed) {
+				return fmt.Errorf("%s: member %q leaves the archive root", path, h.Name)
+			}
+			dest := filepath.Join(tmp, filepath.FromSlash(trimmed))
+			switch h.Typeflag {
+			case tar.TypeDir:
+				// The archive's directory modes do not matter to fsck, and
+				// a hostile one would stop RemoveAll cleaning up.
+				if err := os.MkdirAll(dest, 0o700); err != nil {
+					return fmt.Errorf("%s: creating %s: %w", path, h.Name, err)
+				}
+			case tar.TypeReg:
+				if err := extractTo(tr, dest); err != nil {
+					return fmt.Errorf("%s: extracting %s: %w", path, h.Name, err)
+				}
 			}
 		}
 	}
@@ -351,9 +398,37 @@ func verifyBackup(path, identity string) error {
 		return fmt.Errorf("%s: %d repositories the database names are not in the archive: %s", path, len(missing), strings.Join(missing, ", "))
 	}
 	if extra > 0 {
-		fmt.Printf("%d repositories in the archive that the database does not name (deleted after the snapshot)\n", extra)
+		fmt.Printf("%d repositories in the archive that the database does not name (created after the snapshot)\n", extra)
 	}
+	var broken []string
+	for _, r := range repos {
+		dir := filepath.Join(tmp, "repos", r.OwnerName, r.Name+".git")
+		if err := gitutil.FsckConnectivity(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", r.Path(), err)
+			broken = append(broken, r.Path())
+		}
+	}
+	if len(broken) > 0 {
+		return fmt.Errorf("%s: %d repositories fail the connectivity check: %s", path, len(broken), strings.Join(broken, ", "))
+	}
+	fmt.Printf("connectivity ok on %d repositories\n", len(repos))
 	return nil
+}
+
+// extractTo writes one archive member to dest, owner-only.
+func extractTo(r io.Reader, dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		return err
+	}
+	w, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(w, r); err != nil {
+		w.Close()
+		return err
+	}
+	return w.Close()
 }
 
 const ageHeader = "age-encryption.org/v1\n"

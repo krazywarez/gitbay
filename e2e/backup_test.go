@@ -87,6 +87,10 @@ func TestAdminBackup(t *testing.T) {
 		t.Fatal("the archived database carries the build secret in clear")
 	}
 
+	if out := inst.admin(t, "admin", "backup", "--verify", archive); !strings.Contains(out, "connectivity ok on 1 repositories") {
+		t.Fatalf("verify: %s", out)
+	}
+
 	// Restore: extract into a fresh root and serve from it.
 	root2 := t.TempDir()
 	if outB, err := exec.Command("tar", "-xzf", archive, "-C", root2).CombinedOutput(); err != nil {

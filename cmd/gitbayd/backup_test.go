@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"filippo.io/age"
 
+	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/config"
 )
 
@@ -323,4 +325,161 @@ func TestArchivePath(t *testing.T) {
 			t.Errorf("archivePath(%q) = %q, want %q", c.out, got, c.want)
 		}
 	}
+}
+
+func gitIn(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@e",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@e")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// verify runs git's connectivity check on every repository the
+// database names: a repository missing an object fails it.
+func TestVerifyChecksConnectivity(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	gitIn(t, work, "clone", "-q", "--bare", work, dir)
+
+	good := filepath.Join(t.TempDir(), "good.tar.gz")
+	if err := runBackup(cfg, good, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBackup(good, ""); err != nil {
+		t.Fatalf("intact archive: %v", err)
+	}
+
+	blob := gitIn(t, dir, "rev-parse", "HEAD:a.txt")
+	if err := os.Remove(filepath.Join(dir, "objects", blob[:2], blob[2:])); err != nil {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(t.TempDir(), "bad.tar.gz")
+	if err := runBackup(cfg, bad, false); err != nil {
+		t.Fatal(err)
+	}
+	err = verifyBackup(bad, "")
+	if err == nil || !strings.Contains(err.Error(), "krz/thing") || !strings.Contains(err.Error(), "connectivity") {
+		t.Fatalf("archive with a missing blob: %v", err)
+	}
+}
+
+// A full backup waits for a delete under way, and does not archive its
+// own lock file.
+func TestFullBackupWaitsForRepositoryMoves(t *testing.T) {
+	cfg := testConfig(t)
+	s, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	inFlight, err := backuplock.TryShared(cfg.Server.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "b.tar.gz")
+	done := make(chan error, 1)
+	go func() { done <- runBackup(cfg, out, false) }()
+	select {
+	case err := <-done:
+		t.Fatalf("backup finished while a delete held the lock: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	inFlight()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("backup never started after the delete finished")
+	}
+	for _, n := range members(t, out) {
+		if n == backuplock.Name {
+			t.Fatalf("archive carries %s", n)
+		}
+	}
+}
+
+// A repository with every ref packed keeps its empty refs/heads and
+// refs/tags directories through backup and extraction, the same as a real
+// restore would: git needs refs/ to recognize a bare repository at all,
+// even when every ref lives in packed-refs (#259).
+func TestBackupPreservesPackedRefDirs(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	gitIn(t, work, "clone", "-q", "--bare", work, dir)
+	gitIn(t, dir, "pack-refs", "--all")
+	entries, err := os.ReadDir(filepath.Join(dir, "refs", "heads"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("refs/heads not empty after pack-refs --all: %v", entries)
+	}
+
+	archive := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, archive, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// verify sees the archive exactly as a restore would: no workaround.
+	if err := verifyBackup(archive, ""); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+
+	restored := t.TempDir()
+	if out, err := exec.Command("tar", "-xzf", archive, "-C", restored).CombinedOutput(); err != nil {
+		t.Fatalf("extract: %v\n%s", err, out)
+	}
+	restoredRepo := filepath.Join(restored, "repos", "krz", "thing.git")
+	if got := gitIn(t, restoredRepo, "rev-parse", "--verify", "HEAD"); got == "" {
+		t.Fatal("rev-parse --verify HEAD returned nothing after restore")
+	}
+	gitIn(t, restoredRepo, "fsck", "--connectivity-only", "--no-progress", "--no-dangling")
 }
