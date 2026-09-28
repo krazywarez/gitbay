@@ -6,6 +6,10 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- A wiki link to an existing non-page file (an .svg, .txt, .pdf) now
+  resolves to the raw route instead of 404ing against the page route
+  (#283).
+
 - The new-issue form takes labels, milestone and assignee in one step
   for writers; the watch button names watching, muted and default; a
   Discussion heading sits before comment threads; the build page's

@@ -248,8 +248,16 @@ func rewriteWikiLinks(rendered template.HTML, p repoPage, page string, isPage, i
 					}
 					continue
 				}
+				// A plain link is usually to another page, but a link to
+				// an existing non-page file (an .svg, .txt, .pdf) must
+				// go to _raw the same as an image src, or it 404s
+				// against the page route (#283).
 				if target, ok := wikiResolve(page, trimPageExt(v), isPage); ok {
-					n.Attr[i].Val = base + "/" + target
+					if raw, rok := wikiResolve(page, v, isFile); rok && isFile(raw) && !isPage(target) {
+						n.Attr[i].Val = base + "/_raw/" + raw
+					} else {
+						n.Attr[i].Val = base + "/" + target
+					}
 				}
 			}
 		}

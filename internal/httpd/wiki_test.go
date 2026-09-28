@@ -41,12 +41,14 @@ func TestRewriteWikiLinksInSubfolder(t *testing.T) {
 	pages := map[string]bool{"Admin": true, "Architecture/Identity": true}
 	files := map[string]bool{"diagrams/a.svg": true, "Architecture/b.svg": true}
 	in := template.HTML(`<a href="Identity.org">i</a><a href="Admin.org">a</a>` +
+		`<a href="b.svg">diagram</a>` +
 		`<img src="b.svg"><img src="diagrams/a.svg"><a href="https://x.test/">x</a>`)
 	out := string(rewriteWikiLinks(in, p, "Architecture/Trust",
 		func(s string) bool { return pages[s] }, func(s string) bool { return files[s] }))
 	for _, want := range []string{
 		`href="/krz/gitbay/wiki/Architecture/Identity"`,
 		`href="/krz/gitbay/wiki/Admin"`,
+		`href="/krz/gitbay/wiki/_raw/Architecture/b.svg"`,
 		`src="/krz/gitbay/wiki/_raw/Architecture/b.svg"`,
 		`src="/krz/gitbay/wiki/_raw/diagrams/a.svg"`,
 		`href="https://x.test/"`,
