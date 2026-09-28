@@ -241,3 +241,33 @@ func TestHelpPrintsTheCLIPath(t *testing.T) {
 		}
 	}
 }
+
+func TestHelpRendersAnAliasedNounWithTheRegistryLayout(t *testing.T) {
+	var out, errOut bytes.Buffer
+	c := &Ctx{Stdout: &out, Stderr: &errOut, Term: Term{Cols: 100}, Scope: "full", CLIPath: "auth"}
+	c.Cfg.Server.SiteURL = "https://forge.test"
+	if code := Dispatch(c, []string{"help", "auth"}); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	got := out.String()
+	for _, want := range []string{"auth whoami", "auth keys list", "auth pgp add", "auth token create", "auth export"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "no command matches") {
+		t.Errorf("auth did not resolve: %s", got)
+	}
+}
+
+func TestHelpRendersAnAliasedNounInRegisteredFormOverSSH(t *testing.T) {
+	got := helpOut(t, Term{}, "auth")
+	for _, want := range []string{"whoami", "keys list", "pgp add", "token create", "account export"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "auth keys list") {
+		t.Errorf("stock ssh should not see the CLI-only auth prefix: %s", got)
+	}
+}

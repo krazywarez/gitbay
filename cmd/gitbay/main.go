@@ -484,7 +484,7 @@ func authCmd() *cobra.Command {
 		pass("list", passOpts{server: []string{"token", "list"}}),
 		pass("revoke", passOpts{server: []string{"token", "revoke"}}),
 	)
-	return group("auth", "identity: whoami, SSH and PGP keys",
+	return group("auth", "whoami, SSH and PGP keys, email, API tokens",
 		pass("export", passOpts{server: []string{"account", "export"}}),
 		tokens,
 		pass("whoami", passOpts{server: []string{"whoami"}}),

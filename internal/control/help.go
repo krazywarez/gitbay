@@ -28,6 +28,7 @@ var nounSummaries = map[string]string{
 	"account":       "export or import your account, for instance migration",
 	"admin":         "instance administration (admins)",
 	"audit":         "instance audit log (admins)",
+	"auth":          "whoami, SSH and PGP keys, email, API tokens",
 	"build":         "CI builds",
 	"dashboard":     "pinned repos, open MRs, assigned issues, recent builds",
 	"email":         "manage email addresses",
@@ -61,6 +62,35 @@ var nounSummaries = map[string]string{
 // test (task 4.5).
 func NounSummaries() map[string]string { return nounSummaries }
 
+// nounAlias is one bucket of registered commands, reachable under a
+// CLI-only noun that is not itself a registry path (auth, gathering
+// several unrelated registry prefixes): Registered is what runHelp
+// matches against the registry, CLI is the path a gitbay caller
+// actually types to reach it — not always Registered with the alias's
+// own name stitched on (account export -> auth export drops a word),
+// so the two are paired explicitly rather than derived.
+type nounAlias struct {
+	Registered string
+	CLI        string
+}
+
+// nounAliases groups a CLI-only noun into the real prefixes it gathers,
+// so `help auth` renders with the same layout a real noun gets instead
+// of falling back to whatever a caller does when help fails. A stock
+// ssh caller — the only one who could ever ask for a bare "auth" and
+// get nothing back from the registry — sees the Registered forms
+// unchanged; the CLI, having sent its own path, sees CLI.
+var nounAliases = map[string][]nounAlias{
+	"auth": {
+		{"account export", "auth export"},
+		{"whoami", "auth whoami"},
+		{"keys", "auth keys"},
+		{"email", "auth email"},
+		{"pgp", "auth pgp"},
+		{"token", "auth token"},
+	},
+}
+
 // helpEntry is one row of the registry as help reports it.
 type helpEntry struct {
 	Path     string   `json:"path"`
@@ -76,11 +106,33 @@ type helpEntry struct {
 // noun with several commands under it renders a READ/WRITE summary.
 func runHelp(c *Ctx, args []string) int {
 	prefix := joinPath(args)
+	prefixes := []string{prefix}
+	override := map[string]string{}
+	if aliased, ok := nounAliases[prefix]; ok {
+		prefixes = nil
+		for _, a := range aliased {
+			prefixes = append(prefixes, a.Registered)
+		}
+		if c.CLIPath != "" {
+			for _, cmd := range registry {
+				p := joinPath(cmd.Path)
+				for _, a := range aliased {
+					if p == a.Registered || strings.HasPrefix(p, a.Registered+" ") {
+						override[p] = a.CLI + strings.TrimPrefix(p, a.Registered)
+						break
+					}
+				}
+			}
+		}
+	}
 	var matched []Command
 	for _, cmd := range registry {
 		p := joinPath(cmd.Path)
-		if prefix == "" || p == prefix || strings.HasPrefix(p, prefix+" ") {
-			matched = append(matched, cmd)
+		for _, pfx := range prefixes {
+			if pfx == "" || p == pfx || strings.HasPrefix(p, pfx+" ") {
+				matched = append(matched, cmd)
+				break
+			}
 		}
 	}
 	if len(matched) == 0 {
@@ -106,7 +158,7 @@ func runHelp(c *Ctx, args []string) int {
 		case joinPath(matched[0].Path) == prefix:
 			c.helpVerb(w, matched[0], matched[1:])
 		default:
-			c.helpNoun(w, prefix, matched)
+			c.helpNoun(w, prefix, matched, override)
 		}
 	})
 }
@@ -260,16 +312,28 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 	}
 }
 
-func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command) {
+// helpNoun renders a noun with several commands under it. override, from
+// an aliased noun (auth), gives the full CLI path for a row that is not
+// itself under prefix (keys list, gathered under auth, becomes "auth
+// keys list"); it is empty for an ordinary noun, so every row there
+// still trims to just its own verb.
+func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command, override map[string]string) {
 	head := nounSummaries[strings.Fields(prefix)[0]]
 	fmt.Fprintln(w, head)
 	fmt.Fprintln(w)
 	c.heading(w, "USAGE")
 	display := c.shownAs(prefix, prefix)
 	fmt.Fprintf(w, "  %s %s <verb> ...\n", c.program(), display)
+	rowText := func(cmd Command) string {
+		full := joinPath(cmd.Path)
+		if ov, ok := override[full]; ok {
+			return ov
+		}
+		return strings.TrimPrefix(full, prefix+" ")
+	}
 	wide := 0
 	for _, cmd := range cmds {
-		wide = max(wide, cells(strings.TrimPrefix(joinPath(cmd.Path), prefix+" ")))
+		wide = max(wide, cells(rowText(cmd)))
 	}
 	for _, section := range []struct {
 		title string
@@ -285,8 +349,7 @@ func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command) {
 				c.heading(w, section.title)
 				first = false
 			}
-			verb := strings.TrimPrefix(joinPath(cmd.Path), prefix+" ")
-			fmt.Fprintf(w, "  %s  %s\n", pad(verb, wide), cmd.Summary)
+			fmt.Fprintf(w, "  %s  %s\n", pad(rowText(cmd), wide), cmd.Summary)
 		}
 	}
 	fmt.Fprintln(w)
