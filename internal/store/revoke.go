@@ -3,6 +3,7 @@ package store
 import (
 	"slices"
 	"strings"
+	"time"
 )
 
 // Revoked names SSH keys that stopped being valid: by id, or every key
@@ -32,19 +33,20 @@ func (s *Store) announce(r Revoked) {
 	}
 }
 
-// LiveSSHKeys reports which of ids still name a registered key on an
-// account that is not disabled.
+// LiveSSHKeys reports which of ids still name a registered, unexpired
+// key on an account that is not disabled.
 func (s *Store) LiveSSHKeys(ids []int64) (map[int64]bool, error) {
 	live := map[int64]bool{}
 	if len(ids) == 0 {
 		return live, nil
 	}
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
+	args := []any{fmtTime(time.Now())}
+	for _, id := range ids {
+		args = append(args, id)
 	}
 	rows, err := s.DB.Query(`SELECT k.id FROM ssh_keys k JOIN users u ON u.id = k.user_id
-		WHERE u.disabled = 0 AND k.id IN (?`+strings.Repeat(", ?", len(ids)-1)+`)`, args...)
+		WHERE u.disabled = 0 AND (k.expires_at IS NULL OR k.expires_at > ?)
+		AND k.id IN (?`+strings.Repeat(", ?", len(ids)-1)+`)`, args...)
 	if err != nil {
 		return nil, err
 	}
