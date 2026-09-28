@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ type Worker struct {
 	Tick time.Duration
 	// Lookup resolves a mirror's host immediately before each sync.
 	Lookup func(ctx context.Context, host string) ([]net.IP, error)
+	// gitErr is set when the server's git cannot pin addresses; no
+	// mirror syncs while it is.
+	gitErr error
 }
 
 func New(st *store.Store, cfg config.Config) *Worker {
@@ -53,6 +57,15 @@ func New(st *store.Store, cfg config.Config) *Worker {
 }
 
 func (w *Worker) Run(ctx context.Context) {
+	out, err := exec.CommandContext(ctx, toolpath.Look("git"), "version").Output()
+	if err != nil {
+		w.gitErr = fmt.Errorf("mirrors disabled: running git version: %v", err)
+	} else {
+		w.gitErr = gitVersionOK(string(out))
+	}
+	if w.gitErr != nil {
+		slog.Error("mirror: not syncing", "err", w.gitErr)
+	}
 	t := time.NewTicker(w.Tick)
 	defer t.Stop()
 	for {
@@ -73,6 +86,10 @@ func (w *Worker) sweep() {
 		return
 	}
 	for _, m := range due {
+		if w.gitErr != nil {
+			w.St.SetMirrorResult(m.ID, w.gitErr.Error())
+			continue
+		}
 		if err := w.sync(m); err != nil {
 			slog.Warn("mirror sync failed", "mirror", m.ID, "url", m.URL, "err", err)
 			w.St.SetMirrorResult(m.ID, err.Error())
@@ -113,7 +130,10 @@ func (w *Worker) sync(m store.Mirror) error {
 		return err
 	}
 
-	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + w.Cfg.Server.Root}
+	// No system or global gitconfig: a proxy, URL rewrite or redirect
+	// setting there would take git around the pin.
+	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + w.Cfg.Server.Root,
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
 	if m.Token != "" {
 		askpass := filepath.Join(w.Cfg.Server.Root, "mirror-askpass.sh")
 		if err := os.WriteFile(askpass, []byte(askpassScript), 0o700); err != nil {
@@ -171,4 +191,25 @@ func pinArgs(u *url.URL, ips []net.IP) []string {
 		}
 	}
 	return append(args, "-c", "http.curloptResolve="+host+":"+port+":"+strings.Join(addrs, ","))
+}
+
+// gitVersionOK accepts the output of `git version` for git 2.37 or
+// later, the first release with http.curloptResolve. An older git
+// ignores the setting and would resolve the host itself.
+func gitVersionOK(out string) error {
+	fields := strings.Fields(out)
+	if len(fields) >= 3 && fields[0] == "git" && fields[1] == "version" {
+		parts := strings.Split(fields[2], ".")
+		if len(parts) >= 2 {
+			major, err1 := strconv.Atoi(parts[0])
+			minor, err2 := strconv.Atoi(parts[1])
+			if err1 == nil && err2 == nil {
+				if major > 2 || major == 2 && minor >= 37 {
+					return nil
+				}
+				return fmt.Errorf("mirrors disabled: git %s is older than 2.37 and cannot pin mirror addresses", fields[2])
+			}
+		}
+	}
+	return fmt.Errorf("mirrors disabled: cannot read git version from %q", strings.TrimSpace(out))
 }

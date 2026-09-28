@@ -43,7 +43,9 @@ must add =--scope full=. Existing tokens keep their scope.
   only to them, with redirects off; a URL that now resolves to private
   space, or is not http or https, fails the sync with the reason on
   =repo mirror list=. A mirror of a renamed repository that redirects
-  fails until its URL is updated. Needs git 2.37 or later (#279).
+  fails until its URL is updated. Sync ignores the system and global
+  gitconfig. Needs git 2.37 or later: with an older git no mirror
+  syncs, and each records why (#279).
 - Webhook and mirror targets in 100.64.0.0/10 or on a multicast
   address are refused, as private addresses are (#279).
 

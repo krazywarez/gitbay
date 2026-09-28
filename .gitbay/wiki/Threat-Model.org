@@ -84,16 +84,18 @@ no inbound HMAC.
 
 * Network-facing request forgery
 
-Anything that makes the *server* open an outbound connection to a
-user-supplied address — webhook delivery, GitHub-history import
-=--api-base=, mirror remotes — passes the same SSRF guard: the scheme
+Webhook delivery, GitHub-history import =--api-base= and mirror
+remotes, which make the *server* open an outbound connection to a
+user-supplied address, pass the same SSRF guard: the scheme
 must be http/https and, unless =webhooks.allow_local= is set, the
 resolved address must not be loopback, private, shared
 (100.64.0.0/10), link-local, or multicast. The webhook dialer re-checks
 at connect time, and the mirror worker resolves and checks before each
 sync and pins git to the checked addresses, so a DNS answer that
 changes after validation still cannot reach private space. Redirects
-are never followed.
+are never followed. =repo import --from= is the exception: its clone
+checks the scheme but not the address, and follows git's default
+redirect rule (#298).
 
 * Rendering pushed markup
 

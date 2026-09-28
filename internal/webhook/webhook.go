@@ -20,19 +20,20 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
-// ValidateURL rejects URLs a webhook must not target: non-HTTP schemes and,
-// unless allowLocal, anything resolving to loopback, private, or link-local
-// addresses (SSRF).
+// ValidateURL rejects URLs the server must not connect to (SSRF): non-HTTP
+// schemes and, unless allowLocal, anything resolving to a loopback,
+// private, shared (100.64.0.0/10), link-local, multicast or unspecified
+// address. Webhooks, mirrors and issue import use it.
 func ValidateURL(raw string, allowLocal bool) error {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("webhook URLs must be http or https")
+		return fmt.Errorf("URLs must be http or https")
 	}
 	if u.Hostname() == "" {
-		return fmt.Errorf("webhook URL has no host")
+		return fmt.Errorf("URL has no host")
 	}
 	if allowLocal {
 		return nil
@@ -42,7 +43,7 @@ func ValidateURL(raw string, allowLocal bool) error {
 		return fmt.Errorf("cannot resolve %s: %w", u.Hostname(), err)
 	}
 	if err := CheckAddrs(u.Hostname(), ips, allowLocal); err != nil {
-		return fmt.Errorf("webhook target %s resolves to a private or local address; refusing (SSRF)", u.Hostname())
+		return fmt.Errorf("target %s resolves to a private or local address; refusing (SSRF)", u.Hostname())
 	}
 	return nil
 }

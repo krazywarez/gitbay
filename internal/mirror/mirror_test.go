@@ -111,6 +111,68 @@ func TestSyncConnectsToTheCheckedAddress(t *testing.T) {
 	}
 }
 
+// The server account's own gitconfig cannot route git around the pin:
+// a proxy and a URL rewrite in HOME's config are both ignored.
+func TestSyncIgnoresGlobalGitConfig(t *testing.T) {
+	remote, sha := upstream(t)
+	u, _ := url.Parse(remote)
+	root := t.TempDir()
+	st, m, dir := local(t, root, "http://mirror.test:"+u.Port()+"/remote.git")
+	conf := "[http]\n\tproxy = http://127.0.0.1:9\n[url \"http://elsewhere.test/\"]\n\tinsteadOf = http://mirror.test:" + u.Port() + "/\n"
+	if err := os.WriteFile(filepath.Join(root, ".gitconfig"), []byte(conf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var cfg config.Config
+	cfg.Server.Root = root
+	cfg.Webhooks.AllowLocal = true
+	w := &Worker{St: st, Cfg: cfg, Lookup: func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("127.0.0.1")}, nil
+	}}
+	if err := w.sync(m); err != nil {
+		t.Fatal(err)
+	}
+	if got := git(t, dir, "rev-parse", "refs/heads/main"); got != sha {
+		t.Fatalf("main = %s, want %s", got, sha)
+	}
+}
+
+// A git too old for http.curloptResolve would ignore the pin; the
+// sweep refuses to sync and says why on every due mirror.
+func TestSweepRefusesWithAnOldGit(t *testing.T) {
+	root := t.TempDir()
+	st, m, _ := local(t, root, "https://mirror.test/x.git")
+	var cfg config.Config
+	cfg.Server.Root = root
+	cfg.Mirrors.PullIntervalMinutes = 15
+	w := &Worker{St: st, Cfg: cfg, Lookup: func(context.Context, string) ([]net.IP, error) {
+		t.Fatal("looked up a host with an old git")
+		return nil, nil
+	}}
+	w.gitErr = gitVersionOK("git version 2.36.1")
+	w.sweep()
+	ms, err := st.ListMirrors(m.RepoID)
+	if err != nil || len(ms) != 1 {
+		t.Fatalf("mirrors: %v %v", ms, err)
+	}
+	if !strings.Contains(ms[0].LastError, "2.37") {
+		t.Fatalf("last error = %q", ms[0].LastError)
+	}
+}
+
+func TestGitVersionOK(t *testing.T) {
+	for _, s := range []string{"git version 2.37.0", "git version 2.47.3", "git version 2.39.5 (Apple Git-154)",
+		"git version 2.45.2.windows.1", "git version 3.0.0\n"} {
+		if err := gitVersionOK(s); err != nil {
+			t.Errorf("%q: %v", s, err)
+		}
+	}
+	for _, s := range []string{"git version 2.36.9", "git version 1.99.0", "git version 2", "nonsense", ""} {
+		if err := gitVersionOK(s); err == nil {
+			t.Errorf("%q accepted", s)
+		}
+	}
+}
+
 // The URL passed the check when it was saved; the answer at sync time
 // is what counts.
 func TestSyncRefusesAPrivateAddressAtSyncTime(t *testing.T) {
