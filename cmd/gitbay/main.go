@@ -435,6 +435,12 @@ func authCmd() *cobra.Command {
 	keysAdd := pass("add", passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
 	// keys add always reads stdin on the server; wire it through directly.
 	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
+		cliPath := cliPathOf(cmd)
+		for _, a := range args {
+			if a == "--help" || a == "-h" {
+				os.Exit(runServerHelp(passOpts{server: []string{"keys", "add"}}, cliPath))
+			}
+		}
 		t, err := resolveTarget()
 		if err != nil {
 			return err
@@ -443,7 +449,7 @@ func authCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		os.Exit(runSSH(t, append([]string{"keys", "add"}, args...), in))
+		os.Exit(runSSH(t, withCLIPath(cliPath, "keys add", append([]string{"keys", "add"}, args...)), in))
 		return nil
 	}
 	pgpAdd := &cobra.Command{
@@ -455,6 +461,12 @@ func authCmd() *cobra.Command {
 		},
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cliPath := cliPathOf(cmd)
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					os.Exit(runServerHelp(passOpts{server: []string{"pgp", "add"}}, cliPath))
+				}
+			}
 			t, err := resolveTarget()
 			if err != nil {
 				return err
@@ -463,7 +475,7 @@ func authCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			os.Exit(runSSH(t, append([]string{"pgp", "add"}, args...), in))
+			os.Exit(runSSH(t, withCLIPath(cliPath, "pgp add", append([]string{"pgp", "add"}, args...)), in))
 			return nil
 		},
 	}

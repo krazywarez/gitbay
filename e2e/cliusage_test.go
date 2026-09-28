@@ -53,3 +53,39 @@ func TestCLIUsagePrintsTheInvokingPath(t *testing.T) {
 		t.Errorf("stock ssh saw the CLI's auth grouping: %q", errOut)
 	}
 }
+
+// keys add and pgp add wire stdin directly to the server rather than going
+// through pass(), so they lost the --help check every other passthrough
+// command has: --help was treated as key material instead of showing help
+// (#267).
+func TestKeysAddAndPGPAddCheckHelpBeforeStdin(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	key := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub",
+		"--email", "alice@example.test", "--verified")
+
+	c := &cli{bin: buildGitbayCLI(t), configDir: t.TempDir(), inst: inst, key: key}
+	c.must(t, "", "", "remote", "add", "test", "127.0.0.1",
+		"--port", fmt.Sprint(inst.port),
+		"--ssh-option", "-i", "--ssh-option", key,
+		"--ssh-option", "-oIdentitiesOnly=yes",
+		"--ssh-option", "-oStrictHostKeyChecking=no",
+		"--ssh-option", "-oUserKnownHostsFile="+filepath.Join(inst.sshDir, "kh"),
+		"--ssh-option", "-oBatchMode=yes",
+		"--default")
+
+	for _, args := range [][]string{
+		{"auth", "keys", "add", "--help"},
+		{"auth", "pgp", "add", "--help"},
+	} {
+		out, errOut, code := c.run(t, "", "", args...)
+		if code != 0 {
+			t.Errorf("%v: exit %d, stdout %q, stderr %q", args, code, out, errOut)
+		}
+		want := "gitbay " + strings.Join(args[:len(args)-1], " ")
+		if !strings.Contains(out, want) {
+			t.Errorf("%v: stdout %q does not contain %q", args, out, want)
+		}
+	}
+}
