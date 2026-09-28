@@ -198,3 +198,35 @@ func renderBuilds(t *testing.T, builds []control.BuildOut, filter buildFilter, o
 	}
 	return sb.String()
 }
+
+// A failed build's page folds its log by step, opens the step that
+// failed and links to it; no JavaScript (#266).
+func TestBuildPageFoldsStepsAndOpensFailure(t *testing.T) {
+	b := control.BuildOut{Number: 61, Job: "test", Status: "failure",
+		SHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b", Ref: "main",
+		CreatedAt: "2026-08-28T04:42:54Z", FinishedAt: "2026-08-28T04:53:50Z", DurationS: 656,
+		Steps: []string{"go build ./...", "go test ./..."}, FailedStep: 2, FailedReason: "exit 1"}
+	log := "$ git clone x (ff6271a9d4)\n$ go build ./...\n$ go test ./...\n--- FAIL: TestCLI\nstep 2/2 failed: exit 1\n"
+	v := buildView{repoPage: testRepoPage(), Build: b, Log: log, Duration: "10m56s"}
+	v.Steps, v.Failed = logSteps(log, b)
+	var sb strings.Builder
+	if err := web.Render(&sb, "build.html", v); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	for _, want := range []string{
+		`<details class="difffold buildstep" id="failed" open>`,
+		"step 2/2", "<code>go test ./...</code>", `href="#failed"`, "Jump to failure",
+		"ran 10m56s", "--- FAIL: TestCLI",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("build.html missing %q", want)
+		}
+	}
+	if n := strings.Count(out, `class="difffold buildstep"`); n != 3 {
+		t.Errorf("%d step folds, want 3 (setup and two steps)", n)
+	}
+	if n := strings.Count(out, `id="failed"`); n != 1 {
+		t.Errorf("%d failed anchors, want 1", n)
+	}
+}

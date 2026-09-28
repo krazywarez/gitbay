@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/protocol"
@@ -282,16 +283,52 @@ func (s *Server) build(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v.Log, _, _ = s.runControl(viewer, []string{"build", "log", p.Repo.Path(), n})
+	v.Steps, v.Failed = logSteps(v.Log, b)
+	if b.DurationS > 0 {
+		v.Duration = (time.Duration(b.DurationS) * time.Second).String()
+	}
 	s.render(w, "build.html", v)
 }
 
 type buildView struct {
 	repoPage
-	Build    control.BuildOut
-	Log      string
+	Build control.BuildOut
+	Log   string
+	// Steps is the finished log cut at its steps, nil when there is no
+	// step to cut at; Failed says whether one of them is marked failed.
+	Steps    []logStep
+	Failed   bool
+	Duration string
 	Live     bool
 	CanWrite bool
 	Notice   string
+}
+
+type logStep struct {
+	control.LogSection
+	Failed bool
+}
+
+// logSteps cuts a finished build's log at its steps and marks the one it
+// failed at. Nil when no step's line is in the log — a build that
+// stopped in the clone — which renders as one block.
+func logSteps(log string, b control.BuildOut) ([]logStep, bool) {
+	sections := control.SplitBuildLog(log, b.Steps)
+	stepped := false
+	for _, s := range sections {
+		if s.N > 0 {
+			stepped = true
+		}
+	}
+	if !stepped {
+		return nil, false
+	}
+	failed := control.FailedSection(sections, b.Status, b.FailedStep)
+	out := make([]logStep, len(sections))
+	for i, s := range sections {
+		out[i] = logStep{LogSection: s, Failed: i == failed}
+	}
+	return out, failed >= 0
 }
 
 // liveLogMarker stands in for the log when build.html is rendered for a

@@ -1113,7 +1113,9 @@ pre.matchline mark { background: color-mix(in srgb, var(--mark) 25%, transparent
 p.pager { margin-top: var(--sp-4); }
 .snippetfile { margin-bottom: var(--sp-5); }
 p.filefacts { color: var(--muted); font-size: var(--fs-1); margin: 0 0 var(--sp-3); }
-pre.buildlog { max-height: 40rem; overflow: auto; }
+pre.buildlog { max-height: 40rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+details.buildstep pre.buildlog { margin: 0; border: 0; border-radius: 0; }
+details.buildstep summary code { overflow-wrap: anywhere; }
 
 /* ---- rendered prose ---- */
 pre {
