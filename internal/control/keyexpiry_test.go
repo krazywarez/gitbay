@@ -47,6 +47,12 @@ func TestKeysAddTTLAndList(t *testing.T) {
 	if _, _, code := run(authorizedKey(t, "x"), "keys", "add", "--ttl", "soon"); code != protocol.ExitUsage {
 		t.Fatalf("bad ttl: exit %d", code)
 	}
+	if _, _, code := run(authorizedKey(t, "x"), "keys", "add", "--ttl", "0h"); code != protocol.ExitUsage {
+		t.Fatalf("zero ttl: exit %d", code)
+	}
+	if _, _, code := run(authorizedKey(t, "x"), "keys", "add", "--ttl", "-1h"); code != protocol.ExitUsage {
+		t.Fatalf("negative ttl: exit %d", code)
+	}
 
 	keys, err := st.ListSSHKeys(uid)
 	if err != nil || len(keys) != 2 {
