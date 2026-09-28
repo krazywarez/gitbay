@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,17 +16,14 @@ import (
 	"time"
 )
 
+// waitForPort waits for a restarted daemon's listener; the failure names
+// the port.
 func waitForPort(t *testing.T, port int) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return
-		}
+	deadline := time.Now().Add(startupWait)
+	for !dialable(port) {
 		if time.Now().After(deadline) {
-			t.Fatal("listener did not come back")
+			t.Fatalf("listener on %d did not come back within %s", port, startupWait)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

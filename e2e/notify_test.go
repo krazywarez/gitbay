@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -53,18 +52,7 @@ func TestActivityNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inst.proc.Process.Kill(); inst.proc.Wait() })
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", inst.port), 200*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("daemon did not restart")
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	waitForPort(t, inst.port)
 
 	aliceKey := inst.newKey(t, "alice")
 	bobKey := inst.newKey(t, "bob")

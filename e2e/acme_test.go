@@ -48,23 +48,8 @@ acme_http_addr = "127.0.0.1:%d"
 	}
 	t.Cleanup(func() { inst.proc.Process.Kill(); inst.proc.Wait() })
 
-	wait := func(port int) {
-		t.Helper()
-		deadline := time.Now().Add(10 * time.Second)
-		for {
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
-			if err == nil {
-				conn.Close()
-				return
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("port %d never came up", port)
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
-	wait(httpsPort)
-	wait(acmeHTTPPort)
+	waitForPort(t, httpsPort)
+	waitForPort(t, acmeHTTPPort)
 
 	// The helper listener redirects everything to the canonical HTTPS host.
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -89,7 +74,7 @@ acme_http_addr = "127.0.0.1:%d"
 		conn.Close()
 		t.Fatal("handshake unexpectedly succeeded with no CA reachable")
 	}
-	wait(httpsPort) // still listening after the failed handshake
+	waitForPort(t, httpsPort) // still listening after the failed handshake
 
 	// Certificates cache under the server root.
 	if _, err := os.Stat(filepath.Join(inst.root, "acme")); err != nil {

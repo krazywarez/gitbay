@@ -4,6 +4,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net"
 	"os"
@@ -23,8 +24,9 @@ type instance struct {
 	httpPort int
 	gitPort  int
 	proc     *exec.Cmd
-	sshDir   string // per-user client keys live here
-	keyFile  string // server.secret_key_file, outside root
+	sshDir   string      // per-user client keys live here
+	keyFile  string      // server.secret_key_file, outside root
+	stderr   *tailBuffer // the end of the first serve's stderr
 }
 
 // nextPort hands out candidate ports. Seeded randomly so two test processes
@@ -113,8 +115,9 @@ port = %d
 
 	inst.admin(t, "admin", "secrets", "init")
 
+	inst.stderr = &tailBuffer{max: 16 << 10}
 	inst.proc = exec.Command(inst.gitbayd, "--config", inst.config, "serve")
-	inst.proc.Stderr = os.Stderr
+	inst.proc.Stderr = io.MultiWriter(os.Stderr, inst.stderr)
 	if err := inst.proc.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -126,9 +129,7 @@ port = %d
 	// Every listener, not just SSH: the HTTP and git ones come up in their
 	// own goroutines, and a test whose first act is an HTTP request used
 	// to race them and be refused.
-	for _, port := range []int{inst.port, inst.httpPort, inst.gitPort} {
-		waitForPort(t, port)
-	}
+	inst.waitListening(t, inst.port, inst.httpPort, inst.gitPort)
 	return inst
 }
 
