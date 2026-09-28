@@ -229,11 +229,7 @@ func runDashboard(c *Ctx, args []string) int {
 		lines := FeedLines(events)
 		activityRows := make([][]cell, len(lines))
 		for i, l := range lines {
-			sentence := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
-			if l.Extra != "" {
-				sentence += " " + l.Extra
-			}
-			activityRows[i] = []cell{cAge(l.When), cFlex(sentence)}
+			activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
 		}
 		section("recent activity:", []string{"WHEN", "EVENT"}, activityRows)
 
@@ -352,11 +348,7 @@ func runFeed(c *Ctx, args []string) int {
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "WHEN", "EVENT")
 		for _, l := range lines {
-			sentence := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
-			if l.Extra != "" {
-				sentence += " " + l.Extra
-			}
-			tb.row(cAge(l.When), cFlex(sentence))
+			tb.row(cAge(l.When), cFlex(l.Sentence()))
 		}
 		tb.flush()
 	})

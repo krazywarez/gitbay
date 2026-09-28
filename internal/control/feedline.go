@@ -27,6 +27,16 @@ type FeedLine struct {
 	sha   string // the commit a build event fired on, for fold-matching
 }
 
+// Sentence renders the line the way the CLI shows it: "<actor> <verb>
+// <repo><ref>", with Extra (a label list) appended when set.
+func (l FeedLine) Sentence() string {
+	s := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
+	if l.Extra != "" {
+		s += " " + l.Extra
+	}
+	return s
+}
+
 // FeedLines turns stored events into readable lines. An unknown kind
 // still shows: the feed says what happened even for events added later.
 // Build events on the same commit, adjacent in the input, fold into one

@@ -231,3 +231,15 @@ func TestFeedLinesScheduleAbsorbsPushJobs(t *testing.T) {
 		t.Errorf("second line jobs: %+v, want the schedule and the push folded", lines[1].Jobs)
 	}
 }
+
+func TestFeedLineSentence(t *testing.T) {
+	l := FeedLine{Actor: "cmc", Verb: "opened issue", Repo: "krz/gitbay", Ref: "#1"}
+	if got, want := l.Sentence(), "cmc opened issue krz/gitbay#1"; got != want {
+		t.Errorf("Sentence() = %q, want %q", got, want)
+	}
+
+	l.Extra = "ops, security"
+	if got, want := l.Sentence(), "cmc opened issue krz/gitbay#1 ops, security"; got != want {
+		t.Errorf("Sentence() with Extra = %q, want %q", got, want)
+	}
+}
