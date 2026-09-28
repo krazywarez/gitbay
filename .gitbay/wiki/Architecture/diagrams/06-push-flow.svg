@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 780" width="970" height="780" role="img" aria-labelledby="t d">
+<title id="t">6. git push over SSH</title><desc id="d">Sequence of a push: SSH checks, pre-receive decision by the daemon, optional signature verification, post-receive side effects.</desc>
+<style>
+text{font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,'Segoe UI',sans-serif}
+.bg{fill:#ffffff}
+.t{fill:#1a1a1a;font-size:13px}
+.tb1{fill:#1a1a1a;font-size:13px;font-weight:700}
+.ts{fill:#4d4d4d;font-size:11px}
+.th{fill:#1a1a1a;font-size:17px;font-weight:700}
+.m{font-family:'Atkinson Hyperlegible Mono',ui-monospace,Menlo,monospace}
+.gb{fill:#eaf0fd;stroke:#1f4fd1;stroke-width:1.4}
+.ext{fill:#f3f3f3;stroke:#6b6b6b;stroke-width:1.2}
+.act{fill:#ffffff;stroke:#1a1a1a;stroke-width:1.2}
+.st{fill:#fff4e8;stroke:#9a3412;stroke-width:1.2}
+.bad{fill:#fdecec;stroke:#b42318;stroke-width:1.2}
+.ok{fill:#e8f5ec;stroke:#1a7f37;stroke-width:1.2}
+.dec{fill:#ffffff;stroke:#1f4fd1;stroke-width:1.4;stroke-dasharray:5 3}
+.host{fill:none;stroke:#6b6b6b;stroke-width:1.2;stroke-dasharray:3 3}
+.zone{fill:none;stroke:#c2410c;stroke-width:1.6;stroke-dasharray:7 4}
+.zl{fill:#c2410c;font-size:12px;font-weight:700}
+.tag{fill:#c2410c;font-size:11px;font-weight:700}
+.ln{stroke:#1a1a1a;stroke-width:1.2;fill:none}
+.lnd{stroke:#6b6b6b;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.life{stroke:#9a9a9a;stroke-width:1;stroke-dasharray:3 4}
+.ah{fill:#1a1a1a}
+.ahd{fill:#6b6b6b}
+@media (prefers-color-scheme: dark){
+.bg{fill:#121212}
+.t,.tb1,.th{fill:#ececec}
+.ts{fill:#b0b0b0}
+.gb{fill:#16233f;stroke:#7aa2ff}
+.ext{fill:#1e1e1e;stroke:#8a8a8a}
+.act{fill:#121212;stroke:#ececec}
+.st{fill:#2a1a0e;stroke:#f0a36b}
+.bad{fill:#2c1414;stroke:#f28b82}
+.ok{fill:#122417;stroke:#6fcf8f}
+.dec{fill:#121212;stroke:#7aa2ff}
+.host{stroke:#8a8a8a}
+.zone{stroke:#fb923c}
+.zl,.tag{fill:#fb923c}
+.ln{stroke:#ececec}
+.lnd{stroke:#9a9a9a}
+.life{stroke:#6a6a6a}
+.ah{fill:#ececec}
+.ahd{fill:#9a9a9a}
+}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ah"/></marker>
+<marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="970" height="780"/>
+<text class="th" x="28" y="36">6. git push over SSH</text>
+<rect class="act" x="15" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="90.0" y="80.0" text-anchor="middle">Client</text>
+<line class="life" x1="90" y1="96" x2="90" y2="750"/>
+<rect class="gb" x="175" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="250.0" y="80.0" text-anchor="middle">sshd · runGit</text>
+<line class="life" x1="250" y1="96" x2="250" y2="750"/>
+<rect class="ext" x="335" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="410.0" y="80.0" text-anchor="middle">git receive-pack</text>
+<line class="life" x1="410" y1="96" x2="410" y2="750"/>
+<rect class="ext" x="495" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="570.0" y="80.0" text-anchor="middle">gitbayd hook</text>
+<line class="life" x1="570" y1="96" x2="570" y2="750"/>
+<rect class="gb" x="655" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="730.0" y="80.0" text-anchor="middle">hookd</text>
+<line class="life" x1="730" y1="96" x2="730" y2="750"/>
+<rect class="gb" x="810" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="885.0" y="80.0" text-anchor="middle">policy · sig · store</text>
+<line class="life" x1="885" y1="96" x2="885" y2="750"/>
+<path class="ln" d="M90,130 L248,130" marker-end="url(#a)"/>
+<rect class="bg" x="65.69999999999999" y="111" width="208.60000000000002" height="15"/>
+<text class="ts" x="170.0" y="123" text-anchor="middle">exec git-receive-pack 'owner/repo'</text>
+<path class="ln" d="M250,168 L883,168" marker-end="url(#a)"/>
+<rect class="bg" x="436.65" y="149" width="261.70000000000005" height="15"/>
+<text class="ts" x="567.5" y="161" text-anchor="middle">resolve repository · access · scope · quota</text>
+<path class="ln" d="M250,206 L408,206" marker-end="url(#a)"/>
+<rect class="bg" x="205.05" y="187" width="249.9" height="15"/>
+<text class="ts" x="330.0" y="199" text-anchor="middle">spawn with hook socket, repo, user, scope</text>
+<path class="ln" d="M90,244 L408,244" marker-end="url(#a)"/>
+<rect class="bg" x="219.45" y="225" width="61.1" height="15"/>
+<text class="ts" x="250.0" y="237" text-anchor="middle">pack data</text>
+<path class="ln" d="M410,282 L568,282" marker-end="url(#a)"/>
+<rect class="bg" x="388.65" y="263" width="202.70000000000002" height="15"/>
+<text class="ts" x="490.0" y="275" text-anchor="middle">pre-receive: ref updates on stdin</text>
+<path class="ln" d="M570,320 L728,320" marker-end="url(#a)"/>
+<rect class="bg" x="581.1" y="301" width="137.8" height="15"/>
+<text class="ts" x="650.0" y="313" text-anchor="middle">request over hook.sock</text>
+<path class="ln" d="M730,358 L883,358" marker-end="url(#a)"/>
+<rect class="bg" x="685.5" y="339" width="244.0" height="15"/>
+<text class="ts" x="807.5" y="351" text-anchor="middle">CheckPush: protected · require-mr · tags</text>
+<path class="lnd" d="M730,396 L572,396" marker-end="url(#ad)"/>
+<rect class="bg" x="551.6" y="377" width="196.8" height="15"/>
+<text class="ts" x="650.0" y="389" text-anchor="middle">need commits (if require-signed)</text>
+<path class="lnd" d="M570,434 L728,434" marker-end="url(#ad)"/>
+<rect class="bg" x="592.9" y="415" width="114.2" height="15"/>
+<text class="ts" x="650.0" y="427" text-anchor="middle">raw commit objects</text>
+<path class="lnd" d="M730,472 L883,472" marker-end="url(#ad)"/>
+<rect class="bg" x="741.55" y="453" width="131.9" height="15"/>
+<text class="ts" x="807.5" y="465" text-anchor="middle">VerifyCommit for each</text>
+<path class="ln" d="M730,510 L572,510" marker-end="url(#a)"/>
+<rect class="bg" x="554.55" y="491" width="190.9" height="15"/>
+<text class="ts" x="650.0" y="503" text-anchor="middle">allow, or refuse with a message</text>
+<path class="ln" d="M570,548 L412,548" marker-end="url(#a)"/>
+<rect class="bg" x="453.55" y="529" width="72.9" height="15"/>
+<text class="ts" x="490.0" y="541" text-anchor="middle">exit 0 or 1</text>
+<path class="ln" d="M410,586 L568,586" marker-end="url(#a)"/>
+<rect class="bg" x="450.6" y="567" width="78.80000000000001" height="15"/>
+<text class="ts" x="490.0" y="579" text-anchor="middle">post-receive</text>
+<path class="ln" d="M570,624 L728,624" marker-end="url(#a)"/>
+<rect class="bg" x="587.0" y="605" width="126.0" height="15"/>
+<text class="ts" x="650.0" y="617" text-anchor="middle">post-receive request</text>
+<path class="ln" d="M730,662 L883,662" marker-end="url(#a)"/>
+<rect class="bg" x="656.0" y="643" width="303.0" height="15"/>
+<text class="ts" x="807.5" y="655" text-anchor="middle">events · CI queue · mirrors · MR heads · Closes #N</text>
+<path class="ln" d="M410,700 L92,700" marker-end="url(#a)"/>
+<rect class="bg" x="228.3" y="681" width="43.400000000000006" height="15"/>
+<text class="ts" x="250.0" y="693" text-anchor="middle">result</text>
+</svg>

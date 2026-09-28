@@ -1,0 +1,51 @@
+#+title: 10. Known gaps
+
+Open weaknesses. Issues on krz/gitbay are public; this page gives the
+title and the consequence, not a reproduction. The current list is the
+open issues labelled =security=:
+https://gitbay.org/krz/gitbay/issues?label=security. The table below is
+what the 2026-09-27 review found; remove a row when its issue closes.
+
+* Filed
+
+| Issue | Area             | Gap                                                                   | Severity |
+|-------+------------------+-----------------------------------------------------------------------+----------|
+| #255  | CI isolation     | Untrusted and trusted builds of a repository share a writable build home | high  |
+| #256  | Authentication   | A removed SSH key keeps working on connections already open           | high     |
+| #257  | Credentials      | An expiring token can create credentials that outlive it; tokens default to full scope | high |
+| #258  | CI integrity     | Any writer can post a =ci/*= status; tree reuse ignores trust and image | high   |
+| #259  | Recovery         | No restore has been exercised; verification does not check git connectivity | high |
+| #260  | CI network       | Builds share the runner's source address; no egress policy            | medium   |
+| #261  | Various          | Migration foreign-key check after commit; three web writes bypass dispatch; documentation drift | medium |
+| #262  | Availability     | No limit on concurrent git pack generation                            | high     |
+
+Decisions already taken on these: #256 closes a removed key's
+connections, running commands included; #257 refuses credential
+creation from expiring tokens, records which token created each
+credential, and makes =read= the default scope.
+
+* Not yet filed
+
+Found during the 2026-09-27 review.
+
+| Area             | Gap                                                                                   | Where                                       |
+|------------------+---------------------------------------------------------------------------------------+---------------------------------------------|
+| Data at rest     | CI secrets, webhook secrets and mirror tokens are stored in clear in SQLite            | =build_secrets=, =webhooks=, =mirrors=      |
+| Backups          | The local backup archive is not encrypted                                             | =cmd/gitbayd/backup.go=               |
+| Audit            | Refused commands are not audited; the audit table is writable by the daemon user       | =internal/control/control.go=       |
+| Sessions         | Web sessions have a 7-day absolute lifetime and no idle timeout                        | =internal/httpd/accounts.go=            |
+| Credentials      | SSH and deploy keys never expire                                                      | =ssh_keys=                                  |
+| Login links      | =web login= over SSH is not counted against the 5-per-hour login-link limit            | =internal/control/web.go=             |
+| SSRF             | Mirror URLs are checked when saved but not when git connects, so a DNS change can redirect a mirror to a private address | =internal/control/mirrorcmd.go= |
+| Mail             | STARTTLS is used only when the relay offers it                                        | =internal/mail/mail.go=               |
+| TLS              | Go defaults; no explicit minimum version                                              | =cmd/gitbayd/main.go=                       |
+| Hook socket      | Any process that can open =hook.sock= can claim any user id; it relies on the data directory's permissions | =internal/hookd/hookd.go= |
+
+* Questions an auditor will ask that have no answer yet
+
+| Question                                                  | Status                                   |
+|-----------------------------------------------------------+------------------------------------------|
+| What is the measured recovery time?                       | unmeasured (#259)                        |
+| How many concurrent clones does the host sustain?         | unmeasured (#262)                        |
+| What can a build reach on the host's network?             | configuration inspected, reachability untested (#260) |
+| Have the collaboration features been used by independent users? | no; one human user, tests only     |

@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 650" width="970" height="650" role="img" aria-labelledby="t d">
+<title id="t">4. Trust boundaries</title><desc id="d">Zones Z0 to Z6 and the boundaries TB1 to TB10 that data crosses between them.</desc>
+<style>
+text{font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,'Segoe UI',sans-serif}
+.bg{fill:#ffffff}
+.t{fill:#1a1a1a;font-size:13px}
+.tb1{fill:#1a1a1a;font-size:13px;font-weight:700}
+.ts{fill:#4d4d4d;font-size:11px}
+.th{fill:#1a1a1a;font-size:17px;font-weight:700}
+.m{font-family:'Atkinson Hyperlegible Mono',ui-monospace,Menlo,monospace}
+.gb{fill:#eaf0fd;stroke:#1f4fd1;stroke-width:1.4}
+.ext{fill:#f3f3f3;stroke:#6b6b6b;stroke-width:1.2}
+.act{fill:#ffffff;stroke:#1a1a1a;stroke-width:1.2}
+.st{fill:#fff4e8;stroke:#9a3412;stroke-width:1.2}
+.bad{fill:#fdecec;stroke:#b42318;stroke-width:1.2}
+.ok{fill:#e8f5ec;stroke:#1a7f37;stroke-width:1.2}
+.dec{fill:#ffffff;stroke:#1f4fd1;stroke-width:1.4;stroke-dasharray:5 3}
+.host{fill:none;stroke:#6b6b6b;stroke-width:1.2;stroke-dasharray:3 3}
+.zone{fill:none;stroke:#c2410c;stroke-width:1.6;stroke-dasharray:7 4}
+.zl{fill:#c2410c;font-size:12px;font-weight:700}
+.tag{fill:#c2410c;font-size:11px;font-weight:700}
+.ln{stroke:#1a1a1a;stroke-width:1.2;fill:none}
+.lnd{stroke:#6b6b6b;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.life{stroke:#9a9a9a;stroke-width:1;stroke-dasharray:3 4}
+.ah{fill:#1a1a1a}
+.ahd{fill:#6b6b6b}
+@media (prefers-color-scheme: dark){
+.bg{fill:#121212}
+.t,.tb1,.th{fill:#ececec}
+.ts{fill:#b0b0b0}
+.gb{fill:#16233f;stroke:#7aa2ff}
+.ext{fill:#1e1e1e;stroke:#8a8a8a}
+.act{fill:#121212;stroke:#ececec}
+.st{fill:#2a1a0e;stroke:#f0a36b}
+.bad{fill:#2c1414;stroke:#f28b82}
+.ok{fill:#122417;stroke:#6fcf8f}
+.dec{fill:#121212;stroke:#7aa2ff}
+.host{stroke:#8a8a8a}
+.zone{stroke:#fb923c}
+.zl,.tag{fill:#fb923c}
+.ln{stroke:#ececec}
+.lnd{stroke:#9a9a9a}
+.life{stroke:#6a6a6a}
+.ah{fill:#ececec}
+.ahd{fill:#9a9a9a}
+}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ah"/></marker>
+<marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="970" height="650"/>
+<text class="th" x="28" y="36">4. Trust boundaries</text>
+<rect class="zone" x="20" y="60" width="190" height="560" rx="2"/>
+<text class="zl" x="28" y="76" text-anchor="start">Z0 Internet (untrusted)</text>
+<rect class="zone" x="250" y="60" width="380" height="310" rx="2"/>
+<text class="zl" x="258" y="76" text-anchor="start">Z1 gitbayd</text>
+<rect class="zone" x="660" y="60" width="290" height="270" rx="2"/>
+<text class="zl" x="668" y="76" text-anchor="start">Z2 Local state</text>
+<rect class="zone" x="250" y="400" width="380" height="110" rx="2"/>
+<text class="zl" x="258" y="416" text-anchor="start">Z3 git and hooks</text>
+<rect class="zone" x="660" y="400" width="290" height="220" rx="2"/>
+<text class="zl" x="668" y="416" text-anchor="start">Z4 Runner</text>
+<rect class="zone" x="675" y="500" width="260" height="110" rx="2"/>
+<text class="zl" x="683" y="516" text-anchor="start">Z5 Containers</text>
+<rect class="zone" x="250" y="540" width="380" height="80" rx="2"/>
+<text class="zl" x="258" y="556" text-anchor="start">Z6 Operator</text>
+<rect class="act" x="35" y="90" width="160" height="50" rx="2"/>
+<text class="tb1" x="115.0" y="119.0" text-anchor="middle">Visitor</text>
+<rect class="act" x="35" y="170" width="160" height="50" rx="2"/>
+<text class="tb1" x="115.0" y="199.0" text-anchor="middle">User over SSH</text>
+<rect class="act" x="35" y="250" width="160" height="50" rx="2"/>
+<text class="tb1" x="115.0" y="279.0" text-anchor="middle">Browser</text>
+<rect class="act" x="35" y="330" width="160" height="50" rx="2"/>
+<text class="tb1" x="115.0" y="359.0" text-anchor="middle">API client, iOS</text>
+<rect class="ext" x="35" y="500" width="160" height="60" rx="2"/>
+<text class="tb1" x="115.0" y="526.0" text-anchor="middle">Webhook and</text>
+<text class="ts" x="115.0" y="542.0" text-anchor="middle">mirror endpoints</text>
+<rect class="gb" x="270" y="95" width="150" height="55" rx="2"/>
+<text class="tb1" x="345.0" y="118.5" text-anchor="middle">sshd</text>
+<text class="ts" x="345.0" y="134.5" text-anchor="middle">key auth</text>
+<rect class="gb" x="270" y="200" width="150" height="60" rx="2"/>
+<text class="tb1" x="345.0" y="226.0" text-anchor="middle">httpd</text>
+<text class="ts" x="345.0" y="242.0" text-anchor="middle">cookie · token · CSP</text>
+<rect class="gb" x="270" y="300" width="150" height="50" rx="2"/>
+<text class="tb1" x="345.0" y="329.0" text-anchor="middle">workers</text>
+<rect class="gb" x="450" y="130" width="160" height="110" rx="2"/>
+<text class="tb1" x="530.0" y="165.0" text-anchor="middle">Dispatch</text>
+<text class="ts" x="530.0" y="181.0" text-anchor="middle">handler</text>
+<text class="ts" x="530.0" y="197.0" text-anchor="middle">resolveRepo</text>
+<text class="ts" x="530.0" y="213.0" text-anchor="middle">policy</text>
+<rect class="st" x="680" y="95" width="250" height="55" rx="2"/>
+<text class="tb1" x="805.0" y="118.5" text-anchor="middle">SQLite</text>
+<text class="ts" x="805.0" y="134.5" text-anchor="middle">token hashes · secrets in clear</text>
+<rect class="st" x="680" y="170" width="250" height="55" rx="2"/>
+<text class="tb1" x="805.0" y="201.5" text-anchor="middle">repositories · LFS</text>
+<rect class="st" x="680" y="245" width="250" height="55" rx="2"/>
+<text class="tb1" x="805.0" y="276.5" text-anchor="middle">host key · ACME · config</text>
+<rect class="ext" x="270" y="430" width="150" height="60" rx="2"/>
+<text class="tb1" x="345.0" y="456.0" text-anchor="middle">git receive-pack</text>
+<text class="ts" x="345.0" y="472.0" text-anchor="middle">upload-pack</text>
+<rect class="ext" x="450" y="430" width="160" height="60" rx="2"/>
+<text class="tb1" x="530.0" y="456.0" text-anchor="middle">gitbayd hook</text>
+<text class="ts" x="530.0" y="472.0" text-anchor="middle">to hook.sock</text>
+<rect class="gb" x="680" y="430" width="250" height="50" rx="2"/>
+<text class="tb1" x="805.0" y="459.0" text-anchor="middle">gitbay-runner</text>
+<rect class="bad" x="690" y="530" width="230" height="55" rx="2"/>
+<text class="tb1" x="805.0" y="553.5" text-anchor="middle">build steps</text>
+<text class="ts" x="805.0" y="569.5" text-anchor="middle">repository and fork code</text>
+<rect class="ext" x="270" y="565" width="340" height="40" rx="2"/>
+<text class="tb1" x="440.0" y="589.0" text-anchor="middle">root shell: outside every in-app control</text>
+<path class="ln" d="M195,195 L270,122" marker-end="url(#a)"/>
+<text class="tag" x="232" y="150" text-anchor="middle">TB1</text>
+<path class="ln" d="M195,115 L270,215" marker-end="url(#a)"/>
+<path class="ln" d="M195,275 L270,232" marker-end="url(#a)" marker-start="url(#a)"/>
+<path class="ln" d="M195,355 L270,250" marker-end="url(#a)"/>
+<text class="tag" x="232" y="300" text-anchor="middle">TB2 · TB9</text>
+<path class="ln" d="M420,122 L450,160" marker-end="url(#a)"/>
+<path class="ln" d="M420,230 L450,215" marker-end="url(#a)"/>
+<text class="tag" x="435" y="190" text-anchor="middle">TB3</text>
+<path class="ln" d="M610,160 L680,122" marker-end="url(#a)"/>
+<path class="ln" d="M610,200 L680,197" marker-end="url(#a)"/>
+<path class="ln" d="M480,240 L400,430" marker-end="url(#a)"/>
+<text class="tag" x="455" y="330" text-anchor="end">TB4</text>
+<path class="ln" d="M420,460 L450,460" marker-end="url(#a)"/>
+<path class="ln" d="M560,430 L560,240" marker-end="url(#a)"/>
+<text class="tag" x="566" y="330" text-anchor="start">TB5</text>
+<path class="ln" d="M680,450 L610,240" marker-end="url(#a)" marker-start="url(#a)"/>
+<text class="tag" x="648" y="320" text-anchor="start">TB6</text>
+<path class="ln" d="M805,480 L805,530" marker-end="url(#a)"/>
+<text class="tag" x="812" y="510" text-anchor="start">TB7</text>
+<path class="ln" d="M270,325 L195,520" marker-end="url(#a)"/>
+<text class="tag" x="226" y="460" text-anchor="middle">TB8</text>
+<path class="lnd" d="M690,545 L645,525 L195,525" marker-end="url(#ad)"/>
+<text class="ts" x="420" y="520" text-anchor="middle">egress open</text>
+<text class="tag" x="620" y="596" text-anchor="end">TB10</text>
+<rect class="act" x="28" y="629" width="18" height="14" rx="2"/>
+<text class="ts" x="52" y="640" text-anchor="start">external actor</text>
+<rect class="gb" x="148.8" y="629" width="18" height="14" rx="2"/>
+<text class="ts" x="172.8" y="640" text-anchor="start">gitbay process</text>
+<rect class="st" x="269.6" y="629" width="18" height="14" rx="2"/>
+<text class="ts" x="293.6" y="640" text-anchor="start">stored data</text>
+<rect class="bad" x="371.8" y="629" width="18" height="14" rx="2"/>
+<text class="ts" x="395.8" y="640" text-anchor="start">untrusted code</text>
+</svg>

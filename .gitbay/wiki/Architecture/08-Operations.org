@@ -1,0 +1,89 @@
+#+title: 8. Operations
+
+* Logging
+
+- The daemon logs with Go's =log/slog= default handler to stderr, which
+  systemd sends to the journal. Retention is the journal's.
+- Logged: listener start-up, schema version, worker failures (webhook,
+  mail, push, mirror), sweeps and reaps with counts, SSH lookup errors.
+- Not logged: request bodies, tokens, secrets. Mail errors are logged
+  with addresses redacted.
+
+* Audit log
+
+Table =audit_log=: actor, action, JSON data, time
+(=internal/store/audit.go=). Readable by admins with =audit=.
+
+| Recorded                                     | How                                                  |
+|----------------------------------------------+------------------------------------------------------|
+| Every successful mutating command, every surface | =Dispatch= writes =cmd <path>= with pruned argv and the source: key fingerprint, =web=, =api= or =host= (=internal/control/control.go=) |
+| SSH authentication failures and throttling   | =auth.failed= (IP, fingerprint), =auth.throttled= (IP) |
+| Registration                                  | =auth.registered=, =pending.expired=                 |
+| Administration                                | =admin user.*=, =admin email.*=, =admin invite.issued=, =admin repo.*=, =admin mr.prune=, =admin runners.forget= |
+| Repository events of security interest        | =push.forced=, =repo.runner.add/remove=, =pages.domain_verified= |
+
+Failed commands and reads are not audited. The separate =events= table is
+the product activity feed, not an audit trail.
+
+* Monitoring
+
+- =/healthz= returns the serving commit and a database check.
+- =deploy/cloud-init.yaml= installs an hourly heartbeat that checks the
+  service, disk, certificate expiry and backup age, and can POST to an
+  external monitor URL.
+- =admin runners= reports the build queue: pending builds, claims and
+  average and worst claim wait over 24 hours, reaped builds, and each
+  runner key's last poll.
+
+* Patching
+
+- Host: =unattended-upgrades= with automatic security updates and a
+  04:30 reboot (=deploy/cloud-init.yaml=).
+- Application: =govulncheck= nightly in CI; a module update is a
+  normal merge request and deploy.
+- CI image: rebuilt by the operator when =deploy/Containerfile.ci=
+  changes; weekly =podman image prune= removes old images.
+
+* Backup and recovery
+
+| Item            | Schedule | Kept | Contents                                                        |
+|-----------------+----------+------+-----------------------------------------------------------------|
+| Full archive    | nightly  | 7    | SQLite snapshot (=VACUUM INTO=), all repositories, LFS, SSH host keys |
+| Database only   | hourly   | 48   | SQLite snapshot                                                 |
+| Offsite (restic)| nightly  | per prune policy | =/var/lib/gitbay= and a staged database copy, to object storage |
+
+- The database snapshot is taken before repositories are read, so a
+  push during the backup leaves only unreferenced objects
+  (=cmd/gitbayd/backup.go=).
+- Excluded: WAL files, the hook socket, askpass scripts, generated
+  hooks.
+- =gitbayd admin backup --verify= checks SQLite integrity and that every
+  repository the database names is present (=backup.go=). It does
+  not check git object connectivity.
+- The host's restic credentials are append-only; the key that can
+  delete or prune snapshots is held off the host, so a compromised host
+  cannot destroy its own history (documented: Admin wiki).
+- Recovery point: about one hour for database-only data (issues, merge
+  requests, reviews), one day for repositories.
+- Recovery time: not measured. No restore onto a clean host has been
+  recorded (#259).
+
+Restore procedure: extract the archive into an empty directory, point
+=server.root= at it, start =gitbayd=; hooks regenerate and the host key
+is preserved.
+
+* Operator levers during an incident
+
+| Need                               | Command                                          |
+|------------------------------------+--------------------------------------------------|
+| Stop a user                        | =admin user disable <name>=                      |
+| Remove a key                       | =keys remove= (own) or =admin user= commands     |
+| Kill a user's browser sessions     | =web sessions revoke --all= (as that user)       |
+| Revoke a token                     | =token revoke <name>=                            |
+| Stop a runner key claiming         | =repo runner remove=, =admin runners forget <fingerprint>= |
+| Hide a repository                  | =admin repo visibility <repo> private=           |
+| Close registration                 | =registration.mode = "closed"= and restart       |
+| See what happened                  | =audit= (filter by actor, action, time)                |
+
+Open connections of a removed key keep working until they close; see
+#256.

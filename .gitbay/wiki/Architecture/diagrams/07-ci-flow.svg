@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 660" width="970" height="660" role="img" aria-labelledby="t d">
+<title id="t">7. CI build</title><desc id="d">Sequence of a CI build from push to result, including the claim and where secrets travel.</desc>
+<style>
+text{font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,'Segoe UI',sans-serif}
+.bg{fill:#ffffff}
+.t{fill:#1a1a1a;font-size:13px}
+.tb1{fill:#1a1a1a;font-size:13px;font-weight:700}
+.ts{fill:#4d4d4d;font-size:11px}
+.th{fill:#1a1a1a;font-size:17px;font-weight:700}
+.m{font-family:'Atkinson Hyperlegible Mono',ui-monospace,Menlo,monospace}
+.gb{fill:#eaf0fd;stroke:#1f4fd1;stroke-width:1.4}
+.ext{fill:#f3f3f3;stroke:#6b6b6b;stroke-width:1.2}
+.act{fill:#ffffff;stroke:#1a1a1a;stroke-width:1.2}
+.st{fill:#fff4e8;stroke:#9a3412;stroke-width:1.2}
+.bad{fill:#fdecec;stroke:#b42318;stroke-width:1.2}
+.ok{fill:#e8f5ec;stroke:#1a7f37;stroke-width:1.2}
+.dec{fill:#ffffff;stroke:#1f4fd1;stroke-width:1.4;stroke-dasharray:5 3}
+.host{fill:none;stroke:#6b6b6b;stroke-width:1.2;stroke-dasharray:3 3}
+.zone{fill:none;stroke:#c2410c;stroke-width:1.6;stroke-dasharray:7 4}
+.zl{fill:#c2410c;font-size:12px;font-weight:700}
+.tag{fill:#c2410c;font-size:11px;font-weight:700}
+.ln{stroke:#1a1a1a;stroke-width:1.2;fill:none}
+.lnd{stroke:#6b6b6b;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.life{stroke:#9a9a9a;stroke-width:1;stroke-dasharray:3 4}
+.ah{fill:#1a1a1a}
+.ahd{fill:#6b6b6b}
+@media (prefers-color-scheme: dark){
+.bg{fill:#121212}
+.t,.tb1,.th{fill:#ececec}
+.ts{fill:#b0b0b0}
+.gb{fill:#16233f;stroke:#7aa2ff}
+.ext{fill:#1e1e1e;stroke:#8a8a8a}
+.act{fill:#121212;stroke:#ececec}
+.st{fill:#2a1a0e;stroke:#f0a36b}
+.bad{fill:#2c1414;stroke:#f28b82}
+.ok{fill:#122417;stroke:#6fcf8f}
+.dec{fill:#121212;stroke:#7aa2ff}
+.host{stroke:#8a8a8a}
+.zone{stroke:#fb923c}
+.zl,.tag{fill:#fb923c}
+.ln{stroke:#ececec}
+.lnd{stroke:#9a9a9a}
+.life{stroke:#6a6a6a}
+.ah{fill:#ececec}
+.ahd{fill:#9a9a9a}
+}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ah"/></marker>
+<marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="970" height="660"/>
+<text class="th" x="28" y="36">7. CI build</text>
+<rect class="act" x="15" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="90.0" y="80.0" text-anchor="middle">Pusher</text>
+<line class="life" x1="90" y1="96" x2="90" y2="630"/>
+<rect class="gb" x="205" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="280.0" y="80.0" text-anchor="middle">gitbayd</text>
+<line class="life" x1="280" y1="96" x2="280" y2="630"/>
+<rect class="gb" x="395" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="470.0" y="80.0" text-anchor="middle">store</text>
+<line class="life" x1="470" y1="96" x2="470" y2="630"/>
+<rect class="gb" x="585" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="660.0" y="80.0" text-anchor="middle">gitbay-runner</text>
+<line class="life" x1="660" y1="96" x2="660" y2="630"/>
+<rect class="bad" x="785" y="56" width="150" height="40" rx="2"/>
+<text class="tb1" x="860.0" y="80.0" text-anchor="middle">container</text>
+<line class="life" x1="860" y1="96" x2="860" y2="630"/>
+<path class="ln" d="M90,130 L278,130" marker-end="url(#a)"/>
+<rect class="bg" x="124.94999999999999" y="111" width="120.10000000000001" height="15"/>
+<text class="ts" x="185.0" y="123" text-anchor="middle">push (post-receive)</text>
+<path class="ln" d="M280,168 L468,168" marker-end="url(#a)"/>
+<rect class="bg" x="196.95" y="149" width="356.1" height="15"/>
+<text class="ts" x="375.0" y="161" text-anchor="middle">queueJobs: ci/&lt;job&gt; pending, skipped, or reused (same tree)</text>
+<path class="ln" d="M660,206 L282,206" marker-end="url(#a)"/>
+<rect class="bg" x="286.04999999999995" y="187" width="367.90000000000003" height="15"/>
+<text class="ts" x="470.0" y="199" text-anchor="middle">runner next [--untrusted] · runner key, attached repositories</text>
+<path class="ln" d="M280,244 L468,244" marker-end="url(#a)"/>
+<rect class="bg" x="238.25" y="225" width="273.5" height="15"/>
+<text class="ts" x="375.0" y="237" text-anchor="middle">ClaimBuild: trusted builds unless --untrusted</text>
+<path class="ln" d="M280,282 L658,282" marker-end="url(#a)"/>
+<rect class="bg" x="336.2" y="263" width="267.6" height="15"/>
+<text class="ts" x="470.0" y="275" text-anchor="middle">claim: steps, image, secrets only if trusted</text>
+<path class="ln" d="M660,320 L282,320" marker-end="url(#a)"/>
+<rect class="bg" x="389.3" y="301" width="161.4" height="15"/>
+<text class="ts" x="470.0" y="313" text-anchor="middle">clone over SSH (read only)</text>
+<path class="ln" d="M660,358 L858,358" marker-end="url(#a)"/>
+<rect class="bg" x="593.75" y="339" width="332.5" height="15"/>
+<text class="ts" x="760.0" y="351" text-anchor="middle">podman run --pull=never · env file 0600 · build home rw</text>
+<path class="ln" d="M660,396 L858,396" marker-end="url(#a)"/>
+<rect class="bg" x="640.95" y="377" width="238.10000000000002" height="15"/>
+<text class="ts" x="760.0" y="389" text-anchor="middle">podman exec sh -c &lt;step&gt;, for each step</text>
+<path class="ln" d="M660,434 L282,434" marker-end="url(#a)"/>
+<rect class="bg" x="371.6" y="415" width="196.8" height="15"/>
+<text class="ts" x="470.0" y="427" text-anchor="middle">runner log &lt;id&gt;: streamed output</text>
+<path class="ln" d="M280,472 L468,472" marker-end="url(#a)"/>
+<rect class="bg" x="261.85" y="453" width="226.3" height="15"/>
+<text class="ts" x="375.0" y="465" text-anchor="middle">append log · a cancel ends the stream</text>
+<path class="ln" d="M660,510 L282,510" marker-end="url(#a)"/>
+<rect class="bg" x="371.6" y="491" width="196.8" height="15"/>
+<text class="ts" x="470.0" y="503" text-anchor="middle">runner done &lt;id&gt; success|failure</text>
+<path class="ln" d="M280,548 L468,548" marker-end="url(#a)"/>
+<rect class="bg" x="258.9" y="529" width="232.20000000000002" height="15"/>
+<text class="ts" x="375.0" y="541" text-anchor="middle">status ci/&lt;job&gt; · event · failure mail</text>
+<path class="ln" d="M470,578 L500,578 L500,592 L474,592" marker-end="url(#a)"/>
+<rect class="bg" x="503" y="576" width="338.40000000000003" height="15"/>
+<text class="ts" x="506" y="588" text-anchor="start">scheduler reaps: log closed &gt; 2 min, or started &gt; 90 min</text>
+</svg>

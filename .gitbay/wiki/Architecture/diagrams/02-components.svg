@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 680" width="970" height="680" role="img" aria-labelledby="t d">
+<title id="t">2. Components inside gitbayd</title><desc id="d">Packages of the gitbayd daemon and how requests move between them.</desc>
+<style>
+text{font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,'Segoe UI',sans-serif}
+.bg{fill:#ffffff}
+.t{fill:#1a1a1a;font-size:13px}
+.tb1{fill:#1a1a1a;font-size:13px;font-weight:700}
+.ts{fill:#4d4d4d;font-size:11px}
+.th{fill:#1a1a1a;font-size:17px;font-weight:700}
+.m{font-family:'Atkinson Hyperlegible Mono',ui-monospace,Menlo,monospace}
+.gb{fill:#eaf0fd;stroke:#1f4fd1;stroke-width:1.4}
+.ext{fill:#f3f3f3;stroke:#6b6b6b;stroke-width:1.2}
+.act{fill:#ffffff;stroke:#1a1a1a;stroke-width:1.2}
+.st{fill:#fff4e8;stroke:#9a3412;stroke-width:1.2}
+.bad{fill:#fdecec;stroke:#b42318;stroke-width:1.2}
+.ok{fill:#e8f5ec;stroke:#1a7f37;stroke-width:1.2}
+.dec{fill:#ffffff;stroke:#1f4fd1;stroke-width:1.4;stroke-dasharray:5 3}
+.host{fill:none;stroke:#6b6b6b;stroke-width:1.2;stroke-dasharray:3 3}
+.zone{fill:none;stroke:#c2410c;stroke-width:1.6;stroke-dasharray:7 4}
+.zl{fill:#c2410c;font-size:12px;font-weight:700}
+.tag{fill:#c2410c;font-size:11px;font-weight:700}
+.ln{stroke:#1a1a1a;stroke-width:1.2;fill:none}
+.lnd{stroke:#6b6b6b;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.life{stroke:#9a9a9a;stroke-width:1;stroke-dasharray:3 4}
+.ah{fill:#1a1a1a}
+.ahd{fill:#6b6b6b}
+@media (prefers-color-scheme: dark){
+.bg{fill:#121212}
+.t,.tb1,.th{fill:#ececec}
+.ts{fill:#b0b0b0}
+.gb{fill:#16233f;stroke:#7aa2ff}
+.ext{fill:#1e1e1e;stroke:#8a8a8a}
+.act{fill:#121212;stroke:#ececec}
+.st{fill:#2a1a0e;stroke:#f0a36b}
+.bad{fill:#2c1414;stroke:#f28b82}
+.ok{fill:#122417;stroke:#6fcf8f}
+.dec{fill:#121212;stroke:#7aa2ff}
+.host{stroke:#8a8a8a}
+.zone{stroke:#fb923c}
+.zl,.tag{fill:#fb923c}
+.ln{stroke:#ececec}
+.lnd{stroke:#9a9a9a}
+.life{stroke:#6a6a6a}
+.ah{fill:#ececec}
+.ahd{fill:#9a9a9a}
+}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ah"/></marker>
+<marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="970" height="680"/>
+<text class="th" x="28" y="36">2. Components inside gitbayd</text>
+<rect class="gb" x="40" y="70" width="250" height="64" rx="2"/>
+<text class="tb1" x="165.0" y="98.0" text-anchor="middle">internal/sshd</text>
+<text class="ts" x="165.0" y="114.0" text-anchor="middle">SSH :22 · key auth · exec · git transport</text>
+<rect class="gb" x="310" y="70" width="330" height="64" rx="2"/>
+<text class="tb1" x="475.0" y="98.0" text-anchor="middle">internal/httpd</text>
+<text class="ts" x="475.0" y="114.0" text-anchor="middle">web · JSON API · smart HTTP (fetch) · LFS</text>
+<rect class="gb" x="660" y="70" width="270" height="64" rx="2"/>
+<text class="tb1" x="795.0" y="98.0" text-anchor="middle">internal/gitd</text>
+<text class="ts" x="795.0" y="114.0" text-anchor="middle">git:// · upload-pack · off by default</text>
+<rect class="gb" x="40" y="190" width="600" height="80" rx="2"/>
+<text class="tb1" x="340.0" y="218.0" text-anchor="middle">internal/control: the command registry</text>
+<text class="ts" x="340.0" y="234.0" text-anchor="middle">Dispatch: scope · read-only · disabled · admin · pending · write budget</text>
+<text class="ts" x="340.0" y="250.0" text-anchor="middle">stdin gating · handler · audit of successful writes</text>
+<rect class="gb" x="660" y="190" width="270" height="80" rx="2"/>
+<text class="tb1" x="795.0" y="218.0" text-anchor="middle">internal/policy</text>
+<text class="ts" x="795.0" y="234.0" text-anchor="middle">CanRead / CanWrite / CanAdmin</text>
+<text class="ts" x="795.0" y="250.0" text-anchor="middle">key scopes · CheckPush · CODEOWNERS</text>
+<rect class="gb" x="40" y="320" width="180" height="70" rx="2"/>
+<text class="tb1" x="130.0" y="343.0" text-anchor="middle">internal/hookd</text>
+<text class="ts" x="130.0" y="359.0" text-anchor="middle">pre- and post-receive</text>
+<text class="ts" x="130.0" y="375.0" text-anchor="middle">decisions</text>
+<rect class="gb" x="240" y="320" width="190" height="70" rx="2"/>
+<text class="tb1" x="335.0" y="343.0" text-anchor="middle">internal/gitutil</text>
+<text class="ts" x="335.0" y="359.0" text-anchor="middle">git as a subprocess</text>
+<text class="ts" x="335.0" y="375.0" text-anchor="middle">argv only, no shell</text>
+<rect class="gb" x="450" y="320" width="190" height="70" rx="2"/>
+<text class="tb1" x="545.0" y="343.0" text-anchor="middle">internal/sig</text>
+<text class="ts" x="545.0" y="359.0" text-anchor="middle">OpenPGP and SSHSIG</text>
+<text class="ts" x="545.0" y="375.0" text-anchor="middle">verification only</text>
+<rect class="gb" x="660" y="320" width="270" height="70" rx="2"/>
+<text class="tb1" x="795.0" y="343.0" text-anchor="middle">internal/store</text>
+<text class="ts" x="795.0" y="359.0" text-anchor="middle">SQLite · hand-written SQL</text>
+<text class="ts" x="795.0" y="375.0" text-anchor="middle">59 migrations</text>
+<rect class="gb" x="40" y="440" width="600" height="70" rx="2"/>
+<text class="tb1" x="340.0" y="463.0" text-anchor="middle">background workers</text>
+<text class="ts" x="340.0" y="479.0" text-anchor="middle">webhook delivery · mail · APNs · mirrors</text>
+<text class="ts" x="340.0" y="495.0" text-anchor="middle">CI scheduler and stale-build reaper · dependency checks · retention sweep</text>
+<rect class="gb" x="800" y="440" width="130" height="70" rx="2"/>
+<text class="tb1" x="865.0" y="463.0" text-anchor="middle">internal/lfs</text>
+<text class="ts" x="865.0" y="479.0" text-anchor="middle">content-addressed</text>
+<text class="ts" x="865.0" y="495.0" text-anchor="middle">HMAC tokens</text>
+<rect class="st" x="40" y="570" width="180" height="50" rx="2"/>
+<text class="tb1" x="130.0" y="591.0" text-anchor="middle">hook.sock</text>
+<text class="ts" x="130.0" y="607.0" text-anchor="middle">unix socket</text>
+<rect class="st" x="240" y="570" width="190" height="50" rx="2"/>
+<text class="tb1" x="335.0" y="591.0" text-anchor="middle">repos/*.git</text>
+<text class="ts" x="335.0" y="607.0" text-anchor="middle">bare repositories</text>
+<rect class="st" x="660" y="570" width="120" height="50" rx="2"/>
+<text class="tb1" x="720.0" y="591.0" text-anchor="middle">gitbay.db</text>
+<text class="ts" x="720.0" y="607.0" text-anchor="middle">SQLite, 0640</text>
+<rect class="st" x="800" y="570" width="130" height="50" rx="2"/>
+<text class="tb1" x="865.0" y="591.0" text-anchor="middle">lfs/</text>
+<text class="ts" x="865.0" y="607.0" text-anchor="middle">objects</text>
+<path class="ln" d="M165,134 L165,190" marker-end="url(#a)"/>
+<path class="ln" d="M475,134 L475,190" marker-end="url(#a)"/>
+<path class="ln" d="M700,134 L610,190" marker-end="url(#a)"/>
+<path class="ln" d="M640,230 L660,230" marker-end="url(#a)"/>
+<path class="ln" d="M335,270 L335,320" marker-end="url(#a)"/>
+<text class="ts" x="342" y="300" text-anchor="start">git transport</text>
+<path class="ln" d="M545,270 L545,320" marker-end="url(#a)"/>
+<path class="ln" d="M600,270 L700,320" marker-end="url(#a)"/>
+<path class="ln" d="M130,320 L130,270" marker-end="url(#a)"/>
+<text class="ts" x="137" y="300" text-anchor="start">decision request</text>
+<path class="ln" d="M560,440 L700,390" marker-end="url(#a)"/>
+<path class="ln" d="M335,390 L335,570" marker-end="url(#a)"/>
+<path class="ln" d="M240,595 L220,595" marker-end="url(#a)"/>
+<text class="ts" x="230" y="560" text-anchor="middle">hooks</text>
+<path class="ln" d="M120,570 L120,390" marker-end="url(#a)"/>
+<path class="ln" d="M720,390 L720,570" marker-end="url(#a)"/>
+<path class="ln" d="M865,510 L865,570" marker-end="url(#a)"/>
+<rect class="gb" x="28" y="649" width="18" height="14" rx="2"/>
+<text class="ts" x="52" y="660" text-anchor="start">gitbayd package</text>
+<rect class="st" x="155.0" y="649" width="18" height="14" rx="2"/>
+<text class="ts" x="179.0" y="660" text-anchor="start">on-disk state</text>
+</svg>

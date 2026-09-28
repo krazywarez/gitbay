@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 640" width="970" height="640" role="img" aria-labelledby="t d">
+<title id="t">3. Deployment (reference host)</title><desc id="d">Processes, users, ports and files on the single gitbay host.</desc>
+<style>
+text{font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,'Segoe UI',sans-serif}
+.bg{fill:#ffffff}
+.t{fill:#1a1a1a;font-size:13px}
+.tb1{fill:#1a1a1a;font-size:13px;font-weight:700}
+.ts{fill:#4d4d4d;font-size:11px}
+.th{fill:#1a1a1a;font-size:17px;font-weight:700}
+.m{font-family:'Atkinson Hyperlegible Mono',ui-monospace,Menlo,monospace}
+.gb{fill:#eaf0fd;stroke:#1f4fd1;stroke-width:1.4}
+.ext{fill:#f3f3f3;stroke:#6b6b6b;stroke-width:1.2}
+.act{fill:#ffffff;stroke:#1a1a1a;stroke-width:1.2}
+.st{fill:#fff4e8;stroke:#9a3412;stroke-width:1.2}
+.bad{fill:#fdecec;stroke:#b42318;stroke-width:1.2}
+.ok{fill:#e8f5ec;stroke:#1a7f37;stroke-width:1.2}
+.dec{fill:#ffffff;stroke:#1f4fd1;stroke-width:1.4;stroke-dasharray:5 3}
+.host{fill:none;stroke:#6b6b6b;stroke-width:1.2;stroke-dasharray:3 3}
+.zone{fill:none;stroke:#c2410c;stroke-width:1.6;stroke-dasharray:7 4}
+.zl{fill:#c2410c;font-size:12px;font-weight:700}
+.tag{fill:#c2410c;font-size:11px;font-weight:700}
+.ln{stroke:#1a1a1a;stroke-width:1.2;fill:none}
+.lnd{stroke:#6b6b6b;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.life{stroke:#9a9a9a;stroke-width:1;stroke-dasharray:3 4}
+.ah{fill:#1a1a1a}
+.ahd{fill:#6b6b6b}
+@media (prefers-color-scheme: dark){
+.bg{fill:#121212}
+.t,.tb1,.th{fill:#ececec}
+.ts{fill:#b0b0b0}
+.gb{fill:#16233f;stroke:#7aa2ff}
+.ext{fill:#1e1e1e;stroke:#8a8a8a}
+.act{fill:#121212;stroke:#ececec}
+.st{fill:#2a1a0e;stroke:#f0a36b}
+.bad{fill:#2c1414;stroke:#f28b82}
+.ok{fill:#122417;stroke:#6fcf8f}
+.dec{fill:#121212;stroke:#7aa2ff}
+.host{stroke:#8a8a8a}
+.zone{stroke:#fb923c}
+.zl,.tag{fill:#fb923c}
+.ln{stroke:#ececec}
+.lnd{stroke:#9a9a9a}
+.life{stroke:#6a6a6a}
+.ah{fill:#ececec}
+.ahd{fill:#9a9a9a}
+}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ah"/></marker>
+<marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ahd"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="970" height="640"/>
+<text class="th" x="28" y="36">3. Deployment (reference host)</text>
+<rect class="ext" x="20" y="80" width="180" height="470" rx="2"/>
+<text class="tb1" x="110" y="110" text-anchor="middle">Internet</text>
+<text class="ts" x="110" y="140" text-anchor="middle">clients: SSH, HTTPS</text>
+<text class="ts" x="110" y="162" text-anchor="middle">ACME CA</text>
+<text class="ts" x="110" y="184" text-anchor="middle">SMTP relay</text>
+<text class="ts" x="110" y="206" text-anchor="middle">APNs</text>
+<text class="ts" x="110" y="228" text-anchor="middle">webhook endpoints</text>
+<text class="ts" x="110" y="250" text-anchor="middle">mirror remotes</text>
+<text class="ts" x="110" y="272" text-anchor="middle">package registries</text>
+<text class="ts" x="110" y="294" text-anchor="middle">offsite object storage</text>
+<rect class="host" x="240" y="60" width="710" height="520" rx="2"/>
+<text class="ts" x="252" y="80" text-anchor="start">Host: Ubuntu 24.04 · ufw inbound 22, 80, 443, 2222 · outbound open</text>
+<rect class="gb" x="280" y="100" width="360" height="200" rx="2"/>
+<text class="tb1" x="460.0" y="164.0" text-anchor="middle">gitbayd.service (user gitbay)</text>
+<text class="ts" x="460.0" y="180.0" text-anchor="middle">:22 SSH · :443 HTTPS · :80 ACME and redirect</text>
+<text class="ts" x="460.0" y="196.0" text-anchor="middle">hook.sock (unix)</text>
+<text class="ts" x="460.0" y="212.0" text-anchor="middle">ProtectSystem=strict · NoNewPrivileges</text>
+<text class="ts" x="460.0" y="228.0" text-anchor="middle">CAP_NET_BIND_SERVICE only · SystemCallFilter</text>
+<text class="ts" x="460.0" y="244.0" text-anchor="middle">MemoryDenyWriteExecute · PrivateTmp</text>
+<rect class="st" x="680" y="100" width="250" height="200" rx="2"/>
+<text class="tb1" x="805.0" y="156.0" text-anchor="middle">/var/lib/gitbay (0750)</text>
+<text class="ts" x="805.0" y="172.0" text-anchor="middle">gitbay.db (0640)</text>
+<text class="ts" x="805.0" y="188.0" text-anchor="middle">repos/ · lfs/ · hooks/</text>
+<text class="ts" x="805.0" y="204.0" text-anchor="middle">ssh/host_ed25519 (0600)</text>
+<text class="ts" x="805.0" y="220.0" text-anchor="middle">acme/</text>
+<text class="ts" x="805.0" y="236.0" text-anchor="middle">/etc/gitbay/config.toml (0640)</text>
+<text class="ts" x="805.0" y="252.0" text-anchor="middle">/var/backups/gitbay (0750)</text>
+<rect class="gb" x="280" y="340" width="360" height="100" rx="2"/>
+<text class="tb1" x="460.0" y="378.0" text-anchor="middle">gitbay-runner.service (user ci-runner)</text>
+<text class="ts" x="460.0" y="394.0" text-anchor="middle">polls git@127.0.0.1 over SSH with a runner key</text>
+<text class="ts" x="460.0" y="410.0" text-anchor="middle">MemoryMax 6G · CPUQuota 300% · Delegate=yes</text>
+<rect class="bad" x="300" y="470" width="320" height="80" rx="2"/>
+<text class="tb1" x="460.0" y="498.0" text-anchor="middle">CI containers (rootless podman)</text>
+<text class="ts" x="460.0" y="514.0" text-anchor="middle">untrusted steps · --pull=never</text>
+<text class="ts" x="460.0" y="530.0" text-anchor="middle">build home per repository, read-write</text>
+<rect class="ext" x="680" y="340" width="250" height="100" rx="2"/>
+<text class="tb1" x="805.0" y="370.0" text-anchor="middle">timers (user gitbay)</text>
+<text class="ts" x="805.0" y="386.0" text-anchor="middle">backup nightly · database hourly</text>
+<text class="ts" x="805.0" y="402.0" text-anchor="middle">git gc weekly · monitor hourly</text>
+<text class="ts" x="805.0" y="418.0" text-anchor="middle">restic to offsite storage</text>
+<rect class="ext" x="680" y="470" width="250" height="80" rx="2"/>
+<text class="tb1" x="805.0" y="506.0" text-anchor="middle">operator sshd :2222</text>
+<text class="ts" x="805.0" y="522.0" text-anchor="middle">keys only · fail2ban</text>
+<path class="ln" d="M200,170 L280,170" marker-end="url(#a)"/>
+<text class="ts" x="240" y="163" text-anchor="middle">:22 :443 :80</text>
+<path class="ln" d="M280,260 L200,260" marker-end="url(#a)"/>
+<text class="ts" x="240" y="276" text-anchor="middle">outbound</text>
+<path class="ln" d="M640,200 L680,200" marker-end="url(#a)"/>
+<path class="ln" d="M460,340 L460,300" marker-end="url(#a)"/>
+<text class="ts" x="468" y="324" text-anchor="start">SSH</text>
+<path class="ln" d="M460,440 L460,470" marker-end="url(#a)"/>
+<path class="ln" d="M805,340 L805,300" marker-end="url(#a)"/>
+<path class="lnd" d="M300,520 L200,500" marker-end="url(#ad)"/>
+<text class="ts" x="250" y="530" text-anchor="middle">egress open</text>
+<path class="ln" d="M200,540 L255,566 L805,566 L805,550" marker-end="url(#a)"/>
+<text class="ts" x="530" y="560" text-anchor="middle">SSH :2222</text>
+<rect class="gb" x="28" y="609" width="18" height="14" rx="2"/>
+<text class="ts" x="52" y="620" text-anchor="start">gitbay unit</text>
+<rect class="st" x="130.2" y="609" width="18" height="14" rx="2"/>
+<text class="ts" x="154.2" y="620" text-anchor="start">files</text>
+<rect class="ext" x="195.2" y="609" width="18" height="14" rx="2"/>
+<text class="ts" x="219.2" y="620" text-anchor="start">host service</text>
+<rect class="bad" x="303.6" y="609" width="18" height="14" rx="2"/>
+<text class="ts" x="327.6" y="620" text-anchor="start">untrusted code</text>
+</svg>

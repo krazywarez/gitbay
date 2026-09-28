@@ -1,0 +1,104 @@
+#+title: 9. Controls matrix
+
+One row per control an auditor typically asks about. *Status*: =in
+place= (implemented and cited), =partial= (implemented with a stated
+limit), =gap= (not implemented; see [[file:10-Known-Gaps.org][10]]). Categories follow the
+chapter names of OWASP ASVS 4.0 where one fits.
+
+** Architecture (V1)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| One authorization path for every surface     | partial  | all surfaces call =control.Dispatch= (=internal/control/control.go=); three web toggles write the store directly (#261) |
+| No server-side signing key                  | in place | =internal/sig= verifies only                                     |
+| Least functionality by default              | in place | API, web accounts, git://, push and registration default off (=internal/config/config.go=) |
+| No git library; git runs as a subprocess with built argv | in place | =internal/gitutil=                                     |
+
+** Authentication (V2) and session management (V3)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| No passwords anywhere                       | in place | SSH keys, emailed single-use links, bearer tokens                |
+| Credentials stored as hashes                | in place | SHA-256 of 256-bit random values (=internal/store/sessions.go=)  |
+| Brute-force limit on SSH auth               | in place | 10 failures a minute per IP (=internal/sshd/ratelimit.go=)       |
+| Account enumeration resistance at login     | in place | uniform response (=internal/control/loginlink.go=)         |
+| Session cookie flags                        | in place | HttpOnly, SameSite=Lax, Secure with TLS (=internal/httpd/accounts.go=) |
+| Session lifetime                            | partial  | 7 days absolute, no idle timeout                                  |
+| Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none                    |
+| Revocation takes effect immediately         | gap      | removed SSH key keeps open connections (#256)                    |
+| Delegation bounded by the delegating credential | gap  | expiring tokens can mint lasting credentials (#257)              |
+
+** Access control (V4)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| Deny by default on private data             | in place | =CanRead= requires owner, public or grant (=internal/policy/access.go=) |
+| Private resources indistinguishable from missing | in place | =resolveRepo= (=internal/control/repo.go=), =runGit=, smart HTTP |
+| Credential scopes narrow account rights     | in place | key and token scopes (=control.go=, =policy/access.go=) |
+| Server-side write protections              | in place | pre-receive =CheckPush=, signed commits (=internal/hookd/hookd.go=) |
+| Merge gates                                 | partial  | =MergeGates=; any writer can post a =ci/*= status (#258)         |
+| Admin functions isolated                    | in place | =admin= noun gated in =Dispatch=; =audit= admin-only             |
+| CSRF protection                             | in place | SameSite=Lax plus =checkOrigin= (=accounts.go=)               |
+| Typed confirmation for destructive web actions | in place | =internal/httpd/confirm.go=                                  |
+
+** Input handling and output encoding (V5)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| User markup sanitised                       | in place | =ugcHTML= with bluemonday (=internal/httpd/web.go=)         |
+| No script execution in pages                | in place | CSP =script-src 'none'= (=internal/httpd/routes.go=)         |
+| Control characters stripped at the terminal | in place | =termSafe= (=internal/control/term.go=)                    |
+| No shell in command execution               | in place | =protocol.Tokenize= for SSH argv; git and podman with argv slices |
+| Parsers fuzzed                              | partial  | five fuzz targets run briefly by =deploy/audit.sh=               |
+
+** Cryptography (V6) and data protection (V8)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| TLS for all authenticated HTTP              | in place | ACME or certificate files; HSTS                                  |
+| Secrets encrypted at rest                   | gap      | CI secrets, webhook secrets, mirror tokens stored in clear ([[file:06-Data-and-Cryptography.org][6]]) |
+| Secrets kept out of argv, logs and output   | in place | =ReadsStdin=, pruned audit argv, write-only secret commands      |
+| Local backups encrypted                     | gap      | tar.gz in clear; offsite copy encrypted by restic                |
+| Data retention configurable                 | in place | =[retention]= (=internal/config/config.go=)              |
+| User data export                            | in place | =account export=                                                 |
+
+** Logging (V7)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| Security-relevant writes audited            | in place | every successful mutating command (=control.go=)         |
+| Authentication failures audited             | in place | =auth.failed=, =auth.throttled=                                  |
+| Denied attempts audited                     | gap      | refused commands are not recorded                                |
+| Audit log tamper resistance                 | gap      | same database, writable by the daemon user                       |
+
+** Communications and integrations (V9, V10, V12)
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| SSRF protection on user-supplied URLs       | partial  | webhooks at save and connect; mirrors at save only               |
+| Webhook payload integrity                   | in place | HMAC-SHA256 header                                               |
+| SMTP credentials protected in transit       | partial  | STARTTLS opportunistic; Go refuses PLAIN auth without TLS to a remote host |
+| Upload size limits                          | in place | per-owner storage quota at push (=internal/sshd/sshd.go=); API body 1 MiB |
+
+** CI and build isolation
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| Untrusted code runs isolated                | partial  | rootless podman, cgroup limits; shared build home per repository (#255) |
+| No secrets for untrusted builds             | in place | =internal/control/build.go=                                  |
+| Runner limited to attached repositories     | in place | =runnerMayBuild= (=build.go=)                            |
+| Build images fixed by the operator          | in place | =--pull=never=                                                   |
+| Build network egress restricted             | gap      | #260                                                             |
+| Build results reused only across equal trust | gap     | tree reuse ignores trust and image (#258)                        |
+
+** Availability and operations
+
+| Control                                     | Status   | Evidence                                                         |
+|---------------------------------------------+----------+------------------------------------------------------------------|
+| Rate limits on API and writes               | in place | [[file:05-Identity-and-Access.org][5. Rate limits]]                         |
+| Concurrency limit on git pack generation    | gap      | #262                                                             |
+| Service hardening                           | in place | systemd sandboxing ([[file:03-Deployment.org][3]])                                     |
+| Backups offsite and append-only             | in place | restic with append-only credentials (documented)                 |
+| Restore tested                              | gap      | #259                                                             |
+| Migrations validated before commit          | gap      | foreign-key check runs after commit (#261)                       |
+| Signed, reviewed changes to production      | in place | signed commits, =require-mr=, ff-only merges, clean-tree deploys |

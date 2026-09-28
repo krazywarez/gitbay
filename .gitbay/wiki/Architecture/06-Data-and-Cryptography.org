@@ -1,0 +1,116 @@
+#+title: 6. Data and cryptography
+
+* Data inventory
+
+Schema: =internal/store/migrations/=, 59 migrations. Classification:
+*C* credential or secret, *P* personal data, *R* private repository
+content (as confidential as the repository), *O* operational.
+
+| Domain          | Tables                                                                                      | Class | Notes                                           |
+|-----------------+---------------------------------------------------------------------------------------------+-------+-------------------------------------------------|
+| Identity        | =users=, =emails=, =ssh_keys=, =pgp_keys=, =orgs=, =org_members=, =teams=, =team_members=   | P     | email addresses in clear; keys are public       |
+| Credentials     | =api_tokens=, =web_sessions=, =login_tokens=, =email_tokens=, =invites=                    | C     | SHA-256 hashes only                              |
+| Repositories    | =repos=, =repo_access=, =team_repos=, =repo_topics=, =repo_watchers=, =repo_pins=, =repo_bookmarks=, =page_domains= | O |                                  |
+| Collaboration   | =issues=, =issue_*=, =merge_requests=, =mr_*=, =labels=, =milestones=, =mentions=           | R     | bodies of issues, comments and reviews          |
+| Releases, snippets | =releases=, =release_assets=, =snippets=, =snippet_files=                                | R     |                                                 |
+| CI              | =builds= (includes logs), =build_schedules=, =runner_repos=, =runner_seen=                  | R     | build logs can echo anything a step prints      |
+| CI secrets      | =build_secrets=                                                                             | C     | *plaintext*                                     |
+| Integrations    | =webhooks= (secret), =webhook_deliveries=, =mirrors= (username, token)                      | C     | *plaintext* secrets and tokens                  |
+| Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=            | P     | device tokens in clear                          |
+| Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
+| Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows |
+| Dependencies    | =dep_checks=, =dep_reports=                                                                 | O     |                                                 |
+
+Outside the database:
+
+| Data                       | Location                          | Class |
+|----------------------------+-----------------------------------+-------|
+| Repository contents        | =<root>/repos=                    | R     |
+| LFS objects                | =<root>/lfs=                      | R     |
+| SSH host key               | =<root>/ssh/host_ed25519=         | C     |
+| TLS keys (ACME)            | =<root>/acme=                     | C     |
+| SMTP password              | =/etc/gitbay/config.toml=         | C     |
+| APNs signing key (.p8)     | path in =push.key_file=           | C     |
+| Backups                    | =/var/backups/gitbay=, offsite    | all of the above |
+
+No table stores client IP addresses as a column. The daemon writes a
+client IP into an audit row only for authentication failures and
+throttling (=internal/sshd/sshd.go=).
+
+* At rest
+
+| Item                                  | Protection                                                     |
+|---------------------------------------+----------------------------------------------------------------|
+| API tokens, sessions, login links, email codes, invites | SHA-256 of a 256-bit random value; the value is shown once and never stored (=internal/store/sessions.go=) |
+| CI secrets, webhook secrets, mirror tokens, APNs device tokens | stored in clear in SQLite; protection is filesystem permissions and the rule that values are write-only through the interface |
+| SQLite file                           | mode 0640, directory 0750                                      |
+| Backups                               | the local archive is not encrypted; restic encrypts the offsite copy |
+| Disk                                  | no application-level encryption; any disk encryption is the host's |
+
+The code base contains no symmetric encryption. A database or backup
+file read by anyone other than the =gitbay= user discloses every CI
+secret, webhook secret and mirror token.
+
+* In transit
+
+| Channel                  | Protection                                                   |
+|--------------------------+--------------------------------------------------------------|
+| SSH                      | Go =x/crypto/ssh=; ed25519 host key generated on first start |
+| HTTPS                    | TLS via ACME or operator certificates; HSTS one year         |
+| HTTP port 80             | ACME challenges and redirect only                            |
+| git://                   | none (public data only; off by default)                      |
+| Runner ↔ server          | SSH                                                           |
+| SMTP                     | STARTTLS when the relay offers it                            |
+| APNs                     | TLS, HTTP/2                                                  |
+| Webhooks                 | TLS when the URL is https; HMAC-SHA256 body signature in =X-Gitbay-Signature-256= (=internal/webhook/webhook.go=) |
+| Mirrors                  | per URL; token passed through =GIT_ASKPASS=, never argv (=internal/mirror/mirror.go=) |
+
+The TLS configuration uses Go's defaults; no minimum version or cipher
+list is set in code.
+
+* Cryptographic primitives
+
+| Use                             | Primitive                                  | Code                               |
+|---------------------------------+--------------------------------------------+------------------------------------|
+| Token generation                | =crypto/rand=, 32 bytes                    | =internal/store/sessions.go=    |
+| Token storage                   | SHA-256                                    | =sessions.go=                   |
+| LFS transfer tokens             | HMAC-SHA256, secret in =settings=          | =internal/lfs/lfs.go=      |
+| Webhook signatures              | HMAC-SHA256                                | =internal/webhook/webhook.go=  |
+| APNs provider token             | ES256 JWT (ECDSA P-256)                    | =internal/push/token.go=           |
+| SSH host key                    | ed25519                                    | =internal/sshd/sshd.go=     |
+| Commit and tag signatures       | verify OpenPGP (ProtonMail go-crypto) and SSHSIG | =internal/sig=               |
+| LFS object ids                  | SHA-256                                    | =internal/lfs/lfs.go=           |
+
+Signature verification results are cached in =commit_signatures= with
+the global =key_epoch= at the time of verification. Any change to a
+trust input (a key added or removed, an email verified) bumps the
+epoch, which invalidates every cached result (=internal/store/users.go=,
+=internal/control/sig.go=).
+
+The server holds no signing key and signs nothing. A "verified" badge
+means a user's own key signed the commit.
+
+* Secret handling rules
+
+- Secrets enter only on stdin. A command must set =ReadsStdin=
+  to receive stdin at all; =TestStdinCommandsReadStdin= enforces it.
+  Examples: =repo secret set=, =repo deploy-key add=, =repo import
+  --token-stdin= (=internal/control/build.go=, =import.go=).
+- Secrets are listed by name, never echoed back.
+- The audit log stores argv with flag values stripped
+  (=internal/control/control.go=).
+- Mail errors are logged with addresses redacted
+  (=internal/notify/notify.go=).
+- CI secrets travel in the runner's claim only for trusted builds and
+  reach the container as environment variables through a 0600 env file
+  or podman's =--env NAME= pass-through, never argv
+  (=cmd/gitbay-runner/isolate.go=).
+
+* Retention
+
+Configured under =[retention]= for =audit=, =events=,
+=webhook_deliveries=, =mail= and =push=; unset means keep forever.
+Expired sessions and tokens are swept hourly regardless
+(=internal/config/config.go=, =cmd/gitbayd/main.go=).
+Accounts that never verify are removed after
+=registration.pending_expiry=. =account export= gives a user their data.

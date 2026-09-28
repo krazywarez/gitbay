@@ -2,7 +2,8 @@
 
 What the forge trusts, what it refuses to do, and where the boundaries
 are. This is the reference for security review; it complements the audit
-log and hardening notes in [[Admin]].
+log and hardening notes in [[Admin]]. Diagrams, data flows, a controls
+matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Architecture]] pages.
 
 * What gitbay never does
 
