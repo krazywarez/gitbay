@@ -80,9 +80,13 @@ does not appear in anyone's review queue. Draft is a flag rather than a
 fifth state, so every =state = 'open'= rule still means what it did.
 =mr revisions= lists the heads a merge request has had; the web page
 lists them beside the reviews they staled, and the iOS client has a
-Revisions section. =mr range-diff= compares two heads: the iOS client
-shows it from a revision to the one before, as text; the web has no
-view. Batched review is not built.
+Revisions section. =mr range-diff= compares two heads: the iOS client shows it from a
+revision to the one before, as text; the web has no view yet
+(krz/gitbay#269). Batched review — draft diff comments held with
+=mr comment --pending= and sent together with =--comment=/=--discard=
+or a verdict — is built and the web uses it: composing review
+comments before publishing them is the same round trip as the CLI's
+=--pending= flag.
 
 =mr review request --add <user>= asks a *particular* person, who then
 carries the merge request in their queue and is notified; =--remove=
@@ -187,7 +191,7 @@ rather than the one the web page shows.
 | bookmark list               | yes | yes | yes |
 | bookmarks on your profile   | n/a | yes | no  |
 | watch, unwatch              | yes | yes | yes |
-| mute                        | yes | no  | yes |
+| mute                        | yes | yes | yes |
 | settings, protection        | yes | yes | yes |
 | default branch              | yes | yes | yes |
 | merge requests only         | yes | yes | yes |
@@ -247,9 +251,10 @@ repository — and a repository bookmarked while public and since made
 private drops out of the listing rather than leaking that it exists
 (krz/gitbay#146).
 
-The web's watch and pin controls write the store directly instead of
-dispatching =repo watch= and =repo pin=. That is why the web cannot
-mute: its toggle knows watching and default only.
+The web's watch and pin controls dispatch =repo pin=/=repo unpin= and
+=repo watch=/=repo mute=/=repo unwatch=, the same commands the CLI runs
+(krz/gitbay#261). The single watch button cycles default, watching and
+muted.
 
 Dependency checks are off until a repository's admin turns them on: the
 check tells a public registry what the repository depends on. =repo deps

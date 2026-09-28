@@ -17,10 +17,15 @@ matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Archite
 - *Serve repository HTML on its own origin as active content.* Raw file
   serving is =text/plain= with =nosniff=. Rendered markdown/org is
   sanitized (bluemonday) and served under a CSP that forbids scripts.
-- *Put secrets in argv, URLs, or logs.* Import and mirror credentials,
-  registration invites, and API tokens travel on stdin or in request
-  bodies, never as command arguments (visible in =/proc=) or query
-  strings. Tokens are stored only as SHA-256 hashes.
+- *Put secrets in argv, URLs, or logs, with one documented exception.*
+  Import and mirror credentials, registration invites, and API tokens
+  travel on stdin or in request bodies, never as command arguments
+  (visible in =/proc=) or query strings. The one exception is the
+  emailed login link, =/login?token=...=: single-use, 15-minute expiry,
+  and the response that consumes it carries =Cache-Control: no-store= so
+  no intermediary keeps a copy. An operator running gitbay behind a
+  reverse proxy should configure that proxy to strip the query string
+  from its own access logs. Tokens are stored only as SHA-256 hashes.
 - *Name a mail recipient in the log.* A queued mail is logged by its
   queue row id, never by address, and the relay's own error is redacted
   before it is logged because a rejection usually quotes the address it

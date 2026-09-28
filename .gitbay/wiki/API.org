@@ -59,8 +59,9 @@ the command wrote diagnostics:
 
 HTTP status maps the exit code: 0→200, 2→400, 3→404, 4→403, else 500.
 Commands that emit raw text rather than an envelope (=help=, =mr diff=)
-come wrapped as ={"output": "..."}=. Git transport commands and the
-token commands are refused by name.
+come wrapped as ={"output": "..."}=. Git transport commands are refused
+by name; the token commands are not — a full-scope token can mint,
+list and revoke tokens the same way it can run anything else.
 
 #+begin_src sh
 curl -s -H "Authorization: Bearer $TOKEN" \
