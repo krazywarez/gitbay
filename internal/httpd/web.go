@@ -2095,6 +2095,7 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 	allLabels, _ := s.st.ListLabels(p.Repo, readable)
 	openMS, _ := s.st.ListMilestones(p.Repo, "open", readable)
 	facets := listFacets(base, []string{"open", "merged", "closed", "all"}, state, allLabels, openMS, true)
+	canOpenMR := canWrite || len(s.writableForks(s.viewer(r), p.Repo)) > 0
 	s.render(w, "mrs.html", struct {
 		repoPage
 		State       string
@@ -2104,10 +2105,10 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		MRs         []mrRow
 		LabelColors map[string]template.CSS
 		Older       string
-		CanWrite    bool
+		CanOpenMR   bool
 	}{p, state, mf.Search,
 		activeFilters(state, [][2]string{{"label", mf.Label}, {"author", mf.Author}, {"milestone", mf.Milestone}}),
-		facets, rows, s.labelColors(p.Repo), older, canWrite})
+		facets, rows, s.labelColors(p.Repo), older, canOpenMR})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {

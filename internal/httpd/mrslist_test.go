@@ -31,7 +31,15 @@ func TestMRsListContributionHintByAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.CreateRepo("user", owner, "app", "public"); err != nil {
+	forker, err := st.CreateUser("carol", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repoID, err := st.CreateRepo("user", owner, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateFork("user", forker, "app", "public", repoID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,5 +90,13 @@ func TestMRsListContributionHintByAccess(t *testing.T) {
 	ownerOut := get(owner)
 	if !strings.Contains(ownerOut, "New merge request") {
 		t.Errorf("owner: missing New merge request link:\n%s", ownerOut)
+	}
+
+	forkerOut := get(forker)
+	if !strings.Contains(forkerOut, "New merge request") {
+		t.Errorf("reader with a writable fork: missing New merge request link:\n%s", forkerOut)
+	}
+	if strings.Contains(forkerOut, "Fork this repository to propose a change") {
+		t.Error("reader with a writable fork should not see the fork hint")
 	}
 }

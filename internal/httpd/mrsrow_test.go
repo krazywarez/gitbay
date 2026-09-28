@@ -10,13 +10,13 @@ import (
 // mrsPageData mirrors the anonymous struct the mrs handler renders with.
 type mrsPageData struct {
 	repoPage
-	State    string
-	Query    string
-	Filters  []listFilter
-	Facets   []facetGroup
-	MRs      []mrRow
-	Older    string
-	CanWrite bool
+	State     string
+	Query     string
+	Filters   []listFilter
+	Facets    []facetGroup
+	MRs       []mrRow
+	Older     string
+	CanOpenMR bool
 }
 
 func renderMRs(t *testing.T, rows []mrRow, state string) string {

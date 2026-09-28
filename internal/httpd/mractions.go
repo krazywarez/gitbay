@@ -187,26 +187,36 @@ type mrNewPage struct {
 	Draft    *draft
 }
 
+// writableForks lists the forks of repo that u can push to — the source
+// half of what a merge request may be opened from, alongside the
+// repository's own branches. Write is the filter because a contributor
+// proposes from a fork they own; the command still checks the source for
+// itself (#168).
+func (s *Server) writableForks(u store.User, repo store.Repo) []store.Repo {
+	if u.ID == 0 {
+		return nil
+	}
+	forks, _ := s.st.ListForks(repo.ID)
+	var out []store.Repo
+	for _, f := range forks {
+		grant, _ := s.st.AccessRole(f.ID, u.ID)
+		if policy.CanWrite(u, f, grant) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // mrSources lists the branches a merge request may be opened from, in the
 // form the command takes: this repository's branches by name, and those of
-// any fork of it the viewer can push to as "owner/name:branch".
-// Write is the filter because a contributor proposes from a fork they
-// own; the command still checks the source for itself (#168).
+// any writable fork as "owner/name:branch".
 func (s *Server) mrSources(u store.User, p repoPage) []string {
 	var out []string
 	branches, _ := gitutil.Refs(p.Dir, "heads")
 	for _, b := range branches {
 		out = append(out, b.Name)
 	}
-	if u.ID == 0 {
-		return out
-	}
-	forks, _ := s.st.ListForks(p.Repo.ID)
-	for _, f := range forks {
-		grant, _ := s.st.AccessRole(f.ID, u.ID)
-		if !policy.CanWrite(u, f, grant) {
-			continue
-		}
+	for _, f := range s.writableForks(u, p.Repo) {
 		dir := control.RepoDir(s.cfg.Server.Root, f.OwnerName, f.Name)
 		refs, _ := gitutil.Refs(dir, "heads")
 		for _, b := range refs {

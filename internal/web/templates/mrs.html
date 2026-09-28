@@ -13,7 +13,7 @@
   </form>
   {{range .Filters}}<p class="meta">{{.Key}}: {{if eq .Key "label"}}<span class="chip label" style="{{index $.LabelColors .Value}}">{{.Value}}</span>{{else}}<b>{{.Value}}</b>{{end}} <a href="{{.Clear}}">clear</a></p>{{end}}
 </div>
-{{if .CanWrite}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>
+{{if .CanOpenMR}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/mrs/new">New merge request</a></p>
 {{else if .Viewer}}<p class="meta"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/fork">Fork this repository to propose a change</a></p>
 {{else}}<p class="meta"><a href="/login">Sign in to propose a change</a></p>{{end}}
 <ul class="issuelist rows">
