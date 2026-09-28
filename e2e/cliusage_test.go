@@ -1,0 +1,55 @@
+package e2e
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// The CLI sends its own path where it differs from the registered one, so
+// usage and help print a command that exists: gitbay auth keys remove,
+// never gitbay keys remove (#267). Stock ssh sends none and sees the
+// registered path, the only one it can type.
+func TestCLIUsagePrintsTheInvokingPath(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	key := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", key+".pub",
+		"--email", "alice@example.test", "--verified")
+
+	c := &cli{bin: buildGitbayCLI(t), configDir: t.TempDir(), inst: inst, key: key}
+	c.must(t, "", "", "remote", "add", "test", "127.0.0.1",
+		"--port", fmt.Sprint(inst.port),
+		"--ssh-option", "-i", "--ssh-option", key,
+		"--ssh-option", "-oIdentitiesOnly=yes",
+		"--ssh-option", "-oStrictHostKeyChecking=no",
+		"--ssh-option", "-oUserKnownHostsFile="+filepath.Join(inst.sshDir, "kh"),
+		"--ssh-option", "-oBatchMode=yes",
+		"--default")
+
+	_, errOut, code := c.run(t, "", "", "auth", "keys", "remove")
+	if code == 0 || !strings.Contains(errOut, "usage: gitbay auth keys remove <fingerprint>") {
+		t.Errorf("CLI refusal: exit %d, stderr %q", code, errOut)
+	}
+
+	out, errOut, code := c.run(t, "", "", "auth", "keys", "remove", "--help")
+	if code != 0 || !strings.Contains(out, "gitbay auth keys remove <fingerprint>") {
+		t.Errorf("CLI help: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+
+	// A command whose CLI path matches sends no --path=, and off a
+	// terminal prints the ssh form as before.
+	_, errOut, code = c.run(t, "", "", "issue", "show", "alice/app")
+	if code == 0 || !strings.Contains(errOut, "usage: ssh git@") || !strings.Contains(errOut, " issue show <owner/name> <n>") {
+		t.Errorf("matching command: exit %d, stderr %q", code, errOut)
+	}
+
+	_, errOut, code = inst.ssh(t, key, "", "keys", "remove")
+	if code == 0 || !strings.Contains(errOut, "usage: ssh git@") || !strings.Contains(errOut, " keys remove <fingerprint>") {
+		t.Errorf("stock ssh: exit %d, stderr %q", code, errOut)
+	}
+	if strings.Contains(errOut, "auth") {
+		t.Errorf("stock ssh saw the CLI's auth grouping: %q", errOut)
+	}
+}
