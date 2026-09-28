@@ -91,6 +91,16 @@ var nounAliases = map[string][]nounAlias{
 	},
 }
 
+// NounAliasNames returns the keys of nounAliases, for the CLI's own
+// aliasGroupNames agreement test.
+func NounAliasNames() []string {
+	names := make([]string, 0, len(nounAliases))
+	for name := range nounAliases {
+		names = append(names, name)
+	}
+	return names
+}
+
 // helpEntry is one row of the registry as help reports it.
 type helpEntry struct {
 	Path     string   `json:"path"`

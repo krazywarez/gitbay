@@ -65,3 +65,21 @@ func TestGroupsSayWhatTheServerSays(t *testing.T) {
 		}
 	}
 }
+
+// aliasGroupNames is kept by hand because the CLI has no registry to
+// consult; this fails when it drifts from internal/control's nounAliases
+// keys instead of silently falling back to the registered forms (#267).
+func TestAliasGroupNamesMatchServer(t *testing.T) {
+	want := map[string]bool{}
+	for _, name := range control.NounAliasNames() {
+		want[name] = true
+	}
+	if len(aliasGroupNames) != len(want) {
+		t.Fatalf("aliasGroupNames has %d entries, server has %d", len(aliasGroupNames), len(want))
+	}
+	for name := range want {
+		if !aliasGroupNames[name] {
+			t.Errorf("aliasGroupNames is missing %q", name)
+		}
+	}
+}
