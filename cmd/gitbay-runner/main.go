@@ -44,8 +44,8 @@ type job struct {
 	// server did not say: such a build gets no secrets and a home of its
 	// own (#255).
 	Trusted bool `json:"trusted"`
-	// SSH is the instance's public ssh destination, for a build whose
-	// runner polls over loopback (#260).
+	// SSH is the instance's public ssh destination; a runner polling
+	// over loopback takes its port for its builds (#260).
 	SSH     string            `json:"ssh"`
 	Secrets map[string]string `json:"secrets"`
 }
@@ -507,8 +507,8 @@ const hostAddr = "169.254.1.2"
 // instance's public name resolves to the container itself. A runner
 // polling over loopback runs on the daemon's host, and its podman builds
 // get hostAddr with the user from -remote and the port from the claim's
-// destination when it is not 22. Otherwise a build uses the claim's
-// destination, or -remote when the claim carries none.
+// destination when it is not 22. Any other runner's -remote is the path
+// that reaches the forge from where it runs, so its builds get that.
 func (r *runner) buildSSH(public string) string {
 	if r.isolation == isolationPodman && r.loopbackRemote() {
 		user, _, ok := strings.Cut(r.remote, "@")
@@ -524,9 +524,6 @@ func (r *runner) buildSSH(public string) string {
 			dest = net.JoinHostPort(hostAddr, port)
 		}
 		return user + "@" + dest
-	}
-	if public != "" {
-		return public
 	}
 	return r.remote
 }

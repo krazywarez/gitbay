@@ -195,7 +195,7 @@ func TestSplitEnvKeepsMultilineOutOfTheFile(t *testing.T) {
 // address, so a runner polling over loopback gives its podman builds
 // 169.254.1.2, pasta's address for the host, with the claim's port when
 // it is not 22, and never the loopback address it polls. Any other runner
-// passes on the claim's destination, or its own remote without one (#260).
+// passes on its own remote (#260).
 func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 	env := stepEnv(job{}, "/tmp/buildhome", "git@gitbay.org")
 	if !containsEnv(env, "GITBAY_SSH=git@gitbay.org") {
@@ -211,11 +211,12 @@ func TestStepEnvCarriesInstanceAddress(t *testing.T) {
 		{"forge@::1", isolationPodman, "git@gitbay.org", "forge@169.254.1.2"},
 		{"127.0.0.1", isolationPodman, "git@gitbay.org", "git@169.254.1.2"},
 		{"git@127.0.0.1", isolationPodman, "", "git@169.254.1.2"},
-		{"git@127.0.0.1", isolationNone, "git@gitbay.org", "git@gitbay.org"},
+		{"git@127.0.0.1", isolationNone, "git@gitbay.org", "git@127.0.0.1"},
 		{"git@127.0.0.1", isolationNone, "", "git@127.0.0.1"},
-		{"git@gitbay.org", isolationPodman, "git@other.test", "git@other.test"},
+		{"git@gitbay.org", isolationPodman, "git@other.test", "git@gitbay.org"},
 		{"git@gitbay.org", isolationPodman, "", "git@gitbay.org"},
 		{"gitbay.org", isolationPodman, "", "gitbay.org"},
+		{"ci@forge.internal", isolationNone, "git@gitbay.org", "ci@forge.internal"},
 	} {
 		r := &runner{remote: tc.remote, isolation: tc.isolation}
 		if got := r.buildSSH(tc.public); got != tc.want {

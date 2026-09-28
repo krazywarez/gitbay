@@ -462,11 +462,11 @@ func runnerMayBuild(c *Ctx, key store.SSHKey, repoID int64) (bool, error) {
 const maxOrphanSkip = 50
 
 // publicSSH is the instance's ssh destination as anyone outside reaches
-// it. A runner on the daemon's own host polls over loopback and hands
-// its builds this instead, so no build connects from the runner's source
-// address (#260). The port is added only when it is not 22: hutch and
-// orgo build ssh://$GITBAY_SSH/... URLs, valid in both forms. Empty when
-// site_url is not set.
+// it. A runner on the daemon's own host polls over loopback and takes
+// the port from it for its builds' GITBAY_SSH, which names pasta's
+// address for the host (#260). The port is added only when it is not
+// 22: hutch and orgo build ssh://$GITBAY_SSH/... URLs, valid in both
+// forms. Empty when site_url is not set.
 func publicSSH(c *Ctx) string {
 	host := c.Cfg.SiteHost()
 	if host == "" {
@@ -581,8 +581,8 @@ func runRunnerNext(c *Ctx, args []string) int {
 		// Trusted is always sent: a runner decides a build's home and
 		// secrets from it, and reads a missing field as untrusted (#255).
 		Trusted bool `json:"trusted"`
-		// SSH is the instance's public destination for the build's
-		// GITBAY_SSH when its runner polls over loopback (#260).
+		// SSH is the instance's public destination; a runner polling
+		// over loopback takes its port for the build's GITBAY_SSH (#260).
 		SSH     string            `json:"ssh,omitempty"`
 		Secrets map[string]string `json:"secrets,omitempty"`
 	}{ID: b.ID, Repo: repo.Path(), Number: b.Number, Job: b.Job, SHA: b.SHA, Ref: b.Ref,
