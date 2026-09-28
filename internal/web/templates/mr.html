@@ -144,7 +144,7 @@
   <div class="grp">
     <h2>Reviewers</h2>
     {{if .MR.ReviewRequests}}<p class="row">{{range .MR.ReviewRequests}}<a href="/{{.}}">{{.}}</a> {{end}}</p>
-    {{else}}<p class="none">nobody yet</p>{{end}}
+    {{else}}<p class="none">no reviewers</p>{{end}}
     {{if and .CanWrite (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
     <form method="post" action="{{$base}}/review-request" class="actions">
       <input type="text" name="add" aria-label="Add reviewers" autocomplete="off" spellcheck="false" placeholder="add, space-separated">
@@ -175,7 +175,7 @@
   <div class="grp">
     <h2>Labels</h2>
     {{if .MR.Labels}}<p class="row">{{range .MR.Labels}}<a class="chip label" style="{{index $.LabelColors .}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/mrs?label={{.}}">{{.}}</a> {{end}}</p>
-    {{else}}<p class="none">none yet</p>{{end}}
+    {{else}}<p class="none">{{if or (eq .MR.State "merged") (eq .MR.State "closed")}}no labels{{else}}none yet{{end}}</p>{{end}}
     {{if .CanWrite}}
     <form method="post" action="{{$base}}/label" class="actions">
       <input type="text" name="add" aria-label="Add labels" autocomplete="off" spellcheck="false" placeholder="add, space-separated">

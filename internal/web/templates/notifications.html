@@ -18,6 +18,6 @@
   </div>
   {{if not .Read}}<form method="post" action="/notifications" class="inline"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="btn">Mark read</button></form>{{end}}
 </li>
-{{else}}<li class="empty">{{if .All}}nothing here yet{{else}}nothing unread — <a href="/notifications?all=1">show all</a>{{end}}</li>{{end}}
+{{else}}<li class="empty">{{if .All}}nothing to show{{else}}no unread notifications — <a href="/notifications?all=1">show all</a>{{end}}</li>{{end}}
 </ul>
 {{end}}

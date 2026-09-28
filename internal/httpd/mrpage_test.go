@@ -83,6 +83,66 @@ func testMR(state string) store.MR {
 		HeadSHA: "ff6271a9d4570cd46f169091637a9d2e40ad5c2b"}
 }
 
+// A finished merge request states an empty label list as a fact, not a
+// promise something is still coming (#270).
+func TestMRPageLabelsNoYetOnFinishedState(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("merged"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "no labels") {
+		t.Error(`merged MR with no labels should read "no labels", not "none yet"`)
+	}
+}
+
+// An open MR can still gain labels, so its empty state keeps "none yet"
+// rather than the finished-item wording (#270).
+func TestMRPageLabelsNoneYetOnOpenState(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("open"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, "none yet") {
+		t.Error(`open MR with no labels should read "none yet"`)
+	}
+	if strings.Contains(out, "no labels") {
+		t.Error(`open MR with no labels should not read "no labels"`)
+	}
+}
+
+// A closed MR is finished the same way a merged one is (#270).
+func TestMRPageLabelsNoLabelsOnClosedState(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("closed"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "no labels") {
+		t.Error(`closed MR with no labels should read "no labels", not "none yet"`)
+	}
+}
+
+func TestMRPageReviewersEmptyStateDropsNobody(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("open"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Contains(sb.String(), "nobody yet") {
+		t.Error(`reviewers empty state should read "no reviewers"`)
+	}
+	if !strings.Contains(sb.String(), "no reviewers") {
+		t.Error(`missing "no reviewers"`)
+	}
+}
+
 // The header states what happened to the MR: who opened, merged, or closed
 // it, and when. A merge or close with no stamp (imports, pre-0029 merges)
 // names the state without claiming a byline it cannot back up.

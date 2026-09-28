@@ -50,7 +50,7 @@
     {{range .Builds}}<a class="chip check-{{.Status}}" href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/builds/{{.Number}}">{{.Job}}</a>{{end}}
   </div>
 </li>
-{{else}}<li class="empty">no builds — push a commit with a <code>.gitbay/ci.yml</code></li>{{end}}
+{{else}}<li class="empty">no builds{{if .CanWrite}} — push a commit with a .gitbay/ci.yml{{end}}</li>{{end}}
 </ul>
 {{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 </div>

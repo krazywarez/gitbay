@@ -57,6 +57,69 @@ func TestBuildsPageRendersCommandOutput(t *testing.T) {
 	}
 }
 
+// A writer sees the instruction to add CI; a reader without push access
+// sees only the fact, since the instruction is not theirs to act on
+// (#270).
+func TestBuildsEmptyStateOmitsInstructionForReaders(t *testing.T) {
+	var sb strings.Builder
+	filter := buildFilter{}
+	err := web.Render(&sb, "builds.html", struct {
+		repoPage
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		Older    string
+		CanWrite bool
+		Notice   string
+	}{
+		testRepoPage(), nil, nil, nil, filter, nil, nil, "", false, "",
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, "no builds") {
+		t.Error(`missing "no builds"`)
+	}
+	if strings.Contains(out, "ci.yml") {
+		t.Error("a reader without push access should not see the push instruction")
+	}
+}
+
+// A writer with zero builds gets the one instruction the page can give
+// them (#270).
+func TestBuildsEmptyStateShowsInstructionForWriters(t *testing.T) {
+	var sb strings.Builder
+	filter := buildFilter{}
+	err := web.Render(&sb, "builds.html", struct {
+		repoPage
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		Older    string
+		CanWrite bool
+		Notice   string
+	}{
+		testRepoPage(), nil, nil, nil, filter, nil, nil, "", true, "",
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, "no builds") {
+		t.Error(`missing "no builds"`)
+	}
+	if !strings.Contains(out, "push a commit with a .gitbay/ci.yml") {
+		t.Error("a writer with no builds should see the push instruction")
+	}
+}
+
 func TestBuildPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
 	err := web.Render(&sb, "build.html", buildView{
