@@ -58,7 +58,9 @@ type Store struct {
 // no failures, and readers, which WAL keeps out of the way, are
 // unaffected (#121).
 func Open(path string) (*Store, error) {
-	dsn := path + "?_txlock=immediate&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
+	// synchronous(FULL): a commit is durable before it returns, which
+	// secret key rotation needs before it drops the old keys (#273).
+	dsn := path + "?_txlock=immediate&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
 	if path == ":memory:" {
 		dsn = ":memory:?_txlock=immediate&_pragma=foreign_keys(ON)"
 	}

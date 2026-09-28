@@ -6,15 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"gitbay.org/gitbay/internal/config"
 )
 
 // A restart that moves the schema says so. Migrations used to run in silence,
 // which left an unexpected user_version with nothing in the journal tying it to
 // the deploy that applied it.
 func TestOpenStoreLogsSchemaMigration(t *testing.T) {
-	cfg := config.Config{Server: config.Server{Root: t.TempDir()}}
+	cfg := testConfig(t)
 
 	var buf bytes.Buffer
 	prev := slog.Default()

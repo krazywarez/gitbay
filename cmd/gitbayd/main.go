@@ -4,8 +4,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -31,6 +33,7 @@ import (
 	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/push"
+	"gitbay.org/gitbay/internal/seal"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/toolpath"
@@ -38,10 +41,21 @@ import (
 )
 
 func openStore(cfg config.Config) (*store.Store, error) {
+	// The key file seals the secret columns (#273). Without it the
+	// database's secrets cannot be read or written, so nothing that
+	// opens the database runs.
+	keys, err := seal.Load(cfg.Server.SecretKeyFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("secret key file %s does not exist: create it with gitbayd admin secrets init, or restore it from its off-host copy (backups do not carry it)", cfg.Server.SecretKeyFile)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("secret key file: %w", err)
+	}
 	s, err := store.Open(filepath.Join(cfg.Server.Root, "gitbay.db"))
 	if err != nil {
 		return nil, err
 	}
+	s.SetKeyring(keys)
 	// Say so when the schema moves. A restart migrates in silence otherwise,
 	// which makes an unexpected schema version hard to attribute to the deploy
 	// that caused it.
@@ -144,6 +158,15 @@ func serveCmd() *cobra.Command {
 			// audit row outside the database the daemon can write. Rows
 			// are logged at Info, which the default handler always emits.
 			st.AuditJournal = slog.Default()
+			// Values stored before sealing existed, or under a key a
+			// rotation retired, are sealed under the current key before
+			// anything reads them. A value the key file cannot open
+			// stops the start here rather than failing each delivery.
+			if n, err := st.ResealSecrets(); err != nil {
+				return fmt.Errorf("sealing secrets under %s: %w (gitbayd admin secrets check lists every value that does not open)", cfg.Server.SecretKeyFile, err)
+			} else if n > 0 {
+				slog.Info("sealed secret values", "count", n)
+			}
 
 			// Regenerate hook scripts so a moved binary self-heals, then
 			// start the hook policy socket.
@@ -422,6 +445,7 @@ func adminCmd() *cobra.Command {
 		hostCmd("runners [--json]", "runner accounts: last poll, scope, the build each holds", "admin", "runners"),
 		auditCmd,
 		backupCmd(),
+		secretsCmd(),
 		gcCmd(),
 		adminMigrateCommitRefsCmd(),
 		adminMigrateProfileAboutCmd(),

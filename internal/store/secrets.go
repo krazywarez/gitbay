@@ -181,22 +181,61 @@ func (s *Store) ResealSecrets() (int, error) {
 	return n, tx.Commit()
 }
 
-// SecretKeyUse counts the values in the secret columns by the id of the
-// key that sealed them ("" for a value still in clear), opening each
-// one, so a wrong or incomplete key file is an error naming the row.
-func (s *Store) SecretKeyUse() (map[string]int, error) {
-	use := map[string]int{}
+// SecretColumnUse is one secret column's values by the id of the key
+// that sealed them ("" for a value still in clear), and the values that
+// do not open under the loaded key file.
+type SecretColumnUse struct {
+	Column string // "<table>.<column>"
+	ByKey  map[string]int
+	Failed []SecretFailure
+}
+
+// SecretFailure is a stored value that does not open.
+type SecretFailure struct {
+	RowID int64
+	Err   error
+}
+
+// SecretReport opens every value in the secret columns and counts them
+// per column by key id. A value that does not open is listed rather than
+// ending the scan.
+func (s *Store) SecretReport() ([]SecretColumnUse, error) {
+	var out []SecretColumnUse
 	for _, c := range secretColumns {
 		rows, err := secretRows(s.DB, c)
 		if err != nil {
 			return nil, err
 		}
+		u := SecretColumnUse{Column: c.table + "." + c.column, ByKey: map[string]int{}}
 		for _, r := range rows {
 			if _, err := s.openValue(r.aad, r.value); err != nil {
-				return nil, fmt.Errorf("%s.%s row %d: %w", c.table, c.column, r.rowid, err)
+				u.Failed = append(u.Failed, SecretFailure{RowID: r.rowid, Err: err})
+				continue
 			}
 			id, _ := seal.KeyID(r.value)
-			use[id]++
+			u.ByKey[id]++
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+// SecretKeyUse counts the values in the secret columns by the id of the
+// key that sealed them ("" for a value still in clear), opening each
+// one, so a wrong or incomplete key file is an error naming the row.
+func (s *Store) SecretKeyUse() (map[string]int, error) {
+	report, err := s.SecretReport()
+	if err != nil {
+		return nil, err
+	}
+	use := map[string]int{}
+	for _, u := range report {
+		if len(u.Failed) > 0 {
+			f := u.Failed[0]
+			return nil, fmt.Errorf("%s row %d: %w", u.Column, f.RowID, f.Err)
+		}
+		for id, n := range u.ByKey {
+			use[id] += n
 		}
 	}
 	return use, nil

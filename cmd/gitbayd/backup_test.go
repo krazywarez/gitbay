@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
-
-	"gitbay.org/gitbay/internal/config"
 )
 
 // members lists the archive's entries by name.
@@ -43,8 +41,8 @@ func members(t *testing.T, path string) []string {
 // --db-only is what makes an hourly schedule affordable, so it has to leave
 // the repositories out and still carry a restorable database.
 func TestBackupDBOnlyOmitsRepositories(t *testing.T) {
-	root := t.TempDir()
-	cfg := config.Config{Server: config.Server{Root: root}}
+	cfg := testConfig(t)
+	root := cfg.Server.Root
 	s, err := openStore(cfg)
 	if err != nil {
 		t.Fatal(err)
