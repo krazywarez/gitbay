@@ -47,8 +47,11 @@ affordable, and the database is the copy of issues, merge requests and
 comments that exists nowhere else. Repositories are not in such an archive,
 so it supplements a full backup and does not replace one.
 
-Restore: extract into an empty directory, point server.root at it, start
-gitbayd. Host keys are preserved, so clients keep their known_hosts entries.
+Restore: extract into an empty directory, point server.root at it,
+restore server.secret_key_file from its own backup (mode 0600, owned by
+the daemon user), start gitbayd. No archive carries the key file, and
+without it gitbayd refuses to start. Host keys are preserved, so clients
+keep their known_hosts entries.
 
 With [backup] age_recipients set, the archive is encrypted to those age
 public keys and its name ends in .age. --verify then needs --identity

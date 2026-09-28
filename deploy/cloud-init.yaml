@@ -11,7 +11,12 @@
 #   - opens ufw for 22, 80, 443, 2222
 #
 # It does NOT install the gitbayd binary (it is not hosted anywhere yet);
-# scp it to /usr/local/bin/gitbayd afterward and `systemctl start gitbayd`.
+# scp it to /usr/local/bin/gitbayd afterward, then create the secret key
+# and hand it to the daemon user before starting:
+#   gitbayd --config /etc/gitbay/config.toml admin secrets init
+#   chown gitbay:gitbay /etc/gitbay/secret.key
+#   systemctl start gitbayd
+# On a restore, put the key file's off-host copy there instead of init.
 
 package_update: true
 packages:

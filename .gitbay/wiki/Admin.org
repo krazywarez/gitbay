@@ -489,8 +489,11 @@ restic credentials), so verifying an encrypted archive happens there
 or on a restore host.
 
 Restore: extract into an empty directory, point =server.root= at it,
-start gitbayd. Host keys are preserved, so clients keep their
-known_hosts entries; hooks regenerate at startup.
+restore =server.secret_key_file= from its own copy (mode 0600, owned
+by the account gitbayd runs as), then start gitbayd. No archive carries
+the key file, and without it gitbayd refuses to start. Host keys are
+preserved, so clients keep their known_hosts entries; hooks regenerate
+at startup.
 
 ** Schedule and recovery point
 
@@ -518,8 +521,10 @@ too.
 ** Offsite copies
 
 bay1 also takes a nightly restic snapshot of =/var/lib/gitbay= and
-=/var/lib/gitbay-stage= (the staged database copy) to an S3 bucket at
-Scaleway, with a key that can only add snapshots. The key that can
+=/var/lib/gitbay-stage= (a database copy and =config.toml=, staged
+there) to an S3 bucket at Scaleway, with a key that can only add
+snapshots. Nothing else under =/etc/gitbay= is in it: not the secret
+key file, not =apns.p8=. The key that can
 remove them lives on the operator's machine, in
 =~/.config/gitbay/offsite.env=, and never on bay1: a compromised host
 cannot destroy its own history. Forgetting, pruning and rewriting all
@@ -568,7 +573,10 @@ each value prefixed with the id of the key that sealed it
 =server.root=, and therefore in neither the local archives nor the
 main restic repository. It must be copied off the host separately;
 without it a restored database's secrets cannot be opened, and
-gitbayd refuses to start against them.
+gitbayd refuses to start against them. A separate restic repository
+for it and =apns.p8= is planned (runbook D of the data-at-rest plan)
+and not yet in place, so today the only off-host copy is one the
+operator makes by hand after =init= and after every =rotate=.
 
 #+begin_src sh
 gitbayd admin secrets init     # once; deploy/install.sh does it on first install
@@ -598,9 +606,10 @@ backup code (=cmd/gitbayd/backup.go=, the offsite job), and recorded
 below. The disaster it rehearses is losing bay1, so the local archives
 are gone with it and the sources are the main offsite restic
 repository (repositories, LFS, the staged database, =config.toml=),
-the keys repository (=secret.key=, =apns.p8=), and the operator's
-password manager (=offsite.env=, the keys repository's password and
-token, =backup-identity.txt=). The steps are in the data-at-rest
+the off-host copy of =secret.key= and =apns.p8= (a keys repository once
+runbook D creates it; until then the operator's hand-made copy), and
+the operator's password manager (=offsite.env=, the keys repository's
+password and token once it exists, =backup-identity.txt=). The steps are in the data-at-rest
 plan's operator runbook
 (=docs/plans/2026-09-27-data-at-rest-and-backup.md=).
 
