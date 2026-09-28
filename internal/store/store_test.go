@@ -255,3 +255,55 @@ func TestMigrationForeignKeysDirective(t *testing.T) {
 		t.Fatalf("foreign_keys after MigrateUp: %d, want 1", fk)
 	}
 }
+
+// A migration marked "-- foreign_keys: off" must have its
+// foreign_key_check run before the transaction commits, not after —
+// otherwise a violation is reported once the bad schema and
+// user_version are already persisted (#261).
+func TestFKOffMigrationChecksBeforeCommit(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	versionBefore, err := s.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert a row a fkOff rebuild would have to preserve or complain
+	// about: a milestone with no matching repo_id (the deliberately
+	// impossible case a corrupt migration would produce).
+	if _, err := s.DB.Exec("PRAGMA foreign_keys = OFF"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(
+		"INSERT INTO milestones (repo_id, title, state, created_at) VALUES (99999, 'orphan', 'open', datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A no-op fkOff step (rewriting milestones to itself) must now
+	// refuse — before it commits, not after — because the orphan row
+	// fails foreign_key_check.
+	err = s.migrateStep(
+		"UPDATE sqlite_master SET name = name WHERE 0", versionBefore+1, true)
+	if err == nil {
+		t.Fatal("expected foreign_key_check to refuse the orphaned row")
+	}
+	after, err := s.Version()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after != versionBefore {
+		t.Fatalf("user_version changed to %d despite the refused check (should stay %d)", after, versionBefore)
+	}
+	var fk int
+	if err := s.DB.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil {
+		t.Fatal(err)
+	}
+	if fk != 1 {
+		t.Fatalf("foreign_keys after refused fkOff step: %d, want 1", fk)
+	}
+}

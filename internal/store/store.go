@@ -189,51 +189,26 @@ func (s *Store) migrateTo(target int) error {
 	if err != nil {
 		return err
 	}
-	step := func(sqlText string, newVersion int, fkOff bool) (retErr error) {
-		if !fkOff {
-			tx, err := s.DB.Begin()
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-			if _, err := tx.Exec(sqlText); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", newVersion)); err != nil {
-				return err
-			}
-			return tx.Commit()
+	for cur < target {
+		m := ms[cur]
+		if err := s.migrateStep(m.up, m.version, m.upFKOff); err != nil {
+			return fmt.Errorf("migration %d up: %w", m.version, err)
 		}
+		cur = m.version
+	}
+	for cur > target {
+		m := ms[cur-1]
+		if err := s.migrateStep(m.down, m.version-1, m.downFKOff); err != nil {
+			return fmt.Errorf("migration %d down: %w", m.version, err)
+		}
+		cur = m.version - 1
+	}
+	return nil
+}
 
-		// A script whose first line is "-- foreign_keys: off" rebuilds a
-		// table that other tables reference (labels, milestones): with
-		// foreign keys on, the rebuild-by-rename loses the children's
-		// rows. PRAGMA foreign_keys is a no-op inside a transaction, and
-		// the pool gives no guarantee that a pragma set on one connection
-		// is seen by the connection Begin() draws next, so the whole step
-		// — pragma off, transaction, pragma on, foreign_key_check — runs
-		// on a single pinned connection.
-		ctx := context.Background()
-		conn, err := s.DB.Conn(ctx)
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
-			return err
-		}
-		// The connection goes back to the pool when this returns, so every
-		// path out of here has to put foreign keys back on first.
-		restoreFK := func() error {
-			_, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON")
-			return err
-		}
-		defer func() {
-			if err := restoreFK(); err != nil && retErr == nil {
-				retErr = err
-			}
-		}()
-		tx, err := conn.BeginTx(ctx, nil)
+func (s *Store) migrateStep(sqlText string, newVersion int, fkOff bool) (retErr error) {
+	if !fkOff {
+		tx, err := s.DB.Begin()
 		if err != nil {
 			return err
 		}
@@ -244,44 +219,73 @@ func (s *Store) migrateTo(target int) error {
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", newVersion)); err != nil {
 			return err
 		}
-		if err := tx.Commit(); err != nil {
+		return tx.Commit()
+	}
+
+	// A script whose first line is "-- foreign_keys: off" rebuilds a
+	// table that other tables reference (labels, milestones): with
+	// foreign keys on, the rebuild-by-rename loses the children's
+	// rows. PRAGMA foreign_keys is a no-op inside a transaction, and
+	// the pool gives no guarantee that a pragma set on one connection
+	// is seen by the connection Begin() draws next, so the whole step
+	// — pragma off, transaction, foreign_key_check, commit, pragma on —
+	// runs on a single pinned connection. The check runs before commit:
+	// checking after would report a violation once the bad schema and
+	// user_version were already persisted.
+	ctx := context.Background()
+	conn, err := s.DB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+		return err
+	}
+	// The connection goes back to the pool when this returns, so every
+	// path out of here has to put foreign keys back on first.
+	defer func() {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(sqlText); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", newVersion)); err != nil {
+		return err
+	}
+	// foreign_key_check works with enforcement off: it inspects the data
+	// directly rather than consulting the pragma. Running it here, inside
+	// the transaction, means a violation rolls back the whole rebuild
+	// (the deferred tx.Rollback fires) instead of leaving the bad schema
+	// and version committed.
+	rows, err := tx.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return err
+	}
+	if rows.Next() {
+		var table string
+		var rowid sql.NullInt64
+		var referredTable string
+		var fkid int
+		if err := rows.Scan(&table, &rowid, &referredTable, &fkid); err != nil {
+			rows.Close()
 			return err
 		}
-		if err := restoreFK(); err != nil {
-			return err
-		}
-		rows, err := conn.QueryContext(ctx, "PRAGMA foreign_key_check")
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		if rows.Next() {
-			var table string
-			var rowid sql.NullInt64
-			var referredTable string
-			var fkid int
-			if err := rows.Scan(&table, &rowid, &referredTable, &fkid); err != nil {
-				return err
-			}
-			return fmt.Errorf("foreign_key_check failed after migration: %s", table)
-		}
-		return rows.Err()
+		rows.Close()
+		return fmt.Errorf("foreign_key_check failed after migration: %s row %v", table, rowid)
 	}
-	for cur < target {
-		m := ms[cur]
-		if err := step(m.up, m.version, m.upFKOff); err != nil {
-			return fmt.Errorf("migration %d up: %w", m.version, err)
-		}
-		cur = m.version
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
 	}
-	for cur > target {
-		m := ms[cur-1]
-		if err := step(m.down, m.version-1, m.downFKOff); err != nil {
-			return fmt.Errorf("migration %d down: %w", m.version, err)
-		}
-		cur = m.version - 1
-	}
-	return nil
+	rows.Close()
+	return tx.Commit()
 }
 
 // IsInternal reports whether err is the database or the I/O beneath it
