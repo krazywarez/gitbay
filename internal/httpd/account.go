@@ -45,6 +45,16 @@ type accountDevice struct {
 	Confirm    string // the id as text, typed back to confirm removal
 }
 
+// accountToken is one API token as the settings page shows it: never
+// the token itself, only what identifies and describes it.
+type accountToken struct {
+	Name     string
+	Scope    string
+	Created  string
+	Expires  string // "never" or a formatted timestamp
+	LastUsed string // "never" or a formatted timestamp
+}
+
 // accountForm renders the account's own settings: keys, addresses, and the
 // commands for everything that stays on SSH.
 func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -53,6 +63,12 @@ func (s *Server) accountForm(w http.ResponseWriter, r *http.Request, u store.Use
 
 // accountPage renders the settings page.
 func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.User) {
+	s.renderAccount(w, r, u, "")
+}
+
+// renderAccount draws the settings page. tokenShown is a token minted
+// by the request being answered; it is shown in this response only.
+func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.User, tokenShown string) {
 	var keys []accountKey
 	if list, err := s.st.ListSSHKeys(u.ID); err == nil {
 		for _, k := range list {
@@ -90,6 +106,20 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 		}
 	}
 
+	var tokens []accountToken
+	if list, err := s.st.ListAPITokens(u.ID); err == nil {
+		for _, tk := range list {
+			expires, lastUsed := "never", "never"
+			if tk.ExpiresAt != nil {
+				expires = tk.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			if tk.LastUsedAt != nil {
+				lastUsed = tk.LastUsedAt.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			tokens = append(tokens, accountToken{tk.Name, tk.Scope, tk.CreatedAt, expires, lastUsed})
+		}
+	}
+
 	// The about text is a file. The page points at it rather than editing
 	// it: the repository's own editor already does that job.
 	aboutRepo := u.Username + "/" + control.ProfileRepoName
@@ -116,9 +146,12 @@ func (s *Server) accountPage(w http.ResponseWriter, r *http.Request, u store.Use
 		PushOn       bool
 		Devices      []accountDevice
 		ThemeSetting string // system, light or dark: the form's selected option
+		Tokens       []accountToken
+		TokenShown   string // a token minted by this request, shown once
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
 		aboutRepo, aboutEdit, s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme})
+		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme,
+		tokens, tokenShown})
 }
 
 // accountExport hands the browser the same bundle `account export`
@@ -263,6 +296,42 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "primary address changed")
+	case "token-create":
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			back("name the token", "")
+			return
+		}
+		scope := r.FormValue("scope")
+		if scope != "full" {
+			scope = "read"
+		}
+		argv := []string{"token", "create", "--name", name, "--scope", scope}
+		if ttl := strings.TrimSpace(r.FormValue("ttl")); ttl != "" {
+			argv = append(argv, "--ttl", ttl)
+		}
+		var minted struct {
+			Token string `json:"token"`
+		}
+		if msg, ok := s.runControlInto(u, argv, &minted); !ok {
+			back(msg, "")
+			return
+		}
+		// The token is shown in this response and nowhere else: not in a
+		// redirect, a URL or a cookie, and never stored to be shown later.
+		w.Header().Set("Cache-Control", "no-store")
+		s.renderAccount(w, r, u, minted.Token)
+	case "token-revoke":
+		name := r.FormValue("name")
+		if ok, msg := confirmed(r, name); !ok {
+			back(msg, "")
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"token", "revoke", "--", name}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "token revoked")
 	case "theme":
 		if _, msg, ok := s.runControl(u, []string{"web", "theme", "set", r.FormValue("theme")}); !ok {
 			back(msg, "")

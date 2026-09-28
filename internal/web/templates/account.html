@@ -18,6 +18,7 @@
     <li><a href="#notifications">Notifications</a></li>
     <li><a href="#appearance">Appearance</a></li>
     <li><a href="#export">Export</a></li>
+    <li><a href="#tokens">API tokens</a></li>
     <li><a href="#cli">On the command line</a></li>
   </ul></div>
 </details>
@@ -188,11 +189,46 @@ never included; a replayed bundle's emails arrive unverified.</p>
 <p><a href="/settings/export">Download bundle</a></p>
 </section>
 
+<section id="tokens"><h2>API tokens</h2>
+<p class="meta">A token signs in the iOS app, or a script, without your
+password. A phone app needs full scope to comment and merge; full scope
+on an admin account can administer the instance, so give a token the
+narrowest scope and shortest lifetime the job needs.</p>
+{{if .TokenShown}}<p class="notice" role="status">Token created. It is shown once; store it now.</p>
+<pre class="message" tabindex="0">{{.TokenShown}}</pre>{{end}}
+{{if .Tokens}}<div class="tablewrap"><table class="keys nowrap">
+<tr class="cols"><th scope="col">name</th><th scope="col">scope</th><th scope="col">created</th><th scope="col">expires</th><th scope="col">last used</th><th scope="col"><span class="vh">actions</span></th></tr>
+{{range .Tokens}}<tr>
+  <td>{{.Name}}</td>
+  <td>{{.Scope}}</td>
+  <td>{{when .Created}}</td>
+  <td>{{.Expires}}</td>
+  <td>{{.LastUsed}}</td>
+  <td class="act"><form method="post" action="/settings"><input type="hidden" name="field" value="token-revoke"><input type="hidden" name="name" value="{{.Name}}">{{template "confirmfield" .Name}} <button type="submit" class="danger">Revoke</button></form></td>
+</tr>
+{{end}}</table></div>
+{{else}}<p class="none">No API tokens.</p>{{end}}
+<details class="editbox">
+  <summary>Create a token</summary>
+  <form method="post" action="/settings" class="setform stack">
+    <input type="hidden" name="field" value="token-create">
+    <label for="token-name">Name</label>
+    <input id="token-name" name="name" required autocomplete="off" placeholder="e.g. iphone">
+    <label for="token-scope">Scope</label>
+    <select id="token-scope" name="scope">
+      <option value="read" selected>read: read-only commands</option>
+      <option value="full">full: everything your account can do</option>
+    </select>
+    <label for="token-ttl">Expires after</label>
+    <input id="token-ttl" name="ttl" autocomplete="off" placeholder="e.g. 30d or 720h; empty never expires">
+    <button type="submit" class="btn">Create token</button>
+  </form>
+</details>
+</section>
+
 <section id="cli"><h2>On the command line</h2>
-<p class="meta">No page here yet, and nothing refusing one: a credential is
-easier to pipe than to paste, and a minted token is shown once.</p>
-<pre class="message" tabindex="0">gitbay auth token create --name laptop # API tokens, read-only unless --scope full
-gitbay web sessions list               # browser sessions
+<p class="meta">No page here yet, and nothing refusing one.</p>
+<pre class="message" tabindex="0">gitbay web sessions list               # browser sessions
 gitbay admin ...                       # instance administration</pre>
 <p class="meta">All of it works from stock OpenSSH too, with the CLI's
 grouping words dropped: <code>ssh git@{{.Host}} whoami</code>,

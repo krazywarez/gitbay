@@ -284,3 +284,216 @@ func TestWatchToggleCyclesThroughMuted(t *testing.T) {
 	}
 	assertAudited(t, st, "cmd repo unwatch")
 }
+
+// newTokenTestServer is a server over a fresh store with one user.
+func newTokenTestServer(t *testing.T) (*Server, *store.Store, store.User) {
+	t.Helper()
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return New(config.Default(), st), st, store.User{ID: uid, Username: "alice"}
+}
+
+// The settings page lists a user's API tokens with scope and expiry,
+// never the hash (#264).
+func TestAccountPageListsTokens(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	if err := st.CreateAPIToken(u.ID, "laptop", "somehash", "read", nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), u)
+	body := rr.Body.String()
+	if !strings.Contains(body, "<td>laptop</td>") || !strings.Contains(body, "<td>read</td>") {
+		t.Fatalf("token row missing: %s", body)
+	}
+	if strings.Contains(body, "somehash") {
+		t.Fatal("the page printed a token hash")
+	}
+}
+
+// Creating a token answers the POST itself with the token, marked
+// no-store, and puts it in no header: not a Location, not a cookie. A
+// later GET of the page does not show it (#264).
+func TestAccountSubmitTokenCreateShownOnce(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	rr := submitAccountForm(t, s, u, url.Values{"field": {"token-create"}, "name": {"laptop"}, "scope": {"full"}})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d, body %s", rr.Code, rr.Body.String())
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+	body := rr.Body.String()
+	i := strings.Index(body, "gb_")
+	if i < 0 {
+		t.Fatalf("token not shown: %s", body)
+	}
+	token := body[i:]
+	token = token[:strings.IndexAny(token, "<\n")]
+	for name, vals := range rr.Header() {
+		for _, v := range vals {
+			if strings.Contains(v, token) {
+				t.Errorf("header %s carries the token", name)
+			}
+		}
+	}
+	got, tk, err := st.APITokenUser(store.HashToken(token))
+	if err != nil || got.ID != u.ID || tk.Name != "laptop" || tk.Scope != "full" {
+		t.Fatalf("shown token does not resolve: %+v %+v %v", got, tk, err)
+	}
+
+	rr = httptest.NewRecorder()
+	s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), u)
+	if strings.Contains(rr.Body.String(), token) {
+		t.Fatal("a later GET showed the token")
+	}
+	if !strings.Contains(rr.Body.String(), "<td>laptop</td>") {
+		t.Fatal("the new token is not listed")
+	}
+}
+
+// The form sends --scope explicitly, read unless full was picked, so the
+// page does not depend on token create's own default (#264, #257).
+func TestAccountSubmitTokenCreateScope(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	for _, c := range []struct{ name, scope, want string }{
+		{"a", "", "read"}, {"b", "read", "read"}, {"c", "bogus", "read"}, {"d", "full", "full"},
+	} {
+		rr := submitAccountForm(t, s, u, url.Values{"field": {"token-create"}, "name": {c.name}, "scope": {c.scope}})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("%s: status %d", c.name, rr.Code)
+		}
+	}
+	tokens, err := st.ListAPITokens(u.ID)
+	if err != nil || len(tokens) != 4 {
+		t.Fatalf("tokens: %v %v", tokens, err)
+	}
+	want := map[string]string{"a": "read", "b": "read", "c": "read", "d": "full"}
+	for _, tk := range tokens {
+		if tk.Scope != want[tk.Name] {
+			t.Errorf("%s: scope %q, want %q", tk.Name, tk.Scope, want[tk.Name])
+		}
+	}
+}
+
+// A failed create redirects with the reason and shows no token.
+func TestAccountSubmitTokenCreateRefusal(t *testing.T) {
+	s, _, u := newTokenTestServer(t)
+	for _, form := range []url.Values{
+		{"field": {"token-create"}, "name": {""}},
+		{"field": {"token-create"}, "name": {"x"}, "ttl": {"-1h"}},
+	} {
+		rr := submitAccountForm(t, s, u, form)
+		if rr.Code != http.StatusSeeOther || strings.Contains(rr.Body.String(), "gb_") {
+			t.Errorf("%v: status %d, body %s", form, rr.Code, rr.Body.String())
+		}
+	}
+}
+
+// Revoking a token requires the name typed back, the same guard every
+// other removal on this page uses.
+func TestAccountSubmitTokenRevokeRequiresConfirm(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	if err := st.CreateAPIToken(u.ID, "laptop", "somehash", "read", nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	submitAccountForm(t, s, u, url.Values{"field": {"token-revoke"}, "name": {"laptop"}})
+	if tokens, _ := st.ListAPITokens(u.ID); len(tokens) != 1 {
+		t.Fatal("token revoked without confirmation")
+	}
+	rr := submitAccountForm(t, s, u, url.Values{"field": {"token-revoke"}, "name": {"laptop"}, "confirm": {"laptop"}})
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("status %d, body %s", rr.Code, rr.Body.String())
+	}
+	if tokens, _ := st.ListAPITokens(u.ID); len(tokens) != 0 {
+		t.Fatal("token not revoked")
+	}
+}
+
+// A cross-site POST to /settings is refused before a token is minted.
+func TestAccountTokenCreateCrossSiteRefused(t *testing.T) {
+	_, st, u := newTokenTestServer(t)
+	cfg := config.Default()
+	cfg.Web.Mode = "accounts"
+	s := New(cfg, st)
+	form := url.Values{"field": {"token-create"}, "name": {"evil"}, "scope": {"full"}}
+	for _, r := range s.Routes() {
+		if r.Method != "POST" || r.Pattern != "/settings" {
+			continue
+		}
+		req := httptest.NewRequest("POST", "http://example.com/settings", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "https://evil.example")
+		rr := httptest.NewRecorder()
+		r.Handler(rr, req)
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("status %d, want 403", rr.Code)
+		}
+		if tokens, _ := st.ListAPITokens(u.ID); len(tokens) != 0 {
+			t.Fatal("a cross-site POST minted a token")
+		}
+		return
+	}
+	t.Fatal("no POST /settings route")
+}
+
+// A token named like a flag, which token create accepts, can still be
+// revoked from the page: the name goes after "--".
+func TestAccountSubmitTokenRevokeFlagLikeName(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	rr := submitAccountForm(t, s, u, url.Values{"field": {"token-create"}, "name": {"--x"}})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("create: status %d, body %s", rr.Code, rr.Body.String())
+	}
+	rr = submitAccountForm(t, s, u, url.Values{"field": {"token-revoke"}, "name": {"--x"}, "confirm": {"--x"}})
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("revoke: status %d", rr.Code)
+	}
+	if tokens, _ := st.ListAPITokens(u.ID); len(tokens) != 0 {
+		t.Fatalf("token not revoked: %+v", tokens)
+	}
+}
+
+// The audit row for a web token create records the command but not the
+// minted token.
+func TestAccountTokenCreateAuditOmitsToken(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	rr := submitAccountForm(t, s, u, url.Values{"field": {"token-create"}, "name": {"laptop"}})
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "gb_") {
+		t.Fatalf("create: status %d", rr.Code)
+	}
+	rows, err := st.DB.Query("SELECT action, data_json FROM audit_log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var action, data string
+		if err := rows.Scan(&action, &data); err != nil {
+			t.Fatal(err)
+		}
+		if action == "cmd token create" {
+			found = true
+		}
+		if strings.Contains(data, "gb_") {
+			t.Errorf("audit row %q carries the token: %s", action, data)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("no cmd token create audit row")
+	}
+}
