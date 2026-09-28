@@ -421,7 +421,9 @@ func runNotificationsList(c *Ctx, args []string) int {
 	if !c.JSON && !p.active && len(ds) == 0 {
 		msg := "nothing to list"
 		if !all {
-			msg = "no unread notifications (--all for read ones)"
+			if read, err := c.Store.Inbox(c.User.ID, false, 1, 0); err == nil && len(read) > 0 {
+				msg = "no unread notifications (--all for read ones)"
+			}
 		}
 		fmt.Fprintln(c.Stderr, msg)
 		return protocol.ExitOK

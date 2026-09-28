@@ -270,6 +270,18 @@ func TestNotificationsSettingsShowsPush(t *testing.T) {
 
 func TestNotificationsListEmptyUnreadSaysHowToSeeRead(t *testing.T) {
 	c, repo, bob := testRepoWithWatcher(t)
+	// An inbox with nothing in it at all keeps the plain message.
+	var empty bytes.Buffer
+	alice := c.User
+	c.User = store.User{ID: bob, Username: "bob"}
+	c.Stdout, c.Stderr = &bytes.Buffer{}, &empty
+	if code := runNotificationsList(c, nil); code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, empty.String())
+	}
+	if got := empty.String(); got != "nothing to list\n" {
+		t.Errorf("empty inbox stderr = %q", got)
+	}
+	c.User = alice
 	// Give bob one notice (acting as alice, so bob isn't filtered out as
 	// the actor), then mark it read as bob, so his inbox has rows but no
 	// unread ones.
