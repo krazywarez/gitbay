@@ -1,4 +1,4 @@
-#+title: 5. Identity and access
+#+title: Identity and access
 
 [[file:diagrams/05-authorization.svg]]
 

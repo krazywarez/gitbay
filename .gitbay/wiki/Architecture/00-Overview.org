@@ -38,13 +38,13 @@ the =ReadOnly= count from the =ReadOnly: true= literals in
 
 | # | Document                                           | Diagram                                         |
 |---+----------------------------------------------------+-------------------------------------------------|
-| 1 | [[file:01-System-Context.org][System context]]                    | [[file:diagrams/01-context.svg][01-context.svg]]                    |
-| 2 | [[file:02-Components.org][Components]]                        | [[file:diagrams/02-components.svg][02-components.svg]]                 |
-| 3 | [[file:03-Deployment.org][Deployment and network]]            | [[file:diagrams/03-deployment.svg][03-deployment.svg]]                 |
-| 4 | [[file:04-Trust-Boundaries.org][Trust boundaries and data flows]]   | [[file:diagrams/04-trust-boundaries.svg][04-trust-boundaries.svg]], [[file:diagrams/06-push-flow.svg][06-push-flow.svg]] |
-| 5 | [[file:05-Identity-and-Access.org][Identity and access]]               | [[file:diagrams/05-authorization.svg][05-authorization.svg]]              |
+| 1 | [[file:01-System-Context.org][System context]]                    | =01-context.svg=                    |
+| 2 | [[file:02-Components.org][Components]]                        | =02-components.svg=                 |
+| 3 | [[file:03-Deployment.org][Deployment and network]]            | =03-deployment.svg=                 |
+| 4 | [[file:04-Trust-Boundaries.org][Trust boundaries and data flows]]   | =04-trust-boundaries.svg=, =06-push-flow.svg= |
+| 5 | [[file:05-Identity-and-Access.org][Identity and access]]               | =05-authorization.svg=              |
 | 6 | [[file:06-Data-and-Cryptography.org][Data and cryptography]]             |                                                 |
-| 7 | [[file:07-CI-and-Supply-Chain.org][CI and supply chain]]               | [[file:diagrams/07-ci-flow.svg][07-ci-flow.svg]]                    |
+| 7 | [[file:07-CI-and-Supply-Chain.org][CI and supply chain]]               | =07-ci-flow.svg=                    |
 | 8 | [[file:08-Operations.org][Operations]]                        |                                                 |
 | 9 | [[file:09-Controls.org][Controls matrix]]                   |                                                 |
 | 10 | [[file:10-Known-Gaps.org][Known gaps]]                        |                                                 |

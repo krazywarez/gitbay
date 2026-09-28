@@ -1,4 +1,4 @@
-#+title: 6. Data and cryptography
+#+title: Data and cryptography
 
 * Data inventory
 

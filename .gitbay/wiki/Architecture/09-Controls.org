@@ -1,4 +1,4 @@
-#+title: 9. Controls matrix
+#+title: Controls matrix
 
 One row per control an auditor typically asks about. *Status*: =in
 place= (implemented and cited), =partial= (implemented with a stated
@@ -23,8 +23,8 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Brute-force limit on SSH auth               | in place | 10 failures a minute per IP (=internal/sshd/ratelimit.go=)       |
 | Account enumeration resistance at login     | in place | uniform response (=internal/control/loginlink.go=)         |
 | Session cookie flags                        | in place | HttpOnly, SameSite=Lax, Secure with TLS (=internal/httpd/accounts.go=) |
-| Session lifetime                            | partial  | 7 days absolute, no idle timeout                                  |
-| Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none                    |
+| Session lifetime                            | partial  | 7 days absolute, no idle timeout (#276)                                  |
+| Credential expiry                           | partial  | API tokens optional; SSH and deploy keys none (#277)                    |
 | Revocation takes effect immediately         | gap      | removed SSH key keeps open connections (#256)                    |
 | Delegation bounded by the delegating credential | gap  | expiring tokens can mint lasting credentials (#257)              |
 
@@ -56,9 +56,9 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | TLS for all authenticated HTTP              | in place | ACME or certificate files; HSTS                                  |
-| Secrets encrypted at rest                   | gap      | CI secrets, webhook secrets, mirror tokens stored in clear ([[file:06-Data-and-Cryptography.org][6]]) |
+| Secrets encrypted at rest                   | gap      | CI secrets, webhook secrets, mirror tokens stored in clear (#273) |
 | Secrets kept out of argv, logs and output   | in place | =ReadsStdin=, pruned audit argv, write-only secret commands      |
-| Local backups encrypted                     | gap      | tar.gz in clear; offsite copy encrypted by restic                |
+| Local backups encrypted                     | gap      | tar.gz in clear; offsite copy encrypted by restic (#274)                |
 | Data retention configurable                 | in place | =[retention]= (=internal/config/config.go=)              |
 | User data export                            | in place | =account export=                                                 |
 
@@ -68,16 +68,16 @@ chapter names of OWASP ASVS 4.0 where one fits.
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | Security-relevant writes audited            | in place | every successful mutating command (=control.go=)         |
 | Authentication failures audited             | in place | =auth.failed=, =auth.throttled=                                  |
-| Denied attempts audited                     | gap      | refused commands are not recorded                                |
-| Audit log tamper resistance                 | gap      | same database, writable by the daemon user                       |
+| Denied attempts audited                     | gap      | refused commands are not recorded (#275)                                |
+| Audit log tamper resistance                 | gap      | same database, writable by the daemon user (#275)                       |
 
 ** Communications and integrations (V9, V10, V12)
 
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
-| SSRF protection on user-supplied URLs       | partial  | webhooks at save and connect; mirrors at save only               |
+| SSRF protection on user-supplied URLs       | partial  | webhooks at save and connect; mirrors at save only (#279)               |
 | Webhook payload integrity                   | in place | HMAC-SHA256 header                                               |
-| SMTP credentials protected in transit       | partial  | STARTTLS opportunistic; Go refuses PLAIN auth without TLS to a remote host |
+| SMTP credentials protected in transit       | partial  | STARTTLS opportunistic (#280); Go refuses PLAIN auth without TLS to a remote host |
 | Upload size limits                          | in place | per-owner storage quota at push (=internal/sshd/sshd.go=); API body 1 MiB |
 
 ** CI and build isolation

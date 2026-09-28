@@ -1,4 +1,4 @@
-#+title: 7. CI and supply chain
+#+title: CI and supply chain
 
 [[file:diagrams/07-ci-flow.svg]]
 

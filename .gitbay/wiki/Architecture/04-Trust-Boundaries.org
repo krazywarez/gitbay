@@ -1,4 +1,4 @@
-#+title: 4. Trust boundaries and data flows
+#+title: Trust boundaries and data flows
 
 [[file:diagrams/04-trust-boundaries.svg]]
 

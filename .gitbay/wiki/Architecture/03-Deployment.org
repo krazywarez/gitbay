@@ -1,4 +1,4 @@
-#+title: 3. Deployment and network
+#+title: Deployment and network
 
 [[file:diagrams/03-deployment.svg]]
 
