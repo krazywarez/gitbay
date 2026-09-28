@@ -31,6 +31,8 @@ must add =--scope full=. Existing tokens keep their scope.
 - Browser sessions end after twelve hours without a request, and after
   seven days as before. Sessions open at upgrade get a fresh twelve
   hours. =web sessions list= shows when each was last used (#276).
+- =web login= over SSH refuses a sixth link in an hour, the same bound
+  the login page's mailed links have (#278).
 
 * v1.36.0 — 2026-09-23
 

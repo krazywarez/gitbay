@@ -11,11 +11,9 @@ import (
 
 // maxLoginLinksPerHour bounds what one account's address can be made to
 // receive. It matches maxEmailAddsPerHour: enough for a person who mistypes
-// and retries, nothing for a script. The counter is shared with SSH-minted
-// links, not just these: CountLoginTokensSince counts every row in
-// login_tokens, and "web login" over SSH inserts into that same table
-// without consulting this bound, so five "ssh git@host web login" calls in
-// an hour also spend an account's budget here.
+// and retries, nothing for a script. CountLoginTokensSince counts every row
+// in login_tokens, so links minted with "web login" over SSH and links
+// mailed from the login page share the budget, and both refuse past it.
 const maxLoginLinksPerHour = 5
 
 // loginLinkTTL is longer than the five minutes an SSH-minted link gets.

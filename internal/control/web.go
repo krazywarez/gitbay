@@ -86,6 +86,14 @@ func runWebLogin(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitDenied,
 			"this instance runs the web in view-only mode (web.mode = %q); there is nothing to log in to", c.Cfg.Web.Mode)
 	}
+	n, err := c.Store.CountLoginTokensSince(c.User.ID, time.Now().Add(-time.Hour))
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if n >= maxLoginLinksPerHour {
+		return c.fail(protocol.ExitDenied,
+			"%d login links in the last hour is the most an account gets; use one of those, or wait", maxLoginLinksPerHour)
+	}
 	token, hash, err := newStoredToken()
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
