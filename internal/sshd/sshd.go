@@ -575,6 +575,16 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 			}
 		}
 	}
+	if write {
+		// hookd answers only a hook that names this receive-pack.
+		token, err := st.CreatePushToken(repo.ID, user.ID, scope)
+		if err != nil {
+			fmt.Fprintln(stderr, "internal error")
+			return protocol.ExitFailure
+		}
+		defer st.DeletePushToken(token)
+		env = append(env, hookd.EnvToken+"="+token)
+	}
 	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, revoked); err != nil {
 		return protocol.ExitFailure
 	}

@@ -16,7 +16,7 @@ statements in this document about the host rest on those files.
 | 80/tcp               | HTTP              | gitbayd    | on with ACME| none; ACME HTTP-01 and redirect only   | =cmd/gitbayd/main.go=         |
 | 9418/tcp             | git://            | gitbayd    | off         | none; public repositories only         | =internal/gitd=                       |
 | 2222/tcp             | SSH (operator)    | host sshd  | on          | public key, no passwords, fail2ban     | =deploy/cloud-init.yaml=        |
-| =<root>/hook.sock=   | Unix socket       | gitbayd    | on          | filesystem permissions only            | =internal/hookd/hookd.go=          |
+| =<root>/hook.sock=   | Unix socket       | gitbayd    | on          | mode 0600; peer uid must be the daemon's (Linux); per-push token | =internal/hookd/hookd.go= |
 
 With =ssh.mode = system= the host's sshd serves port 22 instead and
 invokes =gitbayd authorized-keys= and =gitbayd shell=

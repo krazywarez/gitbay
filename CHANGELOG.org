@@ -48,6 +48,12 @@ must add =--scope full=. Existing tokens keep their scope.
   syncs, and each records why (#279).
 - Webhook and mirror targets in 100.64.0.0/10 or on a multicast
   address are refused, as private addresses are (#279).
+- The hook socket is mode 0600 and, on Linux, refuses a peer with
+  another uid; each receive-pack gets its own token from sshd, stored
+  hashed (migration 0063), and the hook must present it before the
+  daemon acts. *Operators:* deploy with no push in flight, since a
+  receive-pack started by the old daemon has no token and its
+  post-receive will be refused by the new one (#282).
 
 * v1.36.0 — 2026-09-23
 

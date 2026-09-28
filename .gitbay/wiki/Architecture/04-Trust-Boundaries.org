@@ -22,7 +22,7 @@
 | TB2 | Z0 → Z1 HTTPS                      | page requests, form posts, API calls, fetches, LFS | TLS; session cookie or bearer token; =checkOrigin= on posts; CSP and security headers (=internal/httpd/routes.go=); smart HTTP is fetch-only (=smart.go=) |
 | TB3 | identity → data                    | every command                                    | =Dispatch= gates, then =resolveRepo= with =policy= predicates; unreadable repositories are indistinguishable from missing ones ([[file:05-Identity-and-Access.org][5]]) |
 | TB4 | Z1 → Z3 git                        | argv, repository path, stdin packs               | argv built by code, never a shell; repository path from the database, not the request (=internal/gitutil=) |
-| TB5 | Z3 → Z1 hook socket                | ref updates, repository id, user id, key scope, commit objects | the daemon decides with =policy.CheckPush= and =sig.VerifyCommit= (=internal/hookd/hookd.go=). The socket trusts the ids in the request, so access to the socket is equivalent to acting as any user; it is reachable only through the =gitbay= user's filesystem |
+| TB5 | Z3 → Z1 hook socket                | ref updates, repository id, user id, key scope, push token, commit objects | the socket is mode 0600 and, on Linux, refuses a peer whose uid is not the daemon's; a request must carry the token sshd minted for its receive-pack (stored hashed in =push_tokens=) and name the same repository, account and scope. The daemon then decides with =policy.CheckPush= and =sig.VerifyCommit= (=internal/hookd/hookd.go=) |
 | TB6 | Z4 ↔ Z1 runner channel             | build claims (with secrets for trusted builds), logs, results | runner-scoped SSH key; claims limited to attached repositories; secrets only when the build is trusted (=internal/control/build.go=) |
 | TB7 | Z5 → Z4 container                  | build steps, workspace, build home               | rootless podman, operator-provisioned image, cgroup limits; the build home is shared per repository and the network is open (#255, #260) |
 | TB8 | Z1 → Z0 outbound                   | webhooks, mirrors, mail, push                    | address checks on user-supplied URLs; HMAC on webhooks; no redirects ([[file:03-Deployment.org][3]]) |
@@ -55,7 +55,7 @@ above.
    checks, archive and pull-mirror refusals and the owner's storage
    quota (=sshd.go=). TB3.
 2. =git receive-pack= runs with the hook socket path, repository id,
-   user id and key scope in its environment (=sshd.go=). TB4.
+   user id and key scope in its environment, and a push token (=sshd.go=). TB4.
 3. git runs =pre-receive=, which is =gitbayd hook pre-receive=. It
    reads the ref updates, computes ancestry in git's quarantine
    environment and asks the daemon over the socket
