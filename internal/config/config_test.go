@@ -275,3 +275,94 @@ func TestMailTLSRequired(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretKeyFile(t *testing.T) {
+	cfg, err := Load(writeConfig(t, minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Server.SecretKeyFile != "/etc/gitbay/secret.key" {
+		t.Errorf("default secret_key_file = %q", cfg.Server.SecretKeyFile)
+	}
+	for body, want := range map[string]string{
+		minimal + "secret_key_file = \"/var/lib/gitbay/secret.key\"\n": "inside server.root",
+		minimal + "secret_key_file = \"/var/lib/gitbay\"\n":            "inside server.root",
+		minimal + "secret_key_file = \"\"\n":                           "server.secret_key_file is required",
+	} {
+		if _, err := Load(writeConfig(t, body)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: got %v, want an error containing %q", body, err, want)
+		}
+	}
+	if _, err := Load(writeConfig(t, minimal+"secret_key_file = \"/var/lib/gitbay-keys/secret.key\"\n")); err != nil {
+		t.Errorf("a sibling directory of the root is outside it: %v", err)
+	}
+}
+
+// TestSecretKeyFileSymlinks exercises resolvePath's symlink resolution: a
+// key path or root reached through a symlink is still compared on its
+// resolved location, not its literal spelling.
+func TestSecretKeyFileSymlinks(t *testing.T) {
+	valid := func(root, keyFile string) Config {
+		cfg := Default()
+		cfg.Server.SiteURL = "https://gitbay.example"
+		cfg.Server.Root = root
+		cfg.Server.SecretKeyFile = keyFile
+		return cfg
+	}
+
+	t.Run("key path reaches into root through a symlink", func(t *testing.T) {
+		tmp := t.TempDir()
+		root := filepath.Join(tmp, "root")
+		if err := os.Mkdir(root, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(tmp, "link-into-root")
+		if err := os.Symlink(root, link); err != nil {
+			t.Fatal(err)
+		}
+		// The key file itself need not exist yet; only the symlinked
+		// directory component does.
+		keyFile := filepath.Join(link, "secret.key")
+		if err := valid(root, keyFile).Validate(); err == nil || !strings.Contains(err.Error(), "inside server.root") {
+			t.Errorf("got %v, want an error containing %q", err, "inside server.root")
+		}
+	})
+
+	t.Run("root itself is reached through a symlinked parent", func(t *testing.T) {
+		tmp := t.TempDir()
+		actualRoot := filepath.Join(tmp, "actual", "root")
+		if err := os.MkdirAll(actualRoot, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		rootLink := filepath.Join(tmp, "root-link")
+		if err := os.Symlink(actualRoot, rootLink); err != nil {
+			t.Fatal(err)
+		}
+		// server.root is configured as the symlink; the key file is given
+		// by its real, unsymlinked path under the same directory.
+		keyFile := filepath.Join(actualRoot, "secret.key")
+		if err := valid(rootLink, keyFile).Validate(); err == nil || !strings.Contains(err.Error(), "inside server.root") {
+			t.Errorf("got %v, want an error containing %q", err, "inside server.root")
+		}
+	})
+
+	t.Run("symlink points outside root", func(t *testing.T) {
+		tmp := t.TempDir()
+		root := filepath.Join(tmp, "root")
+		outside := filepath.Join(tmp, "outside")
+		if err := os.Mkdir(root, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(outside, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		escape := filepath.Join(root, "escape")
+		if err := os.Symlink(outside, escape); err != nil {
+			t.Fatal(err)
+		}
+		keyFile := filepath.Join(escape, "secret.key")
+		if err := valid(root, keyFile).Validate(); err != nil {
+			t.Errorf("a symlink leading outside server.root should be accepted: %v", err)
+		}
+	})
+}

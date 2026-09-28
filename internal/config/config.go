@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -54,6 +55,11 @@ type Server struct {
 	// not on that repository's default branch. Empty disables the check, which
 	// is right for any instance that does not host its own source.
 	SourceRepo string `toml:"source_repo"`
+
+	// SecretKeyFile holds the keys that seal the secret columns of the
+	// database (internal/seal). It lives outside Root, so neither a
+	// backup archive nor a snapshot of Root carries it.
+	SecretKeyFile string `toml:"secret_key_file"`
 }
 
 type SSH struct {
@@ -294,7 +300,7 @@ func LoadAPNSKey(path string) (*ecdsa.PrivateKey, error) {
 // Default returns the configuration used when a key is absent from the file.
 func Default() Config {
 	return Config{
-		Server: Server{Root: "/var/lib/gitbay"},
+		Server: Server{Root: "/var/lib/gitbay", SecretKeyFile: "/etc/gitbay/secret.key"},
 		SSH:    SSH{Mode: "embedded", Port: 22},
 		HTTP:   HTTP{Addr: ":443", TLS: "acme", ACMEHTTPAddr: ":80"},
 		Web:    Web{Mode: "view_only"},
@@ -330,6 +336,47 @@ func Load(path string) (Config, error) {
 	return cfg, cfg.Validate()
 }
 
+// within reports whether path is dir or below it. Both are compared as
+// cleaned absolute paths (a relative path resolves against the working
+// directory, same as every other path in this config), with symlinks
+// resolved where the path exists on disk, so a path that reaches into dir
+// through a symlink, or through "..", is still reported as inside.
+func within(dir, path string) bool {
+	dir, path = resolvePath(dir), resolvePath(path)
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// resolvePath returns path as a cleaned absolute path, resolving symlinks in
+// it. The secret key file commonly does not exist yet (it is created by
+// `gitbayd admin secrets init`), and on this platform /var itself is a
+// symlink, so a whole-path resolution is tried first and, failing that, each
+// ancestor directory in turn, walking up to the nearest one that exists and
+// reattaching the missing suffix — a symlinked ancestor still resolves even
+// though the leaf, or several levels above it, does not exist.
+func resolvePath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	dir := abs
+	var suffix []string
+	for {
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			for i := len(suffix) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, suffix[i])
+			}
+			return resolved
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return abs
+		}
+		suffix = append(suffix, filepath.Base(dir))
+		dir = parent
+	}
+}
+
 func oneOf(field, val string, allowed ...string) error {
 	for _, a := range allowed {
 		if val == a {
@@ -356,6 +403,12 @@ func (c Config) Validate() error {
 	}
 	if c.Server.SiteURL == "" {
 		errs = append(errs, errors.New("server.site_url is required"))
+	}
+	switch {
+	case c.Server.SecretKeyFile == "":
+		errs = append(errs, errors.New("server.secret_key_file is required"))
+	case within(c.Server.Root, c.Server.SecretKeyFile):
+		errs = append(errs, fmt.Errorf("server.secret_key_file %q is inside server.root: backups of the root would carry the key beside the values it seals", c.Server.SecretKeyFile))
 	}
 	if err := oneOf("ssh.mode", c.SSH.Mode, "embedded", "system"); err != nil {
 		errs = append(errs, err)
