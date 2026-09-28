@@ -247,8 +247,9 @@ func TestDashboardCommand(t *testing.T) {
 		d.Assigned[0].Title != "todo one" {
 		t.Fatalf("assigned_issues = %+v", d.Assigned)
 	}
-	if len(d.Issues) != 1 || d.Issues[0].Repo != "alice/app" || d.Issues[0].Number != 1 ||
-		d.Issues[0].Title != "todo one" {
+	// The only open issue is assigned to alice, so it is listed under
+	// assigned_issues and not again under open_issues.
+	if len(d.Issues) != 0 {
 		t.Fatalf("open_issues = %+v", d.Issues)
 	}
 	if len(d.Activity) == 0 || d.Activity[0].Repo != "alice/app" {
