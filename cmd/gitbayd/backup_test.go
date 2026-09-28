@@ -717,3 +717,58 @@ func TestBackupRefusesOutputInsideRoot(t *testing.T) {
 		}
 	}
 }
+
+// verify does not extract objects/info/alternates, so an archived
+// repository cannot borrow objects from paths outside the archive.
+func TestVerifyIgnoresAlternates(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	gitIn(t, work, "clone", "-q", "--bare", "--shared", work, dir)
+	if _, err := os.Stat(filepath.Join(dir, "objects", "info", "alternates")); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, dir, "fsck", "--connectivity-only", "--no-progress")
+
+	archive := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, archive, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBackup(archive, ""); err == nil || !strings.Contains(err.Error(), "connectivity") {
+		t.Fatalf("verify of a repository whose objects are only in an alternate: %v", err)
+	}
+}
+
+func TestAlternatesMember(t *testing.T) {
+	for name, want := range map[string]bool{
+		"repos/a/b.git/objects/info/alternates":      true,
+		"repos/a/b.git/objects/info/./alternates":    true,
+		"repos/a/b.git/objects/info/Alternates":      true,
+		"repos/a/b.git/objects/info/http-alternates": true,
+		"repos/a/b.git/objects/info/packs":           false,
+		"repos/a/b.git/refs/heads/alternates":        false,
+	} {
+		if got := alternates(name); got != want {
+			t.Errorf("alternates(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

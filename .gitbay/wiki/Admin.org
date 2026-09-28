@@ -467,9 +467,13 @@ automatic gc removes during the walk is skipped; each repository's refs
 are archived before its objects, so the refs still find their objects,
 and =--verify= reports it if one does not.
 
-Verifying an archive of unknown origin is safe as an unprivileged
-user: the connectivity check runs git against the archived
-repositories' own extracted copies, nothing under =server.root=.
+Verifying an archive of unknown origin: run it as an unprivileged
+user. The connectivity check runs git with =--git-dir= on each
+extracted repository, so a directory that is not a repository fails
+rather than git checking an enclosing one, and =objects/info/alternates=
+members are not extracted, so an archive cannot point git at object
+stores elsewhere on the host. Git still reads each archived
+repository's own =config=.
 
 Archives carry a directory entry for every directory, including an
 empty one, so a bare repository whose refs are all packed restores as

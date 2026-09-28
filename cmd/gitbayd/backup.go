@@ -489,6 +489,9 @@ func verifyBackup(path, identity string) error {
 			if !filepath.IsLocal(trimmed) {
 				return fmt.Errorf("%s: member %q leaves the archive root", path, h.Name)
 			}
+			if alternates(trimmed) {
+				continue
+			}
 			dest := filepath.Join(tmp, filepath.FromSlash(trimmed))
 			switch h.Typeflag {
 			case tar.TypeDir:
@@ -561,6 +564,17 @@ func verifyBackup(path, identity string) error {
 	}
 	fmt.Printf("connectivity ok on %d repositories\n", len(repos))
 	return nil
+}
+
+// alternates reports an archive member that would point git at object
+// stores outside the extracted repository. gitbay writes none, and one in
+// a hostile archive would have fsck read other paths, so verify leaves
+// them out. The comparison ignores case, as a case-insensitive
+// filesystem would.
+func alternates(name string) bool {
+	name = strings.ToLower(filepath.ToSlash(filepath.Clean(name)))
+	return strings.HasSuffix(name, "/objects/info/alternates") ||
+		strings.HasSuffix(name, "/objects/info/http-alternates")
 }
 
 // extractTo writes one archive member to dest, owner-only.

@@ -68,9 +68,11 @@ func PruneNow(dir string) error {
 
 // FsckConnectivity checks that every object reachable from the
 // repository's refs is present, without reading blob contents. A backup
-// verify runs it on each archived repository (#259).
+// verify runs it on each archived repository (#259). dir is the git
+// directory itself; it is passed as --git-dir so that a directory that is
+// not a repository fails instead of git checking one enclosing it.
 func FsckConnectivity(dir string) error {
-	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "fsck", "--connectivity-only", "--no-progress", "--no-dangling")
+	cmd := exec.Command(toolpath.Look("git"), "--git-dir="+dir, "fsck", "--connectivity-only", "--no-progress", "--no-dangling")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("fsck --connectivity-only: %v\n%s", err, out)
 	}
