@@ -84,7 +84,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
-| Untrusted code runs isolated                | partial  | rootless podman, cgroup limits; shared build home per repository (#255) |
+| Untrusted code runs isolated                | in place | rootless podman, cgroup limits; untrusted builds get a disposable home (=cmd/gitbay-runner/main.go=) |
 | No secrets for untrusted builds             | in place | =internal/control/build.go=                                  |
 | Runner limited to attached repositories     | in place | =runnerMayBuild= (=build.go=)                            |
 | Build images fixed by the operator          | in place | =--pull=never=                                                   |

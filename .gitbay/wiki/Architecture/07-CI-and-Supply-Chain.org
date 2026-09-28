@@ -31,8 +31,9 @@ commit instead of failing silently.
    runner key claims only for repositories it is attached to with
    =repo runner add=. Untrusted builds are claimable only by a runner
    started with =-untrusted= (=internal/store/builds.go=). The
-   claim returns id, repository, job, commit, ref, steps, image and —
-   for trusted builds only — the repository's secrets (=build.go=).
+   claim returns id, repository, job, commit, ref, steps, image, the
+   build's trust, and — for trusted builds only — the repository's secrets
+   (=build.go=).
 3. *Run.* The runner clones over SSH into =build-<id>=, starts a
    container and runs each step with =podman exec … sh -c <step>=
    (=cmd/gitbay-runner/isolate.go=).
@@ -64,7 +65,7 @@ Who may do what:
 | Container runtime          | rootless podman under the =ci-runner= user and its subordinate uid range   |
 | Image                      | =--pull=never=; images are built by the operator (=deploy/Containerfile.ci=) and referenced by tag |
 | Workspace                  | =<workdir>/build-<id>=, removed after the build; workdir must be 0700 and owned by the runner (=main.go=) |
-| Build home                 | =<workdir>/home/<owner>/<name>=, one per repository, mounted read-write, shared by trusted and untrusted builds of that repository (#255) |
+| Build home                 | trusted: =<workdir>/trusted-home/<owner>/<name>=, one per repository, persistent; untrusted: =<workdir>/build-<id>-home=, removed with the build (=main.go=) |
 | Secrets                    | env file 0600 outside the workspace, or =--env NAME= for multi-line values |
 | Resources                  | per-build cgroup with =memory.max= and =cpu.max= written by the runner; unit-level =MemoryMax=6G=, =CPUQuota=300%= |
 | Network                    | podman default (pasta); outbound unrestricted (#260)                        |

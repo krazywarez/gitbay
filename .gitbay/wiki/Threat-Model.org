@@ -161,10 +161,12 @@ runner, polling over SSH, clones the commit and runs its steps.
   secrets, and nothing the operator set on the service. =HOME= is a build
   home under the runner's =-workdir=, not the runner's own home, so a
   build cannot read the =.netrc=, =.npmrc= or =.gitconfig= where tools
-  keep credentials. That home is shared by every build on the runner —
-  one build can poison a cache another reads, which is no more than
-  anything a step can already do as this user, and is what isolation
-  (krz/gitbay#144) is for.
+  keep credentials. A trusted build's home belongs to its repository
+  and persists, so caches survive; an untrusted build's home is new,
+  empty and removed when the build ends, so nothing a fork's build
+  writes is read by a later build (krz/gitbay#255). The claim names a
+  build's trust explicitly, and a runner that finds no trust flag treats
+  the build as untrusted.
 - *Where it runs.* Steps run in a rootless podman container, one per
   job, with the workspace bind mounted and nothing else. The clone
   happens outside it with the runner's key, so the container never sees
@@ -194,13 +196,13 @@ runner, polling over SSH, clones the commit and runs its steps.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its
-container, the bind-mounted workspace and the repository's own build
-home, so what a build leaves in a cache is read only by later builds of
-the same repository. Treat the runner host as executing untrusted code
-all the same: keep it off the daemon's host where the database lives,
-or scope it to repositories whose writers you trust. gitbay.org does
-the latter — its runner builds only the repositories the operator
-names.
+container, the bind-mounted workspace and its build home: a trusted
+build's cache is read only by later trusted builds of the same
+repository, and an untrusted build's home is discarded with it. Treat
+the runner host as executing untrusted code all the same: keep it off
+the daemon's host where the database lives, or scope it to repositories
+whose writers you trust. gitbay.org does the latter — its runner builds
+only the repositories the operator names.
 
 * What has not been audited
 

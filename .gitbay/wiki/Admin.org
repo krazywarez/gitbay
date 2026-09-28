@@ -681,9 +681,14 @@ allocates without bound, and it sits above the e2e suite's 5GB peak
 rather than at a fair share. =OOMPolicy=continue= keeps systemd from
 stopping the runner when a build is OOM-killed.
 
-Each repository gets its own build home under the runner's workdir,
-mounted into its containers as =HOME=. Caches persist between builds of
-one repository and are never read by another's.
+A trusted build's home is its repository's, under
+=<workdir>/trusted-home/<owner>/<name>=, mounted into its containers as
+=HOME=: caches persist between trusted builds of one repository and are
+never read by another's. An untrusted build — a merge request head from
+a fork — gets =<workdir>/build-<id>-home=, new and empty, removed when
+the build ends. Homes under =<workdir>/home= are from runners before
+krz/gitbay#255, which shared them with untrusted builds; nothing reads
+them any more, and they can be deleted.
 
 *Images are provisioned, never pulled by a build.* The runner passes
 =--pull=never=. Two reasons, and the second is the better one: the
