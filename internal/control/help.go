@@ -111,14 +111,78 @@ func runHelp(c *Ctx, args []string) int {
 	})
 }
 
-// program is how help spells the command it documents: the CLI at a
-// terminal (only the CLI or a caller passing --term sets one), ssh
-// otherwise.
+// viaCLI reports whether the caller is the gitbay CLI, as far as the
+// session says: a terminal (only the CLI or a caller passing --term sets
+// one), or a CLI path, which only the CLI sends.
+func (c *Ctx) viaCLI() bool {
+	return c.Term.Cols > 0 || c.CLIPath != ""
+}
+
+// program is how help spells the command it documents: gitbay for the
+// CLI, ssh otherwise.
 func (c *Ctx) program() string {
-	if c.Term.Cols > 0 {
+	if c.viaCLI() {
 		return "gitbay"
 	}
 	return "ssh git@" + hostOf(c.Cfg.Server.SiteURL)
+}
+
+// cliUsage marks a leading <owner/name> optional in a usage line for the
+// CLI, which infers it inside a clone (cmd/gitbay/ssh.go's withRepo).
+// Stock ssh never does.
+func cliUsage(usage string) string {
+	return strings.Replace(usage, "<owner/name>", "[<owner/name>]", 1)
+}
+
+// shownAs rewrites full, which starts with the registered path, to start
+// with the CLI's path instead when the CLI sent one that differs (#267).
+// The CLI path must name this command: either it regroups it (the same
+// last word, auth keys remove for keys remove) or extends it (repo
+// topics list for repo topics). Arguments after a CLI command can
+// dispatch to a longer registered path (gitbay repo topics list add
+// reaches repo topics add), and that command keeps its own name.
+func (c *Ctx) shownAs(registered, full string) string {
+	rest, ok := strings.CutPrefix(full, registered)
+	if !ok || c.CLIPath == "" || c.CLIPath == registered {
+		return full
+	}
+	reg, cli := strings.Fields(registered), strings.Fields(c.CLIPath)
+	if len(reg) == 0 || len(cli) == 0 || (cli[len(cli)-1] != reg[len(reg)-1] && !strings.HasPrefix(c.CLIPath, registered+" ")) {
+		return full
+	}
+	return c.CLIPath + rest
+}
+
+// shownBelow is how another command listed beside registered prints to
+// this caller. When the CLI only regrouped the command (auth keys remove
+// for keys remove, the same last word) the other command takes the CLI's
+// parent in place of the registered one. When the CLI renamed the last
+// word (repo topics list for repo topics) nothing follows about the
+// other command's name, so it keeps its registered path.
+func (c *Ctx) shownBelow(registered, other string) string {
+	reg, cli, o := strings.Fields(registered), strings.Fields(c.CLIPath), strings.Fields(other)
+	if len(cli) == 0 || len(reg) == 0 || len(o) < len(reg) || cli[len(cli)-1] != reg[len(reg)-1] ||
+		!slices.Equal(o[:len(reg)-1], reg[:len(reg)-1]) {
+		return other
+	}
+	return joinPath(append(slices.Clip(cli[:len(cli)-1]), o[len(reg)-1:]...))
+}
+
+// usageShape is cmd's registered usage as this caller should see it: the
+// CLI's path in place of the registered one where they differ, and a
+// leading <owner/name> optional for the CLI.
+func (c *Ctx) usageShape(cmd Command) string {
+	shape := c.shownAs(joinPath(cmd.Path), cmd.Usage)
+	if c.viaCLI() {
+		shape = cliUsage(shape)
+	}
+	return shape
+}
+
+// cmdUsage is the running command's usage with the program in front, as
+// a usage refusal prints it.
+func (c *Ctx) cmdUsage() string {
+	return c.program() + " " + c.usageShape(c.Cmd)
 }
 
 func (c *Ctx) heading(w io.Writer, s string) {
@@ -152,7 +216,8 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 	// A required flag (repo delete --yes) or an alternative
 	// (notifications read <id>... | --all) has no " [--" to cut at, so
 	// the usage prints whole.
-	shape := cmd.Usage
+	registered := joinPath(cmd.Path)
+	shape := c.usageShape(cmd)
 	if i := strings.Index(shape, " [--"); i >= 0 {
 		shape = shape[:i] + " [flags]"
 	}
@@ -190,7 +255,7 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 		fmt.Fprintln(w)
 		c.heading(w, "SEE ALSO")
 		for _, b := range below {
-			fmt.Fprintf(w, "  %s %s\n", c.program(), joinPath(b.Path))
+			fmt.Fprintf(w, "  %s %s\n", c.program(), c.shownBelow(registered, joinPath(b.Path)))
 		}
 	}
 }
@@ -200,7 +265,8 @@ func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command) {
 	fmt.Fprintln(w, head)
 	fmt.Fprintln(w)
 	c.heading(w, "USAGE")
-	fmt.Fprintf(w, "  %s %s <verb> ...\n", c.program(), prefix)
+	display := c.shownAs(prefix, prefix)
+	fmt.Fprintf(w, "  %s %s <verb> ...\n", c.program(), display)
 	wide := 0
 	for _, cmd := range cmds {
 		wide = max(wide, cells(strings.TrimPrefix(joinPath(cmd.Path), prefix+" ")))
@@ -224,5 +290,5 @@ func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command) {
 		}
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s %s <verb> --help for flags.\n", c.program(), prefix)
+	fmt.Fprintf(w, "%s %s <verb> --help for flags.\n", c.program(), display)
 }

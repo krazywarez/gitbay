@@ -30,6 +30,12 @@ type Ctx struct {
 	// Term is the client's terminal, from GITBAY_TERM. The zero value
 	// is plain output.
 	Term Term
+	// CLIPath is the path the gitbay CLI resolved this call to, from a
+	// leading --path=, when it differs from the registered path being
+	// dispatched (auth keys remove for keys remove). Usage and help
+	// print it in place of the registered path (#267). Empty for stock
+	// ssh, the web and the API.
+	CLIPath string
 	// ViaAPI marks requests arriving over HTTP, from the token API or
 	// the web. Every command runs there; nothing is held back for SSH
 	// any more (#234). The flag stays because the rate limiter and the
@@ -66,13 +72,13 @@ type Ctx struct {
 // usage reports a bad invocation with the command's registered usage,
 // the one source of it.
 func (c *Ctx) usage() int {
-	return c.fail(protocol.ExitUsage, "usage: %s", c.Cmd.Usage)
+	return c.fail(protocol.ExitUsage, "usage: %s", c.cmdUsage())
 }
 
 // usageWith reports a specific problem with the arguments, then the
 // registered usage, so a person always sees the shape that was expected.
 func (c *Ctx) usageWith(msg string) int {
-	return c.fail(protocol.ExitUsage, "%s\nusage: %s", msg, c.Cmd.Usage)
+	return c.fail(protocol.ExitUsage, "%s\nusage: %s", msg, c.cmdUsage())
 }
 
 // Flag is one flag in a command's help.
@@ -132,18 +138,27 @@ func Dispatch(c *Ctx, argv []string) int {
 		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
 	}
 	// A leading --term=<v> selects terminal output for this session, the
-	// same as GITBAY_TERM. It must come off before Lookup: Lookup matches
-	// argv against a command's Path, and a --term= in front would never
-	// match one. Over HTTP it is dropped unread: the web and the API
-	// render no terminal.
-	if v, ok := strings.CutPrefix(argv[0], "--term="); ok {
-		if !c.ViaAPI {
-			c.Term = ParseTerm(v)
+	// same as GITBAY_TERM; a leading --path=<v> is the CLI's own path for
+	// the command (Ctx.CLIPath). Both come off before Lookup, in either
+	// order: Lookup matches argv against a command's Path, and either in
+	// front would never match one. Over HTTP both are dropped unread: the
+	// web and the API render no terminal and have no CLI path.
+	for len(argv) > 0 {
+		if v, ok := strings.CutPrefix(argv[0], "--term="); ok {
+			if !c.ViaAPI {
+				c.Term = ParseTerm(v)
+			}
+		} else if v, ok := strings.CutPrefix(argv[0], "--path="); ok {
+			if !c.ViaAPI {
+				c.CLIPath = v
+			}
+		} else {
+			break
 		}
 		argv = argv[1:]
-		if len(argv) == 0 {
-			return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
-		}
+	}
+	if len(argv) == 0 {
+		return c.fail(protocol.ExitUsage, "no command given; try: ssh <host> help")
 	}
 	cmd, rest, ok := Lookup(argv)
 	c.Cmd = cmd

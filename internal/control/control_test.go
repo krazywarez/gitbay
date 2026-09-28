@@ -260,6 +260,34 @@ func TestFailErrExitCodes(t *testing.T) {
 	}
 }
 
+// TestPathArgument: --path= is read only as a leading argument, in
+// either order with --term=, and never over HTTP.
+func TestPathArgument(t *testing.T) {
+	cases := []struct {
+		name     string
+		viaAPI   bool
+		argv     []string
+		want     string
+		wantArgv []string
+	}{
+		{"leading", false, []string{"--path=auth keys remove", "keys", "remove", "abc"}, "auth keys remove", []string{"abc"}},
+		{"after term", false, []string{"--term=80", "--path=auth keys remove", "keys", "remove", "abc"}, "auth keys remove", []string{"abc"}},
+		{"before term", false, []string{"--path=auth keys remove", "--term=80", "keys", "remove", "abc"}, "auth keys remove", []string{"abc"}},
+		{"later", false, []string{"keys", "remove", "abc", "--path=x"}, "", []string{"abc", "--path=x"}},
+		{"over HTTP", true, []string{"--path=auth keys remove", "keys", "remove", "abc"}, "", []string{"abc"}},
+	}
+	for _, tc := range cases {
+		c := &Ctx{Scope: "git", ViaAPI: tc.viaAPI, Stdout: io.Discard, Stderr: io.Discard}
+		Dispatch(c, tc.argv)
+		if c.CLIPath != tc.want {
+			t.Errorf("%s: CLIPath %q, want %q", tc.name, c.CLIPath, tc.want)
+		}
+		if !slices.Equal(c.Argv, tc.wantArgv) {
+			t.Errorf("%s: Argv %q, want %q", tc.name, c.Argv, tc.wantArgv)
+		}
+	}
+}
+
 // TestArgumentRefusalsNameTheUsage: a missing positional argument is a
 // usage error that prints the registered usage, the shared reference
 // helpers included (#215).
@@ -267,12 +295,14 @@ func TestArgumentRefusalsNameTheUsage(t *testing.T) {
 	for _, argv := range [][]string{{"build", "show"}, {"release", "show"}, {"mr", "resolve"}, {"issue", "show"}} {
 		var out, errOut bytes.Buffer
 		c := &Ctx{Scope: "full", Stdout: &out, Stderr: &errOut}
+		c.Cfg.Server.SiteURL = "https://forge.test"
 		if code := Dispatch(c, argv); code != protocol.ExitUsage {
 			t.Errorf("%v: exit %d, want %d (%s)", argv, code, protocol.ExitUsage, errOut.String())
 			continue
 		}
-		if !strings.Contains(errOut.String(), "usage: "+strings.Join(argv, " ")) {
-			t.Errorf("%v: no usage line: %q", argv, errOut.String())
+		want := "usage: ssh git@forge.test " + strings.Join(argv, " ")
+		if !strings.Contains(errOut.String(), want) {
+			t.Errorf("%v: got %q, want it to contain %q", argv, errOut.String(), want)
 		}
 	}
 }
