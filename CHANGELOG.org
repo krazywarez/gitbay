@@ -6,6 +6,8 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+Credentials: revocation and delegation (#256, #257).
+
 *Upgrade note.* =token create= makes a =read= token unless given
 =--scope full=. A script that mints a token and then writes with it
 must add =--scope full=. Existing tokens keep their scope.
@@ -15,7 +17,7 @@ must add =--scope full=. Existing tokens keep their scope.
   invites, accounts and verified addresses (#257).
 - Tokens and SSH keys record the token they were created through.
   =token revoke <name>= lists what it created; =--created= revokes
-  those too.
+  those too (#257).
 - Removing an SSH key, a deploy key, or disabling an account closes the
   connections the key opened, a push in flight included (#256).
 
