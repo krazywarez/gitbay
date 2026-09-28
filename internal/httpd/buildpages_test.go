@@ -120,6 +120,38 @@ func TestBuildsEmptyStateShowsInstructionForWriters(t *testing.T) {
 	}
 }
 
+// The badge section offers the snippet for a README.md and a README.org.
+func TestBuildsPageBadgeSnippetsMarkdownAndOrg(t *testing.T) {
+	var sb strings.Builder
+	rp := testRepoPage()
+	err := web.Render(&sb, "builds.html", struct {
+		repoPage
+		Builds   []control.BuildOut
+		Jobs     []control.JobOut
+		Runs     []buildRun
+		Filter   buildFilter
+		Facets   []facetGroup
+		Refs     []string
+		Older    string
+		CanWrite bool
+		Notice   string
+	}{
+		rp, nil, nil, nil, buildFilter{}, nil, nil, "", false, "",
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	base := "https://" + rp.Host + "/" + rp.Repo.OwnerName + "/" + rp.Repo.Name
+	for _, want := range []string{
+		"[![build](" + base + "/badge/build.svg)](" + base + "/builds)",
+		"[[" + base + "/builds][" + base + "/badge/build.svg]]",
+	} {
+		if !strings.Contains(sb.String(), want) {
+			t.Errorf("badge section lacks %s", want)
+		}
+	}
+}
+
 func TestBuildPageRendersCommandOutput(t *testing.T) {
 	var sb strings.Builder
 	err := web.Render(&sb, "build.html", buildView{

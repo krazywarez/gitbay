@@ -6,6 +6,8 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- The builds page's status badge section gives an org-mode snippet
+  beside the Markdown one, for a README.org (#299).
 - A wiki link to an existing non-page file (an .svg, .txt, .pdf) now
   resolves to the raw route instead of 404ing against the page route
   (#283).
