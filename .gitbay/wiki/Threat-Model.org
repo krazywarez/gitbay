@@ -249,8 +249,10 @@ is recorded here rather than in a closed issue:
   escape what is there. #144 covers the missing isolation.
 - *Timing and traffic analysis.* Token comparison is a hash index lookup
   by design, but nothing has been measured.
-- *Denial of service by resource exhaustion* beyond rate: large pushes,
-  pathological diffs, deep histories, zip bombs in LFS.
+- *Denial of service by resource exhaustion* beyond rate. Concurrent
+  clones, fetches and web archives are bounded by the pack limit
+  (#262); pushes are not, beyond =max_pack_bytes= on each one. Nor are
+  pathological diffs, deep histories, or zip bombs in LFS.
 
 A sweep is a point in time. This section says what a reader should not
 assume has been checked.
@@ -271,13 +273,15 @@ assume has been checked.
   present as objects no archived ref names, and a repository's refs may
   be newer than the database snapshot (see [[Admin]]).
 - The audit log lives in the database the daemon writes, so anyone with
-  the daemon user's access can change it. The hash chain makes an edited
-  or removed row show as a break under =gitbayd admin audit verify=,
-  except at the end: removing the newest rows, and writing new rows
-  under their freed ids, leaves a valid chain. Only comparing verify's
-  last id and hash with the daemon's journal copy shows it, and rows
-  written outside the daemon (=gitbayd shell= under =ssh.mode =
-  "system"=, host =gitbayd admin= commands) have no journal copy.
+  the daemon user's access can change it. The hash chain is unkeyed:
+  whoever can write the database can edit a row and recompute every
+  later hash. =gitbayd admin audit verify= catches an edited or removed
+  row only when the later hashes were not recomputed, and never catches
+  removing the newest rows or writing new rows under their freed ids.
+  Comparing verify's last id and hash with the daemon's journal copy is
+  the check for any change; rows written outside the daemon (=gitbayd
+  shell= under =ssh.mode = "system"=, host =gitbayd admin= commands)
+  have no journal copy.
 - A global signature-verification epoch over-invalidates the cache on any
   trust-input change. Correct, not a leak; a performance tradeoff.
 - A build's secrets are environment variables inside its container, so

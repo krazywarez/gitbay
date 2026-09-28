@@ -47,13 +47,15 @@ The practical ceiling on this hardware is concurrent pack generation:
 full clones of large repositories are CPU-bound in git itself (the 17s
 clone ran git at ~156% CPU). =limits.pack_concurrency= bounds how many
 run at once across SSH, HTTP and git://, with a queue behind it (see
-[[Admin]], =[limits]=); the measurements below set its default.
+[[Admin]], =[limits]=).
 
 * Concurrent clones
 
-Measured with =deploy/clonebench.sh https://gitbay.org/krz/gitbay.git <n>=
-from a machine outside bay1 (four cores), before and after the pack
-limit was deployed with its defaults (=pack_concurrency= 3,
-=pack_per_principal= 2, =pack_queue= 32, =pack_queue_wait= 60s). All
-clones in one run come from one address, so the per-principal cap
-applies to them; the "limit off" run sets the counts to -1.
+The defaults (=pack_concurrency= 3, =pack_per_principal= 2,
+=pack_queue= 32, =pack_queue_wait= 60s) are set for a four-core host
+from the single-clone figure above; no concurrent-clone measurement
+backs them yet. =deploy/clonebench.sh <clone-url> <n>= starts n full
+clones at once from a machine other than the server. Clones from one
+address count against one principal, so run it from two addresses, or
+against an instance with =pack_per_principal = -1=, or it measures the
+per-principal cap instead of the global one.

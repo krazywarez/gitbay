@@ -218,15 +218,23 @@ push=.
   at most =pack_concurrency= − 1 slots when it is above 1, so a signed-in
   client (SSH key, bearer token or web session) can always get the last.
   Past that an SSH client gets "the server is busy…" and exit 1, HTTP
-  gets 503 with =Retry-After: 30=, git:// an =ERR= line. A queued
-  client that disconnects leaves the queue; a running clone whose
-  client disconnects is killed. Ref listings (info/refs, protocol v2
+  gets 503 with =Retry-After: 30=, git:// an =ERR= line. An SSH client
+  that disconnects while queued leaves the queue; an HTTP or git:// one
+  keeps its place until the wait runs out. A running clone is killed
+  when its client disconnects, or when no write to the client completes
+  for two minutes: a client reading below about 550 B/s, or an HTTP
+  request body that takes over two minutes with nothing written back,
+  is cut. Ref listings (info/refs, protocol v2
   =ls-refs=), pushes and =repo download= are outside the budget. For the
   three counts 0 means the default and a negative value turns that
   bound off. The defaults suit a four-core host; see [[Performance]].
   With =ssh.mode = "system"= each SSH session is its own process and
   SSH clones are not counted.
-- =max_pack_bytes=, =ssh_auth_rate= — reserved, not yet enforced.
+- =max_pack_bytes= (2 GiB) — the largest pack one push may send,
+  enforced as =receive.maxInputSize= and lowered to what an owner's
+  storage quota has left.
+- =ssh_auth_rate= (10) — SSH authentication failures per client address
+  per minute on the embedded listener; see below.
 
 ** [git_daemon]
 - =enabled= (false), =port= (9418) — the anonymous =git://= listener.
@@ -294,7 +302,10 @@ Each row carries the SHA-256 of the row before it. =gitbayd admin audit
 verify= opens the store as other admin commands do, applying pending
 migrations, so run it with the binary that matches the daemon. It
 recomputes the chain and exits 1 naming the first row that was
-edited or whose predecessor was removed. Retention removing the oldest
+edited or whose predecessor was removed. The chain is unkeyed: whoever
+can write the database can recompute every hash after an edit, and
+verify then finds nothing. It catches an edit only when the later
+hashes were not recomputed. Retention removing the oldest
 rows is not a break. Rows written before the chain existed are counted
 and skipped; when every row is such a row, verify warns and exits 1,
 since clearing the hash columns looks the same. After an upgrade that
@@ -304,7 +315,8 @@ Removing the newest rows leaves no break, and neither do rows written
 afterwards under the freed ids. The database cannot show either. The
 daemon logs every row it writes to its journal, outside the database
 (=journalctl -u gitbayd -g 'INFO audit '=), and verify prints the last
-id and hash: compare them with the newest journal line. Rows written by
+id and hash: comparing them with the newest journal line is the check
+for any change, recomputed hashes included. Rows written by
 host =gitbayd admin= commands, and by =gitbayd shell= when =ssh.mode =
 "system"=, are not copied to the journal.
 

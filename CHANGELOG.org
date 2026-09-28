@@ -99,8 +99,11 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   before it (migration 0064), and the daemon logs a copy of every row it
   writes to its journal. =gitbayd admin audit verify= prints the row
   count and the last id and hash, and exits 1 naming the first row that
-  was edited or whose predecessor was removed. Removing the newest rows
-  shows only by comparing that last id and hash with the journal (#275).
+  was edited or whose predecessor was removed. The chain is unkeyed:
+  someone who can write the database can recompute the later hashes,
+  and verify catches an edit only when they were not recomputed.
+  Comparing verify's last id and hash with the journal is the check for
+  any change, including removing the newest rows (#275).
 - Refused mutating commands (exit 3 or 4) are audited as =refused
   <command>=, and refused pushes as =refused git-receive-pack=, keeping
   flag names and the target but no values; ten a minute per account and
@@ -228,8 +231,11 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   "the server is busy…" and exits 1, HTTP gets 503 with
   =Retry-After: 30=, and git:// gets an =ERR= line. *Operators:* the
   defaults are tuned for a four-core host; set the three counts to -1
-  to turn the limit off. Ref listings, pushes and =repo download= are
-  unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
+  to turn the limit off. A running clone is killed when no write to
+  its client completes for two minutes: a client reading below about
+  550 B/s, or an HTTP request body that takes over two minutes with
+  nothing written back, is cut. Ref listings, pushes and =repo
+  download= are unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
   since each session is its own process (#262).
 - Anonymous clones are counted per IPv4 address or IPv6 /64, and
   together hold at most =pack_concurrency= − 1 slots, so a signed-in
