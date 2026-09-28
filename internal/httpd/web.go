@@ -2037,6 +2037,7 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Tab = "merge requests"
+	canWrite := s.canWriteRepo(r, p.Repo)
 	state := r.URL.Query().Get("state")
 	if state == "" {
 		state = "open"
@@ -2096,9 +2097,10 @@ func (s *Server) mrs(w http.ResponseWriter, r *http.Request) {
 		MRs         []mrRow
 		LabelColors map[string]template.CSS
 		Older       string
+		CanWrite    bool
 	}{p, state, mf.Search,
 		activeFilters(state, [][2]string{{"label", mf.Label}, {"author", mf.Author}, {"milestone", mf.Milestone}}),
-		facets, rows, s.labelColors(p.Repo), older})
+		facets, rows, s.labelColors(p.Repo), older, canWrite})
 }
 
 func (s *Server) mr(w http.ResponseWriter, r *http.Request) {
