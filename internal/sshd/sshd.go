@@ -12,9 +12,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -50,6 +52,19 @@ type Server struct {
 type conn struct {
 	net    net.Conn
 	active atomic.Int32
+	// keyID and userID are the key that authenticated the connection and
+	// its account: 0 before the handshake and for an unregistered key.
+	// Guarded by Server.mu.
+	keyID, userID int64
+	revoked       chan struct{} // closed by cut
+	cutOnce       sync.Once
+}
+
+// cut ends the connection because its key was revoked: a git transport
+// on it is killed, and every other command loses its channel.
+func (c *conn) cut() {
+	c.cutOnce.Do(func() { close(c.revoked) })
+	c.net.Close()
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
@@ -67,6 +82,7 @@ func New(cfg config.Config, st *store.Store) (*Server, error) {
 		sc.AddHostKey(sg)
 	}
 	s.sshCfg = sc
+	st.OnRevoke(s.revoke)
 	return s, nil
 }
 
@@ -150,19 +166,20 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Pe
 	return &ssh.Permissions{Extensions: map[string]string{
 		"user-id": strconv.FormatInt(key.UserID, 10),
 		"key-id":  strconv.FormatInt(key.ID, 10),
-		"key-fp":  fp,
-		"scope":   key.Scope,
 	}}, nil
 }
 
 // Serve accepts connections on ln until it is closed.
 func (s *Server) Serve(ln net.Listener) error {
+	served := make(chan struct{})
+	defer close(served)
+	go s.sweep(served)
 	for {
 		nc, err := ln.Accept()
 		if err != nil {
 			return err
 		}
-		c := &conn{net: nc}
+		c := &conn{net: nc, revoked: make(chan struct{})}
 		s.mu.Lock()
 		s.conns[c] = struct{}{}
 		s.mu.Unlock()
@@ -176,6 +193,76 @@ func (s *Server) Serve(ln net.Listener) error {
 			}()
 			s.handleConn(c)
 		}()
+	}
+}
+
+// revoke closes the connections opened by the keys r names.
+func (s *Server) revoke(r store.Revoked) {
+	var cut []*conn
+	s.mu.Lock()
+	for c := range s.conns {
+		if c.keyID == 0 {
+			continue
+		}
+		if (r.UserID != 0 && c.userID == r.UserID) || slices.Contains(r.KeyIDs, c.keyID) {
+			cut = append(cut, c)
+		}
+	}
+	s.mu.Unlock()
+	for _, c := range cut {
+		c.cut()
+	}
+}
+
+// sweepInterval bounds how long a revocation this process was not told
+// about (gitbayd admin on the host) leaves a connection open.
+const sweepInterval = 15 * time.Second
+
+func (s *Server) sweep(served <-chan struct{}) {
+	t := time.NewTicker(sweepInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			s.sweepOnce()
+		case <-served:
+			return
+		case <-s.stopping:
+			return
+		}
+	}
+}
+
+// sweepOnce cuts every connection whose key is no longer live. Only
+// connections whose key was asked about are judged: one that
+// authenticated while the query ran waits for the next sweep.
+func (s *Server) sweepOnce() {
+	asked := map[int64]bool{}
+	s.mu.Lock()
+	for c := range s.conns {
+		if c.keyID != 0 {
+			asked[c.keyID] = true
+		}
+	}
+	s.mu.Unlock()
+	if len(asked) == 0 {
+		return
+	}
+	live, err := s.st.LiveSSHKeys(slices.Collect(maps.Keys(asked)))
+	if err != nil {
+		slog.Error("ssh sweep: key lookup", "err", err)
+		return
+	}
+	var cut []*conn
+	s.mu.Lock()
+	for c := range s.conns {
+		if asked[c.keyID] && !live[c.keyID] {
+			cut = append(cut, c)
+		}
+	}
+	s.mu.Unlock()
+	for _, c := range cut {
+		c.cut()
 	}
 }
 
@@ -218,6 +305,11 @@ func (s *Server) handleConn(c *conn) {
 		return
 	}
 	defer sconn.Close()
+	ext := sconn.Permissions.Extensions
+	s.mu.Lock()
+	c.keyID, _ = strconv.ParseInt(ext["key-id"], 10, 64)
+	c.userID, _ = strconv.ParseInt(ext["user-id"], 10, 64)
+	s.mu.Unlock()
 	go ssh.DiscardRequests(reqs)
 
 	for newCh := range chans {
@@ -232,12 +324,12 @@ func (s *Server) handleConn(c *conn) {
 		c.active.Add(1)
 		go func() {
 			defer c.active.Add(-1)
-			s.handleSession(sconn, ch, chReqs)
+			s.handleSession(c, sconn, ch, chReqs)
 		}()
 	}
 }
 
-func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-chan *ssh.Request) {
+func (s *Server) handleSession(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 	defer ch.Close()
 	var term control.Term
 	for req := range reqs {
@@ -268,7 +360,7 @@ func (s *Server) handleSession(sconn *ssh.ServerConn, ch ssh.Channel, reqs <-cha
 				}
 				close(done)
 			}()
-			code := s.runExec(sconn, ch, term, payload.Command, done)
+			code := s.runExec(c, sconn, ch, term, payload.Command, done)
 			sendExit(ch, code)
 			return
 		case "shell":
@@ -296,20 +388,32 @@ func sendExit(ch ssh.Channel, code int) {
 	ch.SendRequest("exit-status", false, ssh.Marshal(&msg))
 }
 
-func (s *Server) runExec(sconn *ssh.ServerConn, ch ssh.Channel, term control.Term, cmdline string, done <-chan struct{}) int {
+func (s *Server) runExec(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, term control.Term, cmdline string, done <-chan struct{}) int {
 	ext := sconn.Permissions.Extensions
 	if blob := ext["anon-key"]; blob != "" {
 		return s.runAnonymous(ch, blob, cmdline)
 	}
 	userID, _ := strconv.ParseInt(ext["user-id"], 10, 64)
 	keyID, _ := strconv.ParseInt(ext["key-id"], 10, 64)
+	// A connection outlives its commands, so the key is read again for
+	// each one: what it may do is what it may do now (#256).
+	key, err := s.st.SSHKeyByID(keyID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && key.UserID != userID) {
+		fmt.Fprintln(ch.Stderr(), "this key is no longer registered")
+		return protocol.ExitDenied
+	}
+	if err != nil {
+		slog.Error("ssh exec: key lookup", "err", err)
+		fmt.Fprintln(ch.Stderr(), "authentication temporarily unavailable")
+		return protocol.ExitFailure
+	}
 	user, err := s.st.UserByID(userID)
 	if err != nil {
 		fmt.Fprintln(ch.Stderr(), "account no longer exists")
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, user, ext["scope"], ext["key-fp"], term, cmdline, ch, ch, ch.Stderr(), done, s.stopping)
+	return Exec(s.cfg, s.st, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -338,9 +442,9 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
-// forced command (gitbayd shell).
-func Exec(cfg config.Config, st *store.Store, user store.User, scope, source string, term control.Term, cmdline string,
-	stdin io.Reader, stdout, stderr io.Writer, done, stopping <-chan struct{}) int {
+// forced command (gitbayd shell). Closing revoked kills a git transport.
+func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey, term control.Term, cmdline string,
+	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
 		return protocol.ExitDenied
@@ -357,7 +461,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source str
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 				return protocol.ExitDenied
 			}
-			return runGit(cfg, st, user, scope, argv, stdin, stdout, stderr)
+			return runGit(cfg, st, user, key.Scope, argv, stdin, stdout, stderr, revoked)
 		case "git-lfs-authenticate":
 			// Part of the git transport, not the control plane: usable by
 			// git-scoped and deploy keys, with the transports' access rules.
@@ -365,13 +469,13 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source str
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 				return protocol.ExitDenied
 			}
-			return runLFSAuthenticate(cfg, st, user, scope, argv, stdout, stderr)
+			return runLFSAuthenticate(cfg, st, user, key.Scope, argv, stdout, stderr)
 		}
 	}
 	ctx := &control.Ctx{
 		User:     user,
-		Scope:    scope,
-		Source:   source,
+		Scope:    key.Scope,
+		Source:   key.Fingerprint,
 		Term:     term,
 		Store:    st,
 		Cfg:      cfg,
@@ -386,7 +490,7 @@ func Exec(cfg config.Config, st *store.Store, user store.User, scope, source str
 
 // runGit streams a git transport service after access checks.
 func runGit(cfg config.Config, st *store.Store, user store.User, scope string, argv []string,
-	stdin io.Reader, stdout, stderr io.Writer) int {
+	stdin io.Reader, stdout, stderr io.Writer, revoked <-chan struct{}) int {
 	service := argv[0]
 	if len(argv) != 2 {
 		fmt.Fprintf(stderr, "usage: %s <path>\n", service)
@@ -461,7 +565,7 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 			}
 		}
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, nil); err != nil {
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, revoked); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK

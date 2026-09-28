@@ -18,10 +18,18 @@ import (
 	"gitbay.org/gitbay/internal/store"
 )
 
-// followServer starts an embedded server holding alice, her public repo
-// alice/app and a queued build 1 whose log has one line, and returns it
-// with a client connected as alice.
-func followServer(t *testing.T) (*Server, *ssh.Client) {
+// testServer is an embedded server over a fresh store holding alice
+// with one full-scope key, and a client connected with that key.
+type testServer struct {
+	srv    *Server
+	st     *store.Store
+	client *ssh.Client
+	uid    int64
+	keyID  int64
+	fp     string
+}
+
+func newTestServer(t *testing.T) testServer {
 	t.Helper()
 	root := t.TempDir()
 	st, err := store.Open(filepath.Join(root, "gitbay.db"))
@@ -36,17 +44,6 @@ func followServer(t *testing.T) (*Server, *ssh.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repoID, err := st.CreateRepo("user", uid, "app", "public")
-	if err != nil {
-		t.Fatal(err)
-	}
-	id, err := st.CreateBuild(repoID, "unit", "abc", "main", `["true"]`, "", "", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := st.AppendBuildLog(id, []byte("queued\n")); err != nil {
-		t.Fatal(err)
-	}
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +53,12 @@ func followServer(t *testing.T) (*Server, *ssh.Client) {
 		t.Fatal(err)
 	}
 	pub := signer.PublicKey()
-	if err := st.AddSSHKey(uid, ssh.FingerprintSHA256(pub), pub.Type(), pub.Marshal(), "full", "test"); err != nil {
+	fp := ssh.FingerprintSHA256(pub)
+	if err := st.AddSSHKey(uid, fp, pub.Type(), pub.Marshal(), "full", "test"); err != nil {
+		t.Fatal(err)
+	}
+	key, err := st.SSHKeyByFingerprint(fp)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +85,34 @@ func followServer(t *testing.T) (*Server, *ssh.Client) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { client.Close() })
-	return srv, client
+	return testServer{srv: srv, st: st, client: client, uid: uid, keyID: key.ID, fp: fp}
+}
+
+// withBuild gives alice the public repo alice/app and a queued build 1
+// whose log has one line.
+func withBuild(t *testing.T, ts testServer) {
+	t.Helper()
+	repoID, err := ts.st.CreateRepo("user", ts.uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := ts.st.CreateBuild(repoID, "unit", "abc", "main", `["true"]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.st.AppendBuildLog(id, []byte("queued\n")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// followServer starts an embedded server holding alice, her public repo
+// alice/app and a queued build 1 whose log has one line, and returns it
+// with a client connected as alice.
+func followServer(t *testing.T) (*Server, *ssh.Client) {
+	t.Helper()
+	ts := newTestServer(t)
+	withBuild(t, ts)
+	return ts.srv, ts.client
 }
 
 // startFollow runs build log --follow on a new session and returns once
