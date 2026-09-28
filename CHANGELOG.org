@@ -108,6 +108,10 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   =refused.throttled= row stands for the rest of the minute. Under
   =ssh.mode = "system"= each =gitbayd shell= connection counts
   separately (#275).
+- Pushes refused in pre-receive (a branch or tag rule, a release
+  anchor, an unsigned commit) are audited as =refused push= with the
+  repository and ref names, and hook socket requests failing the peer
+  or push-token check as =refused hook=, under the same caps (#275).
 - Audit retention deletes by id, up to the newest row older than the
   retention, so a clock step back cannot leave a gap in the chain (#275).
 - =dashboard= and =feed= print activity as sentences

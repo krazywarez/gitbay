@@ -122,8 +122,10 @@ func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 	dec := json.NewDecoder(conn)
 	enc := json.NewEncoder(conn)
-	if err := checkPeer(conn); err != nil {
+	if err := peerCheck(conn); err != nil {
 		slog.Warn("hook socket: refused connection", "err", err)
+		// Nothing about the request is known yet, and no account.
+		control.AuditRefused(s.st, 0, "refused hook", map[string]any{"reason": err.Error()})
 		enc.Encode(Response{Allow: false, Message: "hook socket: " + err.Error()})
 		return
 	}
@@ -132,7 +134,9 @@ func (s *Server) handle(conn net.Conn) {
 		enc.Encode(Response{Allow: false, Message: "bad hook request"})
 		return
 	}
-	if msg := s.authorize(req); msg != "" {
+	if actor, msg := s.authorize(req); msg != "" {
+		control.AuditRefused(s.st, actor, "refused hook",
+			map[string]any{"repo_id": req.RepoID, "hook": req.Hook, "reason": msg})
 		enc.Encode(Response{Allow: false, Message: msg})
 		return
 	}
@@ -149,18 +153,34 @@ func (s *Server) handle(conn net.Conn) {
 
 // authorize ties a request to a receive-pack sshd started: its token
 // must be live and name the same repository, account and key scope.
-func (s *Server) authorize(req Request) string {
+// On a refusal actor is the token's account when the token is live,
+// and 0 otherwise: the request's own user id is only a claim.
+func (s *Server) authorize(req Request) (actor int64, msg string) {
 	if req.Token == "" {
-		return "push not started by this server"
+		return 0, "push not started by this server"
 	}
 	tok, err := s.st.PushTokenByHash(store.HashToken(req.Token))
 	if err != nil {
-		return "push not started by this server"
+		return 0, "push not started by this server"
 	}
 	if tok.RepoID != req.RepoID || tok.UserID != req.UserID || tok.Scope != req.Scope {
-		return "push token does not match this request"
+		return tok.UserID, "push token does not match this request"
 	}
-	return ""
+	return 0, ""
+}
+
+// peerCheck is checkPeer; tests replace it.
+var peerCheck = checkPeer
+
+// refusePush answers a pre-receive refusal and audits it.
+func (s *Server) refusePush(enc *json.Encoder, req Request, repo store.Repo, msg string) {
+	refs := make([]string, len(req.Updates))
+	for i, u := range req.Updates {
+		refs[i] = u.Ref
+	}
+	control.AuditRefused(s.st, req.UserID, "refused push",
+		map[string]any{"repo": repo.Path(), "refs": refs, "reason": msg})
+	enc.Encode(Response{Allow: false, Message: msg})
 }
 
 func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
@@ -170,11 +190,11 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		return
 	}
 	if msg := policy.CheckPush(repo, req.Updates); msg != "" {
-		enc.Encode(Response{Allow: false, Message: msg})
+		s.refusePush(enc, req, repo, msg)
 		return
 	}
 	if msg := s.releaseAnchors(repo, req.Updates); msg != "" {
-		enc.Encode(Response{Allow: false, Message: msg})
+		s.refusePush(enc, req, repo, msg)
 		return
 	}
 	if !repo.Settings.RequireSignedCommits {
@@ -220,7 +240,7 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		}
 	}
 	if refusal != "" {
-		enc.Encode(Response{Allow: false, Message: refusal})
+		s.refusePush(enc, req, repo, refusal)
 		return
 	}
 	enc.Encode(Response{Allow: true})

@@ -1,12 +1,15 @@
 package hookd
 
 import (
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -101,5 +104,60 @@ func TestHookRequestNeedsItsPushToken(t *testing.T) {
 	}
 	if resp, err = Ask(sock, req, nil); err != nil || resp.Allow {
 		t.Fatalf("finished push: %+v, %v", resp, err)
+	}
+}
+
+func refusedRows(t *testing.T, st *store.Store, action string) []store.AuditEntry {
+	t.Helper()
+	rows, err := st.AuditEntries(store.AuditFilter{ActionPrefix: action, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}
+
+// Refused hook requests and refused pushes are audited; the token never
+// lands in a row (#275).
+func TestHookRefusalsAreAudited(t *testing.T) {
+	sock, st, repoID, uid := serveSocket(t)
+
+	forged := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: "not-a-live-token"}
+	if resp, err := Ask(sock, forged, nil); err != nil || resp.Allow {
+		t.Fatalf("forged: %+v, %v", resp, err)
+	}
+	rows := refusedRows(t, st, "refused hook")
+	if len(rows) != 1 || rows[0].Actor != "" || strings.Contains(rows[0].Data, forged.Token) ||
+		!strings.Contains(rows[0].Data, "not started by this server") || !strings.Contains(rows[0].Data, `"hook":"pre-receive"`) {
+		t.Fatalf("refused hook rows: %+v", rows)
+	}
+
+	token, err := st.CreatePushToken(repoID, uid, "full")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: token,
+		Updates: []policy.RefUpdate{{Ref: "refs/merge-requests/1/head", Old: zeroSHA40, New: strings.Repeat("a", 40)}}}
+	if resp, err := Ask(sock, req, nil); err != nil || resp.Allow {
+		t.Fatalf("push to a server-owned ref: %+v, %v", resp, err)
+	}
+	rows = refusedRows(t, st, "refused push")
+	if len(rows) != 1 || rows[0].Actor != "alice" || strings.Contains(rows[0].Data, token) ||
+		!strings.Contains(rows[0].Data, "alice/app") || !strings.Contains(rows[0].Data, "refs/merge-requests/1/head") {
+		t.Fatalf("refused push rows: %+v", rows)
+	}
+}
+
+// A connection from another uid is audited with no actor.
+func TestPeerRefusalIsAudited(t *testing.T) {
+	old := peerCheck
+	peerCheck = func(net.Conn) error { return errors.New("peer uid not permitted") }
+	t.Cleanup(func() { peerCheck = old })
+	sock, st, repoID, uid := serveSocket(t)
+	if resp, err := Ask(sock, Request{Hook: "pre-receive", RepoID: repoID, UserID: uid}, nil); err != nil || resp.Allow {
+		t.Fatalf("refused peer: %+v, %v", resp, err)
+	}
+	rows := refusedRows(t, st, "refused hook")
+	if len(rows) != 1 || rows[0].Actor != "" || !strings.Contains(rows[0].Data, "peer uid not permitted") {
+		t.Fatalf("refused hook rows: %+v", rows)
 	}
 }

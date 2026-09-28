@@ -276,8 +276,12 @@ meaningful — an unverified address never produces a =verified= badge.
 The audit log is the security feed (events are the product feed): every
 successful mutating command with its argv and source credential (SSH key
 fingerprint or API), every refused one (exit 3 or 4) as =refused
-<command>=, refused pushes as =refused git-receive-pack=, registrations,
-admin actions, force-pushes, and auth failures/throttling. A refusal row
+<command>=, refused pushes as =refused git-receive-pack= (the access
+check) or =refused push= (a branch or tag rule, a release anchor or an
+unsigned commit, with the repository and ref names), hook socket
+requests failing the peer or push-token check as =refused hook= (never
+the token), registrations, admin actions, force-pushes, and auth
+failures/throttling. A refusal row
 keeps the flag names and the first positional, not the values.
 Refusals are recorded up to ten a minute per account and 600 a minute
 across the instance; past either, one =refused.throttled= row stands
