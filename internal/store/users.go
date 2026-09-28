@@ -95,6 +95,7 @@ func (s *Store) DeleteUser(id int64) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	s.announce(Revoked{UserID: id})
 	return nil
 }
 
@@ -171,7 +172,8 @@ func (s *Store) ListEmails(userID int64) ([]Email, error) {
 // SetUserDisabled suspends or restores an account. Disabling drops every
 // credential that would grant a session on its own — web sessions, API
 // tokens, unclaimed login links — and leaves the SSH keys registered but
-// refused at every entry point until re-enabled.
+// refused at every entry point until re-enabled; connections they opened
+// are closed.
 func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 	v := 0
 	if disabled {
@@ -192,6 +194,7 @@ func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 				return err
 			}
 		}
+		s.announce(Revoked{UserID: userID})
 	}
 	return err
 }
@@ -288,24 +291,30 @@ func (s *Store) AddSSHKey(userID int64, fingerprint, algo string, blob []byte, s
 	return tx.Commit()
 }
 
-// RemoveSSHKey removes a key owned by userID and bumps the key epoch.
+// RemoveSSHKey removes a key owned by userID, bumps the key epoch, and
+// announces the revocation.
 func (s *Store) RemoveSSHKey(userID int64, fingerprint string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec("DELETE FROM ssh_keys WHERE user_id = ? AND fingerprint = ?", userID, fingerprint)
+	var id int64
+	err = tx.QueryRow("DELETE FROM ssh_keys WHERE user_id = ? AND fingerprint = ? RETURNING id", userID, fingerprint).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
 	}
 	if err := bumpKeyEpoch(tx); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.announce(Revoked{KeyIDs: []int64{id}})
+	return nil
 }
 
 // SetSSHKeyLabel renames a key owned by userID. Labels do not touch the
@@ -538,17 +547,22 @@ func (s *Store) RemoveDeployKey(repoID int64, fingerprint string) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(
-		"DELETE FROM ssh_keys WHERE fingerprint = ? AND scope LIKE 'deploy:' || ? || ':%'",
-		fingerprint, repoID)
+	var id int64
+	err = tx.QueryRow(
+		"DELETE FROM ssh_keys WHERE fingerprint = ? AND scope LIKE 'deploy:' || ? || ':%' RETURNING id",
+		fingerprint, repoID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
 	}
 	if err := bumpKeyEpoch(tx); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.announce(Revoked{KeyIDs: []int64{id}})
+	return nil
 }

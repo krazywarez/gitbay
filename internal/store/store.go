@@ -27,6 +27,10 @@ type Store struct {
 	// by the next change to that build's row (BuildLogWait).
 	logMu   sync.Mutex
 	logWait map[int64]chan struct{}
+
+	// onRevoke runs after each key revocation this process commits.
+	revokeMu sync.Mutex
+	onRevoke []func(Revoked)
 }
 
 // Open opens (creating if needed) the database at path with WAL mode and
