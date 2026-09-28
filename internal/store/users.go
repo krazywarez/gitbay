@@ -25,6 +25,7 @@ type SSHKey struct {
 	Label       string // "" when the key was added with no name
 	CreatedAt   string
 	LastUsedAt  string // "" when the key has never authenticated
+	CreatedBy   string // name of the API token that added the key; "" for none. ListSSHKeys only.
 }
 
 // ErrDuplicateKey carries the exact user-facing message from the spec. It
@@ -270,16 +271,26 @@ func (s *Store) UserByID(id int64) (User, error) {
 	return u, err
 }
 
+// KeyOrigin is how a key came to be.
+type KeyOrigin struct {
+	CreatedByToken int64 // the API token that added it; 0 for none
+}
+
 // AddSSHKey registers a key and bumps the key epoch in one transaction.
 func (s *Store) AddSSHKey(userID int64, fingerprint, algo string, blob []byte, scope, label string) error {
+	return s.AddSSHKeyFrom(userID, fingerprint, algo, blob, scope, label, KeyOrigin{})
+}
+
+// AddSSHKeyFrom is AddSSHKey recording where the key came from.
+func (s *Store) AddSSHKeyFrom(userID int64, fingerprint, algo string, blob []byte, scope, label string, o KeyOrigin) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(
-		"INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope, label) VALUES (?, ?, ?, ?, ?, ?)",
-		userID, fingerprint, algo, blob, scope, label); err != nil {
+		"INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope, label, created_by_token) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		userID, fingerprint, algo, blob, scope, label, nullID(o.CreatedByToken)); err != nil {
 		if isUniqueErr(err) {
 			return ErrDuplicateKey
 		}
@@ -343,8 +354,10 @@ func (s *Store) SSHKeyByFingerprint(fingerprint string) (SSHKey, error) {
 
 func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	rows, err := s.DB.Query(
-		`SELECT id, user_id, fingerprint, algo, blob, scope, label, created_at, COALESCE(last_used_at, '')
-		 FROM ssh_keys WHERE user_id = ? ORDER BY id`,
+		`SELECT k.id, k.user_id, k.fingerprint, k.algo, k.blob, k.scope, k.label, k.created_at,
+		        COALESCE(k.last_used_at, ''), COALESCE(t.name, '')
+		 FROM ssh_keys k LEFT JOIN api_tokens t ON t.id = k.created_by_token
+		 WHERE k.user_id = ? ORDER BY k.id`,
 		userID)
 	if err != nil {
 		return nil, err
@@ -353,7 +366,7 @@ func (s *Store) ListSSHKeys(userID int64) ([]SSHKey, error) {
 	var keys []SSHKey
 	for rows.Next() {
 		var k SSHKey
-		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label, &k.CreatedAt, &k.LastUsedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.UserID, &k.Fingerprint, &k.Algo, &k.Blob, &k.Scope, &k.Label, &k.CreatedAt, &k.LastUsedAt, &k.CreatedBy); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)
