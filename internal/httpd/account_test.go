@@ -300,7 +300,7 @@ func newTokenTestServer(t *testing.T) (*Server, *store.Store, store.User) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(config.Default(), st), st, store.User{ID: uid, Username: "alice"}
+	return New(config.Default(), st, nil), st, store.User{ID: uid, Username: "alice"}
 }
 
 // The settings page lists a user's API tokens with scope and expiry,
@@ -425,7 +425,7 @@ func TestAccountTokenCreateCrossSiteRefused(t *testing.T) {
 	_, st, u := newTokenTestServer(t)
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 	form := url.Values{"field": {"token-create"}, "name": {"evil"}, "scope": {"full"}}
 	for _, r := range s.Routes() {
 		if r.Method != "POST" || r.Pattern != "/settings" {

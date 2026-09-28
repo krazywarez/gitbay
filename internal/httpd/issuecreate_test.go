@@ -306,7 +306,7 @@ func TestIssueCreateFormPreviewKeepsMilestoneAndAssignee(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.Web.Mode = "accounts"
-	s := New(cfg, st)
+	s := New(cfg, st, nil)
 	form := url.Values{
 		"title":     {"a bug"},
 		"body":      {"**steps**"},
@@ -356,7 +356,7 @@ func TestIssueCreateSubmitRefusedKeepsDraft(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New(config.Default(), st)
+	s := New(config.Default(), st, nil)
 	form := url.Values{
 		"title":     {"needs a fix"},
 		"body":      {"details"},
