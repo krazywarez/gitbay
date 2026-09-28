@@ -166,4 +166,13 @@ func TestExpiredKeyRefusedAtAuth(t *testing.T) {
 	if err == nil {
 		t.Fatal("an expired key authenticated")
 	}
+	// Anyone holding only the public key can offer it; each offer
+	// counts against the address like an unknown key.
+	ip := remoteIP(ts.client.LocalAddr())
+	ts.srv.authLimiter.mu.Lock()
+	w := ts.srv.authLimiter.seen[ip]
+	ts.srv.authLimiter.mu.Unlock()
+	if w == nil || w.count < 1 {
+		t.Fatalf("an expired key's attempt from %s did not count against the limiter", ip)
+	}
 }

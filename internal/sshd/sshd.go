@@ -163,6 +163,7 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, pub ssh.PublicKey) (*ssh.Pe
 		return nil, fmt.Errorf("unknown key %s", fp)
 	}
 	if key.Expired(time.Now()) {
+		s.authLimiter.fail(ip)
 		s.st.Audit(key.UserID, "auth.expired", map[string]any{"ip": ip, "fingerprint": fp})
 		return nil, fmt.Errorf("key %s has expired", fp)
 	}
