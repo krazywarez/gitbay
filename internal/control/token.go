@@ -122,19 +122,11 @@ func runTokenList(c *Ctx, args []string) int {
 	for _, t := range tokens {
 		ds = append(ds, out{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt, t.CreatedBy})
 	}
+	now := time.Now()
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "NAME", "SCOPE", "EXPIRES")
 		for _, d := range ds {
-			exp := "never expires"
-			if d.ExpiresAt != nil {
-				ts := d.ExpiresAt.UTC().Format(time.RFC3339Nano)
-				if c.Term.Cols == 0 {
-					exp = "expires " + stamp(ts)
-				} else {
-					exp = "expires " + relAge(ts, termNow())
-				}
-			}
-			tb.row(cRef(d.Name), cState(d.Scope), cText(exp))
+			tb.row(cRef(d.Name), cState(d.Scope), cText(expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})
