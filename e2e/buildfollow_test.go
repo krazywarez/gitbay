@@ -133,7 +133,7 @@ func TestBuildLogFollow(t *testing.T) {
 	}
 	defer page.Body.Close()
 	web := newStreamReader(page.Body)
-	web.waitFor(t, "Live: the log streams here")
+	web.waitFor(t, "This page updates itself until the build ends")
 
 	// A static render while the build runs returns at once.
 	static := &http.Client{Timeout: 10 * time.Second}
