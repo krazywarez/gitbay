@@ -66,6 +66,11 @@
     <a class="button btn" href="/{{.OwnerName}}/{{.Name}}/fork">Fork</a>{{end}}
   </div>
   {{if eq $top "code"}}{{if field $ "Mirrors"}}<p class="repometa">{{range $i, $m := field $ "Mirrors"}}{{if $i}} · {{end}}{{if eq $m.Direction "push"}}mirrors to{{else}}mirrors from{{end}} <a href="{{$m.URL}}" rel="nofollow">{{$m.Target}}</a>{{if $m.Error}}, <span class="bad">sync error: {{$m.Error}}</span>{{else if $m.Synced}}, synced {{$m.Synced}}{{end}}{{end}}</p>{{end}}{{end}}
+  {{/* A tab's own count badge is omitted at zero (an empty <i> reads as
+       stray punctuation next to the tab word); the dashboard pin row's
+       count chip always shows its number, zero included, the same as
+       every other count chip in the app. Two elements, two rules,
+       decided once here (#270). */}}
   <nav class="tabs" aria-label="Repository">
     <a {{if eq $top "code"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}">Code</a>
     <a {{if eq $top "issues"}}aria-current="page" {{end}}href="/{{.OwnerName}}/{{.Name}}/issues">Issues{{with field $ "OpenIssues"}}{{if .}} <i>{{.}}</i>{{end}}{{end}}</a>

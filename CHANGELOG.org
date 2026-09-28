@@ -6,6 +6,12 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- Empty states on the web state the fact instead of a CLI command, and
+  drop "yet" on a finished item; the merge request list offers a New
+  merge request link, a fork link, or a sign-in prompt depending on
+  what the visitor can do; and the search page's scope caption is
+  always visible, not only before a first search (#270).
+
 Credentials and sessions: revocation, delegation, expiry and an idle
 timeout (#256, #257, #276, #277).
 
