@@ -59,6 +59,23 @@ func TestMRDiffViewNamesAPrunedHead(t *testing.T) {
 	}
 }
 
+// The watch button names all three states it cycles through, including
+// muted, which MR 1 made reachable (#271).
+func TestRepoHeaderWatchButtonNamesMutedState(t *testing.T) {
+	var sb strings.Builder
+	rp := testRepoPage()
+	rp.Viewer = "cmc" // the watch button only renders for a signed-in viewer
+	rp.Watch = "muted"
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: rp, MR: testMR("open"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "Muted") {
+		t.Error(`watch button does not render "Muted" for a muted repo`)
+	}
+}
+
 func renderMR(t *testing.T, m store.MR, reviews []store.MRReview, checks []store.Check) string {
 	rows := make([]reviewRow, 0, len(reviews))
 	for _, r := range reviews {

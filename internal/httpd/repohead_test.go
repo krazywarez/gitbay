@@ -39,7 +39,7 @@ func TestRepoHeaderTwoRows(t *testing.T) {
 	}
 	for _, want := range []string{
 		`title="Pinned repositories show on your dashboard"`,
-		`title="Watching sends every issue, request and build to your inbox"`,
+		`title="Only what involves you. Click to watch everything."`,
 		`title="Bookmarked lists it under Bookmarks"`,
 		`<p class="repodesc">A CLI-first git forge.`,
 	} {
