@@ -295,3 +295,44 @@ func TestRunnerNextCarriesPublicSSH(t *testing.T) {
 		}
 	}
 }
+
+// runner done records the failed step and a one-line reason (#266).
+func TestRunnerDoneRecordsFailedStep(t *testing.T) {
+	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
+	n, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", `["go build ./...","go test ./..."]`, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, ok, err := st.ClaimBuild([]int64{repo.ID}, false)
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	c, out := runnerCtx(st, uid, root)
+	if code := runRunnerDone(c, []string{fmt.Sprint(b.ID), "failure", "--step", "2", "--reason", "exit 1\n"}); code != protocol.ExitOK {
+		t.Fatalf("runner done: exit %d\n%s", code, out.String())
+	}
+	got, _ := st.BuildByNumber(repo.ID, n)
+	if got.Status != "failure" || got.FailedStep != 2 || got.FailedReason != "exit 1" {
+		t.Fatalf("status %s step %d reason %q", got.Status, got.FailedStep, got.FailedReason)
+	}
+}
+
+// A report with no flags — an older runner — or with a step past the
+// job's still finishes the build; the step is then recorded as 0.
+func TestRunnerDoneToleratesMissingOrBadStep(t *testing.T) {
+	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
+	for _, extra := range [][]string{nil, {"--step", "9"}} {
+		n, _ := st.CreateBuild(repo.ID, "unit", baseSHA, "main", `["true"]`, "", "", true)
+		b, ok, err := st.ClaimBuild([]int64{repo.ID}, false)
+		if err != nil || !ok {
+			t.Fatalf("claim: ok=%v err=%v", ok, err)
+		}
+		c, out := runnerCtx(st, uid, root)
+		if code := runRunnerDone(c, append([]string{fmt.Sprint(b.ID), "failure"}, extra...)); code != protocol.ExitOK {
+			t.Fatalf("runner done %v: exit %d\n%s", extra, code, out.String())
+		}
+		if got, _ := st.BuildByNumber(repo.ID, n); got.Status != "failure" || got.FailedStep != 0 {
+			t.Fatalf("%v: status %s step %d", extra, got.Status, got.FailedStep)
+		}
+	}
+}

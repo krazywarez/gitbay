@@ -101,9 +101,13 @@ func init() {
 		Examples:   []string{"runner log 431"},
 		ReadsStdin: true, Run: runRunnerLog})
 	register(Command{Path: []string{"runner", "done"},
-		Summary:  "finish a build",
-		Usage:    "runner done <build-id> success|failure",
-		Examples: []string{"runner done 431 success"},
+		Summary: "finish a build",
+		Usage:   "runner done <build-id> success|failure [--step <n>] [--reason <text>]",
+		Flags: []Flag{
+			{"--step", "<n>", "the 1-based step a failed build stopped at", ""},
+			{"--reason", "<text>", "how it failed, one line", ""},
+		},
+		Examples: []string{"runner done 431 success", "runner done 431 failure --step 3 --reason 'exit 1'"},
 		Run:      runRunnerDone})
 }
 
@@ -675,12 +679,18 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	if len(args) != 2 || (args[1] != "success" && args[1] != "failure") {
+	f, err := parseFlags(args, flagSpec{Values: []string{"--step", "--reason"}, MaxPos: 2,
+		Usage: "runner done <build-id> success|failure [--step <n>] [--reason <text>]"})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if len(f.Pos) != 2 || (f.Pos[1] != "success" && f.Pos[1] != "failure") {
 		return c.usage()
 	}
-	id, err := strconv.ParseInt(args[0], 10, 64)
+	outcome := f.Pos[1]
+	id, err := strconv.ParseInt(f.Pos[0], 10, 64)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "bad build id %q", args[0])
+		return c.fail(protocol.ExitUsage, "bad build id %q", f.Pos[0])
 	}
 	b, err := c.Store.BuildByID(id)
 	if err != nil {
@@ -699,7 +709,20 @@ func runRunnerDone(c *Ctx, args []string) int {
 			fmt.Fprintf(w, "build %d was cancelled\n", b.Number)
 		})
 	}
-	if err := c.Store.FinishBuild(id, args[1]); err != nil {
+	if outcome == "failure" {
+		// A step the job does not have is recorded as none rather than
+		// refused: refusing would lose the outcome over a detail (#266).
+		var steps []string
+		json.Unmarshal([]byte(b.Steps), &steps)
+		step, _ := strconv.Atoi(f.Value("--step"))
+		if step < 0 || step > len(steps) {
+			step = 0
+		}
+		if err := c.Store.SetBuildFailure(id, step, failureReason(f.Value("--reason"))); err != nil && !errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitFailure, "recording build %d's failure: %v", id, err)
+		}
+	}
+	if err := c.Store.FinishBuild(id, outcome); err != nil {
 		return c.fail(protocol.ExitFailure, "finishing build %d: %v", id, err)
 	}
 	c.Store.RunnerDone(key.ID)
@@ -708,15 +731,15 @@ func runRunnerDone(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)
-	desc := "build " + args[1]
-	if err := c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, args[1], desc, url, c.User.ID); err != nil {
+	desc := "build " + outcome
+	if err := c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, outcome, desc, url, c.User.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+args[1],
+	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+outcome,
 		fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))
 	// A red build mails the repo's notify targets with the log tail — a
 	// failed scheduled job must not wait to be noticed.
-	if args[1] == "failure" {
+	if outcome == "failure" {
 		if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
 			tail := ""
 			if log, err := c.Store.BuildLog(id); err == nil && len(log) > 0 {
@@ -732,9 +755,19 @@ func runRunnerDone(c *Ctx, args []string) int {
 				path:    fmt.Sprintf("%s/builds/%d", repo.Path(), b.Number)})
 		}
 	}
-	return c.emit(map[string]any{"build": b.Number, "status": args[1]}, func(w io.Writer) {
-		fmt.Fprintf(w, "build %d %s\n", b.Number, args[1])
+	return c.emit(map[string]any{"build": b.Number, "status": outcome}, func(w io.Writer) {
+		fmt.Fprintf(w, "build %d %s\n", b.Number, outcome)
 	})
+}
+
+// failureReason keeps a runner's reason to one line of at most 200
+// bytes: it is shown on the build page and by build show.
+func failureReason(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > 200 {
+		s = s[:200]
+	}
+	return strings.ToValidUTF8(s, "")
 }
 
 // QueueBranchBuilds reads .gitbay/ci.yml at sha and creates one pending
