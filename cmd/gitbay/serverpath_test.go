@@ -43,3 +43,39 @@ func TestServerPathMismatches(t *testing.T) {
 		t.Errorf("mismatched CLI paths = %v\nwant %v", got, want)
 	}
 }
+
+// TestHelpArgvSendsThePathForAnAliasGroup pins the review-round fix: a
+// bare `gitbay auth --help` (cliPath == prefix == "auth") must still send
+// --path=auth, since the registry has no "auth" command for withCLIPath's
+// equality shortcut to correctly skip (#267 follow-up).
+func TestHelpArgvSendsThePathForAnAliasGroup(t *testing.T) {
+	got := helpArgv("auth", "auth")
+	want := []string{"--path=auth", "help", "auth"}
+	if !slices.Equal(got, want) {
+		t.Errorf("helpArgv(auth, auth) = %v, want %v", got, want)
+	}
+}
+
+// TestHelpArgvSendsNoPathWhenCLIMatchesTheRegistry pins the unaffected
+// case: an ordinary noun's cliPath and registered prefix are the same
+// string, and it is not a CLI-only alias grouping, so no --path= is sent
+// and the server resolves it on its own.
+func TestHelpArgvSendsNoPathWhenCLIMatchesTheRegistry(t *testing.T) {
+	got := helpArgv("issue", "issue")
+	want := []string{"help", "issue"}
+	if !slices.Equal(got, want) {
+		t.Errorf("helpArgv(issue, issue) = %v, want %v", got, want)
+	}
+}
+
+// TestHelpArgvSendsThePathForAMismatchedGroup pins the ordinary
+// Task 2.1 case, unchanged by the alias-group fix: a nested group whose
+// cliPath differs from its registered prefix (auth keys, for keys)
+// already sends --path= through withCLIPath.
+func TestHelpArgvSendsThePathForAMismatchedGroup(t *testing.T) {
+	got := helpArgv("keys", "auth keys")
+	want := []string{"--path=auth keys", "help", "keys"}
+	if !slices.Equal(got, want) {
+		t.Errorf("helpArgv(keys, auth keys) = %v, want %v", got, want)
+	}
+}

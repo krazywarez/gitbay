@@ -52,6 +52,34 @@ func TestCLIUsagePrintsTheInvokingPath(t *testing.T) {
 	if strings.Contains(errOut, "auth") {
 		t.Errorf("stock ssh saw the CLI's auth grouping: %q", errOut)
 	}
+
+	// A bare `gitbay auth --help` (cliPath == "auth", the registered
+	// prefix it asks for) must still send --path=auth: the registry has
+	// no "auth" command, so withCLIPath's equality shortcut would
+	// otherwise read that as "no override needed" and print the
+	// registered rows the CLI cannot actually type (#267 review finding).
+	out, errOut, code = c.run(t, "", "", "auth", "--help")
+	if code != 0 {
+		t.Errorf("gitbay auth --help: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	for _, want := range []string{"auth keys add", "auth export"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("gitbay auth --help: missing %q in %q", want, out)
+		}
+	}
+
+	out, errOut, code = inst.ssh(t, key, "", "help", "auth")
+	if code != 0 {
+		t.Errorf("ssh help auth: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	for _, want := range []string{"keys add", "account export"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("ssh help auth: missing %q in %q", want, out)
+		}
+	}
+	if strings.Contains(out, "auth keys add") {
+		t.Errorf("stock ssh saw the CLI's auth grouping: %q", out)
+	}
 }
 
 // keys add and pgp add wire stdin directly to the server rather than going

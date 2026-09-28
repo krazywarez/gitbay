@@ -390,6 +390,28 @@ func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 	return c
 }
 
+// aliasGroupNames are CLI-only noun names with no matching registry
+// prefix (internal/control's nounAliases keys — kept in sync by hand,
+// since the CLI has no registry to consult): auth's own cliPath is
+// "auth", equal to the prefix it asks help for, so withCLIPath's
+// equality shortcut reads that as "no override needed" even though no
+// registered command is named "auth" at all, and help would silently
+// fall back to the registered forms (#267 review finding). Force
+// --path= for these regardless of the equality check.
+var aliasGroupNames = map[string]bool{"auth": true}
+
+// helpArgv builds the server argv for a group's --help: --path=cliPath
+// when the CLI's path differs from the registered prefix it names, or
+// unconditionally when prefix is a CLI-only alias grouping the registry
+// never answers to under that name.
+func helpArgv(prefix, cliPath string) []string {
+	argv := []string{"help", prefix}
+	if aliasGroupNames[prefix] {
+		return append([]string{"--path=" + cliPath}, argv...)
+	}
+	return withCLIPath(cliPath, prefix, argv)
+}
+
 // serverHelp prints the registry's usage for a prefix and reports whether
 // it did. cliPath is the group's own path in the CLI. At a terminal it
 // goes through the terminal-aware path, so it gets the same
@@ -401,7 +423,7 @@ func serverHelp(prefix, cliPath string) bool {
 	if err != nil {
 		return false
 	}
-	argv := withCLIPath(cliPath, prefix, []string{"help", prefix})
+	argv := helpArgv(prefix, cliPath)
 	if term.IsTerminal(int(os.Stdout.Fd())) {
 		return runSSH(t, argv, strings.NewReader("")) == 0
 	}
