@@ -94,6 +94,11 @@ func TestRemoveKeyCutsConnection(t *testing.T) {
 
 func TestDisableCutsConnection(t *testing.T) {
 	ts := newTestServer(t)
+	// The client's handshake can finish before the server has recorded
+	// the connection's account; a command answered proves it has.
+	if code, errOut := execStatus(ts.client, "whoami"); code != 0 {
+		t.Fatalf("whoami: %d %s", code, errOut)
+	}
 	if err := ts.st.SetUserDisabled(ts.uid, true); err != nil {
 		t.Fatal(err)
 	}
