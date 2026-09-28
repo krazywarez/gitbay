@@ -197,6 +197,6 @@ A 2xx within 10 seconds is success. Anything else retries with
 exponential backoff (30s base, doubling) and dead-letters after five
 attempts; =webhook deliveries= shows the trail and =redeliver= revives a
 dead letter. Redirects are never followed, and targets resolving to
-loopback/private/link-local addresses are refused both at registration
-and again at connect time, unless the instance sets
-=[webhooks] allow_local=.
+loopback, private, shared (100.64.0.0/10), link-local or multicast
+addresses are refused both at registration and again at connect time,
+unless the instance sets =[webhooks] allow_local=.

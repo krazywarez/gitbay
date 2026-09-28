@@ -174,7 +174,8 @@ push=.
   means no credential-bearing HTTP endpoint exists at all.
 
 ** [webhooks]
-- =allow_local= (false) — permit webhook targets on loopback/private
+- =allow_local= (false) — permit webhook and mirror targets on
+  loopback, private, shared (100.64.0.0/10), link-local or multicast
   addresses. Leave off unless you know why you need it (SSRF).
 
 ** [limits]
@@ -198,7 +199,11 @@ push=.
 ** [mirrors]
 - =pull_interval_minutes= (15) — how often pull mirrors fetch their
   upstream. Push mirrors sync shortly after each local ref update.
-  Mirror URLs pass the same SSRF rules as webhook targets.
+  Mirror URLs pass the same SSRF rules as webhook targets, when saved
+  and again before every sync; git then connects only to the addresses
+  that were checked (=http.curloptResolve=) and does not follow
+  redirects, so a mirror of a renamed repository fails until its URL
+  is updated. Needs git 2.37 or later on the server.
 
 ** [go_import]
 Vanity Go module paths, one per line: ="host/module" = "owner/repo"=.

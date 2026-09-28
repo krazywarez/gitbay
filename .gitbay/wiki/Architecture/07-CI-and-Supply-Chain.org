@@ -75,7 +75,7 @@ Who may do what:
 | Integration | Trigger              | Security properties                                                            |
 |-------------+----------------------+--------------------------------------------------------------------------------|
 | Webhooks    | recorded events      | SSRF checks at save and connect time, no redirects, HMAC-SHA256 signature, 5 attempts with exponential backoff, response body capped at 4 KiB (=internal/webhook/webhook.go=) |
-| Mirrors     | schedule             | address check at save; token via =GIT_ASKPASS= script (0700); heads and tags only; 10-minute timeout (=internal/mirror/mirror.go=) |
+| Mirrors     | schedule             | address check at save and before each sync, git pinned to the checked addresses, no redirects; token via =GIT_ASKPASS= script (0700); heads and tags only; 10-minute timeout (=internal/mirror/mirror.go=) |
 | Dependency checks | schedule, opt-in | fixed registry hosts; package names restricted (=internal/deps/registry.go=) |
 
 * The project's own supply chain
