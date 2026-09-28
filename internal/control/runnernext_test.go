@@ -245,3 +245,24 @@ func TestRunnerLogMarksStreamClosed(t *testing.T) {
 		t.Errorf("status %s, want still running until the runner reports", got.Status)
 	}
 }
+
+// The claim says whether a build is trusted in so many words. A runner
+// must not infer it from secrets being absent: a trusted repository with
+// no secrets looks the same (#255).
+func TestRunnerNextSaysWhetherTrusted(t *testing.T) {
+	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
+	for _, trusted := range []bool{true, false} {
+		if _, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", trusted); err != nil {
+			t.Fatal(err)
+		}
+		c, out := runnerCtx(st, uid, root)
+		c.JSON = true
+		if code := runRunnerNext(c, []string{"--untrusted"}); code != protocol.ExitOK {
+			t.Fatalf("runner next: exit %d, output:\n%s", code, out.String())
+		}
+		want := fmt.Sprintf(`"trusted":%v`, trusted)
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("claim of a trusted=%v build lacks %s:\n%s", trusted, want, out.String())
+		}
+	}
+}

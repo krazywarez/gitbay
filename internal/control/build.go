@@ -552,16 +552,20 @@ func runRunnerNext(c *Ctx, args []string) int {
 		}
 	}
 	d := struct {
-		ID      int64             `json:"id"`
-		Repo    string            `json:"repo"`
-		Number  int64             `json:"number"`
-		Job     string            `json:"job"`
-		SHA     string            `json:"sha"`
-		Ref     string            `json:"ref"`
-		Steps   []string          `json:"steps"`
-		Image   string            `json:"image,omitempty"`
+		ID     int64    `json:"id"`
+		Repo   string   `json:"repo"`
+		Number int64    `json:"number"`
+		Job    string   `json:"job"`
+		SHA    string   `json:"sha"`
+		Ref    string   `json:"ref"`
+		Steps  []string `json:"steps"`
+		Image  string   `json:"image,omitempty"`
+		// Trusted is always sent: a runner decides a build's home and
+		// secrets from it, and reads a missing field as untrusted (#255).
+		Trusted bool              `json:"trusted"`
 		Secrets map[string]string `json:"secrets,omitempty"`
-	}{b.ID, repo.Path(), b.Number, b.Job, b.SHA, b.Ref, steps, b.Image, secrets}
+	}{ID: b.ID, Repo: repo.Path(), Number: b.Number, Job: b.Job, SHA: b.SHA, Ref: b.Ref,
+		Steps: steps, Image: b.Image, Trusted: b.Trusted, Secrets: secrets}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d: %s %s @ %.10s\n", d.ID, d.Repo, d.Job, d.SHA)
 	})
