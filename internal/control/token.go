@@ -69,21 +69,16 @@ func runTokenCreate(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	name, scope, ttl := f.Value("--name"), "read", f.Value("--ttl")
+	name, scope := f.Value("--name"), "read"
 	if f.Has("--scope") {
 		scope = f.Value("--scope")
 	}
 	if name == "" || (scope != "full" && scope != "read") {
 		return c.usage()
 	}
-	var expires *time.Time
-	if ttl != "" {
-		d, err := parseTTL(ttl)
-		if err != nil {
-			return c.failInput(err)
-		}
-		t := time.Now().Add(d)
-		expires = &t
+	expires, code := c.ttlFlag(f)
+	if code >= 0 {
+		return code
 	}
 	raw, _, err := store.NewToken()
 	if err != nil {

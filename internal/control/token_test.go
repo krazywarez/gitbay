@@ -102,3 +102,17 @@ func TestTokenCreateDefaultsToReadAndRecordsCreator(t *testing.T) {
 		t.Fatal(`no token named "child"`)
 	}
 }
+
+func TestTokenCreateRefusesNonPositiveTTL(t *testing.T) {
+	st, _, uid := newQueueTestRepo(t)
+	for _, ttl := range []string{"0s", "-1h"} {
+		c, _ := pruneCtx(st, t.TempDir(), store.User{ID: uid, Username: "alice"})
+		c.Cfg.Limits.WriteRate = -1
+		if code := Dispatch(c, []string{"token", "create", "--name", "x", "--ttl", ttl}); code != protocol.ExitUsage {
+			t.Errorf("--ttl %s: exit %d", ttl, code)
+		}
+	}
+	if toks, err := st.ListAPITokens(uid); err != nil || len(toks) != 0 {
+		t.Fatalf("tokens: %+v %v", toks, err)
+	}
+}
