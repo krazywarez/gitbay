@@ -224,6 +224,18 @@ func runIssueCreate(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitDenied, "permission denied on %s; ask its owner for access", path)
 		}
 	}
+	// Resolve everything that can be refused before the issue exists, so
+	// a typo in a milestone or an assignee creates nothing.
+	var milestone store.Milestone
+	if m := f.Value("--milestone"); m != "" {
+		if milestone, err = c.Store.MilestoneByTitle(repo, m); err != nil {
+			return milestoneErr(c, repo, m, err)
+		}
+	}
+	assignees, code := resolveUsers(c, f.List("--assignee"))
+	if code >= 0 {
+		return code
+	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
 		return c.failInput(err)
@@ -244,30 +256,21 @@ func runIssueCreate(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	notifyMentions(c, repo, issueThread, issue.ID, n, title, b)
-	for _, l := range f.List("--label") {
-		if err := c.Store.SetIssueLabel(repo, issue.ID, l, true); err != nil {
+	if labels := f.List("--label"); len(labels) > 0 {
+		if _, code := labelIssue(c, repo, issue, labels, nil); code >= 0 {
+			return code
+		}
+	}
+	if milestone.ID != 0 {
+		if err := recordItemMilestone(c, repo, "issue", n, milestone.ID, milestone.Title, func(id int64) error {
+			return c.Store.SetIssueMilestone(issue.ID, id)
+		}); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
-	if m := f.Value("--milestone"); m != "" {
-		ms, err := c.Store.MilestoneByTitle(repo, m)
-		if err != nil {
-			return milestoneErr(c, repo, m, err)
-		}
-		if err := c.Store.SetIssueMilestone(issue.ID, ms.ID); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-	}
-	for _, name := range f.List("--assignee") {
-		u, err := c.Store.UserByUsername(name)
-		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "no such user %q", name)
-		}
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, true); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
+	if len(assignees) > 0 {
+		if _, code := assignIssue(c, repo, issue, assignees, nil); code >= 0 {
+			return code
 		}
 	}
 	return c.emit(Created{Number: n}, func(w io.Writer) {
@@ -523,28 +526,39 @@ func runIssueLabel(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
+	labels, code := labelIssue(c, repo, issue, adds, removes)
+	if code >= 0 {
+		return code
+	}
+	return c.emit(map[string]any{"number": issue.Number, "labels": labels}, func(w io.Writer) {
+		fmt.Fprintf(w, "labels on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(labels, ", "))
+	})
+}
+
+// labelIssue adds and removes labels on issue and records the
+// issue.labeled event, returning the labels it carries afterwards. It
+// backs issue label and issue create --label.
+func labelIssue(c *Ctx, repo store.Repo, issue store.Issue, adds, removes []string) ([]string, int) {
 	for _, l := range adds {
 		if err := c.Store.SetIssueLabel(repo, issue.ID, l, true); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return nil, c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
 	for _, l := range removes {
 		if err := c.Store.SetIssueLabel(repo, issue.ID, l, false); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				return c.fail(protocol.ExitNotFound, "%v", err)
+				return nil, c.fail(protocol.ExitNotFound, "%v", err)
 			}
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return nil, c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
 	updated, err := c.Store.IssueByNumber(repo.ID, issue.Number)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return nil, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.labeled",
 		fmt.Sprintf(`{"number":%d,"labels":%s}`, issue.Number, jsonStrings(updated.Labels)))
-	return c.emit(map[string]any{"number": issue.Number, "labels": updated.Labels}, func(w io.Writer) {
-		fmt.Fprintf(w, "labels on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(updated.Labels, ", "))
-	})
+	return updated.Labels, -1
 }
 
 func runIssueAssign(c *Ctx, args []string) int {
@@ -562,16 +576,44 @@ func runIssueAssign(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
-	resolve := func(name string) (store.User, int) {
+	add, code := resolveUsers(c, adds)
+	if code >= 0 {
+		return code
+	}
+	remove, code := resolveUsers(c, removes)
+	if code >= 0 {
+		return code
+	}
+	assignees, code := assignIssue(c, repo, issue, add, remove)
+	if code >= 0 {
+		return code
+	}
+	return c.emit(map[string]any{"number": issue.Number, "assignees": assignees}, func(w io.Writer) {
+		fmt.Fprintf(w, "assignees on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(assignees, ", "))
+	})
+}
+
+// resolveUsers looks up every name, failing on the first that does not
+// exist, so a typo changes nothing.
+func resolveUsers(c *Ctx, names []string) ([]store.User, int) {
+	users := make([]store.User, 0, len(names))
+	for _, name := range names {
 		u, err := c.Store.UserByUsername(name)
 		if errors.Is(err, store.ErrNotFound) {
-			return u, c.fail(protocol.ExitNotFound, "no such user %q", name)
+			return nil, c.fail(protocol.ExitNotFound, "no such user %q", name)
 		}
 		if err != nil {
-			return u, c.fail(protocol.ExitFailure, "%v", err)
+			return nil, c.fail(protocol.ExitFailure, "%v", err)
 		}
-		return u, -1
+		users = append(users, u)
 	}
+	return users, -1
+}
+
+// assignIssue adds and removes assignees on issue, records the
+// issue.assigned event and tells each newly added account, returning the
+// assignees afterwards. It backs issue assign and issue create --assignee.
+func assignIssue(c *Ctx, repo store.Repo, issue store.Issue, adds, removes []store.User) ([]string, int) {
 	// issue is the read from before the update, so its Assignees are who
 	// was already on it. SetIssueAssignee inserts ON CONFLICT DO NOTHING
 	// and returns nil whether or not it inserted, and the notice below is
@@ -582,13 +624,9 @@ func runIssueAssign(c *Ctx, args []string) int {
 		assigned[name] = true
 	}
 	var added []int64
-	for _, name := range adds {
-		u, code := resolve(name)
-		if code >= 0 {
-			return code
-		}
+	for _, u := range adds {
 		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, true); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return nil, c.fail(protocol.ExitFailure, "%v", err)
 		}
 		if assigned[u.Username] {
 			continue
@@ -596,21 +634,17 @@ func runIssueAssign(c *Ctx, args []string) int {
 		assigned[u.Username] = true
 		added = append(added, u.ID)
 	}
-	for _, name := range removes {
-		u, code := resolve(name)
-		if code >= 0 {
-			return code
-		}
+	for _, u := range removes {
 		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, false); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				return c.fail(protocol.ExitNotFound, "%s is not assigned", name)
+				return nil, c.fail(protocol.ExitNotFound, "%s is not assigned", u.Username)
 			}
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return nil, c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
 	updated, err := c.Store.IssueByNumber(repo.ID, issue.Number)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return nil, c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.assigned",
 		fmt.Sprintf(`{"number":%d,"assignees":%s}`, issue.Number, jsonStrings(updated.Assignees)))
@@ -624,7 +658,5 @@ func runIssueAssign(c *Ctx, args []string) int {
 			action:  fmt.Sprintf("assigned you to #%d", issue.Number),
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
 	}
-	return c.emit(map[string]any{"number": issue.Number, "assignees": updated.Assignees}, func(w io.Writer) {
-		fmt.Fprintf(w, "assignees on %s#%d: %s\n", repo.Path(), issue.Number, strings.Join(updated.Assignees, ", "))
-	})
+	return updated.Assignees, -1
 }

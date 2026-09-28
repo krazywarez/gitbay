@@ -3,6 +3,7 @@ package control
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"testing"
 
 	"gitbay.org/gitbay/internal/protocol"
@@ -58,13 +59,32 @@ func TestIssueCreateSetsLabelsMilestoneAndAssignee(t *testing.T) {
 	if _, err := c.Store.CreateMilestone(repo, "m1", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Store.CreateUser("bob", false); err != nil {
+	bob, err := c.Store.CreateUser("bob", false)
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	if code := runIssueCreate(c, []string{repo.Path(), "--title", "t",
 		"--label", "bug", "--milestone", "m1", "--assignee", "bob"}); code != 0 {
 		t.Fatalf("exit %d", code)
+	}
+	rows, _ := c.Store.Inbox(bob, false, 20, 0)
+	if len(rows) != 1 || rows[0].Summary != "assigned you to #1" {
+		t.Errorf("bob's inbox = %+v, want one assigned-you notice", rows)
+	}
+	var kinds []string
+	ev, err := c.Store.DB.Query("SELECT kind FROM events WHERE repo_id = ? ORDER BY id", repo.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for ev.Next() {
+		var k string
+		ev.Scan(&k)
+		kinds = append(kinds, k)
+	}
+	ev.Close()
+	if want := []string{"issue.created", "issue.labeled", "issue.milestoned", "issue.assigned"}; !slices.Equal(kinds, want) {
+		t.Errorf("events = %v, want %v", kinds, want)
 	}
 	issue, err := c.Store.IssueByNumber(repo.ID, 1)
 	if err != nil {
@@ -78,6 +98,29 @@ func TestIssueCreateSetsLabelsMilestoneAndAssignee(t *testing.T) {
 	}
 	if len(issue.Assignees) != 1 || issue.Assignees[0] != "bob" {
 		t.Errorf("assignees = %v", issue.Assignees)
+	}
+}
+
+// A milestone or assignee that does not resolve is refused before the
+// issue exists, so a typo creates nothing.
+func TestIssueCreateRefusesUnknownMilestoneOrAssigneeFirst(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	repoID, err := c.Store.CreateRepo("user", c.User.ID, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := c.Store.RepoByID(repoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range [][]string{{"--milestone", "nope"}, {"--assignee", "nobody"}} {
+		args := append([]string{repo.Path(), "--title", "t", "--body", "b", "--label", "bug"}, extra...)
+		if code := runIssueCreate(c, args); code != protocol.ExitNotFound {
+			t.Errorf("%v: exit %d, want %d", extra, code, protocol.ExitNotFound)
+		}
+		if _, err := c.Store.IssueByNumber(repo.ID, 1); !errors.Is(err, store.ErrNotFound) {
+			t.Fatalf("%v: an issue was created: %v", extra, err)
+		}
 	}
 }
 

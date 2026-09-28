@@ -223,6 +223,17 @@ func runMRMilestone(c *Ctx, args []string) int {
 	})
 }
 
+// recordItemMilestone sets milestone id (0 clears it) through set and
+// records the milestoned event naming title ("" when cleared).
+func recordItemMilestone(c *Ctx, repo store.Repo, noun string, number, id int64, title string, set func(int64) error) error {
+	if err := set(id); err != nil {
+		return err
+	}
+	c.Store.RecordEvent(repo.ID, c.User.ID, noun+".milestoned",
+		fmt.Sprintf(`{"number":%d,"milestone":%q}`, number, title))
+	return nil
+}
+
 // noun and number name what the milestone was set on, for the event.
 func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title string, set func(int64) error) int {
 	var id int64
@@ -233,15 +244,13 @@ func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title 
 		}
 		id = m.ID
 	}
-	if err := set(id); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
 	cleared := title
 	if cleared == "none" {
 		cleared = ""
 	}
-	c.Store.RecordEvent(repo.ID, c.User.ID, noun+".milestoned",
-		fmt.Sprintf(`{"number":%d,"milestone":%q}`, number, cleared))
+	if err := recordItemMilestone(c, repo, noun, number, id, cleared, set); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	if title == "none" {
 		return c.emit(map[string]string{"milestone": ""}, func(w io.Writer) {
 			fmt.Fprintln(w, "milestone cleared")
