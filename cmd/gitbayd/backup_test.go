@@ -626,3 +626,30 @@ func TestGCRefusedDuringBackup(t *testing.T) {
 		t.Fatalf("gc during a backup: %v", err)
 	}
 }
+
+// A backup and its verify need no key file: sealed values are copied as
+// they are. A missing database is refused rather than created.
+func TestBackupNeedsNoKeyFile(t *testing.T) {
+	cfg := testConfig(t)
+	out := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, out, false); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("backup without a database: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cfg.Server.Root, "gitbay.db")); !os.IsNotExist(err) {
+		t.Fatalf("backup created a database: %v", err)
+	}
+	s, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if err := os.Remove(cfg.Server.SecretKeyFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := runBackup(cfg, out, false); err != nil {
+		t.Fatalf("backup without the key file: %v", err)
+	}
+	if err := verifyBackup(out, ""); err != nil {
+		t.Fatalf("verify without the key file: %v", err)
+	}
+}

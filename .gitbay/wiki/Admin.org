@@ -587,6 +587,8 @@ gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
 - Missing file: every gitbayd process that opens the database refuses
   to run and names the path, including =serve= and, in system mode,
   =authorized-keys=. =migrate= does not need it.
+- Backups: =admin backup= and =admin backup --verify= do not need the
+  key file; a restore does.
 - Wrong key: =serve= stops at startup naming the first row that does
   not open; =secrets check= does the same without starting anything.
 - Upgrade: the first start after the upgrade seals every value still

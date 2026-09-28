@@ -108,7 +108,14 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 		defer release()
 	}
 
-	st, err := openStore(cfg)
+	// VACUUM INTO copies sealed values as they are, so the backup needs
+	// no key file, and it migrates nothing. store.Open would create a
+	// missing database, so its absence is checked first.
+	dbFile := filepath.Join(cfg.Server.Root, "gitbay.db")
+	if _, err := os.Stat(dbFile); err != nil {
+		return fmt.Errorf("database: %w", err)
+	}
+	st, err := store.Open(dbFile)
 	if err != nil {
 		return err
 	}
