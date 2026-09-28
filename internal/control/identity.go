@@ -127,28 +127,28 @@ func keyLabel(s string) (string, error) {
 	return s, nil
 }
 
-// usedText is a key's last use as a list shows it.
+// usedText is a key's last use as a USED cell shows it.
 func (c *Ctx) usedText(ts string) string {
 	switch {
 	case ts == "":
-		return "never used"
+		return "never"
 	case c.Term.Cols == 0:
-		return "used " + stamp(ts)
+		return stamp(ts)
 	}
-	return "used " + relAge(ts, termNow())
+	return relAge(ts, termNow())
 }
 
-// expiresText is a credential's expiry as a list shows it. It is
-// absolute at a terminal too: relAge reads only the past.
+// expiresText is a credential's expiry as an EXPIRES cell shows it. It
+// is absolute at a terminal too: relAge reads only the past.
 func expiresText(t *time.Time, now time.Time) string {
 	if t == nil {
-		return "never expires"
+		return "never"
 	}
 	s := stamp(t.UTC().Format(time.RFC3339Nano))
 	if !t.After(now) {
 		return "expired " + s
 	}
-	return "expires " + s
+	return s
 }
 
 func runKeysAdd(c *Ctx, args []string) int {
@@ -204,7 +204,7 @@ func runKeysAdd(c *Ctx, args []string) int {
 			line += " " + d.Label
 		}
 		if d.ExpiresAt != nil {
-			line += ", " + expiresText(d.ExpiresAt, time.Now())
+			line += ", expires " + expiresText(d.ExpiresAt, time.Now())
 		}
 		fmt.Fprintln(w, line)
 	})

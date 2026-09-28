@@ -6,7 +6,7 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
-Credentials: revocation and delegation (#256, #257).
+Credentials: revocation, delegation and expiry (#256, #257, #277).
 
 *Upgrade note.* =token create= makes a =read= token unless given
 =--scope full=. A script that mints a token and then writes with it
@@ -25,6 +25,8 @@ must add =--scope full=. Existing tokens keep their scope.
   15 seconds. An expiring key cannot create credentials, like an
   expiring token. =keys list= and =repo deploy-key list= gain =USED= and
   =EXPIRES= columns, after the label (#277).
+- =token list= at a terminal shows a future expiry as a time, not
+  "just now" (#286).
 
 * v1.36.0 — 2026-09-23
 

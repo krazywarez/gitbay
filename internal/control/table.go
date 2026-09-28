@@ -95,7 +95,7 @@ func (t *table) flush() {
 	line := make([]string, n)
 	for i := range line {
 		if i < len(t.header) {
-			line[i] = t.header[i]
+			line[i] = clip(t.header[i], widths[i])
 		}
 	}
 	b.WriteString(t.term.paint(sgrDim, t.join(line, widths)) + "\n")

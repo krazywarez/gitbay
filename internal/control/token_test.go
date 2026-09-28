@@ -64,7 +64,7 @@ func TestTokenListFutureExpiryAtTerminal(t *testing.T) {
 	if strings.Contains(out.String(), "just now") {
 		t.Fatalf("token list at a terminal printed \"just now\" for a future expiry:\n%s", out.String())
 	}
-	if !strings.Contains(out.String(), "expires ") {
+	if !strings.Contains(out.String(), exp.UTC().Format("2006-01-02")) {
 		t.Fatalf("token list:\n%s", out.String())
 	}
 }

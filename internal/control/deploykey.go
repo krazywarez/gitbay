@@ -84,7 +84,7 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	return c.emit(d, func(w io.Writer) {
 		line := fmt.Sprintf("deploy key %s (%s) bound to %s", fp, mode, repo.Path())
 		if expires != nil {
-			line += ", " + expiresText(expires, time.Now())
+			line += ", expires " + expiresText(expires, time.Now())
 		}
 		fmt.Fprintln(w, line)
 	})

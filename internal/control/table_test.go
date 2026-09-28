@@ -35,6 +35,22 @@ func TestTableTerminalFits(t *testing.T) {
 	}
 }
 
+// A column shrunk below its header's width clips the header too.
+func TestTableClipsHeaderToColumn(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 16}}).table(&b, "FINGERPRINT", "SCOPE")
+	tb.row(cFlex("SHA256:abcdefghijklmnopqrstuvwxyz"), cState("full"))
+	tb.flush()
+	for _, line := range strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n") {
+		if cells(line) > 16 {
+			t.Errorf("line of %d cells at 16 columns: %q", cells(line), line)
+		}
+	}
+	if !strings.HasPrefix(b.String(), "FINGERPR…  SCOPE\n") {
+		t.Errorf("header:\n%s", b.String())
+	}
+}
+
 func TestTableColourOnlyAddsSGR(t *testing.T) {
 	var mono, colour bytes.Buffer
 	fixtureTable(&Ctx{Term: Term{Cols: 40}}, &mono)

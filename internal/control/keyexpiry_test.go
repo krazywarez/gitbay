@@ -63,12 +63,16 @@ func TestKeysAddTTLAndList(t *testing.T) {
 			t.Errorf("%s expires %v", k.Label, k.ExpiresAt)
 		}
 	}
+	exp := map[string]string{}
+	for _, k := range keys {
+		exp[k.Label] = k.ExpiresAt.UTC().Format("2006-01-02")
+	}
 	out, _, _ := run("", "keys", "list")
-	if !strings.Contains(out, "\tlaptop\tnever used\texpires ") {
+	if !strings.Contains(out, "\tlaptop\tnever\t"+exp["laptop"]) {
 		t.Fatalf("keys list:\n%s", out)
 	}
 	out, _, _ = run("", "repo", "deploy-key", "list", repo.Path())
-	if !strings.Contains(out, "\tci\tnever used\texpires ") {
+	if !strings.Contains(out, "\tci\tnever\t"+exp["ci"]) {
 		t.Fatalf("deploy-key list:\n%s", out)
 	}
 }
