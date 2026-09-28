@@ -26,6 +26,7 @@
 
 {{if eq .View "conversation"}}
 <div class="prose">
+<h2>Discussion</h2>
 {{if .CanEdit}}<details class="editbox"{{if .Draft.Is "edit"}} open{{end}}><summary>Edit</summary>
 {{if .Draft.Is "edit"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="{{$base}}/edit" class="commentform">

@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,7 +11,33 @@ import (
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/web"
 )
+
+// A heading precedes the issue's comment thread, matching the merge
+// request page, so a screen-reader user skimming by heading has a
+// landmark before the first comment rather than falling straight from
+// the edit box into the body (#271).
+func TestIssuePageHasDiscussionHeading(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "issue.html", struct {
+		repoPage
+		Issue       store.Issue
+		BodyHTML    template.HTML
+		Comments    []renderedComment
+		CanEdit     bool
+		CanWrite    bool
+		Milestones  []store.Milestone
+		Notice      string
+		LabelColors map[string]template.CSS
+		Draft       *draft
+	}{repoPage: testRepoPage(), Issue: store.Issue{Number: 1, Title: "bug", Author: "cmc", State: "open"}}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "<h2>Discussion</h2>") {
+		t.Error("no Discussion heading")
+	}
+}
 
 // sessionCookieFor gives uid a real web session, the way canWriteRepo's
 // call to s.viewer(r) needs (internal/httpd/accounts.go:37-47), since

@@ -10,6 +10,7 @@
 
 <div class="withaside">
 <div class="mainside">
+<h2>Discussion</h2>
 {{if .CanEdit}}<details class="editbox"{{if .Draft.Is "edit"}} open{{end}}><summary>edit</summary>
 {{if .Draft.Is "edit"}}{{template "previewblock" .Draft.HTML}}{{end}}
 <form method="post" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Issue.Number}}/edit" class="commentform">

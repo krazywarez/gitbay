@@ -59,6 +59,21 @@ func TestMRDiffViewNamesAPrunedHead(t *testing.T) {
 	}
 }
 
+// A heading precedes the comment thread, so a screen-reader user
+// skimming by heading does not fall from the aside's groups straight
+// into the first comment with no landmark (#271).
+func TestMRPageHasDiscussionHeading(t *testing.T) {
+	var sb strings.Builder
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("open"), View: "conversation",
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(sb.String(), "<h2>Discussion</h2>") {
+		t.Error("no Discussion heading")
+	}
+}
+
 // The watch button names all three states it cycles through, including
 // muted, which MR 1 made reachable (#271).
 func TestRepoHeaderWatchButtonNamesMutedState(t *testing.T) {
