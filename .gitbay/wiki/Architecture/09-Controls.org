@@ -77,7 +77,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | SSRF protection on user-supplied URLs       | partial  | webhooks at save and connect; mirrors at save only (#279)               |
 | Webhook payload integrity                   | in place | HMAC-SHA256 header                                               |
-| SMTP credentials protected in transit       | partial  | STARTTLS opportunistic (#280); Go refuses PLAIN auth without TLS to a remote host |
+| SMTP credentials protected in transit       | in place | STARTTLS required for non-local relays, implicit TLS optional (=internal/mail/mail.go=) |
 | Upload size limits                          | in place | per-owner storage quota at push (=internal/sshd/sshd.go=); API body 1 MiB |
 
 ** CI and build isolation

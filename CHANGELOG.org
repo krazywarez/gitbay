@@ -35,6 +35,10 @@ must add =--scope full=. Existing tokens keep their scope.
   the login page's mailed links have (#278).
 - The HTTPS listener refuses TLS below 1.2, in both certificate modes
   (#281).
+- Mail to a non-local relay requires TLS by default; a relay that does
+  not offer STARTTLS gets no mail unless =mail.require_tls = false=
+  restores the old behaviour. =mail.tls = "implicit"= speaks TLS from
+  the first byte, for relays on port 465 (#280).
 
 * v1.36.0 — 2026-09-23
 

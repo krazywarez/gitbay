@@ -60,7 +60,7 @@ secret, webhook secret and mirror token.
 | HTTP port 80             | ACME challenges and redirect only                            |
 | git://                   | none (public data only; off by default)                      |
 | Runner ↔ server          | SSH                                                           |
-| SMTP                     | STARTTLS when the relay offers it                            |
+| SMTP                     | STARTTLS required unless the relay is local (=mail.require_tls=), or implicit TLS (=mail.tls=) |
 | APNs                     | TLS, HTTP/2                                                  |
 | Webhooks                 | TLS when the URL is https; HMAC-SHA256 body signature in =X-Gitbay-Signature-256= (=internal/webhook/webhook.go=) |
 | Mirrors                  | per URL; token passed through =GIT_ASKPASS=, never argv (=internal/mirror/mirror.go=) |

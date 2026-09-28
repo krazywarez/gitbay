@@ -125,10 +125,17 @@ build page's live log arrives only when the build ends;
   registration. Requires [mail].
 
 ** [mail]
-- =smtp_host= (host:port, 587 assumed), =from=, optional =smtp_user= /
-  =smtp_pass=. STARTTLS when offered. Required for invite/open
+- =smtp_host= (host:port; 587 assumed, 465 with =tls = "implicit"=),
+  =from=, optional =smtp_user= / =smtp_pass=. Required for invite/open
   registration and self-service =email add=; in closed mode you may omit
   it entirely and assert addresses by hand (below).
+- =tls= — =starttls= (default) or =implicit= (TLS from the first byte,
+  for relays on 465).
+- =require_tls= — with =starttls=, a relay that does not offer STARTTLS
+  gets no mail: delivery fails and retries, and the admin page's Mail
+  table shows the error. Unset, it is on for every relay except
+  =localhost= and loopback addresses; set =false= to allow plaintext
+  to a remote relay.
 
 ** [push]
 Push notifications to Apple devices, delivered by gitbayd talking to

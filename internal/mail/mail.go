@@ -1,10 +1,13 @@
 // Package mail sends transactional email over SMTP: verification codes and
-// invites. STARTTLS is used when the server offers it; PLAIN auth when
-// credentials are configured.
+// invites. The connection is encrypted with STARTTLS, or with TLS from the
+// first byte when mail.tls = "implicit"; a relay that offers neither gets
+// nothing unless mail.require_tls is off. PLAIN auth when credentials are
+// configured.
 package mail
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/smtp"
@@ -14,30 +17,43 @@ import (
 	"gitbay.org/gitbay/internal/config"
 )
 
+// rootCAs verifies the relay's certificate; nil is the system pool.
+var rootCAs *x509.CertPool
+
 // Send delivers one plain-text message. cfg.Mail.SMTPHost is host:port.
 func Send(cfg config.Config, to, subject, body string) error {
 	m := cfg.Mail
 	if m.SMTPHost == "" || m.From == "" {
 		return fmt.Errorf("[mail] smtp_host and from must be configured")
 	}
+	implicit := m.TLS == "implicit"
 	host := m.SMTPHost
 	if !strings.Contains(host, ":") {
-		host += ":587"
+		if implicit {
+			host += ":465"
+		} else {
+			host += ":587"
+		}
 	}
 	hostname, _, _ := net.SplitHostPort(host)
+	tlsCfg := &tls.Config{ServerName: hostname, RootCAs: rootCAs}
 
 	msg := strings.NewReplacer("\n", "\r\n").Replace(fmt.Sprintf(
 		"From: %s\nTo: %s\nSubject: %s\nDate: %s\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\n%s\n",
 		m.From, to, subject, time.Now().Format(time.RFC1123Z), body))
 
-	c, err := smtp.Dial(host)
+	c, err := dial(host, hostname, implicit, tlsCfg)
 	if err != nil {
 		return fmt.Errorf("smtp dial %s: %w", host, err)
 	}
 	defer c.Close()
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		if err := c.StartTLS(&tls.Config{ServerName: hostname}); err != nil {
-			return fmt.Errorf("starttls: %w", err)
+	if !implicit {
+		if ok, _ := c.Extension("STARTTLS"); ok {
+			if err := c.StartTLS(tlsCfg); err != nil {
+				return fmt.Errorf("starttls: %w", err)
+			}
+		} else if m.TLSRequired() {
+			return fmt.Errorf("%s does not offer STARTTLS and mail.require_tls is on; not sending in clear", host)
 		}
 	}
 	if m.SMTPUser != "" {
@@ -62,4 +78,22 @@ func Send(cfg config.Config, to, subject, body string) error {
 		return err
 	}
 	return c.Quit()
+}
+
+// dial opens the SMTP session: plain TCP for STARTTLS, or TLS from the
+// first byte.
+func dial(addr, hostname string, implicit bool, tlsCfg *tls.Config) (*smtp.Client, error) {
+	if !implicit {
+		return smtp.Dial(addr)
+	}
+	conn, err := tls.Dial("tcp", addr, tlsCfg)
+	if err != nil {
+		return nil, err
+	}
+	c, err := smtp.NewClient(conn, hostname)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return c, nil
 }

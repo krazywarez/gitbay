@@ -57,7 +57,7 @@ a database check.
 | Destination            | Trigger                       | TLS                                          | Guard                                                          |
 |------------------------+-------------------------------+----------------------------------------------+----------------------------------------------------------------|
 | ACME directory         | certificate issue and renewal | yes                                          | host policy limits names to the site and claimed pages domains (=main.go=) |
-| SMTP relay             | queued mail                   | STARTTLS when offered                        | Go's =PlainAuth= will not send credentials over plaintext to a non-local host (=internal/mail/mail.go=) |
+| SMTP relay             | queued mail                   | STARTTLS required for a non-local relay, or implicit TLS | =mail.require_tls=; Go's =PlainAuth= will not send credentials over plaintext to a non-local host (=internal/mail/mail.go=) |
 | APNs                   | queued push                   | yes, HTTP/2                                  | provider token signed with the operator's .p8 key              |
 | Webhook URLs           | recorded events               | yes when https; certificate verified         | private, loopback and link-local targets refused at save and again at connect time; no redirects (=internal/webhook/webhook.go=) |
 | Mirror URLs            | mirror schedule               | per URL                                      | the same address check at save time (=internal/control/mirrorcmd.go=); git makes the connection, so there is no connect-time re-check |
