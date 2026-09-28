@@ -20,9 +20,10 @@
 #   127.0.0.1:22      the forge over loopback, for the runner. Builds do
 #                     not reach loopback at all: the runner starts them
 #                     with pasta's gateway mapping off (--no-map-gw).
-#   loopback :53      the host's resolver, which pasta forwards a
-#                     build's DNS to when the host's nameserver is a
-#                     loopback address.
+#   loopback :53      the host's resolver, for when the host's nameserver
+#                     is a loopback address. That pasta forwards a
+#                     build's DNS there is to be confirmed from inside a
+#                     build by runbook R3, not assumed.
 #   public 22/80/443  the forge, as anyone on the internet reaches it.
 # Everything else is rejected: the admin sshd on 2222 on every address,
 # and any service bound to loopback. -isolation none builds run as the

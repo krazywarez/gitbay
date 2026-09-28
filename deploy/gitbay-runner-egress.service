@@ -10,6 +10,9 @@
 # Reload re-reads the file and replaces the table in one transaction; it
 # does not restart the runner, which a restart of this unit would
 # (Requires= propagates restarts). `make deploy-runner` reloads.
+#
+# Stop uses destroy, which succeeds when the table is already gone (a
+# flush ruleset removes it); delete would fail and leave the unit failed.
 [Unit]
 Description=Host egress rule for CI builds
 After=nftables.service ufw.service
@@ -20,7 +23,7 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
 ExecReload=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
-ExecStop=/usr/sbin/nft delete table inet gitbay_runner
+ExecStop=/usr/sbin/nft destroy table inet gitbay_runner
 
 [Install]
 WantedBy=multi-user.target
