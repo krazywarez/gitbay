@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -564,5 +565,39 @@ func TestBuildLogFrom(t *testing.T) {
 	}
 	if _, _, err := s.BuildLogFrom(9999, 0); err != ErrNotFound {
 		t.Fatalf("missing build: %v", err)
+	}
+}
+
+// Where a failed build stopped is recorded while it runs, before the
+// outcome, and a finished build is not rewritten (#266).
+func TestSetBuildFailure(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := s.CreateUser("cmc", true)
+	repoID, _ := s.CreateRepo("user", uid, "app", "public")
+	if _, err := s.CreateBuild(repoID, "unit", "abc", "main", `["true","false"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	b, ok, err := s.ClaimBuild(nil, false)
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	if err := s.SetBuildFailure(b.ID, 2, "exit 1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FinishBuild(b.ID, "failure"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.BuildByID(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.FailedStep != 2 || got.FailedReason != "exit 1" {
+		t.Fatalf("failed step %d reason %q", got.FailedStep, got.FailedReason)
+	}
+	if err := s.SetBuildFailure(b.ID, 1, "late"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("rewrote a finished build: %v", err)
 	}
 }

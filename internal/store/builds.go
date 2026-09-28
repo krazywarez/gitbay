@@ -30,6 +30,11 @@ type Build struct {
 	// Trusted is false for a merge request head fetched from another
 	// repository: its steps run without the target's secrets.
 	Trusted bool
+	// FailedStep is the 1-based step a failed build stopped at, 0 when it
+	// stopped before its first step or did not fail. FailedReason is the
+	// runner's one line: "exit 1", "build timed out after 45m0s".
+	FailedStep   int
+	FailedReason string
 }
 
 // MaxBuildLog caps a build's stored log; appends past it are dropped.
@@ -65,14 +70,16 @@ func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image, tree 
 }
 
 const buildSelect = `
-	SELECT id, repo_id, number, job, sha, ref, steps, image, tree, status, created_at, started_at, finished_at, log_closed_at, trusted
+	SELECT id, repo_id, number, job, sha, ref, steps, image, tree, status, created_at, started_at, finished_at, log_closed_at, trusted,
+	       failed_step, failed_reason
 	FROM builds`
 
 func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 	var b Build
 	var trusted int
 	err := row.Scan(&b.ID, &b.RepoID, &b.Number, &b.Job, &b.SHA, &b.Ref, &b.Steps, &b.Image, &b.Tree,
-		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &b.LogClosedAt, &trusted)
+		&b.Status, &b.CreatedAt, &b.StartedAt, &b.FinishedAt, &b.LogClosedAt, &trusted,
+		&b.FailedStep, &b.FailedReason)
 	b.Trusted = trusted != 0
 	return b, err
 }
@@ -260,6 +267,21 @@ func (s *Store) FinishBuild(id int64, status string) error {
 		return ErrNotFound
 	}
 	s.wakeBuild(id)
+	return nil
+}
+
+// SetBuildFailure records where a running build failed. The runner
+// reports it with the outcome; it is written first, so a reader woken
+// by the finish sees both.
+func (s *Store) SetBuildFailure(id int64, step int, reason string) error {
+	res, err := s.DB.Exec(`UPDATE builds SET failed_step = ?, failed_reason = ?
+		WHERE id = ? AND status = 'running'`, step, reason, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
 	return nil
 }
 
