@@ -1,6 +1,9 @@
 package store
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrExists marks unique-constraint refusals callers turn into messages.
 var ErrExists = errors.New("already exists")
@@ -20,28 +23,54 @@ type Mirror struct {
 	LastError string
 }
 
+// AddMirror stores the mirror, then seals its token under the new row's
+// id in the same transaction.
 func (s *Store) AddMirror(repoID int64, direction, url, username, token string) (int64, error) {
-	res, err := s.DB.Exec(
-		"INSERT INTO mirrors (repo_id, direction, url, username, token) VALUES (?, ?, ?, ?, ?)",
-		repoID, direction, url, username, token)
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(
+		"INSERT INTO mirrors (repo_id, direction, url, username, token) VALUES (?, ?, ?, ?, '')",
+		repoID, direction, url, username)
 	if err != nil {
 		if isUniqueErr(err) {
 			return 0, ErrExists
 		}
 		return 0, err
 	}
-	return res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if token != "" {
+		sealed, err := s.sealValue(mirrorAAD(id), token)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec("UPDATE mirrors SET token = ? WHERE id = ?", sealed, id); err != nil {
+			return 0, err
+		}
+	}
+	return id, tx.Commit()
 }
 
 const mirrorSelect = `
 	SELECT id, repo_id, direction, url, username, token, dirty, last_sync, last_error
 	FROM mirrors`
 
-func scanMirror(row interface{ Scan(...any) error }) (Mirror, error) {
+func (s *Store) scanMirror(row interface{ Scan(...any) error }) (Mirror, error) {
 	var m Mirror
-	err := row.Scan(&m.ID, &m.RepoID, &m.Direction, &m.URL, &m.Username, &m.Token,
-		&m.Dirty, &m.LastSync, &m.LastError)
-	return m, err
+	if err := row.Scan(&m.ID, &m.RepoID, &m.Direction, &m.URL, &m.Username, &m.Token,
+		&m.Dirty, &m.LastSync, &m.LastError); err != nil {
+		return m, err
+	}
+	var err error
+	if m.Token, err = s.openValue(mirrorAAD(m.ID), m.Token); err != nil {
+		return m, fmt.Errorf("mirror %d: %w", m.ID, err)
+	}
+	return m, nil
 }
 
 func (s *Store) mirrorQuery(q string, args ...any) ([]Mirror, error) {
@@ -52,7 +81,7 @@ func (s *Store) mirrorQuery(q string, args ...any) ([]Mirror, error) {
 	defer rows.Close()
 	var out []Mirror
 	for rows.Next() {
-		m, err := scanMirror(rows)
+		m, err := s.scanMirror(rows)
 		if err != nil {
 			return nil, err
 		}

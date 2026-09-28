@@ -1,13 +1,27 @@
 package store
 
+import "fmt"
+
 // SetBuildSecret stores or replaces one secret. The value never leaves the
-// server except inside a claimed build's environment.
+// server except inside a claimed build's environment. It is sealed inside
+// the write transaction; see ResealSecrets.
 func (s *Store) SetBuildSecret(repoID int64, name, value string) error {
-	_, err := s.DB.Exec(`
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	sealed, err := s.sealValue(buildSecretAAD(repoID, name), value)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
 		INSERT INTO build_secrets (repo_id, name, value) VALUES (?, ?, ?)
 		ON CONFLICT (repo_id, name) DO UPDATE SET value = excluded.value`,
-		repoID, name, value)
-	return err
+		repoID, name, sealed); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) RemoveBuildSecret(repoID int64, name string) error {
@@ -52,7 +66,9 @@ func (s *Store) BuildSecrets(repoID int64) (map[string]string, error) {
 		if err := rows.Scan(&n, &v); err != nil {
 			return nil, err
 		}
-		out[n] = v
+		if out[n], err = s.openValue(buildSecretAAD(repoID, n), v); err != nil {
+			return nil, fmt.Errorf("build secret %s: %w", n, err)
+		}
 	}
 	return out, rows.Err()
 }

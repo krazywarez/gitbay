@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"gitbay.org/gitbay/internal/seal"
 	"modernc.org/sqlite"
 )
 
@@ -37,6 +38,9 @@ type Store struct {
 	// daemon sets it to its own logger, whose output the service
 	// journal keeps outside the database.
 	AuditJournal *slog.Logger
+	// secrets seals and opens the secret columns (secrets.go). Nil
+	// stores values as given and refuses to open sealed ones.
+	secrets *seal.Keyring
 }
 
 // Open opens (creating if needed) the database at path with WAL mode and

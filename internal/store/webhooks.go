@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -38,14 +39,34 @@ type DeliveryStatus struct {
 	CreatedAt  string
 }
 
+// AddWebhook stores the hook, then seals its secret under the new row's
+// id in the same transaction.
 func (s *Store) AddWebhook(repoID int64, url, secret, events string) (int64, error) {
-	res, err := s.DB.Exec(
-		"INSERT INTO webhooks (repo_id, url, secret, events) VALUES (?, ?, ?, ?)",
-		repoID, url, secret, events)
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	defer tx.Rollback()
+	res, err := tx.Exec(
+		"INSERT INTO webhooks (repo_id, url, secret, events) VALUES (?, ?, '', ?)",
+		repoID, url, events)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if secret != "" {
+		sealed, err := s.sealValue(webhookAAD(id), secret)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec("UPDATE webhooks SET secret = ? WHERE id = ?", sealed, id); err != nil {
+			return 0, err
+		}
+	}
+	return id, tx.Commit()
 }
 
 func (s *Store) ListWebhooks(repoID int64) ([]Webhook, error) {
@@ -61,6 +82,9 @@ func (s *Store) ListWebhooks(repoID int64) ([]Webhook, error) {
 		var active int
 		if err := rows.Scan(&w.ID, &w.URL, &w.Secret, &w.Events, &active, &w.CreatedAt); err != nil {
 			return nil, err
+		}
+		if w.Secret, err = s.openValue(webhookAAD(w.ID), w.Secret); err != nil {
+			return nil, fmt.Errorf("webhook %d: %w", w.ID, err)
 		}
 		w.Active = active != 0
 		out = append(out, w)
@@ -106,6 +130,9 @@ func (s *Store) DueDeliveries(limit int) ([]Delivery, error) {
 		if err := rows.Scan(&d.ID, &d.WebhookID, &d.URL, &d.Secret, &d.EventID, &d.EventKind,
 			&d.RepoPath, &d.Actor, &d.DataJSON, &d.EventAt, &d.Attempts); err != nil {
 			return nil, err
+		}
+		if d.Secret, err = s.openValue(webhookAAD(d.WebhookID), d.Secret); err != nil {
+			return nil, fmt.Errorf("webhook %d: %w", d.WebhookID, err)
 		}
 		out = append(out, d)
 	}

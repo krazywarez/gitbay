@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -20,9 +21,11 @@ type PushDevice struct {
 
 // AddPushDevice registers a token to an account. A token already present
 // changes hands rather than erroring: Apple reuses tokens, and a reinstall
-// hands the same one to whichever account signs in next. The id is read
-// back by token rather than taken from LastInsertId, which SQLite leaves
-// unchanged when the DO UPDATE arm fires instead of the INSERT.
+// hands the same one to whichever account signs in next. The token is
+// sealed (secrets.go), so the lookup and the upsert go by its hash, and a
+// handover reseals it under the new owner. The id is read back by hash
+// rather than taken from LastInsertId, which SQLite leaves unchanged when
+// the DO UPDATE arm fires instead of the INSERT.
 //
 // The row id survives that handover, so queue rows written for the
 // previous owner would still be delivered to the device — and an alert
@@ -35,18 +38,27 @@ func (s *Store) AddPushDevice(userID int64, token, label string) (int64, error) 
 		return 0, err
 	}
 	defer tx.Rollback()
+	h := tokenHash(token)
+	// A row written before token_hash existed holds its token in clear.
+	if _, err := tx.Exec("UPDATE push_devices SET token_hash = ? WHERE token_hash IS NULL AND token = ?", h, token); err != nil {
+		return 0, err
+	}
 	var prev int64
-	if err := tx.QueryRow("SELECT user_id FROM push_devices WHERE token = ?", token).Scan(&prev); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRow("SELECT user_id FROM push_devices WHERE token_hash = ?", h).Scan(&prev); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	sealed, err := s.sealValue(pushTokenAAD(userID, h), token)
+	if err != nil {
 		return 0, err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO push_devices (user_id, token, label) VALUES (?, ?, ?)
-		ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, label = excluded.label`,
-		userID, token, label); err != nil {
+		INSERT INTO push_devices (user_id, token, token_hash, label) VALUES (?, ?, ?, ?)
+		ON CONFLICT(token_hash) DO UPDATE SET user_id = excluded.user_id, token = excluded.token, label = excluded.label`,
+		userID, sealed, h, label); err != nil {
 		return 0, err
 	}
 	var id int64
-	if err := tx.QueryRow("SELECT id FROM push_devices WHERE token = ?", token).Scan(&id); err != nil {
+	if err := tx.QueryRow("SELECT id FROM push_devices WHERE token_hash = ?", h).Scan(&id); err != nil {
 		return 0, err
 	}
 	if prev != 0 && prev != userID {
@@ -60,7 +72,7 @@ func (s *Store) AddPushDevice(userID int64, token, label string) (int64, error) 
 
 func (s *Store) PushDevices(userID int64) ([]PushDevice, error) {
 	rows, err := s.DB.Query(`
-		SELECT id, user_id, token, label, created_at, COALESCE(last_seen_at, '')
+		SELECT id, user_id, token, COALESCE(token_hash, ''), label, created_at, COALESCE(last_seen_at, '')
 		FROM push_devices WHERE user_id = ? ORDER BY id`, userID)
 	if err != nil {
 		return nil, err
@@ -69,8 +81,12 @@ func (s *Store) PushDevices(userID int64) ([]PushDevice, error) {
 	var out []PushDevice
 	for rows.Next() {
 		var d PushDevice
-		if err := rows.Scan(&d.ID, &d.UserID, &d.Token, &d.Label, &d.CreatedAt, &d.LastSeenAt); err != nil {
+		var h string
+		if err := rows.Scan(&d.ID, &d.UserID, &d.Token, &h, &d.Label, &d.CreatedAt, &d.LastSeenAt); err != nil {
 			return nil, err
+		}
+		if d.Token, err = s.openValue(pushTokenAAD(d.UserID, h), d.Token); err != nil {
+			return nil, fmt.Errorf("push device %d: %w", d.ID, err)
 		}
 		out = append(out, d)
 	}
@@ -152,7 +168,7 @@ func (s *Store) EnqueuePush(userID int64, title, body, path string) error {
 
 func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	rows, err := s.DB.Query(`
-		SELECT q.id, q.device_id, d.token, u.username, q.title, q.body, q.path, q.attempts,
+		SELECT q.id, q.device_id, d.token, d.user_id, COALESCE(d.token_hash, ''), u.username, q.title, q.body, q.path, q.attempts,
 		       (SELECT COUNT(*) FROM inbox WHERE user_id = d.user_id AND read_at IS NULL)
 		FROM push_queue q
 		JOIN push_devices d ON d.id = q.device_id
@@ -167,8 +183,13 @@ func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 	var out []QueuedPush
 	for rows.Next() {
 		var p QueuedPush
-		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts, &p.Badge); err != nil {
+		var uid int64
+		var h string
+		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &uid, &h, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts, &p.Badge); err != nil {
 			return nil, err
+		}
+		if p.Token, err = s.openValue(pushTokenAAD(uid, h), p.Token); err != nil {
+			return nil, fmt.Errorf("push device %d: %w", p.DeviceID, err)
 		}
 		out = append(out, p)
 	}
@@ -195,8 +216,10 @@ func (s *Store) MarkPushFailed(id int64, errMsg string, nextAt *time.Time) error
 }
 
 // DeletePushDeviceByToken drops a device Apple has told us is gone. The
-// queue rows cascade, so nothing is left retrying at a dead token.
+// queue rows cascade, so nothing is left retrying at a dead token. A row
+// without a hash predates sealing and holds its token in clear.
 func (s *Store) DeletePushDeviceByToken(token string) error {
-	_, err := s.DB.Exec("DELETE FROM push_devices WHERE token = ?", token)
+	_, err := s.DB.Exec("DELETE FROM push_devices WHERE token_hash = ? OR (token_hash IS NULL AND token = ?)",
+		tokenHash(token), token)
 	return err
 }
