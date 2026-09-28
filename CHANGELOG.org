@@ -89,6 +89,9 @@ for the eighteen commands whose CLI path differs from the registry's
   including the error text of the web UI and the JSON API (#267).
 - An unregistered SSH key is refused with its own fingerprint and the
   real host, and both the web and ssh paths to register (#268).
+- =issue create= takes =--label= (repeatable), =--milestone= and
+  =--assignee= (repeatable), setting them in the same call instead of
+  a separate one per field (#268).
 
 * v1.36.0 — 2026-09-23
 

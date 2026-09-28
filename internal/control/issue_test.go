@@ -1,6 +1,85 @@
 package control
 
-import "testing"
+import (
+	"bytes"
+	"errors"
+	"testing"
+
+	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/store"
+)
+
+// TestIssueCreateWithLabelRequiresWrite checks that attaching a label at
+// create time needs the same write access issue label requires, not just
+// the read access that lets anyone file the issue in the first place.
+func TestIssueCreateWithLabelRequiresWrite(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	repoID, err := c.Store.CreateRepo("user", c.User.ID, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := c.Store.RepoByID(repoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Store.SetLabel(repo, "bug", "ff0000"); err != nil {
+		t.Fatal(err)
+	}
+	bobID, err := c.Store.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob := *c
+	bob.User = store.User{ID: bobID, Username: "bob"}
+	var out bytes.Buffer
+	bob.Stdout, bob.Stderr = &out, &out
+
+	if code := runIssueCreate(&bob, []string{repo.Path(), "--title", "t", "--label", "bug"}); code != protocol.ExitDenied {
+		t.Fatalf("exit %d, want %d", code, protocol.ExitDenied)
+	}
+	if _, err := c.Store.IssueByNumber(repo.ID, 1); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("issue was created despite the denial: %v", err)
+	}
+}
+
+func TestIssueCreateSetsLabelsMilestoneAndAssignee(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	repoID, err := c.Store.CreateRepo("user", c.User.ID, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := c.Store.RepoByID(repoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Store.SetLabel(repo, "bug", "ff0000"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Store.CreateMilestone(repo, "m1", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Store.CreateUser("bob", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if code := runIssueCreate(c, []string{repo.Path(), "--title", "t",
+		"--label", "bug", "--milestone", "m1", "--assignee", "bob"}); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	issue, err := c.Store.IssueByNumber(repo.ID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issue.Labels) != 1 || issue.Labels[0] != "bug" {
+		t.Errorf("labels = %v", issue.Labels)
+	}
+	if issue.Milestone != "m1" {
+		t.Errorf("milestone = %q", issue.Milestone)
+	}
+	if len(issue.Assignees) != 1 || issue.Assignees[0] != "bob" {
+		t.Errorf("assignees = %v", issue.Assignees)
+	}
+}
 
 func TestIssueAssignNotifiesTheAssignee(t *testing.T) {
 	c, repo, bob := testRepoWithWatcher(t)

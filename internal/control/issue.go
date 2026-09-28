@@ -17,16 +17,20 @@ const maxBodyBytes = 64 << 10
 func init() {
 	register(Command{Path: []string{"issue", "create"},
 		Summary: "open an issue",
-		Usage:   "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]",
+		Usage:   "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org] [--label <l>]... [--milestone <title>] [--assignee <user>]...",
 		Flags: []Flag{
 			{"--title", "<t>", "the issue's title", ""},
 			{"--body", "<b>", "the issue's body", ""},
 			{"--file", "-", "read the body from stdin", ""},
 			{"--format", "md|org", "the body's markup", "md"},
+			{"--label", "<l>", "label to add, may repeat", ""},
+			{"--milestone", "<title>", "milestone to set", ""},
+			{"--assignee", "<user>", "user to assign, may repeat", ""},
 		},
 		Examples: []string{
 			`issue create krz/gitbay --title "crash on empty repo" --body "steps to reproduce..."`,
 			"issue create krz/gitbay --title notes --file - < notes.md",
+			"issue create krz/gitbay --title bug --label bug --label priority --milestone v1 --assignee cmc",
 		},
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
@@ -177,9 +181,15 @@ func issueToOut(i store.Issue, withBody bool) issueOut {
 	return o
 }
 
+// runIssueCreate opens an issue. The CLI opens $EDITOR for the body
+// when neither --body nor --file is given (cmd/gitbay's issueCmd,
+// editor: "issue"); over stock ssh the body must be one of the two.
 func runIssueCreate(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{Values: []string{"--format", "--title", "--body", "--file"}, MaxPos: 1,
-		Usage: "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org]"})
+	f, err := c.parseArgs(args, flagSpec{
+		Values: []string{"--format", "--title", "--body", "--file", "--milestone"},
+		Multi:  []string{"--label", "--assignee"},
+		MaxPos: 1,
+		Usage:  "issue create <owner/name> --title <t> [--body <b> | --file -] [--format md|org] [--label <l>]... [--milestone <title>] [--assignee <user>]..."})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -202,6 +212,18 @@ func runIssueCreate(c *Ctx, args []string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
+	// Filing an issue only needs read access; setting a label, milestone
+	// or assignee on it needs the same write access issue label/issue
+	// milestone/issue assign require.
+	if len(f.List("--label")) > 0 || f.Value("--milestone") != "" || len(f.List("--assignee")) > 0 {
+		grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "checking access: %v", err)
+		}
+		if !policy.CanWrite(c.User, repo, grant) {
+			return c.fail(protocol.ExitDenied, "permission denied on %s; ask its owner for access", path)
+		}
+	}
 	b, err := bodyFrom(c, body, file)
 	if err != nil {
 		return c.failInput(err)
@@ -217,8 +239,36 @@ func runIssueCreate(c *Ctx, args []string) int {
 			action:  fmt.Sprintf("opened issue #%d", n),
 			excerpt: b, path: fmt.Sprintf("%s/issues/%d", repo.Path(), n)})
 	}
-	if issue, err := c.Store.IssueByNumber(repo.ID, n); err == nil {
-		notifyMentions(c, repo, issueThread, issue.ID, n, title, b)
+	issue, err := c.Store.IssueByNumber(repo.ID, n)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	notifyMentions(c, repo, issueThread, issue.ID, n, title, b)
+	for _, l := range f.List("--label") {
+		if err := c.Store.SetIssueLabel(repo, issue.ID, l, true); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	if m := f.Value("--milestone"); m != "" {
+		ms, err := c.Store.MilestoneByTitle(repo, m)
+		if err != nil {
+			return milestoneErr(c, repo, m, err)
+		}
+		if err := c.Store.SetIssueMilestone(issue.ID, ms.ID); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	for _, name := range f.List("--assignee") {
+		u, err := c.Store.UserByUsername(name)
+		if errors.Is(err, store.ErrNotFound) {
+			return c.fail(protocol.ExitNotFound, "no such user %q", name)
+		}
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if err := c.Store.SetIssueAssignee(issue.ID, u.ID, true); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 	}
 	return c.emit(Created{Number: n}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s#%d\n", repo.Path(), n)
