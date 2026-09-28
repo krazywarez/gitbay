@@ -143,7 +143,7 @@ func TestBuildLogFollow(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if strings.Contains(string(body), "Live:") {
+	if strings.Contains(string(body), "This page updates itself") {
 		t.Fatalf("?follow=0 rendered the live page:\n%s", body)
 	}
 

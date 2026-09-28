@@ -106,11 +106,10 @@ func TestAccountSettingsWeb(t *testing.T) {
 		t.Error("invalid key accepted without an error")
 	}
 
-	// The settings page has no token form. Nothing refuses one now
-	// (#234); there is simply no page for it yet, and a minted token is
-	// shown once, which wants a page designed for it.
-	if strings.Contains(body, `value="token-mint"`) {
-		t.Error("token minting exposed on the web")
+	// The settings page has a token form (#264): API tokens: create,
+	// list, revoke.
+	if !strings.Contains(body, `value="token-create"`) {
+		t.Error("token minting form missing from the web")
 	}
 
 	// The account bundle downloads as an attachment, carrying what
