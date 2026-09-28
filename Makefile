@@ -71,14 +71,22 @@ deploy-runner: preflight
 	$(CROSS) go build -trimpath -ldflags='$(LDFLAGS)' -o $(RUNNER_BIN) ./cmd/gitbay-runner
 	@echo "==> pushing runner to $(HOST)"
 	./deploy/copy.sh $(HOST) $(PORT) $(RUNNER_BIN) /usr/local/bin/gitbay-runner.new
-	ssh -p $(PORT) root@$(HOST) 'mkdir -p /etc/systemd/system/gitbay-runner.service.d'
+	ssh -p $(PORT) root@$(HOST) 'mkdir -p /etc/systemd/system/gitbay-runner.service.d /etc/gitbay-runner'
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner.override.conf /etc/systemd/system/gitbay-runner.service.d/override.conf
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.service /etc/systemd/system/gitbay-runner-prune.service
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.timer /etc/systemd/system/gitbay-runner-prune.timer
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.nft /etc/gitbay-runner/egress.nft
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.service /etc/systemd/system/gitbay-runner-egress.service
+	@echo "==> loading the egress rule"
+	ssh -p $(PORT) root@$(HOST) 'set -eu; \
+	  nft -c -f /etc/gitbay-runner/egress.nft; \
+	  systemctl daemon-reload; \
+	  systemctl enable gitbay-runner-egress.service; \
+	  systemctl reload-or-restart gitbay-runner-egress.service'
+	ssh -p $(PORT) root@$(HOST) 'sh -s' < deploy/runner-egress-check.sh
 	ssh -p $(PORT) root@$(HOST) 'set -eu; \
 	  chmod 755 /usr/local/bin/gitbay-runner.new; \
 	  mv /usr/local/bin/gitbay-runner.new /usr/local/bin/gitbay-runner; \
-	  systemctl daemon-reload; \
 	  systemctl enable --now gitbay-runner-prune.timer; \
 	  systemctl restart gitbay-runner; \
 	  systemctl --no-pager --lines=3 status gitbay-runner; \

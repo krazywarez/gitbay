@@ -1,0 +1,26 @@
+# Loads the CI runner's host egress rule (#260,
+# deploy/gitbay-runner-egress.nft). gitbay-runner.service requires this
+# unit, so the runner starts only with the rule in force; stopping this
+# unit removes the table and stops the runner with it.
+#
+# Ordered after nftables.service and ufw.service: either may rewrite the
+# ruleset at boot, and nftables.service's default config starts with
+# flush ruleset. A missing unit in After= is ignored.
+#
+# Reload re-reads the file and replaces the table in one transaction; it
+# does not restart the runner, which a restart of this unit would
+# (Requires= propagates restarts). `make deploy-runner` reloads.
+[Unit]
+Description=Host egress rule for CI builds
+After=nftables.service ufw.service
+Before=gitbay-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
+ExecReload=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
+ExecStop=/usr/sbin/nft delete table inet gitbay_runner
+
+[Install]
+WantedBy=multi-user.target

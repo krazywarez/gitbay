@@ -28,6 +28,16 @@ if ! command -v podman >/dev/null 2>&1; then
 fi
 podman --version
 
+# nft loads the runner's host egress rule (#260,
+# deploy/gitbay-runner-egress.nft), which `make deploy-runner` ships and
+# the runner's unit requires. Without nft the runner does not start.
+echo "==> installing nftables"
+if ! command -v nft >/dev/null 2>&1; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nftables
+fi
+nft --version
+
 # Rootless podman maps container uids into a range delegated to the user.
 # Without these the runner's `podman run` fails with a mapping error.
 echo "==> subuid/subgid for $RUNNER_USER"

@@ -1,0 +1,59 @@
+#!/usr/sbin/nft -f
+# Host egress for CI builds (#260). Loaded by gitbay-runner-egress.service,
+# which gitbay-runner.service requires, so the runner does not start
+# without it. `make deploy-runner` installs it as
+# /etc/gitbay-runner/egress.nft.
+#
+# Under rootless podman with pasta, a build's connections are made by
+# pasta on the host, from sockets owned by the runner's user, ci-runner.
+# nftables sees them exactly as it sees the runner's own ssh, so this
+# table cannot tell a build from its runner. It limits what that user
+# reaches on this host, and the runner needs little: 127.0.0.1:22, to
+# poll, clone and stream logs.
+#
+# Every packet to one of the host's own addresses, loopback or public,
+# leaves through lo, so the output hook sees host-bound traffic as
+# oifname "lo". Traffic to other hosts is not matched: builds keep
+# outbound internet access, trusted or not (go mod download needs it).
+#
+# What ci-runner may reach on this host:
+#   127.0.0.1:22      the forge over loopback, for the runner. Builds do
+#                     not reach loopback at all: the runner starts them
+#                     with pasta's gateway mapping off (--no-map-gw).
+#   loopback :53      the host's resolver, which pasta forwards a
+#                     build's DNS to when the host's nameserver is a
+#                     loopback address.
+#   public 22/80/443  the forge, as anyone on the internet reaches it.
+# Everything else is rejected: the admin sshd on 2222 on every address,
+# and any service bound to loopback. -isolation none builds run as the
+# same user and get the same rule.
+#
+# The account name is resolved when the file is loaded. A restart of
+# nftables.service (flush ruleset) removes this table; `systemctl
+# reload gitbay-runner-egress` puts it back.
+#
+# The first line creates the table if it is missing, so the delete never
+# fails; the file then replaces it in one transaction, and a reload never
+# leaves a moment without the rule. The uid match sits in the base
+# chain's one rule rather than in a `!=` accept, because a packet with no
+# socket (a reset the kernel sends) matches neither `==` nor `!=` on
+# skuid and would otherwise fall through to the reject.
+
+table inet gitbay_runner
+delete table inet gitbay_runner
+
+table inet gitbay_runner {
+	chain output {
+		type filter hook output priority filter; policy accept;
+		oifname "lo" meta skuid "ci-runner" jump host
+	}
+
+	chain host {
+		ip daddr 127.0.0.1 tcp dport 22 accept
+		ip daddr 127.0.0.0/8 meta l4proto { tcp, udp } th dport 53 accept
+		ip6 daddr ::1 meta l4proto { tcp, udp } th dport 53 accept
+		ip daddr != 127.0.0.0/8 tcp dport { 22, 80, 443 } accept
+		ip6 daddr != ::1 tcp dport { 22, 80, 443 } accept
+		counter reject
+	}
+}
