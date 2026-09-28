@@ -399,6 +399,24 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
 	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, username, msg, s.cfg.SiteHost()})
 }
 
+// issueNewPage is what the new-issue form renders with, whether that is a
+// fresh form, a Preview round trip, or a refused create — each keeps
+// whatever the visitor typed (#271).
+type issueNewPage struct {
+	repoPage
+	Body      string
+	Format    string
+	Title     string
+	Labels    string
+	Milestone string
+	Assignee  string
+	Template  string
+	Templates []control.IssueTemplate
+	Draft     *draft
+	CanWrite  bool
+	Notice    string
+}
+
 // issueCreateForm renders the new-issue form, prefilled from the repo's
 // default issue template when one exists. A Preview submit comes back
 // here with the draft in the form, so the page returns with everything
@@ -411,18 +429,11 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 	p.Tab = "issues"
 	if wantsPreview(r) {
 		d := s.draftFor(r, p.Repo, "body", "body", bodyFormat(r))
-		s.render(w, "issuenew.html", struct {
-			repoPage
-			Body      string
-			Format    string
-			Title     string
-			Labels    string
-			Template  string
-			Templates []control.IssueTemplate
-			Draft     *draft
-			CanWrite  bool
-		}{p, d.Body, d.Format, r.FormValue("title"), r.FormValue("labels"),
-			"", control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), d, s.canWriteRepoAs(u, p.Repo)})
+		s.render(w, "issuenew.html", issueNewPage{
+			repoPage: p, Body: d.Body, Format: d.Format, Title: r.FormValue("title"),
+			Labels: r.FormValue("labels"), Milestone: r.FormValue("milestone"), Assignee: r.FormValue("assignee"),
+			Templates: control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), Draft: d, CanWrite: s.canWriteRepoAs(u, p.Repo),
+		})
 		return
 	}
 	templates := control.IssueTemplates(p.Dir, p.Repo.DefaultBranch)
@@ -447,17 +458,10 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 	if format != "org" {
 		format = "md"
 	}
-	s.render(w, "issuenew.html", struct {
-		repoPage
-		Body      string
-		Format    string
-		Title     string
-		Labels    string
-		Template  string
-		Templates []control.IssueTemplate
-		Draft     *draft
-		CanWrite  bool
-	}{p, body, format, "", "", tplName, templates, nil, s.canWriteRepoAs(u, p.Repo)})
+	s.render(w, "issuenew.html", issueNewPage{
+		repoPage: p, Body: body, Format: format, Template: tplName, Templates: templates,
+		CanWrite: s.canWriteRepoAs(u, p.Repo),
+	})
 }
 
 // Issue and merge request writes run the command the CLI runs, so the
@@ -465,13 +469,18 @@ func (s *Server) issueCreateForm(w http.ResponseWriter, r *http.Request, u store
 // implementation. Bodies travel on stdin, the way --file - does.
 
 func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
-	repoPath := r.PathValue("owner") + "/" + r.PathValue("repo")
+	p, ok := s.repoFor(w, r, "")
+	if !ok {
+		return
+	}
+	repoPath := p.Repo.Path()
 	title := strings.TrimSpace(r.FormValue("title"))
 	format := bodyFormat(r)
 	if wantsPreview(r) {
 		s.issueCreateForm(w, r, u)
 		return
 	}
+	canWrite := s.canWriteRepoAs(u, p.Repo)
 	var created control.Created
 	argv := []string{"issue", "create", repoPath, "--title", title, "--format", format, "--file", "-"}
 	// Labels, milestone and assignee go on the same dispatch issue create
@@ -480,7 +489,7 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 	// events happen (#271). issue create refuses the whole create when any
 	// of them is set without write access, so a reader's hand-crafted POST
 	// carrying one is dropped here rather than failing the create.
-	if repo, err := s.st.RepoByPath(repoPath); err == nil && s.canWriteRepoAs(u, repo) {
+	if canWrite {
 		argv = append(argv, fieldArgs("--label", r.FormValue("labels"))...)
 		if milestone := strings.TrimSpace(r.FormValue("milestone")); milestone != "" {
 			argv = append(argv, "--milestone", milestone)
@@ -489,7 +498,12 @@ func (s *Server) issueCreateSubmit(w http.ResponseWriter, r *http.Request, u sto
 	}
 	code, msg := s.dispatchIntoStdin(u, argv, r.FormValue("body"), &created)
 	if code != protocol.ExitOK {
-		http.Error(w, msg, statusForExit(code))
+		p.Tab = "issues"
+		s.render(w, "issuenew.html", issueNewPage{
+			repoPage: p, Body: r.FormValue("body"), Format: format, Title: title,
+			Labels: r.FormValue("labels"), Milestone: r.FormValue("milestone"), Assignee: r.FormValue("assignee"),
+			Templates: control.IssueTemplates(p.Dir, p.Repo.DefaultBranch), CanWrite: canWrite, Notice: msg,
+		})
 		return
 	}
 	n := created.Number

@@ -283,6 +283,111 @@ func TestIssueCreateSubmitSetsMilestoneAndAssignee(t *testing.T) {
 	}
 }
 
+// Preview carries the milestone and assignee back into the form, the same
+// way it already carries title and labels, so a writer previewing the
+// body does not lose what they picked (#271).
+func TestIssueCreateFormPreviewKeepsMilestoneAndAssignee(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	if _, err := st.CreateRepo("user", uid, "app", "public"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.Web.Mode = "accounts"
+	s := New(cfg, st)
+	form := url.Values{
+		"title":     {"a bug"},
+		"body":      {"**steps**"},
+		"milestone": {"v1"},
+		"assignee":  {"bob"},
+		"preview":   {"1"},
+	}
+	req := httptest.NewRequest("POST", "/alice/app/issues/new", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "app")
+	req.AddCookie(sessionCookieFor(t, s, st, uid))
+	rr := httptest.NewRecorder()
+	s.issueCreateSubmit(rr, req, u)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `value="v1"`) {
+		t.Errorf("preview lost the milestone:\n%s", body)
+	}
+	if !strings.Contains(body, `value="bob"`) {
+		t.Errorf("preview lost the assignee:\n%s", body)
+	}
+}
+
+// A refused create — here a bad milestone — re-renders the new-issue form
+// with the draft and a notice, rather than an http.Error page that drops
+// everything the visitor typed (#271).
+func TestIssueCreateSubmitRefusedKeepsDraft(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	if _, err := st.CreateRepo("user", uid, "app", "public"); err != nil {
+		t.Fatal(err)
+	}
+	repo, err := st.RepoByPath("alice/app")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(config.Default(), st)
+	form := url.Values{
+		"title":     {"needs a fix"},
+		"body":      {"details"},
+		"milestone": {"no-such-milestone"},
+	}
+	req := httptest.NewRequest("POST", "/alice/app/issues/new", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("owner", "alice")
+	req.SetPathValue("repo", "app")
+	rr := httptest.NewRecorder()
+	s.issueCreateSubmit(rr, req, u)
+
+	if rr.Code == http.StatusSeeOther {
+		t.Fatalf("expected a failure status, got redirect")
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `value="needs a fix"`) {
+		t.Errorf("refused create lost the title:\n%s", body)
+	}
+	if !strings.Contains(body, "details") {
+		t.Errorf("refused create lost the body:\n%s", body)
+	}
+	if !strings.Contains(body, `class="error"`) {
+		t.Errorf("refused create has no notice:\n%s", body)
+	}
+
+	if _, err := st.IssueByNumber(repo.ID, 1); err == nil {
+		t.Fatal("issue was created despite the bad milestone")
+	}
+}
+
 // A bad assignee creates nothing: issue create resolves the assignee
 // before writing the issue, so a typo leaves the repo without a
 // half-created issue (#271).

@@ -2,6 +2,7 @@
 {{define "title"}}new issue · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
 {{define "content"}}
 <h1>New issue</h1>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
 {{if gt (len .Templates) 1}}<p class="meta">template:
 {{range .Templates}}{{if eq .Name $.Template}}<strong>{{.Name}}</strong>{{else}}<a href="?template={{.Name}}">{{.Name}}</a>{{end}} {{end}}</p>{{end}}
 {{if .Draft.Is "body"}}{{template "previewblock" .Draft.HTML}}{{end}}
@@ -11,8 +12,8 @@
 {{template "formatpicker" .Format}}
 {{if .CanWrite}}
 <p><input type="text" name="labels" aria-label="Labels" placeholder="labels, space-separated (optional)" value="{{.Labels}}"></p>
-<p><input type="text" name="milestone" aria-label="Milestone" placeholder="milestone (optional)"></p>
-<p><input type="text" name="assignee" aria-label="Assignee" placeholder="assignees, space-separated (optional)"></p>
+<p><input type="text" name="milestone" aria-label="Milestone" placeholder="milestone (optional)" value="{{.Milestone}}"></p>
+<p><input type="text" name="assignee" aria-label="Assignee" placeholder="assignees, space-separated (optional)" value="{{.Assignee}}"></p>
 {{end}}
 <p><button type="submit">Open issue</button> {{template "previewbtn"}}</p>
 </form>
