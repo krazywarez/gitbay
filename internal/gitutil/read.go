@@ -24,11 +24,25 @@ type TreeEntry struct {
 
 // ListTree lists one level of the tree at ref:path.
 func ListTree(dir, ref, path string) ([]TreeEntry, error) {
+	return lsTree(dir, ref, path, false)
+}
+
+// ListTreeRecursive lists every blob under ref:path, named by its path
+// relative to that tree.
+func ListTreeRecursive(dir, ref, path string) ([]TreeEntry, error) {
+	return lsTree(dir, ref, path, true)
+}
+
+func lsTree(dir, ref, path string, recursive bool) ([]TreeEntry, error) {
 	spec := ref
 	if path != "" {
 		spec = ref + ":" + path
 	}
-	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "ls-tree", "-l", "--end-of-options", spec)
+	args := []string{"-C", dir, "ls-tree", "-l"}
+	if recursive {
+		args = append(args, "-r")
+	}
+	cmd := exec.Command(toolpath.Look("git"), append(args, "--end-of-options", spec)...)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("ls-tree %s: %w", spec, err)

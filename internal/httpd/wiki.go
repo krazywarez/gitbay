@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -29,7 +30,7 @@ func (s *Server) wikiDir(repo store.Repo) (dir, branch string) {
 // hasWiki reports whether repo's default branch holds a wiki page.
 func (s *Server) hasWiki(repo store.Repo) bool {
 	dir, branch := s.wikiDir(repo)
-	entries, err := gitutil.ListTree(dir, branch, wikiTreePath)
+	entries, err := gitutil.ListTreeRecursive(dir, branch, wikiTreePath)
 	if err != nil {
 		return false
 	}
@@ -54,7 +55,8 @@ func wikiExtMatch(name string) bool {
 
 // wiki renders a page from the repo's .gitbay/wiki tree. The home page is
 // Home.<ext> (or README.<ext>); /wiki/<name> resolves <name> with .md and
-// .org fallbacks. Rendering reuses the same sanitized pipeline as READMEs.
+// .org fallbacks, and a name may be a path into a subfolder. Rendering
+// reuses the same sanitized pipeline as READMEs.
 func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.repoFor(w, r, "")
 	if !ok {
@@ -75,7 +77,7 @@ func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 			repoPage
 			Page     string
 			PageHTML template.HTML
-			Pages    []string
+			Nav      []wikiNavGroup
 			Missing  bool
 		}{repoPage: p, Missing: true})
 		return
@@ -97,15 +99,66 @@ func (s *Server) wiki(w http.ResponseWriter, r *http.Request) {
 			s.notFound(w, r)
 			return
 		}
-		pageHTML = rewriteWikiLinks(renderReadme(shown.File, []byte(shown.Content)), p)
+		isPage := map[string]bool{}
+		for _, pg := range pages {
+			isPage[pg] = true
+		}
+		isFile := map[string]bool{}
+		dir, branch := s.wikiDir(p.Repo)
+		if entries, err := gitutil.ListTreeRecursive(dir, branch, wikiTreePath); err == nil {
+			for _, e := range entries {
+				isFile[e.Name] = e.Type == "blob"
+			}
+		}
+		pageHTML = rewriteWikiLinks(renderReadme(shown.File, []byte(shown.Content)), p, page,
+			func(t string) bool { return isPage[t] }, func(t string) bool { return isFile[t] })
 	}
 	s.render(w, "wiki.html", struct {
 		repoPage
 		Page     string
 		PageHTML template.HTML
-		Pages    []string
+		Nav      []wikiNavGroup
 		Missing  bool
-	}{p, page, pageHTML, pages, false})
+	}{p, page, pageHTML, wikiNav(pages), false})
+}
+
+// wikiNavGroup is one folder of the wiki sidebar; Dir is empty for the
+// top level, which comes first.
+type wikiNavGroup struct {
+	Dir   string
+	Pages []wikiNavPage
+}
+
+type wikiNavPage struct {
+	Name  string // the page's path, as routed
+	Label string // its last segment
+}
+
+// wikiNav groups page names by folder, keeping the listing's order within
+// each folder.
+func wikiNav(pages []string) []wikiNavGroup {
+	var groups []wikiNavGroup
+	at := map[string]int{}
+	for _, pg := range pages {
+		d := path.Dir(pg)
+		if d == "." {
+			d = ""
+		}
+		i, ok := at[d]
+		if !ok {
+			i = len(groups)
+			at[d] = i
+			groups = append(groups, wikiNavGroup{Dir: d})
+		}
+		groups[i].Pages = append(groups[i].Pages, wikiNavPage{Name: pg, Label: path.Base(pg)})
+	}
+	sort.SliceStable(groups, func(a, b int) bool {
+		if (groups[a].Dir == "") != (groups[b].Dir == "") {
+			return groups[a].Dir == ""
+		}
+		return groups[a].Dir < groups[b].Dir
+	})
+	return groups
 }
 
 // wikiRaw serves non-page files from the wiki (images referenced by pages).
@@ -125,15 +178,49 @@ func (s *Server) wikiRaw(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
+	ct := "application/octet-stream"
+	if t, ok := imageTypes[strings.ToLower(path.Ext(rel))]; ok {
+		ct = t
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(data)
 }
 
+// wikiResolve maps a relative link on page to a path inside the wiki. A
+// page in a subfolder looks in its own folder first and then at the wiki
+// root, so [[Admin]] still reaches a top-level page; when neither exists
+// the folder-relative path is kept, so a broken link points where its
+// author wrote it. A top-level page resolves exactly as before.
+func wikiResolve(page, v string, exists func(string) bool) (string, bool) {
+	dir := path.Dir(page)
+	local := path.Clean(path.Join(dir, v))
+	if local == ".." || strings.HasPrefix(local, "../") {
+		return "", false
+	}
+	if dir == "." || exists(local) {
+		return local, true
+	}
+	if root := path.Clean(v); root != ".." && !strings.HasPrefix(root, "../") && exists(root) {
+		return root, true
+	}
+	return local, true
+}
+
+// trimPageExt drops a page extension from a link target.
+func trimPageExt(target string) string {
+	switch strings.ToLower(path.Ext(target)) {
+	case ".md", ".org", ".markdown", ".html":
+		return strings.TrimSuffix(target, path.Ext(target))
+	}
+	return target
+}
+
 // rewriteWikiLinks makes relative links resolve inside the wiki: page
 // links (with or without .md/.org/.html extensions) go to /wiki/<page>,
-// other relative targets (images) to the wiki raw route.
-func rewriteWikiLinks(rendered template.HTML, p repoPage) template.HTML {
+// other relative targets (images) to the wiki raw route. Targets resolve
+// from the current page's folder, as wikiResolve describes.
+func rewriteWikiLinks(rendered template.HTML, p repoPage, page string, isPage, isFile func(string) bool) template.HTML {
 	ctx := &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div}
 	nodes, err := html.ParseFragment(strings.NewReader(string(rendered)), ctx)
 	if err != nil {
@@ -155,20 +242,15 @@ func rewriteWikiLinks(rendered template.HTML, p repoPage) template.HTML {
 					strings.HasPrefix(v, "data:") {
 					continue
 				}
-				target := path.Clean(v)
-				if strings.HasPrefix(target, "..") {
-					continue
-				}
 				if isSrc {
-					n.Attr[i].Val = base + "/_raw/" + target
+					if target, ok := wikiResolve(page, v, isFile); ok {
+						n.Attr[i].Val = base + "/_raw/" + target
+					}
 					continue
 				}
-				ext := strings.ToLower(path.Ext(target))
-				switch ext {
-				case ".md", ".org", ".markdown", ".html":
-					target = strings.TrimSuffix(target, path.Ext(target))
+				if target, ok := wikiResolve(page, trimPageExt(v), isPage); ok {
+					n.Attr[i].Val = base + "/" + target
 				}
-				n.Attr[i].Val = base + "/" + target
 			}
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {

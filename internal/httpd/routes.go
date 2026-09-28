@@ -69,7 +69,7 @@ func (s *Server) Routes() []Route {
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/labels", Handler: s.labels},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/wiki", Handler: s.wiki},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/wiki/_raw/{path...}", Handler: s.wikiRaw},
-		Route{Method: "GET", Pattern: "/{owner}/{repo}/wiki/{page}", Handler: s.wiki},
+		Route{Method: "GET", Pattern: "/{owner}/{repo}/wiki/{page...}", Handler: s.wiki},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases", Handler: s.releases},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/releases.atom", Handler: s.releasesAtom},
 		Route{Method: "GET", Pattern: "/{owner}/{repo}/log.atom", Handler: s.logAtom},

@@ -58,8 +58,9 @@ func wikiDir(c *Ctx, spec string) (repo store.Repo, dir, branch string, code int
 }
 
 // wikiPages lists the page names under .gitbay/wiki, without extensions.
+// A page in a subfolder is named by its path: Architecture/Identity.
 func wikiPages(dir, branch string) []string {
-	entries, err := gitutil.ListTree(dir, branch, wikiTreePath)
+	entries, err := gitutil.ListTreeRecursive(dir, branch, wikiTreePath)
 	if err != nil {
 		return nil // no .gitbay/wiki tree on this branch
 	}

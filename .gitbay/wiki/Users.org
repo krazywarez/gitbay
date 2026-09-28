@@ -344,6 +344,13 @@ mkdir -p .gitbay/wiki
 git add .gitbay/wiki && git commit -m "wiki" && git push
 #+end_src
 
+Pages may sit in subfolders. A nested page is named by its path —
+=.gitbay/wiki/Guide/Install.md= is =/you/project/wiki/Guide/Install= and
+=wiki show you/project Guide/Install= — and the sidebar groups it under
+its folder. A relative link or image on a nested page resolves from the
+page's own folder first, then from the top of the wiki, so a link to
+=Home= still reaches the top-level page. SVG images render.
+
 Releases anchor notes and binary assets to a pushed tag (write access;
 assets stream over SSH, capped by the instance's =max_asset_bytes=).
 While a release exists its tag can be neither deleted nor moved, whether

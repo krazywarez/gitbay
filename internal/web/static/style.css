@@ -1748,6 +1748,7 @@ h2 .count { background: none; color: var(--muted); font-weight: 400; font-size: 
 .wikipage { flex: 1; min-width: 0; }
 .wikinav { flex: none; width: 15rem; }
 .wikinav ul { list-style: none; margin: var(--sp-1) 0 var(--sp-4); padding: 0; }
+.wikinav .wikidir { margin-bottom: 0; }
 .wikinav li a {
   display: block;
   padding: 5px var(--sp-2);

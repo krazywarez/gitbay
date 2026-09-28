@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,6 +91,46 @@ func TestWikis(t *testing.T) {
 		t.Fatalf("wiki raw escaped .gitbay/wiki: %d\n%s", status, body)
 	}
 
+	// A page in a subfolder is named by its path. Its links resolve from
+	// its own folder first and then the wiki root, the sidebar groups it
+	// under the folder, and an SVG next to it is served as an image.
+	guide := filepath.Join(dir, ".gitbay", "wiki", "Guide")
+	os.MkdirAll(guide, 0o755)
+	os.WriteFile(filepath.Join(guide, "Install.md"), []byte(
+		"# install steps\n\n[Next](Next.md), [Setup](Setup.org)\n\n![flow](flow.svg)\n"), 0o644)
+	os.WriteFile(filepath.Join(guide, "Next.md"), []byte("# next step\n"), 0o644)
+	os.WriteFile(filepath.Join(guide, "flow.svg"), []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "wiki subfolder")
+	mustGit(t, dir, env, "push", "-q", inst.sshURL("alice/app"), "main")
+	status, body = inst.get(t, "/alice/app/wiki/Guide/Install")
+	if status != 200 || !strings.Contains(body, "install steps") {
+		t.Fatalf("subfolder page: %d\n%s", status, body)
+	}
+	for _, want := range []string{
+		`href="/alice/app/wiki/Guide/Next"`,
+		`href="/alice/app/wiki/Setup"`,
+		`src="/alice/app/wiki/_raw/Guide/flow.svg"`,
+		`<p class="meta wikidir">Guide</p>`,
+		`href="/alice/app/wiki/Guide/Install">Install</a>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("subfolder page lacks %s", want)
+		}
+	}
+	resp, err := http.Get(inst.base() + "/alice/app/wiki/_raw/Guide/flow.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); resp.StatusCode != 200 || ct != "image/svg+xml" {
+		t.Errorf("wiki svg: %d %q", resp.StatusCode, ct)
+	}
+	out, _, code := inst.ssh(t, aliceKey, "", "wiki", "show", "alice/app", "Guide/Next", "--json")
+	if code != 0 || !strings.Contains(out, "next step") {
+		t.Errorf("wiki show Guide/Next: %s", out)
+	}
+
 	// A wiki is readable from every surface, not just a browser: the
 	// commands are what the web dispatches, and what the CLI and the
 	// JSON API reach.
@@ -99,6 +140,9 @@ func TestWikis(t *testing.T) {
 	}
 	if !strings.Contains(out, `"Home"`) || !strings.Contains(out, `"Setup"`) {
 		t.Errorf("wiki list pages: %s", out)
+	}
+	if !strings.Contains(out, `"Guide/Install"`) || !strings.Contains(out, `"Guide/Next"`) {
+		t.Errorf("wiki list lacks subfolder pages: %s", out)
 	}
 	if !strings.Contains(out, `"home":"Home"`) {
 		t.Errorf("wiki list did not name the landing page: %s", out)
