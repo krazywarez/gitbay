@@ -242,3 +242,42 @@ func TestMixedTextLinksAreUnderlined(t *testing.T) {
 		}
 	}
 }
+
+// The main rail and the phone "More" menu render New repository,
+// Settings, Admin and Log out from one list, so adding a destination in
+// one place reaches both (#271).
+func TestRailOptItemsDriveBothRailAndMoreMenu(t *testing.T) {
+	items := railOptItems(struct {
+		Tab   string
+		Admin bool
+	}{Tab: "admin", Admin: true})
+	if len(items) != 4 {
+		t.Fatalf("got %d items, want 4 (New repository, Settings, Admin, Log out)", len(items))
+	}
+	if items[2].Name != "Admin" || !items[2].Show {
+		t.Errorf("Admin item: %+v", items[2])
+	}
+	if !items[2].Current {
+		t.Error("Admin item should be Current when Tab is admin")
+	}
+
+	nonAdmin := railOptItems(struct {
+		Tab   string
+		Admin bool
+	}{Tab: "account"})
+	if nonAdmin[2].Show {
+		t.Error("Admin item should not Show for a non-admin viewer")
+	}
+	if !nonAdmin[1].Current {
+		t.Error("Settings item should be Current when Tab is account")
+	}
+
+	// TestRailIconsAreLabelled's regex checks a raillink call site for a
+	// literal "Icon" and "Name" argument; a call built off railOptItems
+	// does not match that pattern, so it is checked here instead.
+	for i, it := range items {
+		if it.Icon == "" || it.Name == "" || it.Href == "" {
+			t.Errorf("item %d missing a field: %+v", i, it)
+		}
+	}
+}

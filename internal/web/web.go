@@ -67,6 +67,65 @@ var fullVersion = sync.OnceValue(func() string {
 // changes that URL and a browser holding a cached copy cannot miss it.
 var StyleVersion string
 
+// railItem is one destination the rail's icon strip and the phone
+// "More" menu both render — from this one list, so a destination added
+// here reaches both instead of the two being hand-kept in step (#271).
+type railItem struct {
+	Href    string
+	Icon    string
+	Name    string
+	Current bool
+	Count   int64 // unused by railOptItems; present so "raillink" can read it uniformly
+	Show    bool
+}
+
+// railField and railBool read a named field off the page value the
+// layout was given — the same reflection str/field already do for the
+// repo header, duplicated narrowly here rather than exported, since
+// railOptItems is their only other caller.
+func railField(v any, name string) string {
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return ""
+	}
+	f := rv.FieldByName(name)
+	if !f.IsValid() || f.Kind() != reflect.String {
+		return ""
+	}
+	return f.String()
+}
+
+func railBool(v any, name string) bool {
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return false
+	}
+	f := rv.FieldByName(name)
+	return f.IsValid() && f.Kind() == reflect.Bool && f.Bool()
+}
+
+// railOptItems is the rail's "New repository", "Settings", "Admin" and
+// "Log out" destinations, in the order the rail shows them. v is the
+// page value the layout renders (any page struct that embeds
+// basePage), read by field name since the layout has no single common
+// type for every page.
+func railOptItems(v any) []railItem {
+	tab := railField(v, "Tab")
+	admin := railBool(v, "Admin")
+	return []railItem{
+		{Href: "/new", Icon: "plus", Name: "New repository", Show: true},
+		{Href: "/settings", Icon: "gear", Name: "Settings", Current: tab == "account", Show: true},
+		{Href: "/admin", Icon: "shield", Name: "Admin", Current: tab == "admin", Show: admin},
+		{Href: "/logout", Icon: "signout", Name: "Log out", Show: true},
+	}
+}
+
 var funcs = template.FuncMap{
 	"gitbayVersion": func() string { return version() },
 	"gitbayCommit":  func() string { return fullVersion() },
@@ -122,6 +181,7 @@ var funcs = template.FuncMap{
 		}
 		return "?"
 	},
+	"railOptItems": railOptItems,
 	// str is field, narrowed to strings: missing or non-string fields
 	// yield "", which comparisons handle without erroring.
 	"str": func(v any, name string) string {

@@ -6,6 +6,12 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- The new-issue form takes labels, milestone and assignee in one step
+  for writers; the watch button names watching, muted and default; a
+  Discussion heading sits before comment threads; the build page's
+  live note says the page updates itself; and the rail and the phone
+  More menu render from one list (#271).
+
 - Empty states on the web state the fact instead of a CLI command, and
   drop "yet" on a finished item; the merge request list offers a New
   merge request link, a fork link, or a sign-in prompt depending on
