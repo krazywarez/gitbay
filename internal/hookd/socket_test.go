@@ -1,7 +1,9 @@
 package hookd
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -159,5 +161,37 @@ func TestPeerRefusalIsAudited(t *testing.T) {
 	rows := refusedRows(t, st, "refused hook")
 	if len(rows) != 1 || rows[0].Actor != "" || !strings.Contains(rows[0].Data, "peer uid not permitted") {
 		t.Fatalf("refused hook rows: %+v", rows)
+	}
+}
+
+// A refused push of many refs records the first auditedRefs names and
+// a count of the rest.
+func TestRefusedPushCapsRefs(t *testing.T) {
+	sock, st, repoID, uid := serveSocket(t)
+	token, err := st.CreatePushToken(repoID, uid, "full")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: token}
+	for i := range 500 {
+		req.Updates = append(req.Updates, policy.RefUpdate{Ref: fmt.Sprintf("refs/merge-requests/%d/head", i),
+			Old: zeroSHA40, New: strings.Repeat("a", 40)})
+	}
+	if resp, err := Ask(sock, req, nil); err != nil || resp.Allow {
+		t.Fatalf("push: %+v, %v", resp, err)
+	}
+	rows := refusedRows(t, st, "refused push")
+	if len(rows) != 1 {
+		t.Fatalf("rows: %+v", rows)
+	}
+	var data struct {
+		Refs     []string `json:"refs"`
+		MoreRefs int      `json:"more_refs"`
+	}
+	if err := json.Unmarshal([]byte(rows[0].Data), &data); err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Refs) != auditedRefs || data.MoreRefs != 500-auditedRefs || data.Refs[0] != "refs/merge-requests/0/head" {
+		t.Fatalf("refs %d, more %d", len(data.Refs), data.MoreRefs)
 	}
 }

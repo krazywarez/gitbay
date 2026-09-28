@@ -238,8 +238,9 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   download= are unaffected. Under =ssh.mode = "system"= SSH clones are not counted,
   since each session is its own process (#262).
 - Anonymous clones are counted per IPv4 address or IPv6 /64, and
-  together hold at most =pack_concurrency= − 1 slots, so a signed-in
-  client can always get the last one (#262).
+  together hold at most =pack_concurrency= − 1 slots: an account can
+  take the last slot when it is free, and anonymous clients cannot hold
+  it (#262).
 - A request turned away by the pack limit logs a warning naming the
   transport and whether the client was signed in, never its address,
   at most once a minute per transport (#262).

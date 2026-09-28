@@ -55,7 +55,10 @@ The defaults (=pack_concurrency= 3, =pack_per_principal= 2,
 =pack_queue= 32, =pack_queue_wait= 60s) are set for a four-core host
 from the single-clone figure above; no concurrent-clone measurement
 backs them yet. =deploy/clonebench.sh <clone-url> <n>= starts n full
-clones at once from a machine other than the server. Clones from one
-address count against one principal, so run it from two addresses, or
-against an instance with =pack_per_principal = -1=, or it measures the
-per-principal cap instead of the global one.
+clones at once from a machine other than the server. Anonymous clones
+together hold at most =pack_concurrency= − 1 slots, and clones from one
+address or account count against one principal, so an anonymous run
+measures those caps rather than the global one. Run it as signed-in
+clients (SSH keys, or HTTP with bearer tokens) from more than one
+account, or against an instance with =pack_per_principal = -1= and
+read the result as the anonymous class cap.

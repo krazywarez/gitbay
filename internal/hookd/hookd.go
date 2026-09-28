@@ -172,14 +172,22 @@ func (s *Server) authorize(req Request) (actor int64, msg string) {
 // peerCheck is checkPeer; tests replace it.
 var peerCheck = checkPeer
 
+// auditedRefs is how many ref names a refused-push row keeps; the rest
+// are counted, so one push of many refs cannot write an unbounded row.
+const auditedRefs = 20
+
 // refusePush answers a pre-receive refusal and audits it.
 func (s *Server) refusePush(enc *json.Encoder, req Request, repo store.Repo, msg string) {
-	refs := make([]string, len(req.Updates))
-	for i, u := range req.Updates {
+	n := min(len(req.Updates), auditedRefs)
+	refs := make([]string, n)
+	for i, u := range req.Updates[:n] {
 		refs[i] = u.Ref
 	}
-	control.AuditRefused(s.st, req.UserID, "refused push",
-		map[string]any{"repo": repo.Path(), "refs": refs, "reason": msg})
+	data := map[string]any{"repo": repo.Path(), "refs": refs, "reason": msg}
+	if more := len(req.Updates) - n; more > 0 {
+		data["more_refs"] = more
+	}
+	control.AuditRefused(s.st, req.UserID, "refused push", data)
 	enc.Encode(Response{Allow: false, Message: msg})
 }
 
