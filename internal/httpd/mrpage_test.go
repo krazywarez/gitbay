@@ -199,3 +199,28 @@ func TestMRGatesRender(t *testing.T) {
 		t.Errorf("gates block on a merge request without gates:\n%s", out)
 	}
 }
+
+// Each revision after the first carries a link comparing it to the one
+// before, so a reviewer does not have to type mr range-diff by hand
+// (#269).
+func TestMRPageListsRevisionsWithCompareLinks(t *testing.T) {
+	var sb strings.Builder
+	revs := []store.MRHead{
+		{SHA: "aaaa1111", CreatedAt: "2026-09-23T10:00:00Z"},
+		{SHA: "bbbb2222", CreatedAt: "2026-09-24T10:00:00Z"},
+	}
+	if err := web.Render(&sb, "mr.html", mrPageData{
+		repoPage: testRepoPage(), MR: testMR("open"), View: "conversation", Revisions: revs,
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := sb.String()
+	for _, want := range []string{"aaaa1111", "bbbb2222", "compare to previous", "from=aaaa1111", "to=bbbb2222"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "gitbay mr range-diff") {
+		t.Error("still quotes the CLI command instead of linking the new page")
+	}
+}
