@@ -25,7 +25,7 @@
   {{if eq $.State "all"}}<span class="chip {{if eq .State "open"}}chip-open{{else}}chip-done{{end}}">{{.State}}</span>{{end}}
 </li>
 {{else}}{{if .Query}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues matching “{{.Query}}”</li>
-{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues — open one with <code>gitbay issue create {{.Repo.OwnerName}}/{{.Repo.Name}} --title "..."</code></li>{{end}}{{end}}
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}issues{{if .Viewer}} — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/new">open one</a>{{end}}</li>{{end}}{{end}}
 </ul>
 {{if .Older}}<p class="pager"><a href="{{.Older}}">older →</a></p>{{end}}
 </div>

@@ -18,6 +18,6 @@
     <div class="progress"><div class="bar" style="width: {{.Percent}}%"></div></div>
   </div>
 </li>
-{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}org milestones — create one with <code>gitbay org milestone create {{.Org}} "v1.0"</code></li>{{end}}
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}org milestones</li>{{end}}
 </ul>
 {{end}}

@@ -17,6 +17,6 @@
     <div class="progress"><div class="bar" style="width: {{.Percent}}%"></div></div>
   </div>
 </li>
-{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}milestones — create one with <code>gitbay milestone create {{.Repo.OwnerName}}/{{.Repo.Name}} "v1.0"</code></li>{{end}}
+{{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}milestones</li>{{end}}
 </ul>
 {{end}}
