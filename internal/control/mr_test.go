@@ -3,6 +3,8 @@ package control
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -175,5 +177,88 @@ func TestMREditSupersededByOnOpenMRRefused(t *testing.T) {
 	}
 	if !strings.Contains(errOut.String(), "only a closed merge request can be superseded") {
 		t.Fatalf("stderr = %q, want the closed-only refusal", errOut.String())
+	}
+}
+
+// mr show pluralizes multi-row section headings with counts.
+func TestMRShowPluralizesMultiRowSections(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	owner := store.User{ID: uid, Username: "alice"}
+
+	// Create git commits for the MR
+	git := gitRunner(t)
+	root := t.TempDir()
+
+	// Create a temporary repository to set up commits
+	src := filepath.Join(root, "src")
+	os.MkdirAll(src, 0o755)
+	git(root, "init", "-q", "-b", "main", "src")
+
+	// Create base commit on main
+	os.WriteFile(filepath.Join(src, "file.txt"), []byte("content"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "initial")
+
+	// Create feature branch with 2 commits
+	git(src, "checkout", "-q", "-b", "feature")
+	os.WriteFile(filepath.Join(src, "file.txt"), []byte("content1"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "commit1")
+
+	os.WriteFile(filepath.Join(src, "file.txt"), []byte("content2"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "commit2")
+	headSHA := strings.TrimSpace(git(src, "rev-parse", "HEAD"))
+
+	// Clone as a bare repository to the gitbay path
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", "src", dir)
+
+	// Create the MR head ref in the bare repository
+	git(dir, "update-ref", "refs/merge-requests/1/head", headSHA)
+
+	// Create an MR
+	_, err := st.CreateMR(repo.ID, uid, repo.ID, "feature", "main", "Feature", "", headSHA, "md", false)
+	if err != nil {
+		t.Fatalf("CreateMR: %v", err)
+	}
+
+	// Add 2 checks
+	if err := st.SetCommitStatus(repo.ID, headSHA, "check1", "success", "", "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetCommitStatus(repo.ID, headSHA, "check2", "success", "", "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 2 reviews
+	bob, err := st.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddMRReview(1, bob, "approve", headSHA); err != nil {
+		t.Fatal(err)
+	}
+	charlie, err := st.CreateUser("charlie", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddMRReview(1, charlie, "approve", headSHA); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call mr show in plain text mode
+	c, out, errOut := mrTestCtx(st, owner)
+	c.Cfg.Server.Root = root
+	if code := Dispatch(c, []string{"mr", "show", repo.Path(), "1"}); code != protocol.ExitOK {
+		t.Fatalf("mr show: exit %d, %s", code, errOut.String())
+	}
+
+	outStr := out.String()
+	for _, want := range []string{"commits (2):", "checks (2):", "reviews (2):"} {
+		if !strings.Contains(outStr, want) {
+			t.Errorf("missing %q in:\n%s", want, outStr)
+		}
 	}
 }

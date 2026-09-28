@@ -790,7 +790,7 @@ func runMRShow(c *Ctx, args []string) int {
 		v.body(d.Body, d.BodyFormat)
 
 		if len(commits) > 1 {
-			v.section("commit")
+			v.section(fmt.Sprintf("commits (%d)", len(commits)))
 			tb := c.table(w, "SHA", "SUBJECT")
 			for _, cm := range commits {
 				tb.row(cRef(fmt.Sprintf("%.10s", cm.SHA)), cFlex(cm.Subject))
@@ -799,7 +799,7 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 
 		if len(checks) > 1 {
-			v.section("check")
+			v.section(fmt.Sprintf("checks (%d)", len(checks)))
 			tb := c.table(w, "CHECK", "STATE", "DURATION", "UPDATED")
 			for _, x := range checks {
 				tb.row(cText(x.Context), cState(x.State), cText(x.Duration), cText(c.when(x.UpdatedAt)))
@@ -808,7 +808,7 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 
 		if len(rs) > 1 {
-			v.section("review")
+			v.section(fmt.Sprintf("reviews (%d)", len(rs)))
 			tb := c.table(w, "REVIEWER", "VERDICT", "WHEN")
 			for _, r := range rs {
 				verdict := r.Verdict
