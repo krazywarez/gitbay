@@ -68,8 +68,8 @@ chapter names of OWASP ASVS 4.0 where one fits.
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | Security-relevant writes audited            | in place | every successful mutating command (=control.go=)         |
 | Authentication failures audited             | in place | =auth.failed=, =auth.throttled=                                  |
-| Denied attempts audited                     | gap      | refused commands are not recorded (#275)                                |
-| Audit log tamper resistance                 | gap      | same database, writable by the daemon user (#275)                       |
+| Denied attempts audited                     | in place | refused mutating commands and pushes, ten a minute per actor, 600 in all (=internal/control/auditrefusal.go=) |
+| Audit log tamper resistance                 | partial  | hash chain checked by =gitbayd admin audit verify=; every row the daemon writes copied to its journal; the table is writable by the daemon user, and removing the newest rows (or reusing their ids) shows only by comparing verify's last id and hash with the journal |
 
 ** Communications and integrations (V9, V10, V12)
 

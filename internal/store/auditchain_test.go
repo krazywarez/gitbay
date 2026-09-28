@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -242,12 +243,27 @@ func TestAuditChainLegacyRows(t *testing.T) {
 func TestAuditJournal(t *testing.T) {
 	s := chainStore(t)
 	var buf bytes.Buffer
-	s.AuditJournal = slog.New(slog.NewTextHandler(&buf, nil))
+	s.AuditJournal = slog.New(slog.NewJSONHandler(&buf, nil))
 	s.Audit(0, "cmd repo create", map[string]any{"argv": []string{"a/b"}})
-	line := buf.String()
-	for _, want := range []string{"msg=audit", "action=\"cmd repo create\"", "id=1", "hash="} {
-		if !strings.Contains(line, want) {
-			t.Fatalf("journal line %q lacks %q", line, want)
-		}
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("journal lines %q", lines)
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &got); err != nil {
+		t.Fatal(err)
+	}
+	var id float64
+	var data, createdAt, hash string
+	if err := s.DB.QueryRow("SELECT id, data_json, created_at, hash FROM audit_log").Scan(&id, &data, &createdAt, &hash); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"level": "INFO", "msg": "audit", "id": id, "actor": float64(0), "action": "cmd repo create",
+		"data": data, "created_at": createdAt, "hash": hash,
+	}
+	delete(got, "time")
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("journal line %v, want %v", got, want)
 	}
 }

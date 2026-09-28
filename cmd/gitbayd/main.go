@@ -140,6 +140,10 @@ func serveCmd() *cobra.Command {
 				return err
 			}
 			defer st.Close()
+			// The daemon's stderr is the service journal: a copy of each
+			// audit row outside the database the daemon can write. Rows
+			// are logged at Info, which the default handler always emits.
+			st.AuditJournal = slog.Default()
 
 			// Regenerate hook scripts so a moved binary self-heals, then
 			// start the hook policy socket.
@@ -406,6 +410,8 @@ func adminCmd() *cobra.Command {
 	)
 	configCmd := &cobra.Command{Use: "config", Short: "the configuration in effect"}
 	configCmd.AddCommand(configShowCmd())
+	auditCmd := hostCmd("audit [--limit n] [--json]", "print the security audit log, newest first", "audit")
+	auditCmd.AddCommand(auditVerifyCmd())
 	admin.AddCommand(
 		userCmd,
 		emailCmd,
@@ -414,7 +420,7 @@ func adminCmd() *cobra.Command {
 		hostCmd("invite --email <address>", "issue a registration invite and email its code", "admin", "invite"),
 		hostCmd("stats [--json]", "instance statistics: counts and per-repository disk usage", "admin", "stats"),
 		hostCmd("runners [--json]", "runner accounts: last poll, scope, the build each holds", "admin", "runners"),
-		hostCmd("audit [--limit n] [--json]", "print the security audit log, newest first", "audit"),
+		auditCmd,
 		backupCmd(),
 		gcCmd(),
 		adminMigrateCommitRefsCmd(),

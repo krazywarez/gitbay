@@ -18,9 +18,14 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | #262  | Availability     | No limit on concurrent git pack generation                            | high     |
 | #273  | Data at rest     | CI secrets, webhook secrets and mirror tokens are stored in clear in SQLite | high |
 | #274  | Backups          | The local backup archive is not encrypted                             | medium   |
-| #275  | Audit            | Refused writes are not audited; the audit table is writable by the daemon user | medium |
 | #298        | SSRF       | =repo import --from= fetches without an address check                 | medium   |
 | #297  | Credentials      | A browser session can mint tokens and keys that outlive it            | low      |
+
+* Not filed
+
+| Area  | Gap                                                                                                         | Severity |
+|-------+-------------------------------------------------------------------------------------------------------------+----------|
+| Audit | Removing the newest audit rows, or writing new rows under their freed ids, is not detectable from the database; only comparing =gitbayd admin audit verify='s last id and hash with the daemon's journal shows it. Rows written by =gitbayd shell= (=ssh.mode = "system"=) and host admin commands have no journal copy, and the refusal caps are per process, so under that mode each connection counts separately | low |
 
 * Questions an auditor will ask that have no answer yet
 

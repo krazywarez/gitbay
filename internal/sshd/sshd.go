@@ -466,11 +466,20 @@ func Exec(cfg config.Config, st *store.Store, user store.User, key store.SSHKey,
 	if len(argv) > 0 {
 		switch argv[0] {
 		case "git-upload-pack", "git-receive-pack", "git-upload-archive":
+			code := protocol.ExitDenied
 			if user.Pending {
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
-				return protocol.ExitDenied
+			} else {
+				code = runGit(cfg, st, user, key.Scope, argv, stdin, stdout, stderr, revoked)
 			}
-			return runGit(cfg, st, user, key.Scope, argv, stdin, stdout, stderr, revoked)
+			// A refused push is a refused write, audited like one. runGit
+			// refuses only with the path as the one argument, so argv[1:]
+			// holds no value beyond the target.
+			if argv[0] == "git-receive-pack" && (code == protocol.ExitDenied || code == protocol.ExitNotFound) {
+				control.AuditRefused(st, user.ID, "refused git-receive-pack",
+					map[string]any{"argv": argv[1:], "source": key.Fingerprint, "exit": code})
+			}
+			return code
 		case "git-lfs-authenticate":
 			// Part of the git transport, not the control plane: usable by
 			// git-scoped and deploy keys, with the transports' access rules.

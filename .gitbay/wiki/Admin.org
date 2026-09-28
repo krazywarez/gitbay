@@ -238,12 +238,38 @@ meaningful — an unverified address never produces a =verified= badge.
 
 The audit log is the security feed (events are the product feed): every
 successful mutating command with its argv and source credential (SSH key
-fingerprint or API), registrations, admin actions, force-pushes, and
-auth failures/throttling. Secrets never appear — they travel on stdin,
-never in argv.
+fingerprint or API), every refused one (exit 3 or 4) as =refused
+<command>=, refused pushes as =refused git-receive-pack=, registrations,
+admin actions, force-pushes, and auth failures/throttling. A refusal row
+keeps the flag names and the first positional, not the values.
+Refusals are recorded up to ten a minute per account and 600 a minute
+across the instance; past either, one =refused.throttled= row stands
+for the rest of that minute. The caps bound the embedded listener, the
+web and the API; under =ssh.mode = "system"= each =gitbayd shell=
+connection counts separately. Secrets never appear — they travel on
+stdin, never in argv.
+
+Each row carries the SHA-256 of the row before it. =gitbayd admin audit
+verify= opens the store as other admin commands do, applying pending
+migrations, so run it with the binary that matches the daemon. It
+recomputes the chain and exits 1 naming the first row that was
+edited or whose predecessor was removed. Retention removing the oldest
+rows is not a break. Rows written before the chain existed are counted
+and skipped; when every row is such a row, verify warns and exits 1,
+since clearing the hash columns looks the same. After an upgrade that
+clears with the first new audit row.
+
+Removing the newest rows leaves no break, and neither do rows written
+afterwards under the freed ids. The database cannot show either. The
+daemon logs every row it writes to its journal, outside the database
+(=journalctl -u gitbayd -g 'INFO audit '=), and verify prints the last
+id and hash: compare them with the newest journal line. Rows written by
+host =gitbayd admin= commands, and by =gitbayd shell= when =ssh.mode =
+"system"=, are not copied to the journal.
 
 #+begin_src sh
 gitbayd admin audit [--actor u|-] [--action prefix] [--since 24h|7d|date] [--limit n] [--json]
+gitbayd admin audit verify           # check the hash chain; exit 1 names the first bad row
 ssh git@<host> audit ...             # the same, from an admin session
 ssh git@<host> admin user list [--state active|pending|disabled|admin]
 ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions

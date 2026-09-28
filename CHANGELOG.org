@@ -54,6 +54,21 @@ must add =--scope full=. Existing tokens keep their scope.
   daemon acts. *Operators:* deploy with no push in flight, since a
   receive-pack started by the old daemon has no token and its
   post-receive will be refused by the new one (#282).
+- Audit rows are hash-chained, each carrying the SHA-256 of the one
+  before it (migration 0064), and the daemon logs a copy of every row it
+  writes to its journal. =gitbayd admin audit verify= prints the row
+  count and the last id and hash, and exits 1 naming the first row that
+  was edited or whose predecessor was removed. Removing the newest rows
+  shows only by comparing that last id and hash with the journal (#275).
+- Refused mutating commands (exit 3 or 4) are audited as =refused
+  <command>=, and refused pushes as =refused git-receive-pack=, keeping
+  flag names and the target but no values; ten a minute per account and
+  600 across the instance, counted per process, past which one
+  =refused.throttled= row stands for the rest of the minute. Under
+  =ssh.mode = "system"= each =gitbayd shell= connection counts
+  separately (#275).
+- Audit retention deletes by id, up to the newest row older than the
+  retention, so a clock step back cannot leave a gap in the chain (#275).
 
 * v1.36.0 — 2026-09-23
 

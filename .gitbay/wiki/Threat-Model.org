@@ -233,6 +233,14 @@ assume has been checked.
 - Backups are consistent per the DB-snapshot-first ordering but are not a
   single atomic snapshot; a few orphaned git objects are possible and
   harmless (see [[Admin]]).
+- The audit log lives in the database the daemon writes, so anyone with
+  the daemon user's access can change it. The hash chain makes an edited
+  or removed row show as a break under =gitbayd admin audit verify=,
+  except at the end: removing the newest rows, and writing new rows
+  under their freed ids, leaves a valid chain. Only comparing verify's
+  last id and hash with the daemon's journal copy shows it, and rows
+  written outside the daemon (=gitbayd shell= under =ssh.mode =
+  "system"=, host =gitbayd admin= commands) have no journal copy.
 - A global signature-verification epoch over-invalidates the cache on any
   trust-input change. Correct, not a leak; a performance tradeoff.
 - A build's secrets are environment variables inside its container, so

@@ -2,10 +2,13 @@ package e2e
 
 import (
 	"crypto/rand"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gitbay.org/gitbay/internal/store"
 )
 
 func TestAuditAndHardening(t *testing.T) {
@@ -113,5 +116,49 @@ func TestAuditAndHardening(t *testing.T) {
 	}
 	if strings.Count(auditOut, "auth.throttled") != 1 {
 		t.Fatal("throttle audited more than once per window")
+	}
+}
+
+// The audit log is a hash chain: gitbayd admin audit verify passes on
+// an untouched log and names the first row that was edited (#275).
+func TestAuditChainVerify(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	if _, _, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/app"); code != 0 {
+		t.Fatal("repo create failed")
+	}
+	if out := inst.admin(t, "admin", "audit", "verify"); !strings.Contains(out, "chain intact") {
+		t.Fatalf("verify: %s", out)
+	}
+	// The passthrough parent still takes its own flags.
+	if out := inst.admin(t, "admin", "audit", "--limit", "5"); !strings.Contains(out, "repo create") {
+		t.Fatalf("audit --limit: %s", out)
+	}
+
+	st, err := store.Open(filepath.Join(inst.root, "gitbay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id int64
+	if err := st.DB.QueryRow("SELECT id FROM audit_log WHERE action = 'cmd repo create'").Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB.Exec("UPDATE audit_log SET data_json = '{}' WHERE id = ?", id); err != nil {
+		t.Fatal(err)
+	}
+	out := inst.forgedAdminErr(t, "admin", "audit", "verify")
+	if !strings.Contains(out, fmt.Sprintf("chain broken at row %d:", id)) {
+		t.Fatalf("verify after edit: %s", out)
+	}
+
+	// With every hash cleared no row is chained, which is not a pass.
+	if _, err := st.DB.Exec("UPDATE audit_log SET prev_hash = '', hash = ''"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	if out := inst.forgedAdminErr(t, "admin", "audit", "verify"); !strings.Contains(out, "no row carries a hash") {
+		t.Fatalf("verify with hashes cleared: %s", out)
 	}
 }

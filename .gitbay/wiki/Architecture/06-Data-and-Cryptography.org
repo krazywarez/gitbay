@@ -18,7 +18,7 @@ content (as confidential as the repository), *O* operational.
 | Integrations    | =webhooks= (secret), =webhook_deliveries=, =mirrors= (username, token)                      | C     | *plaintext* secrets and tokens                  |
 | Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=            | P     | device tokens in clear                          |
 | Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
-| Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows |
+| Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows, a hash chain (=prev_hash=, =hash=) |
 | Dependencies    | =dep_checks=, =dep_reports=                                                                 | O     |                                                 |
 
 Outside the database:
