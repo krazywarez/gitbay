@@ -747,8 +747,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	f, err := parseFlags(args, flagSpec{Values: []string{"--step", "--reason"}, MaxPos: 2,
-		Usage: "runner done <build-id> success|failure [--step <n>] [--reason <text>]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--step", "--reason"}, MaxPos: 2, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
