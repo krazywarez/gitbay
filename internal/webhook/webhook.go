@@ -48,9 +48,9 @@ func ValidateURL(raw string, allowLocal bool) error {
 }
 
 // CheckAddrs refuses host when any of its resolved addresses is
-// loopback, private or link-local, unless allowLocal. A caller resolves
-// immediately before connecting and connects only to the addresses it
-// checked.
+// loopback, private, shared (100.64.0.0/10), link-local, multicast or
+// unspecified, unless allowLocal. A caller resolves immediately before
+// connecting and connects only to the addresses it checked.
 func CheckAddrs(host string, ips []net.IP, allowLocal bool) error {
 	if allowLocal {
 		return nil
@@ -63,9 +63,13 @@ func CheckAddrs(host string, ips []net.IP, allowLocal bool) error {
 	return nil
 }
 
+// cgnat is the shared address space of RFC 6598, which carriers and
+// overlay networks such as Tailscale use as private space.
+var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
 func isForbidden(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+		ip.IsMulticast() || ip.IsUnspecified() || cgnat.Contains(ip)
 }
 
 type Deliverer struct {
