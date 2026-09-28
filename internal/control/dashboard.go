@@ -226,11 +226,16 @@ func runDashboard(c *Ctx, args []string) int {
 		}
 		section("pinned:", []string{"PATH", "VISIBILITY", "DESCRIPTION"}, pinnedRows)
 
-		activityRows := make([][]cell, len(d.Activity))
-		for i, e := range d.Activity {
-			activityRows[i] = []cell{cAge(e.CreatedAt), cText(e.Actor), cText(e.Kind), cRef(e.Repo), cFlex(string(e.Data))}
+		lines := FeedLines(events)
+		activityRows := make([][]cell, len(lines))
+		for i, l := range lines {
+			sentence := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
+			if l.Extra != "" {
+				sentence += " " + l.Extra
+			}
+			activityRows[i] = []cell{cAge(l.When), cFlex(sentence)}
 		}
-		section("recent activity:", []string{"WHEN", "ACTOR", "KIND", "REPO", "DATA"}, activityRows)
+		section("recent activity:", []string{"WHEN", "EVENT"}, activityRows)
 
 		buildRows := make([][]cell, len(d.Builds))
 		for i, b := range d.Builds {
@@ -343,10 +348,15 @@ func runFeed(c *Ctx, args []string) int {
 		return strconv.FormatInt(e.ID, 10)
 	})
 	ds := feedOutputs(events)
+	lines := FeedLines(events)
 	return c.emitPage(p, ds, next, func(w io.Writer) {
-		tb := c.table(w, "WHEN", "ACTOR", "KIND", "REPO", "DATA")
-		for _, d := range ds {
-			tb.row(cAge(d.CreatedAt), cText(d.Actor), cText(d.Kind), cRef(d.Repo), cFlex(string(d.Data)))
+		tb := c.table(w, "WHEN", "EVENT")
+		for _, l := range lines {
+			sentence := fmt.Sprintf("%s %s %s%s", l.Actor, l.Verb, l.Repo, l.Ref)
+			if l.Extra != "" {
+				sentence += " " + l.Extra
+			}
+			tb.row(cAge(l.When), cFlex(sentence))
 		}
 		tb.flush()
 	})
