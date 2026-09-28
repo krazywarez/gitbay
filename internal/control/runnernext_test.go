@@ -266,3 +266,32 @@ func TestRunnerNextSaysWhetherTrusted(t *testing.T) {
 		}
 	}
 }
+
+// A build on the daemon's own host is given the public destination, not
+// the loopback address its runner polls. The port rides along only when
+// it is not 22, so ssh://$GITBAY_SSH/<owner>/<name>.git is a valid URL
+// either way (#260).
+func TestRunnerNextCarriesPublicSSH(t *testing.T) {
+	st, repo, uid, root, baseSHA, _ := setupOrphanRepo(t)
+	for _, tc := range []struct {
+		port int
+		want string
+	}{
+		{0, `"ssh":"git@x.test"`},
+		{22, `"ssh":"git@x.test"`},
+		{2022, `"ssh":"git@x.test:2022"`},
+	} {
+		if _, err := st.CreateBuild(repo.ID, "unit", baseSHA, "main", "[]", "", "", true); err != nil {
+			t.Fatal(err)
+		}
+		c, out := runnerCtx(st, uid, root) // site_url https://x.test
+		c.Cfg.SSH.Port = tc.port
+		c.JSON = true
+		if code := runRunnerNext(c, nil); code != protocol.ExitOK {
+			t.Fatalf("port %d: runner next: exit %d, output:\n%s", tc.port, code, out.String())
+		}
+		if !strings.Contains(out.String(), tc.want) {
+			t.Fatalf("port %d: claim lacks %s:\n%s", tc.port, tc.want, out.String())
+		}
+	}
+}

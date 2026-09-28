@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"regexp"
 	"slices"
 	"strconv"
@@ -460,6 +461,23 @@ func runnerMayBuild(c *Ctx, key store.SSHKey, repoID int64) (bool, error) {
 // walking it forever.
 const maxOrphanSkip = 50
 
+// publicSSH is the instance's ssh destination as anyone outside reaches
+// it. A runner on the daemon's own host polls over loopback and hands
+// its builds this instead, so no build connects from the runner's source
+// address (#260). The port is added only when it is not 22: hutch and
+// orgo build ssh://$GITBAY_SSH/... URLs, valid in both forms. Empty when
+// site_url is not set.
+func publicSSH(c *Ctx) string {
+	host := c.Cfg.SiteHost()
+	if host == "" {
+		return ""
+	}
+	if p := c.Cfg.SSH.Port; p != 0 && p != 22 {
+		return "git@" + net.JoinHostPort(host, strconv.Itoa(p))
+	}
+	return "git@" + host
+}
+
 func runRunnerNext(c *Ctx, args []string) int {
 	key, code := runnerSession(c)
 	if code >= 0 {
@@ -562,10 +580,13 @@ func runRunnerNext(c *Ctx, args []string) int {
 		Image  string   `json:"image,omitempty"`
 		// Trusted is always sent: a runner decides a build's home and
 		// secrets from it, and reads a missing field as untrusted (#255).
-		Trusted bool              `json:"trusted"`
+		Trusted bool `json:"trusted"`
+		// SSH is the instance's public destination for the build's
+		// GITBAY_SSH when its runner polls over loopback (#260).
+		SSH     string            `json:"ssh,omitempty"`
 		Secrets map[string]string `json:"secrets,omitempty"`
 	}{ID: b.ID, Repo: repo.Path(), Number: b.Number, Job: b.Job, SHA: b.SHA, Ref: b.Ref,
-		Steps: steps, Image: b.Image, Trusted: b.Trusted, Secrets: secrets}
+		Steps: steps, Image: b.Image, Trusted: b.Trusted, SSH: publicSSH(c), Secrets: secrets}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d: %s %s @ %.10s\n", d.ID, d.Repo, d.Job, d.SHA)
 	})
