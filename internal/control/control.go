@@ -162,6 +162,23 @@ func Dispatch(c *Ctx, argv []string) int {
 		args = append(args, a)
 	}
 	c.Argv = args
+	code := runChecked(c, cmd, args)
+	if !cmd.ReadOnly {
+		switch code {
+		case protocol.ExitOK:
+			// Every successful mutating command lands in the audit log.
+			c.Store.Audit(c.User.ID, "cmd "+joinPath(cmd.Path), map[string]any{"argv": auditArgs(args), "source": c.Source})
+		case protocol.ExitDenied, protocol.ExitNotFound:
+			// So does every refused one: probing leaves a trace.
+			AuditRefused(c.Store, c.User.ID, "refused "+joinPath(cmd.Path),
+				map[string]any{"argv": refusalArgs(args), "source": c.Source, "exit": code})
+		}
+	}
+	return code
+}
+
+// runChecked applies the dispatcher's own gates, then runs the command.
+func runChecked(c *Ctx, cmd Command, args []string) int {
 	// A runner-scoped key reaches the runner protocol and nothing else, so
 	// the key a CI host holds cannot administer the instance.
 	if c.Scope != "full" && !(c.Scope == "runner" && cmd.Path[0] == "runner") {
@@ -195,15 +212,7 @@ func Dispatch(c *Ctx, argv []string) int {
 	if !cmd.ReadsStdin {
 		c.Stdin = emptyReader{}
 	}
-	code := cmd.Run(c, args)
-	// Every successful mutating command lands in the audit log.
-	if code == protocol.ExitOK && !cmd.ReadOnly {
-		c.Store.Audit(c.User.ID, "cmd "+joinPath(cmd.Path), map[string]any{
-			"argv":   auditArgs(args),
-			"source": c.Source,
-		})
-	}
-	return code
+	return cmd.Run(c, args)
 }
 
 // auditArgs is argv with flag values dropped. Secrets never reach argv —
@@ -220,7 +229,10 @@ func auditArgs(args []string) []string {
 			out = append(out, a)
 			continue
 		}
-		out = append(out, a)
+		// A gate refuses before parseFlags runs, so a "--name=value"
+		// token reaches here whole; only the name is kept.
+		name, _, _ := strings.Cut(a, "=")
+		out = append(out, name)
 		// "--" ends flag parsing; everything after it is positional.
 		if a == "--" {
 			out = append(out, args[i+1:]...)
@@ -231,6 +243,27 @@ func auditArgs(args []string) []string {
 		// without consulting the command's spec.
 		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
 			i++
+		}
+	}
+	return out
+}
+
+// refusalArgs is what a refusal row keeps of argv: the flag names and the
+// first positional, which names the target. A gate refuses before the
+// handler checks its arguments, so later positionals may be anything the
+// caller typed, a value meant for stdin included.
+func refusalArgs(args []string) []string {
+	out := []string{}
+	target := false
+	for _, a := range auditArgs(args) {
+		if a == "--" {
+			break
+		}
+		if strings.HasPrefix(a, "--") {
+			out = append(out, a)
+		} else if !target {
+			out = append(out, a)
+			target = true
 		}
 	}
 	return out
