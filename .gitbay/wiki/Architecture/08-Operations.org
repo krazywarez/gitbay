@@ -52,8 +52,10 @@ the product activity feed, not an audit trail.
 | Database only   | hourly   | 48   | SQLite snapshot; age-encrypted when =[backup] age_recipients= is set |
 | Offsite (restic)| nightly  | per prune policy | =/var/lib/gitbay= and a staged database copy, to object storage |
 
-- The database snapshot is taken before repositories are read, so a
-  push during the backup leaves only unreferenced objects
+- The database snapshot is taken before repositories are read, and
+  each repository's HEAD, packed-refs and refs/ are archived before its
+  objects, so every archived ref finds the objects it reaches. A push
+  during the backup is missing or present as unreferenced objects
   (=cmd/gitbayd/backup.go=).
 - Excluded: WAL files, the hook socket, askpass scripts, generated
   hooks.

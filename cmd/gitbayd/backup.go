@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -25,10 +26,11 @@ import (
 // every repository and the SSH host keys. Restore by extracting the archive
 // into a fresh server.root.
 //
-// Ordering: the database is snapshotted BEFORE the repositories are read.
-// A push that lands mid-backup then shows up only as unreferenced git
-// objects in the archive (harmless); the reverse order could leave database
-// rows pointing at objects the archive never captured.
+// Ordering: the database is snapshotted BEFORE the repositories are read,
+// and each repository's refs before its objects. A push that lands
+// mid-backup then shows up only as unreferenced git objects in the archive
+// (harmless) or not at all; the reverse order could leave database rows or
+// refs pointing at objects the archive never captured.
 func backupCmd() *cobra.Command {
 	var out, verify, identity string
 	var dbOnly bool
@@ -180,15 +182,29 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 			if !d.Type().IsRegular() && !d.IsDir() {
 				return nil // sockets, symlinks
 			}
-			if d.IsDir() {
-				if strings.HasSuffix(rel, ".git") {
-					repoCount++
+			// A repository's refs were archived on entering it.
+			if strings.HasSuffix(filepath.Dir(rel), ".git") && refNames[d.Name()] {
+				if d.IsDir() {
+					return filepath.SkipDir
 				}
+				return nil
+			}
+			if d.IsDir() {
 				// A directory entry, even for one that holds no file (a
 				// bare repository's refs/heads and refs/tags once every
 				// ref is packed), so extraction recreates it: git's own
 				// repository discovery needs refs/ to exist.
-				return addDir(tw, path, filepath.ToSlash(rel))
+				if err := addDir(tw, path, filepath.ToSlash(rel)); err != nil {
+					return err
+				}
+				if strings.HasSuffix(rel, ".git") {
+					repoCount++
+					if err := addRefs(tw, path, filepath.ToSlash(rel)); err != nil {
+						return err
+					}
+					afterRefs(path)
+				}
+				return nil
 			}
 			return addFile(tw, path, filepath.ToSlash(rel))
 		})
@@ -228,6 +244,55 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	}
 	fmt.Printf("wrote %s (%d repositories, %.1f MB)\n", out, repoCount, float64(info.Size())/1e6)
 	return nil
+}
+
+// refNames are what a repository's refs are read from. WalkDir would
+// reach objects/ before packed-refs and refs/, so a push landing mid-walk
+// could leave an archived ref naming objects the archive lacks. addRefs
+// archives these first on entering the repository; objects are only ever
+// added, so the walk that follows finds every object those refs reach.
+var refNames = map[string]bool{"HEAD": true, "packed-refs": true, "refs": true}
+
+// afterRefs runs between a repository's refs and the rest of it. Tests
+// use it to write into the repository at that point.
+var afterRefs = func(repo string) {}
+
+// addRefs archives HEAD, packed-refs and refs/ of the repository at
+// path, whichever exist.
+func addRefs(tw *tar.Writer, path, name string) error {
+	for _, f := range []string{"HEAD", "packed-refs"} {
+		fi, err := os.Lstat(filepath.Join(path, f))
+		if errors.Is(err, fs.ErrNotExist) || err == nil && !fi.Mode().IsRegular() {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := addFile(tw, filepath.Join(path, f), name+"/"+f); err != nil {
+			return err
+		}
+	}
+	refs := filepath.Join(path, "refs")
+	if _, err := os.Lstat(refs); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return filepath.WalkDir(refs, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(path, p)
+		if err != nil {
+			return err
+		}
+		member := name + "/" + filepath.ToSlash(rel)
+		switch {
+		case d.IsDir():
+			return addDir(tw, p, member)
+		case d.Type().IsRegular():
+			return addFile(tw, p, member)
+		}
+		return nil
+	})
 }
 
 // syncDir makes a rename in dir durable.

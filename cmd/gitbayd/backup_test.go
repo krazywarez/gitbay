@@ -483,3 +483,68 @@ func TestBackupPreservesPackedRefDirs(t *testing.T) {
 	}
 	gitIn(t, restoredRepo, "fsck", "--connectivity-only", "--no-progress", "--no-dangling")
 }
+
+// A commit pushed after a repository's refs are archived and before its
+// objects are leaves the archive with the earlier refs and every object
+// they reach, plus the new ones unreferenced (#259).
+func TestBackupArchivesRefsBeforeObjects(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	gitIn(t, work, "clone", "-q", "--bare", work, dir)
+	first := gitIn(t, dir, "rev-parse", "refs/heads/main")
+
+	var second string
+	afterRefs = func(repo string) {
+		if repo != dir {
+			return
+		}
+		if err := os.WriteFile(filepath.Join(work, "b.txt"), []byte("b\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitIn(t, work, "add", "b.txt")
+		gitIn(t, work, "commit", "-q", "-m", "two")
+		gitIn(t, work, "push", "-q", dir, "main")
+		second = gitIn(t, dir, "rev-parse", "refs/heads/main")
+	}
+	t.Cleanup(func() { afterRefs = func(string) {} })
+
+	archive := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, archive, false); err != nil {
+		t.Fatal(err)
+	}
+	if second == "" || second == first {
+		t.Fatal("the push between the refs and the objects did not happen")
+	}
+	if err := verifyBackup(archive, ""); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	restored := t.TempDir()
+	if out, err := exec.Command("tar", "-xzf", archive, "-C", restored).CombinedOutput(); err != nil {
+		t.Fatalf("extract: %v\n%s", err, out)
+	}
+	repo := filepath.Join(restored, "repos", "krz", "thing.git")
+	if got := gitIn(t, repo, "rev-parse", "refs/heads/main"); got != first {
+		t.Errorf("archived main is %s, want %s from before the push", got, first)
+	}
+	gitIn(t, repo, "cat-file", "-e", second)
+}
