@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"filippo.io/age"
 	"github.com/BurntSushi/toml"
 )
 
@@ -40,6 +41,7 @@ type Config struct {
 	Deps         Deps         `toml:"deps"`
 	Retention    Retention    `toml:"retention"`
 	Push         Push         `toml:"push"`
+	Backup       Backup       `toml:"backup"`
 	// GoImport maps vanity Go module paths to repositories, e.g.
 	// "gitbay.org/gitbay" = "krz/gitbay". Requests carrying ?go-get=1
 	// under a mapped path get a go-import meta tag.
@@ -297,6 +299,27 @@ func LoadAPNSKey(path string) (*ecdsa.PrivateKey, error) {
 	return key, nil
 }
 
+// Backup configures gitbayd admin backup.
+type Backup struct {
+	// AgeRecipients, when set, encrypts every archive to these age
+	// public keys (age1...). The matching identities stay off the host,
+	// so the host writes archives it cannot read.
+	AgeRecipients []string `toml:"age_recipients"`
+}
+
+// Recipients parses AgeRecipients.
+func (b Backup) Recipients() ([]age.Recipient, error) {
+	var rs []age.Recipient
+	for _, s := range b.AgeRecipients {
+		r, err := age.ParseX25519Recipient(s)
+		if err != nil {
+			return nil, fmt.Errorf("backup.age_recipients: %q: %w", s, err)
+		}
+		rs = append(rs, r)
+	}
+	return rs, nil
+}
+
 // Default returns the configuration used when a key is absent from the file.
 func Default() Config {
 	return Config{
@@ -477,6 +500,10 @@ func (c Config) Validate() error {
 		if parts := strings.Split(repo, "/"); len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			errs = append(errs, fmt.Errorf("go_import value %q must be owner/name", repo))
 		}
+	}
+
+	if _, err := c.Backup.Recipients(); err != nil {
+		errs = append(errs, err)
 	}
 
 	// Contradictions.

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"filippo.io/age"
 )
 
 func writeConfig(t *testing.T, body string) string {
@@ -365,4 +367,25 @@ func TestSecretKeyFileSymlinks(t *testing.T) {
 			t.Errorf("a symlink leading outside server.root should be accepted: %v", err)
 		}
 	})
+}
+
+func TestBackupRecipients(t *testing.T) {
+	id, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(writeConfig(t, minimal+"[backup]\nage_recipients = [\""+id.Recipient().String()+"\"]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs, err := cfg.Backup.Recipients()
+	if err != nil || len(rs) != 1 {
+		t.Fatalf("Recipients = %v, %v", rs, err)
+	}
+	if _, err := Load(writeConfig(t, minimal+"[backup]\nage_recipients = [\"age1notakey\"]\n")); err == nil || !strings.Contains(err.Error(), "backup.age_recipients") {
+		t.Fatalf("a malformed recipient: %v", err)
+	}
+	if cfg, err := Load(writeConfig(t, minimal)); err != nil || len(cfg.Backup.AgeRecipients) != 0 {
+		t.Fatalf("default: %v, %v", cfg.Backup, err)
+	}
 }
