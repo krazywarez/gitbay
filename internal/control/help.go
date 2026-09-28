@@ -330,10 +330,16 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command, override map[string]string) {
 	head := nounSummaries[strings.Fields(prefix)[0]]
 	fmt.Fprintln(w, head)
-	fmt.Fprintln(w)
-	c.heading(w, "USAGE")
+	// An aliased noun is a CLI grouping: over stock ssh there is no
+	// "auth <verb>" to type, and each row already names its full command.
+	_, aliased := nounAliases[prefix]
+	bare := aliased && c.CLIPath == ""
 	display := c.shownAs(prefix, prefix)
-	fmt.Fprintf(w, "  %s %s <verb> ...\n", c.program(), display)
+	if !bare {
+		fmt.Fprintln(w)
+		c.heading(w, "USAGE")
+		fmt.Fprintf(w, "  %s %s <verb> ...\n", c.program(), display)
+	}
 	rowText := func(cmd Command) string {
 		full := joinPath(cmd.Path)
 		if ov, ok := override[full]; ok {
@@ -362,6 +368,8 @@ func (c *Ctx) helpNoun(w io.Writer, prefix string, cmds []Command, override map[
 			fmt.Fprintf(w, "  %s  %s\n", pad(rowText(cmd), wide), cmd.Summary)
 		}
 	}
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s %s <verb> --help for flags.\n", c.program(), display)
+	if !bare {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "%s %s <verb> --help for flags.\n", c.program(), display)
+	}
 }

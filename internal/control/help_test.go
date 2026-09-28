@@ -270,4 +270,7 @@ func TestHelpRendersAnAliasedNounInRegisteredFormOverSSH(t *testing.T) {
 	if strings.Contains(got, "auth keys list") {
 		t.Errorf("stock ssh should not see the CLI-only auth prefix: %s", got)
 	}
+	if strings.Contains(got, " auth <verb>") {
+		t.Errorf("stock ssh should not be told to type auth <verb>, which the server has no command for: %s", got)
+	}
 }
