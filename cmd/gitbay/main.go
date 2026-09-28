@@ -253,12 +253,13 @@ func pass(use string, o passOpts) *cobra.Command {
 			// The registry is the only place flags are written down, so
 			// --help asks the server rather than reprinting the one-line
 			// summary cobra holds.
+			cliPath := cliPathOf(cmd)
 			for _, a := range args {
 				if a == "--help" || a == "-h" {
-					os.Exit(runServerHelp(o))
+					os.Exit(runServerHelp(o, cliPath))
 				}
 			}
-			os.Exit(runPass(o, args))
+			os.Exit(runPass(o, cliPath, args))
 			return nil
 		},
 	}
@@ -276,16 +277,17 @@ func withShort(cmd *cobra.Command, short string) *cobra.Command {
 }
 
 // runServerHelp prints the registry's usage for one command.
-func runServerHelp(o passOpts) int {
+func runServerHelp(o passOpts, cliPath string) int {
 	t, err := resolveTarget()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
-	return runSSH(t, append([]string{"help"}, o.server...), strings.NewReader(""))
+	argv := withCLIPath(cliPath, strings.Join(o.server, " "), append([]string{"help"}, o.server...))
+	return runSSH(t, argv, strings.NewReader(""))
 }
 
-func runPass(o passOpts, args []string) int {
+func runPass(o passOpts, cliPath string, args []string) int {
 	t, err := resolveTarget()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
@@ -343,7 +345,8 @@ func runPass(o passOpts, args []string) int {
 			stdin = r
 		}
 	}
-	return runSSHPaged(t, append(o.server, args...), stdin, pages(o.server, args))
+	argv := withCLIPath(cliPath, strings.Join(o.server, " "), append(o.server, args...))
+	return runSSHPaged(t, argv, stdin, pages(o.server, args))
 }
 
 func isEmptyReader(r io.Reader) bool {
@@ -380,7 +383,7 @@ func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 	// know by that name, cobra's own tree still prints.
 	local := c.HelpFunc()
 	c.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if !serverHelp(use) {
+		if !serverHelp(use, cliPathOf(c)) {
 			local(cmd, args)
 		}
 	})
@@ -388,19 +391,21 @@ func group(use, short string, subs ...*cobra.Command) *cobra.Command {
 }
 
 // serverHelp prints the registry's usage for a prefix and reports whether
-// it did. At a terminal it goes through the terminal-aware path, so it
-// gets the same --term=<cols>[,color] treatment (and layout) as any other
-// command; piped, it stays a quiet capture, so a network or lookup
-// failure falls back to cobra's local help without noise.
-func serverHelp(prefix string) bool {
+// it did. cliPath is the group's own path in the CLI. At a terminal it
+// goes through the terminal-aware path, so it gets the same
+// --term=<cols>[,color] treatment (and layout) as any other command;
+// piped, it stays a quiet capture, so a network or lookup failure falls
+// back to cobra's local help without noise.
+func serverHelp(prefix, cliPath string) bool {
 	t, err := resolveTarget()
 	if err != nil {
 		return false
 	}
+	argv := withCLIPath(cliPath, prefix, []string{"help", prefix})
 	if term.IsTerminal(int(os.Stdout.Fd())) {
-		return runSSH(t, []string{"help", prefix}, strings.NewReader("")) == 0
+		return runSSH(t, argv, strings.NewReader("")) == 0
 	}
-	out, code := sshCapture(t, []string{"help", prefix})
+	out, code := sshCapture(t, argv)
 	if code != 0 || out == "" {
 		return false
 	}

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestTermValue(t *testing.T) {
@@ -75,5 +78,30 @@ func TestPages(t *testing.T) {
 	}
 	if pages([]string{"issue", "list"}, nil) {
 		t.Error("list must not page")
+	}
+}
+
+func TestCLIPathOf(t *testing.T) {
+	root := &cobra.Command{Use: "gitbay"}
+	auth := &cobra.Command{Use: "auth"}
+	keys := &cobra.Command{Use: "keys"}
+	remove := &cobra.Command{Use: "remove"}
+	keys.AddCommand(remove)
+	auth.AddCommand(keys)
+	root.AddCommand(auth)
+	if got := cliPathOf(remove); got != "auth keys remove" {
+		t.Errorf("cliPathOf = %q", got)
+	}
+}
+
+func TestWithCLIPath(t *testing.T) {
+	argv := []string{"keys", "remove", "abc"}
+	if got := withCLIPath("keys remove", "keys remove", argv); !slices.Equal(got, argv) {
+		t.Errorf("matching path: %v", got)
+	}
+	got := withCLIPath("auth keys remove", "keys remove", argv)
+	want := []string{"--path=auth keys remove", "keys", "remove", "abc"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

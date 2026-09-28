@@ -17,6 +17,7 @@ import (
 	"gitbay.org/gitbay/internal/cliconfig"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/toolpath"
+	"github.com/spf13/cobra"
 )
 
 // context is the resolved target for a command: which instance to talk to
@@ -164,6 +165,23 @@ func pages(server, args []string) bool {
 		return true
 	}
 	return false
+}
+
+// cliPathOf is the path a cobra command was reached by, without the
+// root's name: "auth keys remove".
+func cliPathOf(cmd *cobra.Command) string {
+	return strings.TrimPrefix(cmd.CommandPath(), "gitbay ")
+}
+
+// withCLIPath prepends --path=<cliPath> to a server command line when the
+// CLI path differs from the server path it dispatches, so usage and help
+// print a command the caller can run (#267). Dispatch strips it before
+// Lookup, as it does --term=.
+func withCLIPath(cliPath, server string, argv []string) []string {
+	if cliPath == server {
+		return argv
+	}
+	return append([]string{"--path=" + cliPath}, argv...)
 }
 
 // runSSH executes the server command over the system ssh binary, wiring
