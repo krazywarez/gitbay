@@ -9,7 +9,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -277,6 +279,10 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 // younger than this.
 const staleAge = 24 * time.Hour
 
+// tmpArchive is a temporary archive's name: os.CreateTemp's pattern
+// "."+base+".tmp-" followed by the digits it appends.
+var tmpArchive = regexp.MustCompile(`^\..+\.tmp-[0-9]+$`)
+
 // removeStale removes what a killed run left in dir: snapshot
 // directories and temporary archives last modified before cutoff.
 func removeStale(dir string, cutoff time.Time) {
@@ -287,7 +293,7 @@ func removeStale(dir string, cutoff time.Time) {
 	for _, e := range ents {
 		name := e.Name()
 		snap := e.IsDir() && strings.HasPrefix(name, ".gitbay-snap-")
-		tmp := e.Type().IsRegular() && strings.HasPrefix(name, ".") && strings.Contains(name, ".tmp-")
+		tmp := e.Type().IsRegular() && tmpArchive.MatchString(name)
 		if !snap && !tmp {
 			continue
 		}
@@ -315,25 +321,40 @@ var refNames = map[string]bool{"HEAD": true, "packed-refs": true, "refs": true}
 // use it to write into the repository at that point.
 var afterRefs = func(repo string) {}
 
-// addRefs archives HEAD, packed-refs and refs/ of the repository at
-// path, whichever exist.
+// addRefs archives HEAD, refs/ and packed-refs of the repository at
+// path, whichever exist. refs/ is read before packed-refs, the order git
+// reads them in: pack-refs writes packed-refs before deleting the loose
+// refs it packed, so a ref moving between the two is caught in one.
 func addRefs(tw *tar.Writer, path, name string) error {
-	for _, f := range []string{"HEAD", "packed-refs"} {
-		fi, err := os.Lstat(filepath.Join(path, f))
-		if errors.Is(err, fs.ErrNotExist) || err == nil && !fi.Mode().IsRegular() {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if err := addFile(tw, filepath.Join(path, f), name+"/"+f); err != nil {
-			return err
-		}
+	if err := addRegular(tw, path, name, "HEAD"); err != nil {
+		return err
 	}
 	refs := filepath.Join(path, "refs")
-	if _, err := os.Lstat(refs); errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Lstat(refs); err == nil {
+		if err := addTree(tw, path, name, refs); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return addRegular(tw, path, name, "packed-refs")
+}
+
+// addRegular archives the regular file f in the repository at path, if
+// it exists.
+func addRegular(tw *tar.Writer, path, name, f string) error {
+	fi, err := os.Lstat(filepath.Join(path, f))
+	if errors.Is(err, fs.ErrNotExist) || err == nil && !fi.Mode().IsRegular() {
 		return nil
 	}
+	if err != nil {
+		return err
+	}
+	return addFile(tw, filepath.Join(path, f), name+"/"+f)
+}
+
+// addTree archives the directory refs inside the repository at path.
+func addTree(tw *tar.Writer, path, name, refs string) error {
 	return filepath.WalkDir(refs, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -489,7 +510,7 @@ func verifyBackup(path, identity string) error {
 			if !filepath.IsLocal(trimmed) {
 				return fmt.Errorf("%s: member %q leaves the archive root", path, h.Name)
 			}
-			if alternates(trimmed) {
+			if borrowsObjects(trimmed) {
 				continue
 			}
 			dest := filepath.Join(tmp, filepath.FromSlash(trimmed))
@@ -566,13 +587,17 @@ func verifyBackup(path, identity string) error {
 	return nil
 }
 
-// alternates reports an archive member that would point git at object
-// stores outside the extracted repository. gitbay writes none, and one in
-// a hostile archive would have fsck read other paths, so verify leaves
-// them out. The comparison ignores case, as a case-insensitive
-// filesystem would.
-func alternates(name string) bool {
+// borrowsObjects reports an archive member that would point git at
+// objects or refs outside the extracted repository: alternates, or a
+// commondir directly in a *.git directory. gitbay writes none, and one in
+// a hostile archive would have fsck read another repository on the host,
+// so verify leaves them out. The comparison ignores case, as a
+// case-insensitive filesystem would.
+func borrowsObjects(name string) bool {
 	name = strings.ToLower(filepath.ToSlash(filepath.Clean(name)))
+	if dir, base := path.Split(name); base == "commondir" && strings.HasSuffix(strings.TrimSuffix(dir, "/"), ".git") {
+		return true
+	}
 	return strings.HasSuffix(name, "/objects/info/alternates") ||
 		strings.HasSuffix(name, "/objects/info/http-alternates")
 }

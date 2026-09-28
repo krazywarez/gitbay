@@ -53,8 +53,10 @@ the product activity feed, not an audit trail.
 | Offsite (restic)| nightly  | per prune policy | =/var/lib/gitbay= and a staged database copy, to object storage |
 
 - The database snapshot is taken before repositories are read, and
-  each repository's HEAD, packed-refs and refs/ are archived before its
-  objects, so every archived ref finds the objects it reaches. A push
+  each repository's HEAD, refs/ and packed-refs are archived before its
+  objects, so every archived ref finds the objects it reaches, unless
+  git's own automatic gc after a push repacks during the walk; the
+  archive can then miss objects, and =--verify= reports it. A push
   during the backup is missing or present as unreferenced objects
   (=cmd/gitbayd/backup.go=).
 - Excluded: WAL files, the hook socket, askpass scripts, generated

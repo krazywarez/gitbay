@@ -193,9 +193,11 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   backup is running" while it runs. =--verify= now also runs =git
   fsck --connectivity-only= on each archived repository and names any
   that fail. (#259)
-- A full backup archives each repository's HEAD, =packed-refs= and
-  =refs/= before its objects, so a push during the backup cannot leave
-  an archived ref naming objects the archive lacks. (#259)
+- A full backup archives each repository's HEAD, =refs/= and
+  =packed-refs= before its objects, so a push during the backup cannot
+  leave an archived ref naming objects the archive lacks. The exception
+  is git's own automatic gc after a push repacking during the walk: the
+  archive can then miss objects, and =--verify= reports it. (#259)
 - =gitbayd admin gc= and =admin mr prune= refuse with "a backup is
   running" during a full backup. A pack or loose object that git's
   automatic gc removes while the backup walks is skipped instead of
@@ -208,7 +210,9 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   left beside its archive once they are a day old. (#259)
 - =gitbayd admin backup --verify= runs fsck with =--git-dir=, so a
   directory that is not a repository fails instead of git checking an
-  enclosing one, and does not extract =objects/info/alternates=. (#259)
+  enclosing one, and does not extract =objects/info/alternates= or a
+  repository's =commondir=, so neither can point fsck at another
+  repository on the host. (#259)
 - =gitbayd admin secrets init= and =rotate= hold an flock on =<key
   file>.lock=, so two runs at once serialize. (#273)
 

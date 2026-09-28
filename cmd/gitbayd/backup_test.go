@@ -18,6 +18,7 @@ import (
 
 	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/gitutil"
 )
 
 // members lists the archive's entries by name.
@@ -679,15 +680,16 @@ func TestBackupRemovesStaleTemporaries(t *testing.T) {
 		}
 	}
 	mk(".gitbay-snap-old", true, old)
-	mk(".b.tar.gz.tmp-old", false, old)
+	mk(".b.tar.gz.tmp-123", false, old)
 	mk(".gitbay-snap-new", true, time.Now())
-	mk(".b.tar.gz.tmp-new", false, time.Now())
+	mk(".b.tar.gz.tmp-456", false, time.Now())
 	mk(".keep", false, old)
+	mk(".notes.tmp-draft", false, old)
 	if err := runBackup(cfg, filepath.Join(dir, "b.tar.gz"), true); err != nil {
 		t.Fatal(err)
 	}
 	got := leftovers(t, dir)
-	want := []string{".b.tar.gz.tmp-new", ".gitbay-snap-new", ".keep"}
+	want := []string{".b.tar.gz.tmp-456", ".gitbay-snap-new", ".keep", ".notes.tmp-draft"}
 	sort.Strings(got)
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("left %v, want %v", got, want)
@@ -758,7 +760,7 @@ func TestVerifyIgnoresAlternates(t *testing.T) {
 	}
 }
 
-func TestAlternatesMember(t *testing.T) {
+func TestBorrowsObjectsMember(t *testing.T) {
 	for name, want := range map[string]bool{
 		"repos/a/b.git/objects/info/alternates":      true,
 		"repos/a/b.git/objects/info/./alternates":    true,
@@ -766,9 +768,75 @@ func TestAlternatesMember(t *testing.T) {
 		"repos/a/b.git/objects/info/http-alternates": true,
 		"repos/a/b.git/objects/info/packs":           false,
 		"repos/a/b.git/refs/heads/alternates":        false,
+		"repos/a/b.git/commondir":                    true,
+		"repos/a/b.git/CommonDir":                    true,
+		"repos/a/b.git/refs/heads/commondir":         false,
 	} {
-		if got := alternates(name); got != want {
-			t.Errorf("alternates(%q) = %v, want %v", name, got, want)
+		if got := borrowsObjects(name); got != want {
+			t.Errorf("borrowsObjects(%q) = %v, want %v", name, got, want)
 		}
+	}
+}
+
+// verify does not extract a commondir, so an archived repository with
+// none of its own objects cannot pass by pointing git at a repository on
+// the host.
+func TestVerifyIgnoresCommondir(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateRepo("user", uid, "thing", "public"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	work := t.TempDir()
+	gitIn(t, work, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "a.txt")
+	gitIn(t, work, "commit", "-q", "-m", "one")
+	host := filepath.Join(t.TempDir(), "host.git")
+	gitIn(t, work, "clone", "-q", "--bare", work, host)
+	gitIn(t, host, "pack-refs", "--all")
+
+	// A repository whose refs are its own and whose objects directory is
+	// empty, borrowing everything else from host through commondir.
+	dir := filepath.Join(cfg.Server.Root, "repos", "krz", "thing.git")
+	for _, d := range []string{"objects", "refs"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	packed, err := os.ReadFile(filepath.Join(host, "packed-refs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"HEAD":        "ref: refs/heads/main\n",
+		"packed-refs": string(packed),
+		"commondir":   host + "\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := gitutil.FsckConnectivity(dir); err != nil {
+		t.Fatalf("with commondir on the host the repository should pass: %v", err)
+	}
+
+	archive := filepath.Join(t.TempDir(), "b.tar.gz")
+	if err := runBackup(cfg, archive, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBackup(archive, ""); err == nil || !strings.Contains(err.Error(), "connectivity") {
+		t.Fatalf("verify of a repository whose objects are only in its commondir: %v", err)
 	}
 }

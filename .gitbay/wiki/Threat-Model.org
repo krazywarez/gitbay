@@ -265,7 +265,9 @@ assume has been checked.
 - Backups snapshot the database first, and repository deletes and
   moves wait out a full backup. Each repository's refs are archived
   before its objects, so every archived ref finds the objects it
-  reaches. A push during a backup may be missing from the archive, or
+  reaches, unless git's own automatic gc after a push repacks during
+  the walk: the archive can then miss objects, and =--verify= reports
+  it. A push during a backup may be missing from the archive, or
   present as objects no archived ref names, and a repository's refs may
   be newer than the database snapshot (see [[Admin]]).
 - The audit log lives in the database the daemon writes, so anyone with
