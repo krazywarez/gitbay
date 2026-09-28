@@ -56,7 +56,7 @@ secret, webhook secret and mirror token.
 | Channel                  | Protection                                                   |
 |--------------------------+--------------------------------------------------------------|
 | SSH                      | Go =x/crypto/ssh=; ed25519 host key generated on first start |
-| HTTPS                    | TLS via ACME or operator certificates; HSTS one year         |
+| HTTPS                    | TLS 1.2 minimum (=cmd/gitbayd/tls.go=), ACME or operator certificates; HSTS one year |
 | HTTP port 80             | ACME challenges and redirect only                            |
 | git://                   | none (public data only; off by default)                      |
 | Runner ↔ server          | SSH                                                           |
@@ -65,8 +65,8 @@ secret, webhook secret and mirror token.
 | Webhooks                 | TLS when the URL is https; HMAC-SHA256 body signature in =X-Gitbay-Signature-256= (=internal/webhook/webhook.go=) |
 | Mirrors                  | per URL; token passed through =GIT_ASKPASS=, never argv (=internal/mirror/mirror.go=) |
 
-The TLS configuration uses Go's defaults; no minimum version or cipher
-list is set in code.
+TLS 1.2 is the minimum, set in code (=serverTLS= in
+=cmd/gitbayd/tls.go=); cipher suites are Go's defaults.
 
 * Cryptographic primitives
 

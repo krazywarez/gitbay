@@ -239,6 +239,7 @@ func serveCmd() *cobra.Command {
 				case "off":
 					errCh <- hs.ListenAndServe()
 				case "files":
+					hs.TLSConfig = serverTLS(nil)
 					errCh <- hs.ListenAndServeTLS(cfg.HTTP.CertFile, cfg.HTTP.KeyFile)
 				case "acme":
 					host := cfg.SiteHost()
@@ -298,7 +299,7 @@ func serveCmd() *cobra.Command {
 							}
 						}()
 					}
-					hs.TLSConfig = m.TLSConfig()
+					hs.TLSConfig = serverTLS(m.TLSConfig())
 					errCh <- hs.ListenAndServeTLS("", "")
 				}
 			}()

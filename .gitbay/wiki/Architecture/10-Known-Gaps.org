@@ -21,7 +21,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | #275  | Audit            | Refused writes are not audited; the audit table is writable by the daemon user | medium |
 | #279  | SSRF             | Mirror URLs are checked when saved, not when git connects             | medium   |
 | #280  | Mail             | STARTTLS only when the relay offers it                                | medium   |
-| #281  | TLS              | No explicit minimum TLS version                                       | low      |
 | #282  | Hook socket      | Anything that can open =hook.sock= can act as any user                | medium   |
 | #297  | Credentials      | A browser session can mint tokens and keys that outlive it            | low      |
 

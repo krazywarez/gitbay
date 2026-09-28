@@ -78,6 +78,10 @@ validation still prints, followed by the contradiction.
   site_url with a public DNS name.
 - =files=: =cert_file= + =key_file=.
 - =off=: plain HTTP — development, or behind a TLS-terminating proxy.
+- The HTTPS listener accepts TLS 1.2 and 1.3 only (=serverTLS= in
+  =cmd/gitbayd/tls.go=), with the default cipher suites of the Go
+  release the binary was built with. =openssl s_client -connect
+  <host>:443 -tls1_1= fails the handshake.
 
 =trusted_proxies= lists the addresses or CIDRs of reverse proxies in
 front of the daemon. A request from one of them is attributed, for API

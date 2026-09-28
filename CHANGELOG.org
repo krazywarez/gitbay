@@ -33,6 +33,8 @@ must add =--scope full=. Existing tokens keep their scope.
   hours. =web sessions list= shows when each was last used (#276).
 - =web login= over SSH refuses a sixth link in an hour, the same bound
   the login page's mailed links have (#278).
+- The HTTPS listener refuses TLS below 1.2, in both certificate modes
+  (#281).
 
 * v1.36.0 — 2026-09-23
 
