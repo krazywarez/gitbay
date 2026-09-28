@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"filippo.io/age"
 	"github.com/spf13/cobra"
 
 	"gitbay.org/gitbay/internal/config"
@@ -26,7 +28,7 @@ import (
 // objects in the archive (harmless); the reverse order could leave database
 // rows pointing at objects the archive never captured.
 func backupCmd() *cobra.Command {
-	var out, verify string
+	var out, verify, identity string
 	var dbOnly bool
 	cmd := &cobra.Command{
 		Use:   "backup",
@@ -42,48 +44,93 @@ comments that exists nowhere else. Repositories are not in such an archive,
 so it supplements a full backup and does not replace one.
 
 Restore: extract into an empty directory, point server.root at it, start
-gitbayd. Host keys are preserved, so clients keep their known_hosts entries.`,
+gitbayd. Host keys are preserved, so clients keep their known_hosts entries.
+
+With [backup] age_recipients set, the archive is encrypted to those age
+public keys and its name ends in .age. --verify then needs --identity
+<file> holding a matching private key, which is kept off the host.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if verify != "" {
-				return verifyBackup(verify)
+				return verifyBackup(verify, identity)
 			}
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}
-			if out == "" {
-				out = fmt.Sprintf("gitbay-backup-%s.tar.gz", time.Now().UTC().Format("20060102-150405"))
-			}
-			return runBackup(cfg, out, dbOnly)
+			return runBackup(cfg, archivePath(out, cfg, time.Now()), dbOnly)
 		},
 	}
-	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz)")
+	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz; .age is appended when [backup] age_recipients is set)")
 	cmd.Flags().BoolVar(&dbOnly, "db-only", false, "archive the database snapshot alone, without repositories")
 	cmd.Flags().StringVar(&verify, "verify", "", "check an archive instead of writing one: database integrity, and its repositories against the archive's")
+	cmd.Flags().StringVar(&identity, "identity", "", "with --verify: an age identity file that opens an encrypted archive")
 	return cmd
 }
 
+// archivePath is where the archive goes: out, or a timestamped name,
+// ending in .age when the archive is encrypted.
+func archivePath(out string, cfg config.Config, now time.Time) string {
+	if out == "" {
+		out = fmt.Sprintf("gitbay-backup-%s.tar.gz", now.UTC().Format("20060102-150405"))
+	}
+	if len(cfg.Backup.AgeRecipients) > 0 && !strings.HasSuffix(out, ".age") {
+		out += ".age"
+	}
+	return out
+}
+
 func runBackup(cfg config.Config, out string, dbOnly bool) error {
+	var rs []age.Recipient
+	if len(cfg.Backup.AgeRecipients) > 0 {
+		var err error
+		if rs, err = cfg.Backup.Recipients(); err != nil {
+			return err
+		}
+	} else if strings.HasSuffix(out, ".age") {
+		return fmt.Errorf("%s ends in .age but [backup] age_recipients is not set, so the archive would not be encrypted", out)
+	}
+
 	st, err := openStore(cfg)
 	if err != nil {
 		return err
 	}
 	defer st.Close()
 
-	// 1. Consistent database snapshot, before any repository is read.
-	snap := filepath.Join(os.TempDir(), fmt.Sprintf("gitbay-snap-%d.db", os.Getpid()))
-	os.Remove(snap)
-	defer os.Remove(snap)
+	// 1. Consistent database snapshot, before any repository is read. It
+	// goes in a fresh 0700 directory beside the archive.
+	dir := filepath.Dir(out)
+	snapDir, err := os.MkdirTemp(dir, ".gitbay-snap-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(snapDir)
+	snap := filepath.Join(snapDir, "gitbay.db")
 	if err := snapshotDB(st, snap); err != nil {
 		return fmt.Errorf("database snapshot: %w", err)
 	}
 
-	f, err := os.Create(out)
+	// The archive is written to a temporary name beside out and renamed
+	// once complete, so a failed run leaves no partial archive behind.
+	f, err := os.CreateTemp(dir, "."+filepath.Base(out)+".tmp-")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	gz := gzip.NewWriter(f)
+	done := false
+	defer func() {
+		if !done {
+			f.Close()
+			os.Remove(f.Name())
+		}
+	}()
+	var sink io.Writer = f
+	var enc io.WriteCloser
+	if len(rs) > 0 {
+		if enc, err = age.Encrypt(f, rs...); err != nil {
+			return err
+		}
+		sink = enc
+	}
+	gz := gzip.NewWriter(sink)
 	tw := tar.NewWriter(gz)
 
 	if err := addFile(tw, snap, "gitbay.db"); err != nil {
@@ -137,7 +184,22 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	if err := gz.Close(); err != nil {
 		return err
 	}
+	if enc != nil {
+		if err := enc.Close(); err != nil {
+			return err
+		}
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
 	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(f.Name(), out); err != nil {
+		return err
+	}
+	done = true
+	if err := syncDir(dir); err != nil {
 		return err
 	}
 
@@ -148,6 +210,16 @@ func runBackup(cfg config.Config, out string, dbOnly bool) error {
 	}
 	fmt.Printf("wrote %s (%d repositories, %.1f MB)\n", out, repoCount, float64(info.Size())/1e6)
 	return nil
+}
+
+// syncDir makes a rename in dir durable.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }
 
 // snapshotDB writes a consistent copy of the live database. VACUUM INTO
@@ -180,17 +252,22 @@ func addFile(tw *tar.Writer, path, name string) error {
 	return err
 }
 
-// verifyBackup reads an archive back: the database snapshot must pass
+// verifyBackup reads an archive back, decrypting it with identity when it
+// is encrypted: the database snapshot must pass
 // SQLite's integrity check, and every repository it names must be in the
 // archive. A database-only archive is checked for integrity alone and
 // says so. Nothing is written except a temporary copy of the database.
-func verifyBackup(path string) error {
+func verifyBackup(path, identity string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	gz, err := gzip.NewReader(f)
+	plain, err := archiveReader(f, path, identity)
+	if err != nil {
+		return err
+	}
+	gz, err := gzip.NewReader(plain)
 	if err != nil {
 		return fmt.Errorf("%s: not a gzip archive: %w", path, err)
 	}
@@ -232,6 +309,13 @@ func verifyBackup(path string) error {
 			}
 		}
 	}
+	// Read to the end so gzip checks its trailer and age its final chunk.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return fmt.Errorf("%s: archive truncated or damaged: %w", path, err)
+	}
+	if err := gz.Close(); err != nil {
+		return fmt.Errorf("%s: archive truncated or damaged: %w", path, err)
+	}
 	if dbPath == "" {
 		return fmt.Errorf("%s: no gitbay.db in the archive", path)
 	}
@@ -270,4 +354,36 @@ func verifyBackup(path string) error {
 		fmt.Printf("%d repositories in the archive that the database does not name (deleted after the snapshot)\n", extra)
 	}
 	return nil
+}
+
+const ageHeader = "age-encryption.org/v1\n"
+
+// archiveReader returns the archive's gzip stream, decrypting it first
+// when it is an age file.
+func archiveReader(f io.Reader, path, identity string) (io.Reader, error) {
+	br := bufio.NewReader(f)
+	head, _ := br.Peek(len(ageHeader))
+	if string(head) != ageHeader {
+		if identity != "" {
+			fmt.Fprintf(os.Stderr, "%s is not encrypted; --identity was not used\n", path)
+		}
+		return br, nil
+	}
+	if identity == "" {
+		return nil, fmt.Errorf("%s is encrypted; pass --identity <file> with the private key for one of its recipients", path)
+	}
+	idf, err := os.Open(identity)
+	if err != nil {
+		return nil, err
+	}
+	defer idf.Close()
+	ids, err := age.ParseIdentities(idf)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", identity, err)
+	}
+	r, err := age.Decrypt(br, ids...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: decrypting: %w", path, err)
+	}
+	return r, nil
 }
