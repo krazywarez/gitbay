@@ -183,7 +183,7 @@ form here to add one, since a browser cannot produce an APNs token.</p>
 
 <section id="export"><h2>Export</h2>
 <p class="meta">Your profile, repositories, issues and merge requests as one
-JSON bundle, the same one <code>gitbay account export</code> writes. Keys are
+JSON bundle, the same one <code>gitbay auth export</code> writes. Keys are
 never included; a replayed bundle's emails arrive unverified.</p>
 <p><a href="/settings/export">Download bundle</a></p>
 </section>
@@ -194,8 +194,9 @@ easier to pipe than to paste, and a minted token is shown once.</p>
 <pre class="message" tabindex="0">gitbay auth token create --name laptop # API tokens, read-only unless --scope full
 gitbay web sessions list               # browser sessions
 gitbay admin ...                       # instance administration</pre>
-<p class="meta">All of it works from stock OpenSSH too:
-<code>ssh git@{{.Host}} auth whoami</code>.</p>
+<p class="meta">All of it works from stock OpenSSH too, with the CLI's
+grouping words dropped: <code>ssh git@{{.Host}} whoami</code>,
+<code>ssh git@{{.Host}} token create --name laptop</code>.</p>
 </section>
 </div>
 </div>
