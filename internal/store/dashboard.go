@@ -76,6 +76,8 @@ const dashboardIssuesQuery = `
 	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 	JOIN users au ON au.id = x.author_id
 	WHERE x.state = 'open' AND ` + involvedCond + `
+	  AND NOT EXISTS (SELECT 1 FROM issue_assignees ia
+	                  WHERE ia.issue_id = x.id AND ia.user_id = ?1)
 	ORDER BY x.updated_at DESC LIMIT 50`
 
 func (s *Store) DashboardIssues(userID int64) ([]DashboardItem, error) {
