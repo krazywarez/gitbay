@@ -69,6 +69,13 @@ must add =--scope full=. Existing tokens keep their scope.
   separately (#275).
 - Audit retention deletes by id, up to the newest row older than the
   retention, so a clock step back cannot leave a gap in the chain (#275).
+- =dashboard= and =feed= print activity as sentences
+  (=cmc opened issue krz/gitbay#12=) instead of raw event payloads,
+  and a labelled event names its labels there and on the web feed. An
+  issue assigned to you appears only under "assigned to you": the
+  =open_issues= field of =dashboard --json= no longer includes issues
+  assigned to the caller. =notifications list= names =--all= when only
+  read items remain (#265).
 
 * v1.36.0 — 2026-09-23
 
