@@ -35,8 +35,10 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 // Transport streams one git transport service (upload-pack, receive-pack,
 // upload-archive). extraEnv entries are appended to the process environment;
 // hooks read the GITBAY_* variables from it. maxPack caps incoming pack
-// bytes on receive-pack (0 = unlimited).
-func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string, maxPack int64) error {
+// bytes on receive-pack (0 = unlimited). Closing cancel kills the service
+// and everything it started; a push killed before its pre-receive hook
+// answers updates no refs. A nil cancel never fires.
+func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string, maxPack int64, cancel <-chan struct{}) error {
 	var args []string
 	switch service {
 	case "git-upload-pack", "git-receive-pack", "git-upload-archive":
@@ -52,7 +54,21 @@ func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = errW
-	return cmd.Run()
+	ownProcessGroup(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	finished := make(chan struct{})
+	go func() {
+		select {
+		case <-cancel:
+			killTree(cmd)
+		case <-finished:
+		}
+	}()
+	err := cmd.Wait()
+	close(finished)
+	return err
 }
 
 // IsAncestor reports whether old is an ancestor of new in the repository at

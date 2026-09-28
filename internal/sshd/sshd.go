@@ -461,7 +461,7 @@ func runGit(cfg config.Config, st *store.Store, user store.User, scope string, a
 			}
 		}
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack); err != nil {
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, nil); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK
