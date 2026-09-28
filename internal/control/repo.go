@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -513,6 +514,11 @@ func runRepoTransfer(c *Ctx, args []string) int {
 	if _, err := os.Stat(newDir); err == nil {
 		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", newOwner, repo.Name)
 	}
+	release, lockCode := holdOffBackup(c)
+	if lockCode >= 0 {
+		return lockCode
+	}
+	defer release()
 	// The directory moves before the record changes: a move that fails
 	// leaves nothing to undo, whereas the record's change into an org
 	// folds labels and milestones into the org's rows, which a revert
@@ -557,6 +563,11 @@ func runRepoRename(c *Ctx, args []string) int {
 	if _, err := os.Stat(newDir); err == nil {
 		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", repo.OwnerName, newName)
 	}
+	release, lockCode := holdOffBackup(c)
+	if lockCode >= 0 {
+		return lockCode
+	}
+	defer release()
 	if err := c.Store.RenameRepo(repo.ID, newName); err != nil {
 		return c.failErr(err)
 	}
@@ -609,6 +620,11 @@ func runRepoDelete(c *Ctx, args []string) int {
 // webhooks; an instance that needs to hear about it wants the audit log
 // (#112).
 func deleteRepo(c *Ctx, repo store.Repo) int {
+	release, lockCode := holdOffBackup(c)
+	if lockCode >= 0 {
+		return lockCode
+	}
+	defer release()
 	// Open MRs sourced from this repo keep working (targets own the
 	// objects) but must show that the source is gone.
 	if err := c.Store.MarkSourceGoneForRepo(repo.ID); err != nil {
@@ -623,6 +639,18 @@ func deleteRepo(c *Ctx, repo store.Repo) int {
 	return c.emit(map[string]string{"deleted": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "deleted %s\n", repo.Path())
 	})
+}
+
+// holdOffBackup keeps a full backup from starting while a repository
+// directory moves or goes, and refuses while one runs: the backup's
+// database snapshot names every repository its walk then archives
+// (#259). The caller defers the returned release.
+func holdOffBackup(c *Ctx) (func(), int) {
+	release, err := backuplock.TryShared(c.Cfg.Server.Root)
+	if err != nil {
+		return nil, c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return release, -1
 }
 
 func runAccessGrant(c *Ctx, args []string) int {

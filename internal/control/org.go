@@ -167,6 +167,11 @@ func runOrgRename(c *Ctx, args []string) int {
 	if _, err := os.Stat(newDir); err == nil {
 		return c.fail(protocol.ExitFailure, "repository directory %s already exists", newName)
 	}
+	release, lockCode := holdOffBackup(c)
+	if lockCode >= 0 {
+		return lockCode
+	}
+	defer release()
 	if err := c.Store.RenameOrg(org.ID, newName); err != nil {
 		return c.failErr(err)
 	}
