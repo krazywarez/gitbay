@@ -2,7 +2,7 @@
 
 * Data inventory
 
-Schema: =internal/store/migrations/=, 59 migrations. Classification:
+Schema: =internal/store/migrations/=, 66 migrations. Classification:
 *C* credential or secret, *P* personal data, *R* private repository
 content (as confidential as the repository), *O* operational.
 
@@ -14,9 +14,9 @@ content (as confidential as the repository), *O* operational.
 | Collaboration   | =issues=, =issue_*=, =merge_requests=, =mr_*=, =labels=, =milestones=, =mentions=           | R     | bodies of issues, comments and reviews          |
 | Releases, snippets | =releases=, =release_assets=, =snippets=, =snippet_files=                                | R     |                                                 |
 | CI              | =builds= (includes logs), =build_schedules=, =runner_repos=, =runner_seen=                  | R     | build logs can echo anything a step prints      |
-| CI secrets      | =build_secrets=                                                                             | C     | *plaintext*                                     |
-| Integrations    | =webhooks= (secret), =webhook_deliveries=, =mirrors= (username, token)                      | C     | *plaintext* secrets and tokens                  |
-| Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=            | P     | device tokens in clear                          |
+| CI secrets      | =build_secrets=                                                                             | C     | sealed (AES-256-GCM)                            |
+| Integrations    | =webhooks= (secret), =webhook_deliveries=, =mirrors= (username, token)                      | C     | webhook secret and mirror token sealed          |
+| Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=            | P     | device tokens sealed; looked up by SHA-256      |
 | Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
 | Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows, a hash chain (=prev_hash=, =hash=) |
 | Dependencies    | =dep_checks=, =dep_reports=                                                                 | O     |                                                 |
@@ -31,6 +31,7 @@ Outside the database:
 | TLS keys (ACME)            | =<root>/acme=                     | C     |
 | SMTP password              | =/etc/gitbay/config.toml=         | C     |
 | APNs signing key (.p8)     | path in =push.key_file=           | C     |
+| Secret key file            | =server.secret_key_file= (=/etc/gitbay/secret.key=) | C |
 | Backups                    | =/var/backups/gitbay=, offsite    | all of the above |
 
 No table stores client IP addresses as a column. The daemon writes a
@@ -42,14 +43,15 @@ throttling (=internal/sshd/sshd.go=).
 | Item                                  | Protection                                                     |
 |---------------------------------------+----------------------------------------------------------------|
 | API tokens, sessions, login links, email codes, invites | SHA-256 of a 256-bit random value; the value is shown once and never stored (=internal/store/sessions.go=) |
-| CI secrets, webhook secrets, mirror tokens, APNs device tokens | stored in clear in SQLite; protection is filesystem permissions and the rule that values are write-only through the interface |
+| CI secrets, webhook secrets, mirror tokens, APNs device tokens | AES-256-GCM under a key file outside the database and outside =server.root=; additional data binds table, column and row (=internal/seal=, =internal/store/secrets.go=) |
 | SQLite file                           | mode 0640, directory 0750                                      |
 | Backups                               | the local archive is not encrypted; restic encrypts the offsite copy |
 | Disk                                  | no application-level encryption; any disk encryption is the host's |
 
-The code base contains no symmetric encryption. A database or backup
-file read by anyone other than the =gitbay= user discloses every CI
-secret, webhook secret and mirror token.
+The database file or a backup read by anyone other than the =gitbay=
+user discloses no CI secret, webhook secret, mirror token or device
+token without the key file, which neither carries. Rotation:
+=gitbayd admin secrets rotate= (Admin wiki).
 
 * In transit
 

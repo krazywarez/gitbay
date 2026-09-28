@@ -56,7 +56,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
 | TLS for all authenticated HTTP              | in place | ACME or certificate files; HSTS                                  |
-| Secrets encrypted at rest                   | gap      | CI secrets, webhook secrets, mirror tokens stored in clear (#273) |
+| Secrets encrypted at rest                   | in place | AES-256-GCM, key file outside the database and the main backups (=internal/seal=) |
 | Secrets kept out of argv, logs and output   | in place | =ReadsStdin=, pruned audit argv, write-only secret commands      |
 | Local backups encrypted                     | gap      | tar.gz in clear; offsite copy encrypted by restic (#274)                |
 | Data retention configurable                 | in place | =[retention]= (=internal/config/config.go=)              |

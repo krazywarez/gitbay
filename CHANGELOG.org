@@ -123,6 +123,19 @@ for the eighteen commands whose CLI path differs from the registry's
   browser (#269).
 - Untrusted builds (merge requests from forks) get a fresh HOME removed after the build and no secrets; trusted builds keep a per-repository home under =<workdir>/trusted-home=. Deploy gitbayd before the runner; the old shared homes under the runner's workdir can be deleted. (#255)
 - =status set= refuses =ci/= contexts, which belong to the instance's builds. Build results are reused only from trusted builds on the same image. =repo settings require-contexts= names status contexts that must report green; setting any turns require-checks on, and one not yet reported counts as pending. (#258)
+*Upgrade note.* gitbayd needs =server.secret_key_file= (default
+=/etc/gitbay/secret.key=) and refuses to start without it. Before
+replacing the binary, run =gitbayd admin secrets init= as root and
+=chown gitbay:gitbay /etc/gitbay/secret.key= (=deploy/install.sh= does
+both when the file is missing). The first start seals the stored
+secrets. Back the key file up separately: =admin backup= archives do
+not carry it (see the Admin wiki, "Secret key"). Downgrading to an
+earlier release after values are sealed is not supported: an older
+gitbayd reads a sealed value's =gbs1:...= prefix as the literal
+secret.
+- CI secrets, webhook secrets, mirror tokens and push device tokens are
+  stored sealed with AES-256-GCM (#273). =gitbayd admin secrets
+  init|rotate|check=.
 - Untrusted builds (merge requests from forks) get a fresh HOME
   removed after the build and no secrets; trusted builds keep a
   per-repository home under =<workdir>/trusted-home=. Deploy gitbayd

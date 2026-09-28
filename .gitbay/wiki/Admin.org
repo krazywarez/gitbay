@@ -18,7 +18,13 @@ install -m 755 gitbayd /usr/local/bin/
 adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
 install -d -o gitbay -g gitbay -m 750 /var/lib/gitbay
 gitbayd --config /etc/gitbay/config.toml check-config
+gitbayd --config /etc/gitbay/config.toml admin secrets init
+chown gitbay:gitbay /etc/gitbay/secret.key
 #+end_src
+
+=admin secrets init= refuses when the key file already exists, so a
+reinstall on the same host should skip it — =deploy/install.sh= does
+this with a file check before running it.
 
 =deploy/= in the source tree has a cloud-init file, a hardened systemd
 unit, and a nightly backup timer. Run as the unprivileged =gitbay= user;
@@ -57,6 +63,10 @@ validation still prints, followed by the contradiction.
   keys, ACME cache all live here.
 - =site_url= (required) — canonical =https://host=; drives ACME, clone
   URLs, mail links.
+- =secret_key_file= (default =/etc/gitbay/secret.key=) — the keys that
+  seal CI secrets, webhook secrets, mirror tokens and push device
+  tokens in the database. Must be outside =root=, mode 0600, readable
+  by the daemon's user. See "Secret key" below.
 - =source_repo= (optional, =owner/name=) — the repository this instance
   develops itself in. Startup warns when the running build's commit is
   not on that repository's default branch, which is how a binary built
@@ -502,6 +512,38 @@ restic $RESTIC_OPTS find <name>.git <old-name>.git   # expect no output
 snapshots sit beside them and the data stays referenced. Snapshot IDs
 change; their times do not. Done for krz/keycask (formerly rust-pass)
 on 2026-09-18, across 22 snapshots.
+
+** Secret key
+
+CI secrets, webhook secrets, mirror tokens and APNs device tokens are
+stored sealed: AES-256-GCM under a key in =server.secret_key_file=,
+each value prefixed with the id of the key that sealed it
+(=gbs1:<id>:=). The key file is not in the database, not under
+=server.root=, and therefore in neither the local archives nor the
+main restic repository. It must be copied off the host separately;
+without it a restored database's secrets cannot be opened, and
+gitbayd refuses to start against them.
+
+#+begin_src sh
+gitbayd admin secrets init     # once; deploy/install.sh does it on first install
+gitbayd admin secrets check    # open every value, count by key
+gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
+#+end_src
+
+- Missing file: every gitbayd process that opens the database refuses
+  to run and names the path, including =serve= and, in system mode,
+  =authorized-keys=. =migrate= does not need it.
+- Wrong key: =serve= stops at startup naming the first row that does
+  not open; =secrets check= does the same without starting anything.
+- Upgrade: the first start after the upgrade seals every value still
+  in clear and logs =sealed secret values=.
+- Rotation: =rotate= adds a key, reseals every value under it in one
+  transaction, then removes the old keys. Run it as root, since it
+  replaces the key file in =/etc/gitbay=; the file keeps its owner.
+  The daemon re-reads the file when it changes, so it needs no
+  restart. Copy the new file off the host afterwards.
+- Push devices are looked up by the SHA-256 of their token
+  (=push_devices.token_hash=), since two seals of one token differ.
 
 * Upgrades
 

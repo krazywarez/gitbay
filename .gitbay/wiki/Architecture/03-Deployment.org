@@ -50,6 +50,7 @@ a database check.
 | =<root>/acme=                     | ACME account key and certificates          | autocert defaults         |
 | =<root>/hooks=                    | generated hook scripts                     | 0755                      |
 | =/etc/gitbay/config.toml=         | configuration, including SMTP password     | 0640 (cloud-init)         |
+| =/etc/gitbay/secret.key=          | keys sealing secret columns                | 0600, owner =gitbay= (=deploy/install.sh=) |
 | =/var/backups/gitbay=             | backup archives                            | 0750 (cloud-init)         |
 
 * Outbound connections from gitbayd

@@ -14,6 +14,12 @@ ssh -p "$port" "root@$host" '
   chmod 755 /usr/local/bin/gitbayd.new
   mv /usr/local/bin/gitbayd.new /usr/local/bin/gitbayd
   /usr/local/bin/gitbayd --config /etc/gitbay/config.toml check-config --no-host-checks
+  # The key that seals secrets in the database. Created on the first
+  # install, never replaced here; gitbayd refuses to start without it.
+  if [ ! -e /etc/gitbay/secret.key ]; then
+    /usr/local/bin/gitbayd --config /etc/gitbay/config.toml admin secrets init
+    chown gitbay:gitbay /etc/gitbay/secret.key
+  fi
   systemctl restart gitbayd
   sleep 1
   systemctl --no-pager --lines=5 status gitbayd

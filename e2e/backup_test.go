@@ -16,7 +16,7 @@ import (
 // secretsCheckOneSealed matches "admin secrets check" reporting the one
 // build secret set in TestAdminBackup as sealed under some key, e.g.
 // "build_secrets.value: key 98e412e4 1".
-var secretsCheckOneSealed = regexp.MustCompile(`build_secrets\.value: key \S+ 1`)
+var secretsCheckOneSealed = regexp.MustCompile(`(?m)build_secrets\.value: key \S+ 1$`)
 
 func TestAdminBackup(t *testing.T) {
 	t.Parallel()
