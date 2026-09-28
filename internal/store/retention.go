@@ -73,7 +73,10 @@ func (s *Store) Sweep(r Retention, now time.Time) (Swept, error) {
 		where string
 		keep  time.Duration
 	}{
-		{"audit_log", "created_at < ?", r.Audit},
+		// By id, so a backwards clock step cannot leave a newer row
+		// removed and an older one kept: the audit chain would read
+		// that as tampering.
+		{"audit_log", "id <= (SELECT MAX(id) FROM audit_log WHERE created_at < ?)", r.Audit},
 		// Only deliveries that have finished: one still being retried is
 		// live state, however old its first attempt.
 		{"webhook_deliveries", "created_at < ? AND (delivered_at IS NOT NULL OR failed_at IS NOT NULL)", r.WebhookDeliveries},

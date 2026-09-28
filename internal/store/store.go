@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -31,6 +32,11 @@ type Store struct {
 	// onRevoke runs after each key revocation this process commits.
 	revokeMu sync.Mutex
 	onRevoke []func(Revoked)
+
+	// AuditJournal, when set, receives a copy of every audit row. The
+	// daemon sets it to its own logger, whose output the service
+	// journal keeps outside the database.
+	AuditJournal *slog.Logger
 }
 
 // Open opens (creating if needed) the database at path with WAL mode and
