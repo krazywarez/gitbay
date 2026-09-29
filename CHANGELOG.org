@@ -4,7 +4,15 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.40.1 — 2026-09-29
+
+A concurrency limit for pushes, and =repo download= under the pack
+limit (#308).
+
+*Upgrade note.* Pushes now queue past two at once instance-wide and one
+per account or deploy key; a push idle for a minute after its pack
+starts, or not at pre-receive within fifteen minutes, is cut. Raise the
+=[limits] push_*= settings on an instance with heavier push traffic.
 
 - Pushes have a concurrency limit of their own, separate from the pack
   budget: =[limits] push_concurrency= (2), =push_per_principal= (1),
