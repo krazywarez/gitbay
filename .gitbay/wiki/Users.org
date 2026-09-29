@@ -299,6 +299,21 @@ does on the repository page, with relative links resolved against the
 file's directory; =source= in the file's action bar (or =?view=source=)
 shows the text instead. Other files show the text with highlighting.
 
+TeX math renders as MathML wherever markdown or org renders: READMEs,
+files, wiki pages, issue, merge request and release bodies, comments,
+and their previews. Markdown takes =$…$= inline and =$$…$$= for display,
+either inline or with the =$$= lines on their own. A =$= followed by a
+space, or a closing =$= preceded by a space or followed by a digit, is a
+dollar sign, so =$5 and $10= stays prose; =\$= is always one. Org takes
+=$…$=, =$$…$$=, =\(…\)=, =\[…\]= and =\begin{…}…\end{…}=. Code spans
+and blocks are left alone. The supported TeX is a subset (letters,
+numbers, operators, scripts, =\frac=, =\sqrt=, Greek and common symbols,
+=\left=/=\right=, accents, =\text=, the =\math…= fonts, matrices,
+=cases= and =aligned=; the full list heads =internal/texmath/texmath.go=).
+Anything outside it, including macros, colours and links, shows as
+source, as does an expression over 8 KiB or nested more than 64 deep.
+The CLI shows the source.
+
 * Organizations
 
 Orgs share the owner namespace with users and own repositories at

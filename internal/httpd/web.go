@@ -1192,13 +1192,13 @@ var imageTypes = map[string]string{
 
 // markdown is the shared renderer: GFM (tables, strikethrough, autolinks,
 // task lists) on top of CommonMark, with class-based fence highlighting
-// (the palette lives in the stylesheet, per scheme). Raw HTML is still
-// dropped.
+// (the palette lives in the stylesheet, per scheme), and TeX math as
+// MathML (math.go). Raw HTML is still dropped.
 // Headings carry ids so a README or wiki section can be linked to, the
 // way org headings already are (#132).
 var markdown = goldmark.New(
 	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
-	goldmark.WithExtensions(extension.GFM,
+	goldmark.WithExtensions(extension.GFM, mathExtension{},
 		highlighting.NewHighlighting(highlighting.WithFormatOptions(html.WithClasses(true)))))
 
 // fenceHighlight renders one code block with chroma classes, for org and
@@ -1353,6 +1353,7 @@ var ugcPolicy = func() *bluemonday.Policy {
 	p.AllowAttrs("class").
 		Matching(regexp.MustCompile(`^(chroma|[a-z0-9]{1,3})( (chroma|[a-z0-9]{1,3}))*$`)).
 		OnElements("span", "pre", "code", "div")
+	allowMath(p)
 	return p
 }()
 

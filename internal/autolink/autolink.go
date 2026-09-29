@@ -2,7 +2,7 @@
 // to the repository's issues and merge requests, owner/name#N (and !N)
 // across repositories, and @user to owner pages. It operates on the HTML
 // produced by the markdown/org pipeline, walking text nodes with a real
-// parser so nothing inside <a>, <code>, or <pre> is ever touched, and only
+// parser so nothing inside <a>, <code>, <pre> or <math> is ever touched, and only
 // references that actually resolve become links.
 package autolink
 
@@ -36,7 +36,7 @@ var (
 )
 
 // skip lists elements whose text must never be rewritten.
-var skip = map[string]bool{"a": true, "code": true, "pre": true, "script": true, "style": true}
+var skip = map[string]bool{"a": true, "code": true, "math": true, "pre": true, "script": true, "style": true}
 
 // Rewrite processes an HTML fragment, linking references relative to
 // defaultOwner/defaultName. On any parse failure the input is returned

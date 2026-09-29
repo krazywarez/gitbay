@@ -57,6 +57,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | request a review       | yes | yes | yes |
 | choose body markup     | yes | yes | yes |
 | preview body markup    | n/a | yes | no  |
+| TeX math as MathML     | n/a | yes | no  |
 | stacked merge requests | yes | yes | yes |
 | revisions              | yes | yes | yes |
 | range-diff             | yes | yes | yes |
@@ -125,6 +126,7 @@ reviews, since an approval was of the diff against the old branch.
 | labels: list, colour | yes | yes | yes |
 | choose body markup  | yes | yes | yes |
 | preview body markup | n/a | yes | no  |
+| TeX math as MathML  | n/a | yes | no  |
 | issue templates     | yes | yes | yes |
 | milestone create, close, reopen | yes | yes | yes |
 | org labels: set, list, remove | yes | yes | yes |
@@ -155,7 +157,8 @@ every surface now offers the choice: the web's create forms, and the iOS
 composer on create, edit and comment. An edit starts on the format its
 body was stored in, since starting elsewhere would silently reinterpret
 it on the next save. Diff-line comments have no format column and are
-always markdown.
+always markdown. TeX math in either format renders as MathML on the
+web (#294); the terminal shows the source, so the CLI row is =n/a=.
 
 Every web form that takes markup has a Preview button beside its own
 submit: issue and merge request create, their edit and comment boxes,
