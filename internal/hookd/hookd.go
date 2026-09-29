@@ -368,7 +368,7 @@ func (s *Server) postReceive(req Request) {
 			// A queued merge stays queued across a push by someone who can
 			// merge it, and the new head has to pass the gates on its own.
 			if mr.QueuedAt != "" {
-				control.QueuedMergePushed(s.st, s.cfg, mr.ID, req.UserID)
+				control.QueuedMergePushed(s.st, s.cfg, mr.ID, req.UserID, req.Scope)
 			}
 		}
 	}

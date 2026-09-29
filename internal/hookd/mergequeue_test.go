@@ -2,6 +2,7 @@ package hookd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -203,4 +204,83 @@ func mustMR(t *testing.T, st *store.Store, repoID, n int64) store.MR {
 		t.Fatal(err)
 	}
 	return mr
+}
+
+// A push the queue cannot attribute to a writer dequeues: one from a
+// write deploy key, though the account that registered it can write, and
+// one whose pusher cannot be looked up.
+func TestPostReceiveDequeuesUncheckedPush(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		user   func(alice int64) int64
+		scope  func(repoID int64) string
+		reason string
+	}{
+		{"deploy key", func(a int64) int64 { return a }, func(id int64) string { return fmt.Sprintf("deploy:%d:rw", id) },
+			"a deploy key pushed, and a deploy key cannot merge"},
+		{"unknown pusher", func(int64) int64 { return 9999 }, func(int64) string { return "full" },
+			"could not check who pushed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st, err := store.Open(":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { st.Close() })
+			if err := st.MigrateUp(); err != nil {
+				t.Fatal(err)
+			}
+			alice, _ := st.CreateUser("alice", false)
+			repoID, _ := st.CreateRepo("user", alice, "app", "public")
+			st.UpdateRepoSettings(repoID, func(s *store.RepoSettings) { s.RequireApprovals = 1 })
+			repo, _ := st.RepoByID(repoID)
+			root := t.TempDir()
+			f := &shapeFixture{t: t, st: st, repo: repo, uid: alice, root: root, src: filepath.Join(root, "src")}
+			f.dir = control.RepoDir(root, repo.OwnerName, repo.Name)
+			cfg := config.Config{}
+			cfg.Server.Root = root
+			srv := &Server{cfg: cfg, st: st}
+			os.MkdirAll(f.src, 0o755)
+			f.git(root, "init", "-q", "-b", "main", "src")
+			f.write("README", "x\n")
+			f.git(f.src, "add", ".")
+			f.git(f.src, "commit", "-q", "-m", "base")
+			f.git(f.src, "checkout", "-q", "-b", "feature")
+			f.write("feature.txt", "y\n")
+			f.git(f.src, "add", ".")
+			f.git(f.src, "commit", "-q", "-m", "change")
+			head := f.sha("HEAD")
+			os.MkdirAll(filepath.Dir(f.dir), 0o755)
+			f.git(root, "init", "-q", "--bare", f.dir)
+			f.sync()
+			f.git(f.dir, "update-ref", "refs/merge-requests/1/head", head)
+			if _, err := st.CreateMR(repo.ID, alice, repo.ID, "feature", "main", "t", "", head, "md", false); err != nil {
+				t.Fatal(err)
+			}
+			var out, errOut bytes.Buffer
+			c := &control.Ctx{User: store.User{ID: alice, Username: "alice"}, Scope: "full", Store: st, Cfg: cfg, Stdout: &out, Stderr: &errOut}
+			if code := control.Dispatch(c, []string{"mr", "merge", repo.Path(), "1", "--when-ready"}); code != protocol.ExitOK {
+				t.Fatalf("queue: exit %d, %s", code, errOut.String())
+			}
+
+			f.write("feature.txt", "z\n")
+			f.git(f.src, "commit", "-q", "-am", "more")
+			pushed := f.sha("HEAD")
+			f.sync()
+			srv.postReceive(Request{RepoID: repo.ID, UserID: tc.user(alice), Scope: tc.scope(repo.ID),
+				Updates: []policy.RefUpdate{{Ref: "refs/heads/feature", Old: head, New: pushed}}})
+
+			mr := mustMR(t, st, repo.ID, 1)
+			if mr.QueuedAt != "" || mr.State != "open" {
+				t.Fatalf("!1 = state %s queued_at %q, want open and dequeued", mr.State, mr.QueuedAt)
+			}
+			cs, _ := st.ListMRComments(mr.ID)
+			for _, c := range cs {
+				if c.Kind == "system" && strings.Contains(c.Body, tc.reason) {
+					return
+				}
+			}
+			t.Fatalf("timeline does not say %q: %+v", tc.reason, cs)
+		})
+	}
 }

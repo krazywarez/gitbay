@@ -68,30 +68,46 @@ func TryQueuedMergesAt(st *store.Store, cfg config.Config, repoID int64, sha str
 }
 
 // QueuedMergePushed is post-receive's call for a queued merge request
-// whose source branch pusherID just pushed or deleted. A push from an
-// account that cannot write to the target dequeues it: otherwise the
-// queuer's authority would merge commits someone else chose. A push from
-// one that can keeps it queued, and the new head has to pass on its own.
-func QueuedMergePushed(st *store.Store, cfg config.Config, mrID, pusherID int64) {
+// whose source branch was pushed by pusherID with a key of scope. A push
+// the target's writers did not make dequeues it, since otherwise the
+// queuer's authority would merge commits someone else chose: a deploy
+// key (which can never merge, whoever registered it) or an account that
+// cannot write to the target. A push that cannot be checked dequeues
+// too. A push from a writer keeps it queued, and the new head has to
+// pass on its own.
+func QueuedMergePushed(st *store.Store, cfg config.Config, mrID, pusherID int64, scope string) {
 	mergeQueueMu.Lock()
 	defer mergeQueueMu.Unlock()
 	mr, err := st.MRByID(mrID)
-	if err != nil || mr.QueuedAt == "" {
+	if err != nil {
+		slog.Error("merge queue: push", "mr", mrID, "err", err)
+		st.DequeueMerge(mrID)
 		return
 	}
+	if mr.QueuedAt == "" {
+		return
+	}
+	if policy.IsDeployScope(scope) {
+		dequeueWithReason(st, mr, "a deploy key pushed, and a deploy key cannot merge")
+		return
+	}
+	const unchecked = "could not check who pushed"
 	repo, err := st.RepoByID(mr.RepoID)
 	if err != nil {
-		queueInternalError(st, mr.ID, err)
+		slog.Error("merge queue: push", "mr", mrID, "err", err)
+		dequeueWithReason(st, mr, unchecked)
 		return
 	}
 	pusher, err := st.UserByID(pusherID)
 	if err != nil {
-		queueInternalError(st, mr.ID, err)
+		slog.Error("merge queue: push", "mr", mrID, "err", err)
+		dequeueWithReason(st, mr, unchecked)
 		return
 	}
 	grant, err := st.AccessRole(repo.ID, pusher.ID)
 	if err != nil {
-		queueInternalError(st, mr.ID, err)
+		slog.Error("merge queue: push", "mr", mrID, "err", err)
+		dequeueWithReason(st, mr, unchecked)
 		return
 	}
 	if !policy.CanWrite(pusher, repo, grant) {
