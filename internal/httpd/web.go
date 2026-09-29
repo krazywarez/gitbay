@@ -1324,6 +1324,7 @@ func (s *Server) ugcFor(r *http.Request, repo store.Repo) ugcRenderer {
 
 // renderedComment pairs a comment with its rendered body for templates.
 type renderedComment struct {
+	ID        int64
 	Author    string
 	CreatedAt string
 	Kind      string
@@ -1333,7 +1334,7 @@ type renderedComment struct {
 func renderComments(cs []store.IssueComment, ugc ugcRenderer) []renderedComment {
 	var out []renderedComment
 	for _, c := range cs {
-		out = append(out, renderedComment{c.Author, c.CreatedAt, c.Kind, ugc(c.Body, c.BodyFormat)})
+		out = append(out, renderedComment{ID: c.ID, Author: c.Author, CreatedAt: c.CreatedAt, Kind: c.Kind, BodyHTML: ugc(c.Body, c.BodyFormat)})
 	}
 	return out
 }
@@ -2024,6 +2025,7 @@ func (s *Server) issuePage(w http.ResponseWriter, r *http.Request, previewForm s
 	}
 	// nil readable: the picker lists titles, never the progress counts.
 	milestones, _ := s.st.ListMilestones(p.Repo, "open", nil)
+	bars := s.reactionBars(r, "issue", iss.ID, comments, fmt.Sprintf("/%s/%s/issues/%d/react", p.Repo.OwnerName, p.Repo.Name, iss.Number))
 	s.render(w, "issue.html", struct {
 		repoPage
 		Issue       store.Issue
@@ -2035,9 +2037,10 @@ func (s *Server) issuePage(w http.ResponseWriter, r *http.Request, previewForm s
 		Notice      string
 		LabelColors map[string]template.CSS
 		Draft       *draft
+		Reactions   map[int64]reactionBar
 	}{p, iss, md(iss.Body, iss.BodyFormat), renderComments(comments, md),
 		s.canEditItem(r, p.Repo, iss.Author), s.canWriteRepo(r, p.Repo),
-		milestones, s.takeFlash(w, r), s.labelColors(p.Repo), d})
+		milestones, s.takeFlash(w, r), s.labelColors(p.Repo), d, bars})
 }
 
 // canEditItem: the author or anyone with write access may edit.
@@ -2328,6 +2331,7 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 		}
 		d = s.draftFor(r, p.Repo, previewForm, "body", format)
 	}
+	bars := s.reactionBars(r, "mr", m.ID, comments, fmt.Sprintf("/%s/%s/mrs/%d/react", p.Repo.OwnerName, p.Repo.Name, m.Number))
 	s.render(w, "mr.html", struct {
 		repoPage
 		MR              store.MR
@@ -2360,10 +2364,11 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 		LabelColors     map[string]template.CSS
 		Draft           *draft
 		Layout          diffLayout
+		Reactions       map[int64]reactionBar
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, supersedes, gates,
-		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo), d, layout})
+		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo), d, layout, bars})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the

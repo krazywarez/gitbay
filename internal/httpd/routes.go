@@ -160,6 +160,8 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.issueCommentSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/{n}/edit", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.issueEditSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/{n}/react", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.issueReactSubmit))},
 			// Triage: each runs the matching issue command.
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/issues/{n}/state", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.issueStateSubmit))},
@@ -206,6 +208,8 @@ func (s *Server) Routes() []Route {
 				Handler: s.checkOrigin(s.requireUser(s.mrEditSubmit))},
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/comment", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrCommentSubmit))},
+			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/react", Mutating: true,
+				Handler: s.checkOrigin(s.requireUser(s.mrReactSubmit))},
 			// Review loop: each runs the matching mr command.
 			Route{Method: "POST", Pattern: "/{owner}/{repo}/mrs/{n}/review", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.mrReviewSubmit))},

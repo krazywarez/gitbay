@@ -182,6 +182,12 @@
 {{/* previewbtn is the Preview submit beside a markup form's own submit.
      It posts the form to its usual action, which renders the body and
      hands the page back instead of writing (#235). */}}
+{{/* reactions is one item's reaction bar (reactionBar in httpd). A
+     signed-in viewer gets a button per reaction; anyone else the counts. */}}
+{{define "reactions"}}{{if .Items}}{{if .Signed}}<form method="post" action="{{.Action}}" class="reactions">{{if .Comment}}<input type="hidden" name="comment" value="{{.Comment}}">{{end}}
+{{range .Items}}<button type="submit" name="{{if .Me}}remove{{else}}add{{end}}" value="{{.Name}}" class="react{{if .Me}} mine{{end}}" aria-pressed="{{.Me}}" aria-label="{{.Label}}">{{.Emoji}}{{if .Count}} <span>{{.Count}}</span>{{end}}</button>
+{{end}}</form>{{else}}<p class="reactions">{{range .Items}}<span class="react" aria-label="{{.Label}}">{{.Emoji}} {{.Count}}</span> {{end}}</p>{{end}}{{end}}{{end}}
+
 {{define "previewbtn"}}<button type="submit" name="preview" value="1" class="btn">Preview</button>{{end}}
 
 {{/* previewblock shows a draft as it will read. The argument is the

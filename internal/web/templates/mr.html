@@ -37,12 +37,14 @@
 {{if .BodyHTML}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.MR.Author}}">{{.MR.Author}}</a></strong></header>
   <div class="rendered">{{.BodyHTML}}</div>
-</article>{{end}}
+  {{template "reactions" index .Reactions 0}}
+</article>{{else}}{{template "reactions" index .Reactions 0}}{{end}}
 {{range .Comments}}
 {{if eq .Kind "system"}}<div class="syscomment">{{.BodyHTML}} <span class="when">{{when .CreatedAt}}</span></div>
 {{else}}<article class="comment">
   <header class="commenthead"><strong><a href="/{{.Author}}">{{.Author}}</a></strong> <span class="when">{{when .CreatedAt}}</span></header>
   <div class="rendered">{{.BodyHTML}}</div>
+  {{template "reactions" index $.Reactions .ID}}
 </article>{{end}}
 {{end}}
 {{if .DetachedThreads}}<h2>Threads on earlier revisions</h2>

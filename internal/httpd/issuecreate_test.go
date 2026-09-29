@@ -31,7 +31,8 @@ func TestIssuePageHasDiscussionHeading(t *testing.T) {
 		Notice      string
 		LabelColors map[string]template.CSS
 		Draft       *draft
-	}{repoPage: testRepoPage(), Issue: store.Issue{Number: 1, Title: "bug", Author: "cmc", State: "open"}}); err != nil {
+		Reactions   map[int64]reactionBar
+	}{repoPage: testRepoPage(), Issue: store.Issue{Number: 1, Title: "bug", Author: "cmc", State: "open"}, Reactions: map[int64]reactionBar{0: {}}}); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	if !strings.Contains(sb.String(), "<h2>Discussion</h2>") {

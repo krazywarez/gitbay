@@ -1917,3 +1917,21 @@ svg.icon { vertical-align: -0.125em; }
   /* the mark is a link home too, so it is a target like the rest */
   a.brand { width: var(--rail-hit); }
 }
+
+/* ---- reactions ---- */
+.reactions { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: 0; padding: var(--sp-2) var(--sp-4); }
+p.reactions { color: var(--muted); font-size: var(--fs-1); }
+article.comment .reactions { border-top: 1px solid var(--faint); }
+button.react, span.react {
+  font: inherit;
+  font-size: var(--fs-1);
+  padding: 0 var(--sp-2);
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+}
+button.react { cursor: pointer; }
+button.react:hover { background: var(--surface); }
+button.react.mine { border-color: var(--accent); background: var(--surface); color: var(--fg); }

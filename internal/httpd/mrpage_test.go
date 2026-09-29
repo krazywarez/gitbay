@@ -40,6 +40,7 @@ type mrPageData struct {
 	Base            string
 	Draft           *draft
 	Layout          diffLayout
+	Reactions       map[int64]reactionBar
 }
 
 // A pruned head has no diff to show; the page must say the head is gone
