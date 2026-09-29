@@ -4,7 +4,9 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.37.0 — 2026-09-29
+
+Findings from the 2026-09-27 architecture review.
 
 - =webhook add= reads the signing secret from stdin with =--secret -=;
   a value on the command line is refused, since argv shows in process
