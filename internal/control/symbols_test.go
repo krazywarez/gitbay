@@ -114,6 +114,7 @@ func TestRepoSymbolsRefusals(t *testing.T) {
 		{"another ref", alice, []string{"repo", "symbols", repo.Path(), "--ref", "feature", "Parse"}, protocol.ExitNotFound, "only the default branch"},
 		{"unknown kind", alice, []string{"repo", "symbols", repo.Path(), "--kind", "widget", "Parse"}, protocol.ExitUsage, "--kind"},
 		{"no query", alice, []string{"repo", "symbols", repo.Path()}, protocol.ExitUsage, ""},
+		{"one-character query", alice, []string{"repo", "symbols", repo.Path(), "P"}, protocol.ExitUsage, "2 to"},
 		{"reindex needs an admin", alice, []string{"admin", "symbols", "reindex", repo.Path()}, protocol.ExitDenied, "admin"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

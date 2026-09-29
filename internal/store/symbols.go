@@ -3,22 +3,30 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 )
 
-// SymbolIndex is a repository's symbol index: what was indexed and how it
-// went. The states are described with the table's schema.
+// SymbolIndex is one symbol index of a repository. The states are
+// described with the table's schema; reads only ever see ok or partial.
 type SymbolIndex struct {
 	ID      int64
 	RepoID  int64
 	Commit  string
 	Tree    string
-	State   string // ok | partial | failed
+	State   string // building | ok | partial | retired
 	Note    string
 	Files   int
 	Symbols int
 	BuiltAt string
+}
+
+// SymbolFailure is the last run that could not build an index.
+type SymbolFailure struct {
+	Tree     string
+	Note     string
+	FailedAt string
 }
 
 // SymbolRow is one definition. Key is the name as written where it is
@@ -42,26 +50,31 @@ type SymbolTarget struct {
 
 // SymbolRequest is a repository waiting for the index worker.
 type SymbolRequest struct {
-	RepoID int64
-	Seq    int64
-	Force  bool
+	RepoID   int64
+	Seq      int64
+	Force    bool
+	Attempts int
 }
 
 // RequestSymbolIndex queues a repository for the index worker. A request
 // already waiting is bumped, so one taken by a running build is not
-// cleared when that build ends; force is kept once set.
+// cleared when that build ends, and a deferred retry becomes due now;
+// force is kept once set.
 func (s *Store) RequestSymbolIndex(repoID int64, force bool) error {
 	_, err := s.DB.Exec(`
 		INSERT INTO symbol_requests (repo_id, force) VALUES (?, ?)
 		ON CONFLICT (repo_id) DO UPDATE SET seq = seq + 1,
-		       force = MAX(force, excluded.force),
+		       force = MAX(force, excluded.force), attempts = 0, not_before = '',
 		       requested_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`, repoID, force)
 	return err
 }
 
-// SymbolRequests lists the waiting repositories, oldest request first.
+// SymbolRequests lists the requests that are due, oldest first.
 func (s *Store) SymbolRequests() ([]SymbolRequest, error) {
-	rows, err := s.DB.Query(`SELECT repo_id, seq, force FROM symbol_requests ORDER BY requested_at, repo_id`)
+	rows, err := s.DB.Query(`
+		SELECT repo_id, seq, force, attempts FROM symbol_requests
+		WHERE not_before = '' OR not_before <= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+		ORDER BY requested_at, repo_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +82,7 @@ func (s *Store) SymbolRequests() ([]SymbolRequest, error) {
 	var out []SymbolRequest
 	for rows.Next() {
 		var r SymbolRequest
-		if err := rows.Scan(&r.RepoID, &r.Seq, &r.Force); err != nil {
+		if err := rows.Scan(&r.RepoID, &r.Seq, &r.Force, &r.Attempts); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -84,46 +97,65 @@ func (s *Store) DoneSymbolRequest(r SymbolRequest) error {
 	return err
 }
 
-// SymbolIndexFor returns a repository's index, or ErrNotFound when none
-// has been built.
-func (s *Store) SymbolIndexFor(repoID int64) (SymbolIndex, error) {
+// DeferSymbolRequest keeps a request for another attempt after seconds,
+// unless it was requested again since it was read.
+func (s *Store) DeferSymbolRequest(r SymbolRequest, seconds int) error {
+	_, err := s.DB.Exec(`
+		UPDATE symbol_requests SET force = 0, attempts = attempts + 1,
+		       not_before = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)
+		WHERE repo_id = ? AND seq = ?`, fmt.Sprintf("+%d seconds", seconds), r.RepoID, r.Seq)
+	return err
+}
+
+const symbolIndexCols = `id, repo_id, commit_sha, tree, state, note, files, symbols, built_at`
+
+func scanSymbolIndex(row *sql.Row) (SymbolIndex, error) {
 	var x SymbolIndex
-	err := s.DB.QueryRow(`
-		SELECT id, repo_id, commit_sha, tree, state, note, files, symbols, built_at
-		FROM symbol_indexes WHERE repo_id = ?`, repoID).
-		Scan(&x.ID, &x.RepoID, &x.Commit, &x.Tree, &x.State, &x.Note, &x.Files, &x.Symbols, &x.BuiltAt)
+	err := row.Scan(&x.ID, &x.RepoID, &x.Commit, &x.Tree, &x.State, &x.Note, &x.Files, &x.Symbols, &x.BuiltAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return x, ErrNotFound
 	}
 	return x, err
 }
 
+// SymbolIndexFor returns a repository's current index, or ErrNotFound
+// when none has been published.
+func (s *Store) SymbolIndexFor(repoID int64) (SymbolIndex, error) {
+	return scanSymbolIndex(s.DB.QueryRow(`SELECT `+symbolIndexCols+`
+		FROM symbol_indexes WHERE repo_id = ? AND state IN ('ok', 'partial')`, repoID))
+}
+
+// SymbolIndexByID returns an index in any state.
+func (s *Store) SymbolIndexByID(id int64) (SymbolIndex, error) {
+	return scanSymbolIndex(s.DB.QueryRow(`SELECT `+symbolIndexCols+`
+		FROM symbol_indexes WHERE id = ?`, id))
+}
+
+// BeginSymbolIndex creates an index in the building state, which no read
+// sees until PublishSymbolIndex.
+func (s *Store) BeginSymbolIndex(repoID int64, commit, tree string) (int64, error) {
+	res, err := s.DB.Exec(`
+		INSERT INTO symbol_indexes (repo_id, commit_sha, tree, state)
+		VALUES (?, ?, ?, 'building')`, repoID, commit, tree)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
 // symbolInsertRows is how many rows one INSERT carries: eight columns
 // each, well under SQLite's variable limit.
 const symbolInsertRows = 200
 
-// ReplaceSymbolIndex swaps a repository's index for a new one in one
-// transaction: readers see the old index or the new, never a mix. The
-// symbols count is taken from syms.
-func (s *Store) ReplaceSymbolIndex(x SymbolIndex, syms []SymbolRow) (int64, error) {
+// AddSymbols writes rows into an index being built, in one transaction.
+// The caller keeps each call to a few thousand rows so the write lock is
+// held briefly.
+func (s *Store) AddSymbols(indexID int64, syms []SymbolRow) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec("DELETE FROM symbol_indexes WHERE repo_id = ?", x.RepoID); err != nil {
-		return 0, err
-	}
-	res, err := tx.Exec(`
-		INSERT INTO symbol_indexes (repo_id, commit_sha, tree, state, note, files, symbols)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, x.RepoID, x.Commit, x.Tree, x.State, x.Note, x.Files, len(syms))
-	if err != nil {
-		return 0, err
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
 	for len(syms) > 0 {
 		n := min(len(syms), symbolInsertRows)
 		var q strings.Builder
@@ -134,14 +166,143 @@ func (s *Store) ReplaceSymbolIndex(x SymbolIndex, syms []SymbolRow) (int64, erro
 				q.WriteString(",")
 			}
 			q.WriteString("(?,?,?,?,?,?,?,?)")
-			args = append(args, id, r.Name, strings.ToLower(r.Name), r.Key, strings.ToLower(r.Key), r.Kind, r.Path, r.Line)
+			args = append(args, indexID, r.Name, strings.ToLower(r.Name), r.Key, strings.ToLower(r.Key), r.Kind, r.Path, r.Line)
 		}
 		if _, err := tx.Exec(q.String(), args...); err != nil {
+			return err
+		}
+		syms = syms[n:]
+	}
+	return tx.Commit()
+}
+
+// PublishSymbolIndex makes a built index the repository's current one, as
+// ok or partial, and retires the one it replaces, in one short
+// transaction. A recorded failure is cleared.
+func (s *Store) PublishSymbolIndex(x SymbolIndex) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+		UPDATE symbol_indexes SET state = 'retired'
+		WHERE repo_id = ? AND state IN ('ok', 'partial')`, x.RepoID); err != nil {
+		return err
+	}
+	res, err := tx.Exec(`
+		UPDATE symbol_indexes SET state = ?, note = ?, files = ?,
+		       symbols = (SELECT COUNT(*) FROM symbols WHERE index_id = ?),
+		       built_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+		WHERE id = ? AND repo_id = ? AND state = 'building'`,
+		x.State, x.Note, x.Files, x.ID, x.ID, x.RepoID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return fmt.Errorf("symbol index %d is not being built", x.ID)
+	}
+	if _, err := tx.Exec("DELETE FROM symbol_failures WHERE repo_id = ?", x.RepoID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// symbolDeleteRows is how many symbols one purge transaction deletes.
+const symbolDeleteRows = 5000
+
+// PurgeSymbolIndexes deletes a repository's indexes that are not current:
+// retired ones, and building ones left by a run that did not finish. The
+// symbols go a chunk per transaction, then the index row.
+func (s *Store) PurgeSymbolIndexes(repoID int64) error {
+	rows, err := s.DB.Query(`SELECT id FROM symbol_indexes
+		WHERE repo_id = ? AND state IN ('building', 'retired')`, repoID)
+	if err != nil {
+		return err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		for {
+			res, err := s.DB.Exec(`DELETE FROM symbols WHERE id IN
+				(SELECT id FROM symbols WHERE index_id = ? LIMIT ?)`, id, symbolDeleteRows)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				break
+			}
+		}
+		if _, err := s.DB.Exec(`DELETE FROM symbol_indexes
+			WHERE id = ? AND state IN ('building', 'retired')`, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReplaceSymbolIndex builds, publishes and purges in one call: the
+// worker's sequence, for a caller holding every row already.
+func (s *Store) ReplaceSymbolIndex(x SymbolIndex, syms []SymbolRow) (int64, error) {
+	id, err := s.BeginSymbolIndex(x.RepoID, x.Commit, x.Tree)
+	if err != nil {
+		return 0, err
+	}
+	for len(syms) > 0 {
+		n := min(len(syms), 5000)
+		if err := s.AddSymbols(id, syms[:n]); err != nil {
 			return 0, err
 		}
 		syms = syms[n:]
 	}
-	return id, tx.Commit()
+	x.ID = id
+	if err := s.PublishSymbolIndex(x); err != nil {
+		return 0, err
+	}
+	return id, s.PurgeSymbolIndexes(x.RepoID)
+}
+
+// RecordSymbolFailure records a run that could not build an index. The
+// current index, if any, stays current.
+func (s *Store) RecordSymbolFailure(repoID int64, tree, note string) error {
+	_, err := s.DB.Exec(`
+		INSERT INTO symbol_failures (repo_id, tree, note) VALUES (?, ?, ?)
+		ON CONFLICT (repo_id) DO UPDATE SET tree = excluded.tree, note = excluded.note,
+		       failed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`, repoID, tree, note)
+	return err
+}
+
+// SymbolFailureFor returns the last failure, or ErrNotFound.
+func (s *Store) SymbolFailureFor(repoID int64) (SymbolFailure, error) {
+	var f SymbolFailure
+	err := s.DB.QueryRow(`SELECT tree, note, failed_at FROM symbol_failures WHERE repo_id = ?`, repoID).
+		Scan(&f.Tree, &f.Note, &f.FailedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return f, ErrNotFound
+	}
+	return f, err
+}
+
+// SymbolFailureRecent reports whether tree failed within the last
+// seconds.
+func (s *Store) SymbolFailureRecent(repoID int64, tree string, seconds int) (bool, error) {
+	var n int
+	err := s.DB.QueryRow(`SELECT COUNT(*) FROM symbol_failures
+		WHERE repo_id = ? AND tree = ?
+		  AND failed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)`,
+		repoID, tree, fmt.Sprintf("-%d seconds", seconds)).Scan(&n)
+	return n > 0, err
 }
 
 // SearchSymbols finds the symbols whose name or key starts with q, ignoring

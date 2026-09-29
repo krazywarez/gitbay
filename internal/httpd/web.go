@@ -694,7 +694,14 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Tab = "files"
 	filePath := strings.Trim(r.PathValue("path"), "/")
-	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, maxRenderBytes+1)
+	// The file and its symbol links are read from one commit, even if the
+	// ref moves while the page renders.
+	commit, err := gitutil.ResolveRef(p.Dir, p.Ref)
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	data, err := gitutil.ReadBlob(p.Dir, commit, filePath, maxRenderBytes+1)
 	if err != nil {
 		s.notFound(w, r)
 		return
@@ -708,7 +715,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	}
 	var fileSymbols []store.SymbolRow
 	if !binary && !image {
-		codeHTML, fileSymbols = s.blobSymbols(p, filePath, codeHTML)
+		codeHTML, fileSymbols = s.blobSymbols(p, commit, filePath, codeHTML)
 	}
 	// Markdown and org render like a README, with the source one click
 	// away; ?view=source shows the text instead.

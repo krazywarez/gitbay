@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -29,14 +30,14 @@ func escapePath(p string) string {
 }
 
 // blobSymbols finds the viewed file's symbols and links the names in its
-// highlighted source to their definitions, when the ref being viewed has
-// the indexed tree. A name defined once links to that line at the same
+// highlighted source to their definitions, when commit, the ref being
+// viewed as the page resolved it, has the indexed tree. A name defined once links to that line at the same
 // ref; one defined more than once links to the results page. Names the
 // index does not hold stay plain. The whole page costs one lookup of the
 // file's distinct names, however many times each appears.
-func (s *Server) blobSymbols(p repoPage, filePath string, code template.HTML) (template.HTML, []store.SymbolRow) {
+func (s *Server) blobSymbols(p repoPage, commit, filePath string, code template.HTML) (template.HTML, []store.SymbolRow) {
 	idx, err := s.st.SymbolIndexFor(p.Repo.ID)
-	if err != nil || idx.State == "failed" || !control.IndexedTree(p.Dir, p.Ref, idx) {
+	if err != nil || !control.IndexedTree(p.Dir, commit, idx) {
 		return code, nil
 	}
 	list, _ := s.st.SymbolsInFile(idx.ID, filePath)
@@ -101,20 +102,32 @@ func (s *Server) symbolsPage(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		problem = "no symbol index yet; one is built after a push to " + p.Repo.DefaultBranch
+		if f, ferr := s.st.SymbolFailureFor(p.Repo.ID); ferr == nil {
+			problem = "the symbol index could not be built: " + f.Note
+		}
 	case err != nil:
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
-	case idx.State == "failed":
-		problem = "the symbol index failed: " + idx.Note
-	case len(q) > 200:
-		problem = "query must be 1 to 200 characters"
-	case q != "":
+	case q == "":
+	case len(q) < control.MinSymbolQuery || len(q) > 200:
+		problem = fmt.Sprintf("query must be %d to 200 characters", control.MinSymbolQuery)
+	default:
 		if idx.State == "partial" {
 			note = "the index is partial: " + idx.Note
 		}
 		var after int64
-		if a, err := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64); err == nil && a > 0 {
-			after = a
+		if a := r.URL.Query().Get("after"); a != "" {
+			cursorIdx, id, ok := control.ParseSymbolCursor(a)
+			switch {
+			case !ok:
+				problem = "bad cursor"
+			case cursorIdx != idx.ID:
+				problem = control.StaleSymbolCursor
+			}
+			after = id
+		}
+		if problem != "" {
+			break
 		}
 		rows, err = s.st.SearchSymbols(idx.ID, q, kind, symbolsPageSize+1, after)
 		if err != nil {
@@ -123,7 +136,7 @@ func (s *Server) symbolsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(rows) > symbolsPageSize {
 			rows = rows[:symbolsPageSize]
-			v := url.Values{"q": {q}, "after": {strconv.FormatInt(rows[len(rows)-1].ID, 10)}}
+			v := url.Values{"q": {q}, "after": {control.SymbolCursor(idx.ID, rows[len(rows)-1].ID)}}
 			if kind != "" {
 				v.Set("kind", kind)
 			}

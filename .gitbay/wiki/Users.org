@@ -252,7 +252,8 @@ gitbay repo unarchive you/project                   #   writes refused, browsing
 A push to the default branch queues a symbol index of its tree, built in
 the background after the push completes; a tree that is already indexed
 is not indexed again. =repo symbols <owner/name> [--kind k] <query>=
-lists definitions whose name starts with the query, exact matches
+lists definitions whose name starts with the query (two characters
+at least), exact matches
 first, case-sensitive before case-insensitive, as name, kind, path and
 line; =--limit= and =--cursor= page it, and without them it stops at
 200 rows. A Go method is listed as =Type.Method= and also matches on
@@ -276,13 +277,18 @@ What is indexed:
 Languages other than Go are matched a line at a time, so unusual
 definition shapes are missed. Files over 1 MiB, anything under
 =vendor/= or =node_modules/=, =*_gen.go=, =*.pb.go=, Go files marked
-=Code generated ... DO NOT EDIT.=, and =*.min.js= are skipped. One run
-stops at 200,000 symbols or two minutes and records the index as
-partial; an index that cannot be built is recorded as failed. Either
-record stands for its tree: a push that changes the tree builds again,
-one that does not is left alone. A repository that has not been pushed
-to since the index existed has none until its next push to the default
-branch. =admin symbols reindex <owner/name>= rebuilds one regardless.
+=Code generated ... DO NOT EDIT.=, and =*.min.js= are skipped, and a
+name longer than 256 bytes is dropped. One run stops at 200,000
+symbols, 32 MiB of names and paths, or two minutes, and publishes what
+it found as a partial index that says which bound it reached.
+
+A new index is written while the previous one stays in use, and
+replaces it in one step. A run that cannot build an index records why
+and leaves the previous index current; the same tree is tried again
+once after an hour, or when a push changes the tree. A repository that
+has not been pushed to since the index existed has none until its next
+push to the default branch. =admin symbols reindex <owner/name>=
+rebuilds one regardless.
 
 On the web, a file viewed at the indexed tree (the default branch's
 head, or any commit with the same tree) links each name the index

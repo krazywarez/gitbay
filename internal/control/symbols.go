@@ -59,8 +59,8 @@ func runRepoSymbols(c *Ctx, args []string) int {
 	if path == "" || query == "" {
 		return c.usage()
 	}
-	if len(query) > maxQueryLen {
-		return c.fail(protocol.ExitUsage, "query must be 1 to %d characters", maxQueryLen)
+	if len(query) < MinSymbolQuery || len(query) > maxQueryLen {
+		return c.fail(protocol.ExitUsage, "query must be %d to %d characters", MinSymbolQuery, maxQueryLen)
 	}
 	if kind != "" && !symbols.ValidKind(kind) {
 		return c.fail(protocol.ExitUsage, "--kind must be one of %s", strings.Join(symbols.Kinds, ", "))
@@ -71,27 +71,28 @@ func runRepoSymbols(c *Ctx, args []string) int {
 	}
 	idx, err := c.Store.SymbolIndexFor(repo.ID)
 	if errors.Is(err, store.ErrNotFound) {
+		if f, ferr := c.Store.SymbolFailureFor(repo.ID); ferr == nil {
+			return c.fail(protocol.ExitFailure, "the symbol index of %s could not be built: %s", repo.Path(), f.Note)
+		}
 		return c.fail(protocol.ExitNotFound, "%s has no symbol index yet; one is built after a push to %s", repo.Path(), repo.DefaultBranch)
 	} else if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if ref != "" && ref != repo.DefaultBranch {
 		dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
-		if !IndexedTree(dir, ref, idx) {
+		sha, err := gitutil.ResolveRef(dir, ref)
+		if err != nil || !IndexedTree(dir, sha, idx) {
 			return c.fail(protocol.ExitNotFound, "only the default branch, %s, is indexed; %s is not at the indexed tree", repo.DefaultBranch, ref)
 		}
 	}
-	if idx.State == "failed" {
-		return c.fail(protocol.ExitFailure, "the symbol index of %s failed: %s", repo.Path(), idx.Note)
-	}
 	var after int64
 	if p.key != "" {
-		cursorIdx, id, ok := parseSymbolCursor(p.key)
+		cursorIdx, id, ok := ParseSymbolCursor(p.key)
 		if !ok {
 			return c.fail(protocol.ExitUsage, "bad cursor")
 		}
 		if cursorIdx != idx.ID {
-			return c.fail(protocol.ExitUsage, "the symbol index was rebuilt since that cursor; start again without --cursor")
+			return c.fail(protocol.ExitUsage, "%s", StaleSymbolCursor)
 		}
 		after = id
 	}
@@ -108,7 +109,7 @@ func runRepoSymbols(c *Ctx, args []string) int {
 		rows = rows[:symbolsUnpaged]
 	}
 	rows, next := trimPage(p, rows, "symbol", func(r store.SymbolRow) string {
-		return strconv.FormatInt(idx.ID, 10) + "." + strconv.FormatInt(r.ID, 10)
+		return SymbolCursor(idx.ID, r.ID)
 	})
 	var ds []symbolOut
 	for _, r := range rows {
@@ -129,10 +130,24 @@ func runRepoSymbols(c *Ctx, args []string) int {
 	})
 }
 
-// parseSymbolCursor reads "<index id>.<row id>". The index id makes a
+// MinSymbolQuery is the shortest query repo symbols and the results page
+// take: one character matches too much of an index to be worth a page.
+const MinSymbolQuery = 2
+
+// StaleSymbolCursor is the refusal for a cursor taken from an index that
+// has since been replaced.
+const StaleSymbolCursor = "the symbol index was rebuilt since that cursor; start again without it"
+
+// SymbolCursor is the paging key after row id of index indexID, the form
+// ParseSymbolCursor reads.
+func SymbolCursor(indexID, id int64) string {
+	return strconv.FormatInt(indexID, 10) + "." + strconv.FormatInt(id, 10)
+}
+
+// ParseSymbolCursor reads "<index id>.<row id>". The index id makes a
 // cursor from before a rebuild fail rather than page through the new
 // index from an unrelated row.
-func parseSymbolCursor(key string) (int64, int64, bool) {
+func ParseSymbolCursor(key string) (int64, int64, bool) {
 	a, b, ok := strings.Cut(key, ".")
 	if !ok {
 		return 0, 0, false
@@ -142,15 +157,11 @@ func parseSymbolCursor(key string) (int64, int64, bool) {
 	return idx, id, err1 == nil && err2 == nil && id > 0
 }
 
-// IndexedTree reports whether ref names a commit whose tree is the one
-// idx was built from: the default branch's head when the index is
-// current, or any other commit with the same content. The blob view uses
-// it to decide whether its names can link into the index.
-func IndexedTree(dir, ref string, idx store.SymbolIndex) bool {
-	sha, err := gitutil.ResolveRef(dir, ref)
-	if err != nil {
-		return false
-	}
+// IndexedTree reports whether commit sha has the tree idx was built from:
+// the default branch's head when the index is current, or any other
+// commit with the same content. The blob view uses it to decide whether
+// its names can link into the index.
+func IndexedTree(dir, sha string, idx store.SymbolIndex) bool {
 	if sha == idx.Commit {
 		return true
 	}

@@ -2,6 +2,7 @@ package symbols
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,8 +46,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	root := t.TempDir()
 	f := &fixture{t: t, st: st, repo: repo, src: filepath.Join(root, "src"), bare: filepath.Join(root, "app.git")}
-	f.w = &Worker{St: st, RepoDir: func(owner, name string) string { return f.bare },
-		MaxSymbols: DefaultMaxSymbols, MaxTime: DefaultMaxTime}
+	f.w = NewWith(st, func(owner, name string) string { return f.bare }, 0)
 	f.git(root, "init", "-q", "-b", repo.DefaultBranch, "src")
 	f.git(root, "init", "-q", "--bare", f.bare)
 	return f
@@ -202,22 +202,178 @@ func TestWorkerTimeBound(t *testing.T) {
 	}
 }
 
-// A tree that cannot be read is recorded as failed, and the record stands
-// for that tree: asking again does not retry it.
-func TestWorkerFailureIsRecordedNotRetried(t *testing.T) {
+// breakBlob deletes the loose object of path at the default branch, so
+// the tree cannot be read.
+func (f *fixture) breakBlob(path string) {
+	f.t.Helper()
+	blob := f.git(f.bare, "rev-parse", "refs/heads/"+f.repo.DefaultBranch+":"+path)
+	if err := os.Remove(filepath.Join(f.bare, "objects", blob[:2], blob[2:])); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// A tree that cannot be read is recorded as a failure beside the current
+// index, which stays current. The request is kept for one retry after the
+// backoff rather than tried again at once; a new request for the same
+// tree inside the backoff is not retried either.
+func TestWorkerFailureKeepsCurrentIndex(t *testing.T) {
 	f := newFixture(t)
 	f.commit(map[string]string{"a.go": "package a\n\nfunc A() {}\n"})
-	blob := f.git(f.bare, "rev-parse", "refs/heads/"+f.repo.DefaultBranch+":a.go")
-	if err := os.Remove(filepath.Join(f.bare, "objects", blob[:2], blob[2:])); err != nil {
+	good := f.sweep(false)
+
+	f.commit(map[string]string{"b.go": "package a\n\nfunc B() {}\n"})
+	f.breakBlob("b.go")
+	f.st.RequestSymbolIndex(f.repo.ID, false)
+	f.w.Sweep(context.Background())
+	cur, err := f.st.SymbolIndexFor(f.repo.ID)
+	if err != nil || cur.ID != good.ID {
+		t.Fatalf("current index after a failure = %+v, %v; want %d", cur, err, good.ID)
+	}
+	fail, err := f.st.SymbolFailureFor(f.repo.ID)
+	if err != nil || !strings.Contains(fail.Note, "b.go") {
+		t.Fatalf("failure = %+v, %v", fail, err)
+	}
+	if reqs, _ := f.st.SymbolRequests(); len(reqs) != 0 {
+		t.Fatalf("a failed request is due again at once: %+v", reqs)
+	}
+	var attempts int
+	f.st.DB.QueryRow("SELECT attempts FROM symbol_requests WHERE repo_id = ?", f.repo.ID).Scan(&attempts)
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want the request kept for one retry", attempts)
+	}
+
+	// Asked again inside the backoff: the failed tree is left alone.
+	f.st.RequestSymbolIndex(f.repo.ID, false)
+	failed, err := f.w.Index(context.Background(), f.repo.ID, false)
+	if failed || err != nil {
+		t.Fatalf("a recently failed tree was retried: %v, %v", failed, err)
+	}
+
+	// After the backoff it is tried again, and still fails.
+	f.w.Backoff = 0
+	if failed, _ := f.w.Index(context.Background(), f.repo.ID, false); !failed {
+		t.Fatal("a failed tree was not retried after the backoff")
+	}
+
+	// A second failure of a retry is the end of it.
+	f.st.DB.Exec("DELETE FROM symbol_requests")
+	f.st.DB.Exec("INSERT INTO symbol_requests (repo_id, attempts) VALUES (?, 1)", f.repo.ID)
+	f.w.Sweep(context.Background())
+	var n int
+	f.st.DB.QueryRow("SELECT COUNT(*) FROM symbol_requests").Scan(&n)
+	if n != 0 {
+		t.Fatal("a failed retry was kept for another")
+	}
+
+	// A push that changes the tree builds, and clears the failure.
+	f.git(f.src, "rm", "-q", "b.go")
+	f.commit(map[string]string{"c.go": "package a\n\nfunc C() {}\n"})
+	next := f.sweep(false)
+	if next.ID == good.ID {
+		t.Fatal("a new tree after a failure was not indexed")
+	}
+	if _, err := f.st.SymbolFailureFor(f.repo.ID); err != store.ErrNotFound {
+		t.Fatalf("failure kept after a good index: %v", err)
+	}
+}
+
+// A new index is written in chunks no read sees: throughout the build the
+// old index is current, and the flip replaces it whole.
+func TestWorkerBuildIsInvisibleUntilPublished(t *testing.T) {
+	f := newFixture(t)
+	f.commit(map[string]string{"a.go": "package a\n\nfunc Old() {}\n"})
+	old := f.sweep(false)
+
+	f.commit(map[string]string{"a.go": "package a\n\nfunc New1() {}\nfunc New2() {}\nfunc New3() {}\n"})
+	f.w.ChunkRows = 1
+	chunks := 0
+	f.w.chunkHook = func(building int64) {
+		chunks++
+		cur, err := f.st.SymbolIndexFor(f.repo.ID)
+		if err != nil || cur.ID != old.ID {
+			t.Errorf("mid-build current index = %+v, %v; want the old one", cur, err)
+		}
+		if got := f.names(cur); len(got) != 1 || got[0] != "a.go:Old" {
+			t.Errorf("mid-build reads %v", got)
+		}
+		if b, _ := f.st.SymbolIndexByID(building); b.State != "building" {
+			t.Errorf("index being built is %q", b.State)
+		}
+	}
+	next := f.sweep(false)
+	if chunks != 3 {
+		t.Fatalf("%d chunks, want one per row", chunks)
+	}
+	if got := f.names(next); len(got) != 3 {
+		t.Fatalf("after the flip: %v", got)
+	}
+	var indexes, rows int
+	f.st.DB.QueryRow("SELECT COUNT(*) FROM symbol_indexes").Scan(&indexes)
+	f.st.DB.QueryRow("SELECT COUNT(*) FROM symbols").Scan(&rows)
+	if indexes != 1 || rows != 3 {
+		t.Fatalf("%d indexes and %d rows left, want the new index alone", indexes, rows)
+	}
+}
+
+// A run that stopped mid-build leaves the old index current, and the next
+// run deletes what it wrote.
+func TestWorkerCleansUpInterruptedBuild(t *testing.T) {
+	f := newFixture(t)
+	f.commit(map[string]string{"a.go": "package a\n\nfunc Old() {}\n"})
+	old := f.sweep(false)
+
+	// What a crash between chunks leaves.
+	orphan, err := f.st.BeginSymbolIndex(f.repo.ID, "c", "t")
+	if err != nil {
 		t.Fatal(err)
 	}
-	x := f.sweep(false)
-	if x.State != "failed" || x.Note == "" || x.Symbols != 0 {
-		t.Fatalf("index = %+v, want failed with a note", x)
+	if err := f.st.AddSymbols(orphan, []store.SymbolRow{{Name: "Half", Key: "Half", Kind: "function", Path: "x.go", Line: 1}}); err != nil {
+		t.Fatal(err)
 	}
-	again := f.sweep(false)
-	if again.ID != x.ID {
-		t.Fatalf("a failed tree was retried: %+v then %+v", x, again)
+	if cur, _ := f.st.SymbolIndexFor(f.repo.ID); cur.ID != old.ID {
+		t.Fatalf("an unfinished build became current: %+v", cur)
+	}
+
+	f.commit(nil) // same tree: nothing to build, but the leftovers go
+	f.sweep(false)
+	if _, err := f.st.SymbolIndexByID(orphan); err != store.ErrNotFound {
+		t.Fatalf("interrupted build still there: %v", err)
+	}
+	var rows int
+	f.st.DB.QueryRow("SELECT COUNT(*) FROM symbols WHERE index_id = ?", orphan).Scan(&rows)
+	if rows != 0 {
+		t.Fatalf("%d rows of the interrupted build left", rows)
+	}
+}
+
+// A hostile tree: names past the length cap are dropped, and long
+// headings stop at the byte budget with a partial index saying so.
+func TestWorkerHostileNames(t *testing.T) {
+	f := newFixture(t)
+	files := map[string]string{}
+	huge := strings.Repeat("x", MaxNameBytes+1)
+	for i := 0; i < 20; i++ {
+		files[fmt.Sprintf("huge%02d.go", i)] = "package a\n\nfunc " + huge + "() {}\nvar " + huge + " int\n"
+	}
+	var md strings.Builder
+	for i := 0; i < 500; i++ {
+		fmt.Fprintf(&md, "# %03d %s\n", i, strings.Repeat("h", 200))
+	}
+	files["notes.md"] = md.String()
+	f.commit(files)
+	f.w.MaxBytes = 20_000
+	x := f.sweep(false)
+	if x.State != "partial" || !strings.Contains(x.Note, "20000 bytes") {
+		t.Fatalf("index = %+v, want partial at the byte budget", x)
+	}
+	var longest, total int
+	f.st.DB.QueryRow("SELECT COALESCE(MAX(length(name)), 0), COALESCE(SUM(length(name) + length(key) + length(path)), 0) FROM symbols").
+		Scan(&longest, &total)
+	if longest > MaxNameBytes {
+		t.Errorf("a %d-byte name was kept", longest)
+	}
+	if total > 20_000 || x.Symbols == 0 {
+		t.Errorf("%d symbols holding %d bytes, want some within the budget", x.Symbols, total)
 	}
 }
 

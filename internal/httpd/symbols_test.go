@@ -62,8 +62,7 @@ func symbolServer(t *testing.T) *Server {
 	symbolGit(t, src, "add", ".")
 	symbolGit(t, src, "commit", "-q", "-m", "side")
 
-	w := &symbols.Worker{St: st, RepoDir: func(owner, name string) string { return control.RepoDir(root, owner, name) },
-		MaxSymbols: symbols.DefaultMaxSymbols, MaxTime: symbols.DefaultMaxTime}
+	w := symbols.NewWith(st, func(owner, name string) string { return control.RepoDir(root, owner, name) }, 0)
 	for _, r := range []struct{ name, vis string }{{"app", "public"}, {"secret", "private"}} {
 		id, err := st.CreateRepo("user", uid, r.name, r.vis)
 		if err != nil {
@@ -73,7 +72,7 @@ func symbolServer(t *testing.T) *Server {
 		os.MkdirAll(filepath.Dir(dir), 0o755)
 		symbolGit(t, root, "init", "-q", "--bare", dir)
 		symbolGit(t, src, "push", "-q", dir, "main", "side")
-		if err := w.Index(context.Background(), id, false); err != nil {
+		if _, err := w.Index(context.Background(), id, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,6 +122,14 @@ func TestSymbolsPage(t *testing.T) {
 	w = get(t, h, "/alice/app/symbols?q=dup&kind=type", nil)
 	if strings.Contains(w.Body.String(), "a/dup.go:3") {
 		t.Error("kind filter ignored")
+	}
+	if w := get(t, h, "/alice/app/symbols?q=d", nil); !strings.Contains(w.Body.String(), "query must be 2 to 200 characters") {
+		t.Error("a one-character query was searched")
+	}
+	// A cursor from an index that has been replaced says so rather than
+	// showing an empty page.
+	if w := get(t, h, "/alice/app/symbols?q=dup&after=999999.1", nil); !strings.Contains(w.Body.String(), "rebuilt since that cursor") {
+		t.Errorf("stale cursor:\n%s", w.Body.String())
 	}
 	for _, p := range []string{"/alice/secret/symbols?q=dup", "/alice/secret/blob/main/main.go"} {
 		if w := get(t, h, p, nil); w.Code != 404 {

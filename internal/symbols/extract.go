@@ -113,18 +113,31 @@ func Language(p string) string {
 // convention for generated files.
 var generatedGo = regexp.MustCompile(`(?m)^// Code generated .* DO NOT EDIT\.$`)
 
+// MaxNameBytes is the longest name the index keeps. A longer one is
+// dropped: no real definition is named that way, and a file of them is a
+// way to fill the index.
+const MaxNameBytes = 256
+
 // Extract returns the definitions in one file, in line order.
 func Extract(p string, data []byte) []Symbol {
+	var syms []Symbol
 	switch lang := Language(p); lang {
 	case "":
 		return nil
 	case "go":
-		return extractGo(data)
+		syms = extractGo(data)
 	case "org", "markdown":
-		return extractHeadings(lang, data)
+		syms = extractHeadings(lang, data)
 	default:
-		return extractLines(rules[lang], data)
+		syms = extractLines(rules[lang], data)
 	}
+	kept := syms[:0]
+	for _, s := range syms {
+		if len(s.Name) <= MaxNameBytes && len(s.Key) <= MaxNameBytes {
+			kept = append(kept, s)
+		}
+	}
+	return kept
 }
 
 func extractGo(data []byte) []Symbol {
