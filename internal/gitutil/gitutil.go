@@ -217,14 +217,16 @@ func ReadCommit(dir, sha string) ([]byte, error) {
 
 // FetchMirror pulls all branches, tags, and notes from a foreign URL into
 // the bare repository at dir, forcing updates. Progress streams to errW so
-// an interactive caller can watch. extraEnv carries credentials via
-// GIT_ASKPASS; the URL itself must never contain them.
-func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
-	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "fetch", "--progress", "--no-write-fetch-head", url,
+// an interactive caller can watch. pin is git's leading -c options
+// (gitpin.Remote.Args); env is git's whole environment and carries
+// credentials via GIT_ASKPASS: the URL itself must never contain them.
+func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, pin, env []string) error {
+	args := append(append([]string{}, pin...), "-C", dir, "fetch", "--progress", "--no-write-fetch-head", url,
 		"+refs/heads/*:refs/heads/*",
 		"+refs/tags/*:refs/tags/*",
 		"+refs/notes/*:refs/notes/*")
-	cmd.Env = append(os.Environ(), extraEnv...)
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), args...)
+	cmd.Env = env
 	cmd.Stderr = errW
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("fetch from %s: %w", url, err)
@@ -253,10 +255,12 @@ func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraE
 	return nil
 }
 
-// RemoteDefaultBranch asks the remote which branch HEAD points at.
-func RemoteDefaultBranch(ctx context.Context, url string, extraEnv []string) (string, error) {
-	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "ls-remote", "--symref", url, "HEAD")
-	cmd.Env = append(os.Environ(), extraEnv...)
+// RemoteDefaultBranch asks the remote which branch HEAD points at. pin
+// and env are as for FetchMirror.
+func RemoteDefaultBranch(ctx context.Context, url string, pin, env []string) (string, error) {
+	args := append(append([]string{}, pin...), "ls-remote", "--symref", url, "HEAD")
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), args...)
+	cmd.Env = env
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("ls-remote %s: %w", url, err)

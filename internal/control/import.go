@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"gitbay.org/gitbay/internal/gitpin"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -37,6 +38,9 @@ case "$1" in
   *)         echo "${GITBAY_IMPORT_TOKEN}" ;;
 esac
 `
+
+// importLookup resolves an import's host; tests replace it.
+var importLookup gitpin.Lookup = gitpin.LookupIP
 
 func runRepoImport(c *Ctx, args []string) int {
 	f, err := c.parseArgs(args, flagSpec{Values: []string{"--from"}, Bools: []string{"--private", "--token-stdin"}, MaxPos: 1,
@@ -77,12 +81,12 @@ func runRepoImport(c *Ctx, args []string) int {
 		}
 	}
 
-	// Scheme allowlist. file:// (and anything else local) would read the
-	// server's filesystem; ssh:// would use the server's own keys.
-	switch {
-	case strings.HasPrefix(from, "https://"), strings.HasPrefix(from, "http://"), strings.HasPrefix(from, "git://"):
-	default:
-		return c.fail(protocol.ExitUsage, "import supports https://, http://, and git:// URLs only")
+	// http and https only. git:// has no equivalent of curl's resolve
+	// list, so its connection cannot be held to a checked address;
+	// file:// would read the server's filesystem, and ssh:// would use
+	// the server's own keys.
+	if !strings.HasPrefix(from, "https://") && !strings.HasPrefix(from, "http://") {
+		return c.fail(protocol.ExitUsage, "import fetches over http:// and https:// only; use the repository's https:// URL")
 	}
 	if strings.ContainsAny(from, "@") {
 		// Credentials belong on stdin, not in the URL where they would
@@ -90,9 +94,22 @@ func runRepoImport(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitUsage, "do not embed credentials in the URL; use --token-stdin")
 	}
 
+	// Resolve and check the host now and hold git to those addresses,
+	// as mirror sync does (#298).
+	timeout := time.Duration(c.Cfg.Limits.CloneTimeoutSec) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := gitpin.CheckGit(ctx); err != nil {
+		return c.fail(protocol.ExitFailure, "import unavailable: %v", err)
+	}
+	remote, err := gitpin.Resolve(ctx, importLookup, from, c.Cfg.Webhooks.AllowLocal)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+
 	// The token is read from stdin and handed to git via GIT_ASKPASS and
 	// the environment — never argv, never the database, never a log line.
-	var env []string
+	env := gitpin.Env(c.Cfg.Server.Root)
 	if tokenStdin {
 		token, err := bufio.NewReader(io.LimitReader(c.Stdin, 4096)).ReadString('\n')
 		if err != nil && err != io.EOF {
@@ -106,13 +123,7 @@ func runRepoImport(c *Ctx, args []string) int {
 		if err := os.WriteFile(askpass, []byte(askpassScript), 0o700); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-		env = []string{
-			"GIT_ASKPASS=" + askpass,
-			"GITBAY_IMPORT_TOKEN=" + token,
-			"GIT_TERMINAL_PROMPT=0",
-		}
-	} else {
-		env = []string{"GIT_TERMINAL_PROMPT=0"}
+		env = append(env, "GIT_ASKPASS="+askpass, "GITBAY_IMPORT_TOKEN="+token)
 	}
 
 	visibility := "public"
@@ -143,17 +154,13 @@ func runRepoImport(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 
-	timeout := time.Duration(c.Cfg.Limits.CloneTimeoutSec) * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	fmt.Fprintf(c.Stderr, "importing %s into %s ...\n", from, path)
-	if err := gitutil.FetchMirror(ctx, dir, from, c.Stderr, env); err != nil {
+	if err := gitutil.FetchMirror(ctx, dir, from, c.Stderr, remote.Args(), env); err != nil {
 		cleanup()
 		return c.fail(protocol.ExitFailure, "import failed: %v", err)
 	}
 
-	branch, err := gitutil.RemoteDefaultBranch(ctx, from, env)
+	branch, err := gitutil.RemoteDefaultBranch(ctx, from, remote.Args(), env)
 	if err != nil {
 		branch = "main" // remote gone quiet after the fetch; keep the default
 	}
