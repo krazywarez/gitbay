@@ -126,9 +126,9 @@ reviews, since an approval was of the diff against the old branch.
 | choose body markup  | yes | yes | yes |
 | preview body markup | n/a | yes | no  |
 | issue templates     | yes | yes | yes |
-| milestone create, close, reopen | yes | no | yes |
-| org labels: set, list, remove | yes | list | yes |
-| org milestones: create, list, close, reopen | yes | list | yes |
+| milestone create, close, reopen | yes | yes | yes |
+| org labels: set, list, remove | yes | yes | yes |
+| org milestones: create, list, close, reopen | yes | yes | yes |
 | closes across repositories | yes | yes | yes |
 
 Labels are created on the fly by =issue label --add= and =mr label
@@ -139,11 +139,13 @@ chip and derives one from the name when none is set. The set itself is
 at =/<owner>/<repo>/labels=, linked from the issue list: create,
 recolour and remove, dispatching the same commands.
 
-Org labels and milestones are managed on the CLI, the API and the iOS
-client's org screen; =/<org>/-/labels= and =/<org>/-/milestones= show
-them on the web. The repository
-label page's form exists for colour alone, and three org forms nobody
-asked for were not worth their handlers.
+Org labels and milestones are managed at =/<org>/-/labels= and
+=/<org>/-/milestones=, where org admins see the create, colour, remove,
+close and reopen forms and everyone else sees the list. The repository
+milestones page carries create, close and reopen for writers; a
+milestone the org holds shows no buttons there. Uploading a release
+asset from the releases page streams the file to =release asset add= on
+stdin, capped at =max_asset_bytes=.
 
 Issue, MR and release bodies, and their comments, carry the markup they
 were written in — =--format md|org= on create, comment and edit, stored
@@ -234,8 +236,8 @@ rather than the one the web page shows.
 | delete, transfer            | yes | yes | no  |
 | rename                      | yes | yes | yes |
 | release delete              | yes | yes | yes |
-| release asset add           | yes | no  | n/a |
-| release asset remove        | yes | no  | yes |
+| release asset add           | yes | yes | n/a |
+| release asset remove        | yes | yes | yes |
 | snippet create, edit, delete  | yes | yes | yes |
 | snippet show, list            | yes | yes | yes |
 | snippet file set, get, remove | yes | yes | yes |

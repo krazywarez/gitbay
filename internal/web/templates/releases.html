@@ -43,13 +43,28 @@
     <p>{{template "confirmfield" $rel.Tag}} <button type="submit" class="danger">Delete release</button></p>
   </form>{{end}}</details>{{end}}
   {{if $rel.Assets}}<table class="assets">
-  <thead><tr><th scope="col">File</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead>
+  <thead><tr><th scope="col">File</th><th scope="col">Bytes</th><th scope="col">SHA-256</th>{{if $.CanWrite}}<th scope="col"><span class="vh">actions</span></th>{{end}}</tr></thead>
   {{range $rel.Assets}}<tr>
     <td class="name"><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/download/{{$rel.Tag}}/{{.Name}}">{{.Name}}</a></td>
     <td class="size">{{.Size}}</td>
     <td class="sha"><code title="{{.SHA256}}">{{short .SHA256}}</code></td>
+    {{if $.CanWrite}}<td class="act"><form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/assets" class="inline">
+      <input type="hidden" name="action" value="remove">
+      <input type="hidden" name="tag" value="{{$rel.Tag}}">
+      <input type="hidden" name="name" value="{{.Name}}">
+      {{template "confirmfield" .Name}}
+      <button type="submit" class="danger">Remove</button>
+    </form></td>{{end}}
   </tr>{{end}}
   </table>{{end}}
+  {{if $.CanWrite}}<details class="editbox"><summary>Add asset</summary>
+  <form method="post" action="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/releases/assets" enctype="multipart/form-data" class="commentform">
+    <input type="hidden" name="tag" value="{{$rel.Tag}}">
+    <p><input type="file" name="file" aria-label="File" required></p>
+    <p><input type="text" name="name" aria-label="Name" placeholder="name (defaults to the file's name)"></p>
+    <p><button type="submit" class="btn">Upload</button></p>
+  </form>
+  </details>{{end}}
 </article>
 {{else}}<p class="empty-note">no releases yet</p>{{end}}
 {{end}}

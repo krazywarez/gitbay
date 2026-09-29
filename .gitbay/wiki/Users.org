@@ -393,7 +393,9 @@ gitbay release list / show v1.0 / delete v1.0 --yes
 #+end_src
 
 The web shows them under the repository's =releases= tab with rendered
-notes, sha256 sums, and download links. Feed readers subscribe at
+notes, sha256 sums, and download links; writers add and remove assets
+there (a file upload, up to =max_asset_bytes=; removal asks for the file
+name). Feed readers subscribe at
 =/you/project/releases.atom=; commits are at =/you/project/log.atom=
 (the default branch) or =/you/project/log.atom/<ref>=, and an owner's
 activity on their public repositories at =/you/activity.atom=. The
@@ -414,7 +416,8 @@ repository there. A bare =owner/name#N= links and does nothing.
 
 Milestones group issues and MRs toward a release (write access to
 manage, attach with =issue milestone= / =mr milestone=; progress shows
-on the web at =/owner/name/milestones=):
+on the web at =/owner/name/milestones=, where writers create, close and
+reopen them):
 
 #+begin_src sh
 gitbay milestone create v1.0 --description "first release" --due 2027-01-01
@@ -428,7 +431,8 @@ milestone= and =mr milestone= resolve the org's row first; a repository
 cannot create a label or milestone with a name its org holds. Creating
 an org label or milestone whose name repositories under the org already
 use folds them in: their issues and merge requests move to the org's
-row. Org admins manage them; counts span the repositories you can read.
+row. Org admins manage them, on the CLI or at =/<org>/-/labels= and
+=/<org>/-/milestones=; counts span the repositories you can read.
 
 #+begin_src sh
 gitbay org label set acme bug --color cf222e

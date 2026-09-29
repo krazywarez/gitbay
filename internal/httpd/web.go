@@ -897,7 +897,9 @@ func (s *Server) milestones(w http.ResponseWriter, r *http.Request) {
 		repoPage
 		State      string
 		Milestones []msView
-	}{p, state, views})
+		CanWrite   bool
+		Notice     string
+	}{p, state, views, s.canWriteRepo(r, p.Repo), s.takeFlash(w, r)})
 }
 
 // search runs a bounded literal git grep over the repo's default branch.

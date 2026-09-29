@@ -8,6 +8,21 @@
     <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>
   </nav>
 </div>
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .CanAdmin}}
+<details class="editbox">
+  <summary>New org milestone</summary>
+  <form method="post" action="/{{.Org}}/-/milestones" class="setform stack">
+    <label for="mstitle">Title</label>
+    <input type="text" id="mstitle" name="title" required>
+    <label for="msdesc">Description</label>
+    <input type="text" id="msdesc" name="description">
+    <label for="msdue">Due</label>
+    <input type="text" id="msdue" name="due" placeholder="YYYY-MM-DD">
+    <button type="submit" class="btn">Create milestone</button>
+  </form>
+</details>
+{{end}}
 <p class="meta">Progress spans the repositories under {{.Org}} you can read.</p>
 <ul class="milestonelist">
 {{range .Milestones}}<li>
@@ -16,6 +31,10 @@
     {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
     <p class="meta">{{if .DueDate}}due {{.DueDate}} · {{end}}{{.ClosedItems}} closed, {{.OpenItems}} open · {{.Percent}}%</p>
     <div class="progress"><div class="bar" style="width: {{.Percent}}%"></div></div>
+    {{if $.CanAdmin}}<form method="post" action="/{{$.Org}}/-/milestones" class="inline">
+      <input type="hidden" name="title" value="{{.Title}}">
+      {{if eq .State "open"}}<input type="hidden" name="action" value="close"><button type="submit" class="btn">Close</button>{{else}}<input type="hidden" name="action" value="reopen"><button type="submit" class="btn">Reopen</button>{{end}}
+    </form>{{end}}
   </div>
 </li>
 {{else}}<li class="empty">no {{if ne .State "all"}}{{.State}} {{end}}org milestones</li>{{end}}

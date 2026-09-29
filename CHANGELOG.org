@@ -6,6 +6,11 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- The releases page uploads and removes release assets (the file is
+  streamed to =release asset add=; removal asks for the name). The
+  repository milestones page creates, closes and reopens milestones, and
+  the org labels and milestones pages give org admins set, remove,
+  create, close and reopen (#296).
 - The repository settings page gains access grants and effective access,
   webhooks (add, remove, deliveries, redeliver; the secret is a form
   field passed on stdin and never shown again), rename, transfer and

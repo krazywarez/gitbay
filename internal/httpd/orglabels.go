@@ -12,17 +12,17 @@ import (
 // see it; anyone else only when some repository under the org is
 // readable. Everything else is not found, the same answer as for a
 // user owner or an unknown name.
-func (s *Server) orgScope(w http.ResponseWriter, r *http.Request) (store.Org, store.User, []int64, bool) {
+func (s *Server) orgScope(w http.ResponseWriter, r *http.Request) (store.Org, store.User, []int64, bool, bool) {
 	viewer := s.viewer(r)
 	org, err := s.st.OrgByName(r.PathValue("owner"))
 	if err != nil {
 		s.notFound(w, r)
-		return org, viewer, nil, false
+		return org, viewer, nil, false, false
 	}
 	readable, err := control.ReadableOrgRepoIDs(s.st, viewer, org.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		return org, viewer, nil, false
+		return org, viewer, nil, false, false
 	}
 	role := ""
 	if viewer.ID != 0 {
@@ -30,13 +30,13 @@ func (s *Server) orgScope(w http.ResponseWriter, r *http.Request) (store.Org, st
 	}
 	if role == "" && len(readable) == 0 {
 		s.notFound(w, r)
-		return org, viewer, nil, false
+		return org, viewer, nil, false, false
 	}
-	return org, viewer, readable, true
+	return org, viewer, readable, true, role == "admin"
 }
 
 func (s *Server) orgLabels(w http.ResponseWriter, r *http.Request) {
-	org, viewer, readable, ok := s.orgScope(w, r)
+	org, viewer, readable, ok, admin := s.orgScope(w, r)
 	if !ok {
 		return
 	}
@@ -54,11 +54,13 @@ func (s *Server) orgLabels(w http.ResponseWriter, r *http.Request) {
 		Org         string
 		Labels      []store.Label
 		LabelColors map[string]template.CSS
-	}{s.baseFor(viewer), org.Name, labels, colorStyles(stored)})
+		CanAdmin    bool
+		Notice      string
+	}{s.baseFor(viewer), org.Name, labels, colorStyles(stored), admin, s.takeFlash(w, r)})
 }
 
 func (s *Server) orgMilestones(w http.ResponseWriter, r *http.Request) {
-	org, viewer, readable, ok := s.orgScope(w, r)
+	org, viewer, readable, ok, admin := s.orgScope(w, r)
 	if !ok {
 		return
 	}
@@ -88,5 +90,7 @@ func (s *Server) orgMilestones(w http.ResponseWriter, r *http.Request) {
 		Org        string
 		State      string
 		Milestones []msView
-	}{s.baseFor(viewer), org.Name, state, views})
+		CanAdmin   bool
+		Notice     string
+	}{s.baseFor(viewer), org.Name, state, views, admin, s.takeFlash(w, r)})
 }

@@ -101,6 +101,12 @@ func (s *Server) runControlStdin(u store.User, argv []string, stdin string) (msg
 }
 
 func (s *Server) runControlStdinCode(u store.User, argv []string, stdin string) (msg string, code int) {
+	return s.runControlReader(u, argv, strings.NewReader(stdin))
+}
+
+// runControlReader is runControlStdinCode for a body too large to hold
+// as a string: the command reads it from stdin as a stream.
+func (s *Server) runControlReader(u store.User, argv []string, stdin io.Reader) (msg string, code int) {
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
@@ -108,7 +114,7 @@ func (s *Server) runControlStdinCode(u store.User, argv []string, stdin string) 
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
-		Stdin:  strings.NewReader(stdin),
+		Stdin:  stdin,
 		Stdout: &stdout,
 		Stderr: &stderr,
 		ViaAPI: true,
