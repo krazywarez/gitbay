@@ -24,6 +24,7 @@ import (
 	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/lfs"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -514,9 +515,10 @@ func checkArchive(path, identity, dest string, full bool) error {
 			if err := extractTo(tr, dbPath); err != nil {
 				return fmt.Errorf("%s: extracting the database: %w", path, err)
 			}
-		case strings.HasPrefix(h.Name, "lfs/") && h.Typeflag == tar.TypeReg:
+		case strings.HasPrefix(h.Name, "lfs/") && h.Typeflag == tar.TypeReg && lfs.OIDPat.MatchString(filepath.Base(h.Name)):
 			// Objects are named by their sha256, so each is checked as it
-			// streams past and none is extracted.
+			// streams past and none is extracted. Other names, such as an
+			// upload's .upload-* staging file, are not objects.
 			lfsObjects++
 			if !filepath.IsLocal(h.Name) {
 				return fmt.Errorf("%s: member %q leaves the archive root", path, h.Name)
@@ -664,8 +666,12 @@ func checkReleaseAssets(st *store.Store, repos []store.Repo, root string) (int, 
 			return 0, nil, err
 		}
 		n++
-		r := byID[repoID]
-		label := fmt.Sprintf("%s release %d %s", r.Path(), relID, name)
+		r, ok := byID[repoID]
+		owner := r.Path()
+		if !ok {
+			owner = fmt.Sprintf("repository %d", repoID)
+		}
+		label := fmt.Sprintf("%s release %d %s", owner, relID, name)
 		f, err := os.Open(filepath.Join(root, "repos", r.OwnerName, r.Name+".git", "gitbay-releases", strconv.FormatInt(relID, 10), name))
 		if err != nil {
 			bad = append(bad, label)

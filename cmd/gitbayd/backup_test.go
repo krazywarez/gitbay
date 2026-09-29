@@ -879,6 +879,8 @@ func TestVerifyChecksReleaseAssetsAndLFS(t *testing.T) {
 	oid := sha256.Sum256(obj)
 	o := hex.EncodeToString(oid[:])
 	writeFile(t, filepath.Join(root, "lfs", o[:2], o[2:4], o), obj)
+	// An upload in progress stages a temporary file beside the objects.
+	writeFile(t, filepath.Join(root, "lfs", o[:2], o[2:4], ".upload-123"), []byte("partial"))
 
 	good := filepath.Join(t.TempDir(), "good.tar.gz")
 	if err := runBackup(cfg, good, false); err != nil {
@@ -899,8 +901,8 @@ func TestVerifyChecksReleaseAssetsAndLFS(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "krz/thing release") || !strings.Contains(err.Error(), wrong) {
 		t.Fatalf("archive with a bad asset and LFS object: %v", err)
 	}
-	if strings.Contains(err.Error(), o) {
-		t.Fatalf("intact LFS object reported: %v", err)
+	if strings.Contains(err.Error(), o) || strings.Contains(err.Error(), ".upload-") {
+		t.Fatalf("intact LFS object or upload staging file reported: %v", err)
 	}
 }
 
