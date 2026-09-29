@@ -20,9 +20,11 @@ import (
 // with the HTTP endpoint and a short-lived repo- and operation-scoped
 // token. Access rules mirror the git transports: download needs read,
 // upload needs write; deploy keys authorize by their binding alone, and
-// every denial on an invisible repo reads as nonexistence.
-func runLFSAuthenticate(cfg config.Config, st *store.Store, user store.User, scope string,
+// every denial on an invisible repo reads as nonexistence. The token
+// names the key, so it stops working when the key does (#285).
+func runLFSAuthenticate(cfg config.Config, st *store.Store, user store.User, key store.SSHKey,
 	argv []string, stdout, stderr io.Writer) int {
+	scope := key.Scope
 	if len(argv) != 3 || (argv[2] != "download" && argv[2] != "upload") {
 		fmt.Fprintln(stderr, "usage: git-lfs-authenticate <path> download|upload")
 		return protocol.ExitUsage
@@ -67,7 +69,7 @@ func runLFSAuthenticate(cfg config.Config, st *store.Store, user store.User, sco
 		fmt.Fprintln(stderr, "internal error")
 		return protocol.ExitFailure
 	}
-	token := lfs.Sign([]byte(secret), repo.ID, op, time.Now())
+	token := lfs.Sign([]byte(secret), repo.ID, key.ID, op, time.Now())
 	json.NewEncoder(stdout).Encode(map[string]any{
 		"href": fmt.Sprintf("%s/%s/%s.git/info/lfs",
 			cfg.Server.SiteURL, repo.OwnerName, repo.Name),

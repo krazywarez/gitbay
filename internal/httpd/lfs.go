@@ -36,25 +36,26 @@ func (s *Server) lfsSecret() ([]byte, error) {
 }
 
 // lfsAuth resolves what the request may do to the repo: "upload",
-// "download", or "" for no access. Tokens are repo-scoped; without one,
-// public repos allow anonymous download only.
-func (s *Server) lfsAuth(r *http.Request, repo store.Repo) string {
+// "download", or "" for no access, and the key the grant rests on (0
+// for none). Tokens are repo-scoped; without one, public repos allow
+// anonymous download only.
+func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 	auth := r.Header.Get("Authorization")
 	if tok, ok := strings.CutPrefix(auth, "Bearer "); ok {
 		secret, err := s.lfsSecret()
 		if err != nil {
-			return ""
+			return "", 0
 		}
-		repoID, op, ok := lfs.Verify(secret, tok, time.Now())
-		if !ok || repoID != repo.ID {
-			return ""
+		g, ok := lfs.Verify(secret, tok, time.Now())
+		if !ok || g.RepoID != repo.ID {
+			return "", 0
 		}
-		return op
+		return g.Op, g.KeyID
 	}
 	if repo.Visibility == "public" {
-		return "download"
+		return "download", 0
 	}
-	return ""
+	return "", 0
 }
 
 func lfsError(w http.ResponseWriter, code int, msg string) {
@@ -96,7 +97,7 @@ func (s *Server) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		lfsError(w, http.StatusNotFound, "repository not found")
 		return
 	}
-	granted := s.lfsAuth(r, repo)
+	granted, keyID := s.lfsAuth(r, repo)
 	if granted == "" {
 		// Not naming whether the repo exists, per the enumeration rule.
 		lfsError(w, http.StatusNotFound, "repository not found")
@@ -127,7 +128,7 @@ func (s *Server) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		lfsError(w, http.StatusInternalServerError, "lfs secret unavailable")
 		return
 	}
-	transferToken := lfs.Sign(secret, repo.ID, req.Operation, time.Now())
+	transferToken := lfs.Sign(secret, repo.ID, keyID, req.Operation, time.Now())
 	base := fmt.Sprintf("%s/%s/%s.git/info/lfs/objects",
 		strings.TrimSuffix(s.cfg.Server.SiteURL, "/"), repo.OwnerName, repo.Name)
 	authHeader := map[string]string{"Authorization": "Bearer " + transferToken}
@@ -179,7 +180,11 @@ func (s *Server) lfsBatch(w http.ResponseWriter, r *http.Request) {
 // lfsDownload answers GET /{owner}/{repo}/info/lfs/objects/{oid}.
 func (s *Server) lfsDownload(w http.ResponseWriter, r *http.Request) {
 	repo, err := s.st.RepoByPath(r.PathValue("owner") + "/" + r.PathValue("repo"))
-	if err != nil || s.lfsAuth(r, repo) == "" {
+	if err != nil {
+		lfsError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if op, _ := s.lfsAuth(r, repo); op == "" {
 		lfsError(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -198,7 +203,11 @@ func (s *Server) lfsDownload(w http.ResponseWriter, r *http.Request) {
 // lfsUpload answers PUT /{owner}/{repo}/info/lfs/objects/{oid}.
 func (s *Server) lfsUpload(w http.ResponseWriter, r *http.Request) {
 	repo, err := s.st.RepoByPath(r.PathValue("owner") + "/" + r.PathValue("repo"))
-	if err != nil || s.lfsAuth(r, repo) != "upload" {
+	if err != nil {
+		lfsError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if op, _ := s.lfsAuth(r, repo); op != "upload" {
 		lfsError(w, http.StatusNotFound, "not found")
 		return
 	}

@@ -120,52 +120,65 @@ func (s LocalStore) Delete(oid string) error {
 }
 
 // Tokens bridge SSH authentication to the HTTP endpoints: stateless,
-// HMAC-signed, scoped to one repo and one operation, short-lived. The
-// secret persists in the settings table so tokens survive restarts.
+// HMAC-signed, scoped to one repo and one operation, short-lived, and
+// bound to the SSH key that obtained them, which must still be live
+// when the token is used (#285). The secret persists in the settings
+// table so tokens survive restarts.
 
 const TokenTTL = time.Hour
 
-// Sign mints a token for op ("download" or "upload") on repoID.
-func Sign(secret []byte, repoID int64, op string, now time.Time) string {
-	payload := fmt.Sprintf("%d:%s:%d", repoID, op, now.Add(TokenTTL).Unix())
+// Sign mints a token for op ("download" or "upload") on repoID, bound
+// to keyID: the SSH key, user or deploy, that asked for it, or 0 for an
+// anonymous download of a public repository.
+func Sign(secret []byte, repoID, keyID int64, op string, now time.Time) string {
+	payload := fmt.Sprintf("%d:%d:%s:%d", repoID, keyID, op, now.Add(TokenTTL).Unix())
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." +
 		base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// Verify checks a token and returns the repo and operation it authorizes.
-func Verify(secret []byte, token string, now time.Time) (repoID int64, op string, ok bool) {
+// Grant is what a verified token authorizes.
+type Grant struct {
+	RepoID int64
+	KeyID  int64 // 0: an anonymous download of a public repository
+	Op     string
+}
+
+// Verify checks a token's MAC, shape and expiry. A token from before
+// tokens named their key does not verify.
+func Verify(secret []byte, token string, now time.Time) (Grant, bool) {
 	payloadB64, macB64, found := strings.Cut(token, ".")
 	if !found {
-		return 0, "", false
+		return Grant{}, false
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(payloadB64)
 	if err != nil {
-		return 0, "", false
+		return Grant{}, false
 	}
 	gotMAC, err := base64.RawURLEncoding.DecodeString(macB64)
 	if err != nil {
-		return 0, "", false
+		return Grant{}, false
 	}
 	mac := hmac.New(sha256.New, secret)
 	mac.Write(payload)
 	if !hmac.Equal(mac.Sum(nil), gotMAC) {
-		return 0, "", false
+		return Grant{}, false
 	}
 	parts := strings.Split(string(payload), ":")
-	if len(parts) != 3 {
-		return 0, "", false
+	if len(parts) != 4 {
+		return Grant{}, false
 	}
-	id, err1 := strconv.ParseInt(parts[0], 10, 64)
-	exp, err2 := strconv.ParseInt(parts[2], 10, 64)
-	if err1 != nil || err2 != nil || now.Unix() > exp {
-		return 0, "", false
+	repoID, err1 := strconv.ParseInt(parts[0], 10, 64)
+	keyID, err2 := strconv.ParseInt(parts[1], 10, 64)
+	exp, err3 := strconv.ParseInt(parts[3], 10, 64)
+	if err1 != nil || err2 != nil || err3 != nil || keyID < 0 || now.Unix() > exp {
+		return Grant{}, false
 	}
-	if parts[1] != "download" && parts[1] != "upload" {
-		return 0, "", false
+	if parts[2] != "download" && parts[2] != "upload" {
+		return Grant{}, false
 	}
-	return id, parts[1], true
+	return Grant{RepoID: repoID, KeyID: keyID, Op: parts[2]}, true
 }
 
 // NewSecret returns 32 random bytes, hex-encoded for the settings table.

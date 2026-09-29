@@ -496,7 +496,7 @@ func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user sto
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 				return protocol.ExitDenied
 			}
-			return runLFSAuthenticate(cfg, st, user, key.Scope, argv, stdout, stderr)
+			return runLFSAuthenticate(cfg, st, user, key, argv, stdout, stderr)
 		}
 	}
 	ctx := &control.Ctx{
