@@ -15,6 +15,7 @@ import (
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitpin"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -148,7 +149,7 @@ func TestSweepRefusesWithAnOldGit(t *testing.T) {
 		t.Fatal("looked up a host with an old git")
 		return nil, nil
 	}}
-	w.gitErr = gitVersionOK("git version 2.36.1")
+	w.gitErr = gitpin.VersionOK("git version 2.36.1")
 	w.sweep()
 	ms, err := st.ListMirrors(m.RepoID)
 	if err != nil || len(ms) != 1 {
@@ -156,20 +157,6 @@ func TestSweepRefusesWithAnOldGit(t *testing.T) {
 	}
 	if !strings.Contains(ms[0].LastError, "2.37") {
 		t.Fatalf("last error = %q", ms[0].LastError)
-	}
-}
-
-func TestGitVersionOK(t *testing.T) {
-	for _, s := range []string{"git version 2.37.0", "git version 2.47.3", "git version 2.39.5 (Apple Git-154)",
-		"git version 2.45.2.windows.1", "git version 3.0.0\n"} {
-		if err := gitVersionOK(s); err != nil {
-			t.Errorf("%q: %v", s, err)
-		}
-	}
-	for _, s := range []string{"git version 2.36.9", "git version 1.99.0", "git version 2", "nonsense", ""} {
-		if err := gitVersionOK(s); err == nil {
-			t.Errorf("%q accepted", s)
-		}
 	}
 }
 
@@ -236,24 +223,5 @@ func TestSyncRefusesANonHTTPScheme(t *testing.T) {
 	}}
 	if err := w.sync(m); err == nil || !strings.Contains(err.Error(), "not http or https") {
 		t.Fatalf("sync = %v, want a refusal", err)
-	}
-}
-
-func TestPinArgs(t *testing.T) {
-	u, _ := url.Parse("https://git.example/x.git")
-	got := pinArgs(u, []net.IP{net.ParseIP("203.0.113.5"), net.ParseIP("2001:db8::1")})
-	want := []string{"-c", "http.followRedirects=false",
-		"-c", "http.curloptResolve=git.example:443:203.0.113.5,[2001:db8::1]"}
-	if !slices.Equal(got, want) {
-		t.Fatalf("https: %q", got)
-	}
-	u, _ = url.Parse("http://git.example:8080/x.git")
-	if got := pinArgs(u, []net.IP{net.ParseIP("203.0.113.5")}); got[3] != "http.curloptResolve=git.example:8080:203.0.113.5" {
-		t.Fatalf("http with port: %q", got)
-	}
-	// An address literal is its own resolution; there is nothing to pin.
-	u, _ = url.Parse("https://203.0.113.5/x.git")
-	if got := pinArgs(u, []net.IP{net.ParseIP("203.0.113.5")}); !slices.Equal(got, []string{"-c", "http.followRedirects=false"}) {
-		t.Fatalf("literal: %q", got)
 	}
 }

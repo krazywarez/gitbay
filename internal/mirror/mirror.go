@@ -10,19 +10,16 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/gitpin"
 	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/toolpath"
-	"gitbay.org/gitbay/internal/webhook"
 )
 
 const askpassScript = `#!/bin/sh
@@ -50,20 +47,12 @@ func New(st *store.Store, cfg config.Config) *Worker {
 			tick = d
 		}
 	}
-	return &Worker{St: st, Cfg: cfg, Tick: tick,
-		Lookup: func(ctx context.Context, host string) ([]net.IP, error) {
-			return net.DefaultResolver.LookupIP(ctx, "ip", host)
-		}}
+	return &Worker{St: st, Cfg: cfg, Tick: tick, Lookup: gitpin.LookupIP}
 }
 
 func (w *Worker) Run(ctx context.Context) {
-	out, err := exec.CommandContext(ctx, toolpath.Look("git"), "version").Output()
-	if err != nil {
-		w.gitErr = fmt.Errorf("mirrors disabled: running git version: %v", err)
-	} else {
-		w.gitErr = gitVersionOK(string(out))
-	}
-	if w.gitErr != nil {
+	if err := gitpin.CheckGit(ctx); err != nil {
+		w.gitErr = fmt.Errorf("mirrors disabled: %w", err)
 		slog.Error("mirror: not syncing", "err", w.gitErr)
 	}
 	t := time.NewTicker(w.Tick)
@@ -105,35 +94,18 @@ func (w *Worker) sync(m store.Mirror) error {
 		return err
 	}
 	dir := control.RepoDir(w.Cfg.Server.Root, repo.OwnerName, repo.Name)
-	u, err := url.Parse(m.URL)
-	if err != nil {
-		return err
-	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("mirror URL scheme %q is not http or https", u.Scheme)
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	// The URL was checked when saved, but DNS can answer differently
 	// now. Check what it resolves to at sync time, then let git connect
 	// to exactly those addresses.
-	ips, err := w.Lookup(ctx, u.Hostname())
+	remote, err := gitpin.Resolve(ctx, w.Lookup, m.URL, w.Cfg.Webhooks.AllowLocal)
 	if err != nil {
-		return fmt.Errorf("resolving %s: %w", u.Hostname(), err)
-	}
-	if len(ips) == 0 {
-		// An empty resolve list would leave curl to resolve the host itself.
-		return fmt.Errorf("%s resolves to no address", u.Hostname())
-	}
-	if err := webhook.CheckAddrs(u.Hostname(), ips, w.Cfg.Webhooks.AllowLocal); err != nil {
 		return err
 	}
 
-	// No system or global gitconfig: a proxy, URL rewrite or redirect
-	// setting there would take git around the pin.
-	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + w.Cfg.Server.Root,
-		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
+	env := gitpin.Env(w.Cfg.Server.Root)
 	if m.Token != "" {
 		askpass := filepath.Join(w.Cfg.Server.Root, "mirror-askpass.sh")
 		if err := os.WriteFile(askpass, []byte(askpassScript), 0o700); err != nil {
@@ -149,7 +121,7 @@ func (w *Worker) sync(m store.Mirror) error {
 			"GITBAY_MIRROR_TOKEN="+m.Token)
 	}
 
-	args := append(pinArgs(u, ips), "-C", dir)
+	args := append(remote.Args(), "-C", dir)
 	if m.Direction == "push" {
 		// Branches and tags only: internal refs (merge-requests) stay home.
 		args = append(args, "push", "--prune", m.URL,
@@ -164,52 +136,4 @@ func (w *Worker) sync(m store.Mirror) error {
 		return fmt.Errorf("git %s: %v: %.300s", m.Direction, err, out)
 	}
 	return nil
-}
-
-// pinArgs keeps git on the addresses just checked: curl's resolve list
-// pins the host, and with redirects off a server cannot send git on to
-// a host nobody checked. An address literal needs no pin.
-func pinArgs(u *url.URL, ips []net.IP) []string {
-	args := []string{"-c", "http.followRedirects=false"}
-	host := u.Hostname()
-	if net.ParseIP(host) != nil {
-		return args
-	}
-	port := u.Port()
-	if port == "" {
-		port = "443"
-		if u.Scheme == "http" {
-			port = "80"
-		}
-	}
-	addrs := make([]string, len(ips))
-	for i, ip := range ips {
-		if ip.To4() == nil {
-			addrs[i] = "[" + ip.String() + "]"
-		} else {
-			addrs[i] = ip.String()
-		}
-	}
-	return append(args, "-c", "http.curloptResolve="+host+":"+port+":"+strings.Join(addrs, ","))
-}
-
-// gitVersionOK accepts the output of `git version` for git 2.37 or
-// later, the first release with http.curloptResolve. An older git
-// ignores the setting and would resolve the host itself.
-func gitVersionOK(out string) error {
-	fields := strings.Fields(out)
-	if len(fields) >= 3 && fields[0] == "git" && fields[1] == "version" {
-		parts := strings.Split(fields[2], ".")
-		if len(parts) >= 2 {
-			major, err1 := strconv.Atoi(parts[0])
-			minor, err2 := strconv.Atoi(parts[1])
-			if err1 == nil && err2 == nil {
-				if major > 2 || major == 2 && minor >= 37 {
-					return nil
-				}
-				return fmt.Errorf("mirrors disabled: git %s is older than 2.37 and cannot pin mirror addresses", fields[2])
-			}
-		}
-	}
-	return fmt.Errorf("mirrors disabled: cannot read git version from %q", strings.TrimSpace(out))
 }
