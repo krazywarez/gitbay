@@ -98,6 +98,7 @@ func runStatusSet(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "status",
 		fmt.Sprintf(`{"sha":%q,"context":%q,"state":%q}`, full, context, state))
+	TryQueuedMergesAt(c.Store, c.Cfg, repo.ID, full)
 	return c.emit(map[string]string{"sha": full, "context": context, "state": state}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s on %.10s: %s\n", context, full, state)
 	})

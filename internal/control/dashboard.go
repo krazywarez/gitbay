@@ -40,6 +40,8 @@ type DashboardItem struct {
 	Author    string `json:"author"`
 	State     string `json:"state"`
 	UpdatedAt string `json:"updated_at"`
+	// Queued marks a merge request with a queued merge.
+	Queued bool `json:"queued,omitempty"`
 }
 
 // PinnedOut is one pinned repository on the dashboard.
@@ -119,7 +121,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, m := range mrs {
-		d.MRs = append(d.MRs, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
+		d.MRs = append(d.MRs, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt, m.Queued})
 	}
 
 	reviews, err := c.Store.ReviewQueue(c.User.ID)
@@ -127,7 +129,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, m := range reviews {
-		d.Reviews = append(d.Reviews, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt})
+		d.Reviews = append(d.Reviews, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt, m.Queued})
 	}
 
 	assigned, err := c.Store.AssignedIssues(c.User.ID)
@@ -135,7 +137,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, i := range assigned {
-		d.Assigned = append(d.Assigned, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
+		d.Assigned = append(d.Assigned, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt, i.Queued})
 	}
 
 	issues, err := c.Store.DashboardIssues(c.User.ID)
@@ -143,7 +145,7 @@ func runDashboard(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	for _, i := range issues {
-		d.Issues = append(d.Issues, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt})
+		d.Issues = append(d.Issues, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt, i.Queued})
 	}
 
 	events, err := c.Store.RecentEvents(c.User.ID, 20, 0)

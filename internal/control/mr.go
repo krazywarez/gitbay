@@ -188,11 +188,13 @@ func init() {
 		Run:      runMRLabel})
 	register(Command{Path: []string{"mr", "merge"},
 		Summary: "merge",
-		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]",
+		Usage:   "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase] [--when-ready | --cancel]",
 		Flags: []Flag{
 			{"--strategy", "ff|merge|squash|rebase", "how to merge", ""},
+			{"--when-ready", "", "queue the merge until the gates pass; merges now if they already do", ""},
+			{"--cancel", "", "take a queued merge off the queue", ""},
 		},
-		Examples: []string{"mr merge krz/gitbay 431 --strategy ff"},
+		Examples: []string{"mr merge krz/gitbay 431 --strategy ff", "mr merge krz/gitbay 431 --when-ready", "mr merge krz/gitbay 431 --cancel"},
 		Run:      runMRMerge})
 	register(Command{Path: []string{"mr", "close"},
 		Summary: "close without merging",
@@ -560,6 +562,8 @@ type mrOut struct {
 	// SupersededBy is the merge request, by number, this one was closed
 	// in favour of. 0 means none.
 	SupersededBy int64 `json:"superseded_by,omitempty"`
+	// Queued is the merge queued with mr merge --when-ready, if any.
+	Queued *QueuedOut `json:"queued,omitempty"`
 }
 
 type stackRef struct {
@@ -605,7 +609,8 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 		Source: src, TargetRef: m.TargetRef, HeadSHA: m.HeadSHA, Milestone: m.Milestone,
 		Labels: m.Labels, ReviewRequests: m.ReviewRequests,
 		CreatedAt: m.CreatedAt, MergedAt: m.MergedAt, MergedBy: m.MergedBy,
-		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy, SupersededBy: m.SupersededBy}
+		ClosedAt: m.ClosedAt, ClosedBy: m.ClosedBy, SupersededBy: m.SupersededBy,
+		Queued: queuedOut(m)}
 	if withBody {
 		o.Body = m.Body
 		o.BodyFormat = m.BodyFormat
@@ -795,6 +800,15 @@ func runMRShow(c *Ctx, args []string) int {
 				gates = fmt.Sprintf("%d unmet; %s", len(g.Unmet), ff)
 			}
 		}
+		queued, waiting := "", ""
+		if q := d.Queued; q != nil {
+			queued = "by " + q.By
+			if q.Strategy != "" {
+				queued += " (" + q.Strategy + ")"
+			}
+			queued += ", " + c.when(q.QueuedAt)
+			waiting = q.Reason
+		}
 		unresolved := ""
 		if d.UnresolvedThreads > 0 {
 			unresolved = fmt.Sprintf("%d", d.UnresolvedThreads)
@@ -815,6 +829,8 @@ func runMRShow(c *Ctx, args []string) int {
 			"merged", merged,
 			"closed", closed,
 			"superseded by", superseded,
+			"queued to merge", queued,
+			"waiting on", waiting,
 			"unresolved threads", unresolved,
 			"gates", gates,
 		}
@@ -1108,6 +1124,7 @@ func runMRReview(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.reviewed",
 		fmt.Sprintf(`{"number":%d,"verdict":%q}`, mr.Number, verdict))
+	TryQueuedMerge(c.Store, c.Cfg, mr.ID)
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr",
 			subject: mrSubject(repo, mr.Number, mr.Title),
@@ -1258,7 +1275,8 @@ func runMRLabel(c *Ctx, args []string) int {
 }
 
 func runMRMerge(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{Values: []string{"--strategy"}, MaxPos: -1, Usage: "mr merge <owner/name> <n> [--strategy ff|merge|squash|rebase]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--strategy"}, Bools: []string{"--when-ready", "--cancel"},
+		MaxPos: -1, Usage: c.Cmd.Usage})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
@@ -1267,10 +1285,25 @@ func runMRMerge(c *Ctx, args []string) int {
 	if !valid[strategy] {
 		return c.fail(protocol.ExitUsage, "--strategy must be ff, merge, squash, or rebase")
 	}
+	if f.Has("--cancel") && (f.Has("--when-ready") || f.Has("--strategy")) {
+		return c.fail(protocol.ExitUsage, "--cancel takes no other flag")
+	}
 	repo, mr, code := mrRef(c, rest, policy.CanWrite)
 	if code >= 0 {
 		return code
 	}
+	switch {
+	case f.Has("--cancel"):
+		return cancelQueuedMerge(c, repo, mr)
+	case f.Has("--when-ready"):
+		return queueMerge(c, repo, mr, strategy)
+	}
+	return mergeMR(c, repo, mr, strategy)
+}
+
+// mergeMR merges mr now as c.User, or refuses saying why. The queue runs
+// it too, as the user who queued the merge.
+func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 	if code := refuseArchived(c, repo); code >= 0 {
 		return code
 	}
@@ -1819,6 +1852,9 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.draft",
 		fmt.Sprintf(`{"number":%d,"draft":%t}`, mr.Number, draft))
+	if !draft {
+		TryQueuedMerge(c.Store, c.Cfg, mr.ID)
+	}
 	// Marking ready is the request for review; going back to draft
 	// withdraws it and is not worth anyone's inbox.
 	//

@@ -805,6 +805,7 @@ func runRunnerDone(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+outcome,
 		fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))
+	TryQueuedMergesAt(c.Store, c.Cfg, repo.ID, b.SHA)
 	// A red build mails the repo's notify targets with the log tail — a
 	// failed scheduled job must not wait to be noticed.
 	if outcome == "failure" {
@@ -1037,6 +1038,7 @@ func resolveCancelledCommitStatus(c *Ctx, repo store.Repo, b store.Build) {
 		url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), prev.Number)
 		c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, "success",
 			fmt.Sprintf("passed in build %d on %s", prev.Number, prev.Ref), url, c.User.ID)
+		TryQueuedMergesAt(c.Store, c.Cfg, repo.ID, b.SHA)
 		return
 	}
 	url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)

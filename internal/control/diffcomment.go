@@ -255,6 +255,9 @@ func setThreadResolved(c *Ctx, args []string, resolved bool) int {
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	if resolved {
+		TryQueuedMerge(c.Store, c.Cfg, mr.ID)
+	}
 	verb := "resolved"
 	if !resolved {
 		verb = "reopened"

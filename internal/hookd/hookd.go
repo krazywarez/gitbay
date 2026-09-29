@@ -362,6 +362,11 @@ func (s *Server) postReceive(req Request) {
 			if mr.State == "source_gone" {
 				s.st.SetMRState(mr.ID, "open") // branch came back
 			}
+			// A queued merge stays queued across a push; the new head has
+			// to pass the gates on its own.
+			if mr.QueuedAt != "" {
+				control.TryQueuedMerge(s.st, s.cfg, mr.ID)
+			}
 		}
 	}
 }
