@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -15,13 +16,17 @@ import (
 func init() {
 	register(Command{Path: []string{"webhook", "add"},
 		Summary: "add a webhook",
-		Usage:   "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]",
+		Usage:   "webhook add <owner/name> <url> [--secret -] [--events push,issue.created|*]",
 		Flags: []Flag{
-			{"--secret", "<s>", "signs deliveries so the receiver can verify them", ""},
+			{"--secret", "-", "read the secret that signs deliveries from stdin", ""},
 			{"--events", "push,issue.created|*", "which events to send", "*"},
 		},
-		Examples: []string{"webhook add krz/gitbay https://ci.example.org/hook --events push"},
-		Run:      runWebhookAdd})
+		Examples: []string{
+			"webhook add krz/gitbay https://ci.example.org/hook --events push",
+			"webhook add krz/gitbay https://ci.example.org/hook --secret - < secret.txt",
+		},
+		ReadsStdin: true,
+		Run:        runWebhookAdd})
 	register(Command{Path: []string{"webhook", "list"},
 		Summary:  "list webhooks",
 		Usage:    "webhook list <owner/name>",
@@ -45,16 +50,20 @@ func init() {
 }
 
 func runWebhookAdd(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{Values: []string{"--secret", "--events"}, MaxPos: 2, Usage: "webhook add <owner/name> <url> [--secret <s>] [--events push,issue.created|*]"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--secret", "--events"}, MaxPos: 2, Usage: "webhook add <owner/name> <url> [--secret -] [--events push,issue.created|*]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
-	path, url, secret, events := f.pos(0), f.pos(1), f.Value("--secret"), "*"
+	path, url, events := f.pos(0), f.pos(1), "*"
 	if f.Has("--events") {
 		events = f.Value("--events")
 	}
 	if path == "" || url == "" {
 		return c.usage()
+	}
+	// Secrets travel on stdin: argv shows in /proc and in shell history.
+	if f.Has("--secret") && f.Value("--secret") != "-" {
+		return c.fail(protocol.ExitUsage, "the secret is read from stdin, never argv: pipe it and pass --secret - (printf %%s SECRET | ... --secret -)")
 	}
 	repo, code := resolveRepo(c, path, policy.CanAdmin)
 	if code >= 0 {
@@ -70,6 +79,17 @@ func runWebhookAdd(c *Ctx, args []string) int {
 		// The command line parsed; the value is what the server refuses.
 		// Exit 1 carries the reason to every client verbatim (#187).
 		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	secret := ""
+	if f.Has("--secret") {
+		raw, err := io.ReadAll(io.LimitReader(c.Stdin, 64<<10))
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "reading secret: %v", err)
+		}
+		secret = strings.TrimRight(string(raw), "\n")
+		if secret == "" {
+			return c.fail(protocol.ExitUsage, "no secret on stdin (pipe it: printf %%s SECRET | ... --secret -)")
+		}
 	}
 	id, err := c.Store.AddWebhook(repo.ID, url, secret, events)
 	if err != nil {

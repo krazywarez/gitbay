@@ -39,3 +39,42 @@ func TestWebhookAddRefusedURLIsAFailure(t *testing.T) {
 		t.Errorf("missing url: exit %d, want %d", code, protocol.ExitUsage)
 	}
 }
+
+// The signing secret arrives on stdin with --secret -, like a build
+// secret: a value on the command line is refused before anything is
+// stored, since argv shows in /proc and in shell history (#284).
+func TestWebhookAddSecretFromStdin(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	run := func(stdin string, argv ...string) (string, int) {
+		c, errOut := pruneCtx(st, t.TempDir(), store.User{ID: uid, Username: "alice"})
+		c.Cfg.Limits.WriteRate = -1
+		c.Cfg.Webhooks.AllowLocal = true
+		c.Stdin = strings.NewReader(stdin)
+		code := Dispatch(c, argv)
+		return errOut.String(), code
+	}
+	msg, code := run("", "webhook", "add", repo.Path(), "http://127.0.0.1/hook", "--secret", "s3cret")
+	if code != protocol.ExitUsage || !strings.Contains(msg, "--secret -") {
+		t.Fatalf("literal secret: exit %d, %q", code, msg)
+	}
+	if msg, code := run("", "webhook", "add", repo.Path(), "http://127.0.0.1/hook", "--secret", "-"); code != protocol.ExitUsage || !strings.Contains(msg, "no secret on stdin") {
+		t.Fatalf("empty stdin: exit %d, %q", code, msg)
+	}
+	if hooks, err := st.ListWebhooks(repo.ID); err != nil || len(hooks) != 0 {
+		t.Fatalf("a refused add stored %+v (%v)", hooks, err)
+	}
+	if msg, code := run("s3cret\n", "webhook", "add", repo.Path(), "http://127.0.0.1/hook", "--secret", "-"); code != protocol.ExitOK {
+		t.Fatalf("piped secret: exit %d, %q", code, msg)
+	}
+	// Without --secret nothing reads stdin and the hook is unsigned.
+	if msg, code := run("not a secret\n", "webhook", "add", repo.Path(), "http://127.0.0.1/other"); code != protocol.ExitOK {
+		t.Fatalf("no secret: exit %d, %q", code, msg)
+	}
+	hooks, err := st.ListWebhooks(repo.ID)
+	if err != nil || len(hooks) != 2 {
+		t.Fatalf("hooks: %+v %v", hooks, err)
+	}
+	if hooks[0].Secret != "s3cret" || hooks[1].Secret != "" {
+		t.Fatalf("secrets: %q, %q", hooks[0].Secret, hooks[1].Secret)
+	}
+}
