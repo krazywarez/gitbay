@@ -60,11 +60,17 @@ func (s *Server) reauthNotice(w http.ResponseWriter, notice, path string) bool {
 
 const nextCookie = "gitbay_next"
 
+// localPath reports whether p is a path on this host. Browsers read a
+// leading `/\` like "//", so it is refused too.
+func localPath(p string) bool {
+	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//") && !strings.HasPrefix(p, "/\\")
+}
+
 // setNext remembers the local path an anonymous visitor asked for, so
 // the login that follows can return there. Only a GET path is stored:
 // a POST must not be replayed.
 func (s *Server) setNext(w http.ResponseWriter, path string) {
-	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || len(path) > 300 {
+	if !localPath(path) || len(path) > 300 {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -83,7 +89,7 @@ func (s *Server) takeNext(w http.ResponseWriter, r *http.Request) string {
 	}
 	http.SetCookie(w, s.clearCookie(nextCookie, http.SameSiteLaxMode))
 	p, err := url.QueryUnescape(c.Value)
-	if err != nil || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
+	if err != nil || !localPath(p) {
 		return ""
 	}
 	return p
@@ -97,7 +103,7 @@ func (s *Server) peekNext(r *http.Request) string {
 		return ""
 	}
 	p, err := url.QueryUnescape(c.Value)
-	if err != nil || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
+	if err != nil || !localPath(p) {
 		return ""
 	}
 	return p
