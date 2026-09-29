@@ -23,7 +23,7 @@ func init() {
 		Usage:           "repo runner add <owner/name> < key.pub",
 		Examples:        []string{"repo runner add krz/gitbay < key.pub"},
 		ReadsStdin:      true,
-		MintsCredential: true, Run: runRepoRunnerAdd})
+		MintsCredential: true, NeedsRecentSignIn: true, Run: runRepoRunnerAdd})
 	register(Command{Path: []string{"repo", "runner", "list"},
 		Summary:  "list the runners attached to a repository",
 		Usage:    "repo runner list <owner/name>",

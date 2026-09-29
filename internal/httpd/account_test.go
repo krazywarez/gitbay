@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/store"
@@ -300,7 +301,7 @@ func newTokenTestServer(t *testing.T) (*Server, *store.Store, store.User) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(config.Default(), st, nil), st, store.User{ID: uid, Username: "alice"}
+	return New(config.Default(), st, nil), st, store.User{ID: uid, Username: "alice", SignedInAt: time.Now()}
 }
 
 // The settings page lists a user's API tokens with scope and expiry,

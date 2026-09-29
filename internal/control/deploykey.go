@@ -23,7 +23,7 @@ func init() {
 		},
 		Examples:        []string{"repo deploy-key add krz/gitbay < key.pub", "repo deploy-key add krz/gitbay --ttl 30d < key.pub"},
 		ReadsStdin:      true,
-		MintsCredential: true, Run: runDeployKeyAdd})
+		MintsCredential: true, NeedsRecentSignIn: true, Run: runDeployKeyAdd})
 	register(Command{Path: []string{"repo", "deploy-key", "list"},
 		Summary:  "list deploy keys",
 		Usage:    "repo deploy-key list <owner/name>",

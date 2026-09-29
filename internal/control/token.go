@@ -22,8 +22,8 @@ func init() {
 			{"--ttl", "30d|720h", "how long the token is valid; an expiring token cannot mint credentials", "never expires"},
 		},
 		Examples:        []string{"token create --name laptop --ttl 30d", "token create --name phone --scope full"},
-		MintsCredential: true,
-		Run:             runTokenCreate})
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Run: runTokenCreate})
 	register(Command{Path: []string{"token", "list"},
 		Summary:  "list API tokens",
 		Usage:    "token list",

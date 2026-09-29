@@ -15,8 +15,9 @@ import (
 
 func init() {
 	register(Command{Path: []string{"webhook", "add"},
-		Summary: "add a webhook",
-		Usage:   "webhook add <owner/name> <url> [--secret -] [--events push,issue.created|*]",
+		NeedsRecentSignIn: true,
+		Summary:           "add a webhook",
+		Usage:             "webhook add <owner/name> <url> [--secret -] [--events push,issue.created|*]",
 		Flags: []Flag{
 			{"--secret", "-", "read the secret that signs deliveries from stdin", ""},
 			{"--events", "push,issue.created|*", "which events to send", "*"},

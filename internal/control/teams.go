@@ -30,25 +30,28 @@ func init() {
 		Usage:    "org team show <org> <team>",
 		Examples: []string{"org team show krz maintainers"}, ReadOnly: true, Run: runTeamShow})
 	register(Command{Path: []string{"org", "team", "add"},
-		Summary:  "add org members to a team",
-		Usage:    "org team add <org> <team> <user>...",
-		Examples: []string{"org team add krz maintainers cmc"}, Run: runTeamAdd})
+		NeedsRecentSignIn: true,
+		Summary:           "add org members to a team",
+		Usage:             "org team add <org> <team> <user>...",
+		Examples:          []string{"org team add krz maintainers cmc"}, Run: runTeamAdd})
 	register(Command{Path: []string{"org", "team", "remove"},
 		Summary:  "remove members from a team",
 		Usage:    "org team remove <org> <team> <user>...",
 		Examples: []string{"org team remove krz maintainers cmc"}, Run: runTeamRemove})
 	register(Command{Path: []string{"org", "team", "grant"},
-		Summary:  "grant a team a role on an org repo",
-		Usage:    "org team grant <org> <team> <owner/name> read|write|admin",
-		Examples: []string{"org team grant krz maintainers krz/gitbay write"}, Run: runTeamGrant})
+		NeedsRecentSignIn: true,
+		Summary:           "grant a team a role on an org repo",
+		Usage:             "org team grant <org> <team> <owner/name> read|write|admin",
+		Examples:          []string{"org team grant krz maintainers krz/gitbay write"}, Run: runTeamGrant})
 	register(Command{Path: []string{"org", "team", "revoke"},
 		Summary:  "revoke a team's grant",
 		Usage:    "org team revoke <org> <team> <owner/name>",
 		Examples: []string{"org team revoke krz maintainers krz/gitbay"}, Run: runTeamRevoke})
 	register(Command{Path: []string{"org", "settings", "members-role"},
-		Summary:  "role plain membership implies on every org repo",
-		Usage:    "org settings members-role <org> write|read|none (default write)",
-		Examples: []string{"org settings members-role krz read"}, Run: runOrgMembersRole})
+		NeedsRecentSignIn: true,
+		Summary:           "role plain membership implies on every org repo",
+		Usage:             "org settings members-role <org> write|read|none (default write)",
+		Examples:          []string{"org settings members-role krz read"}, Run: runOrgMembersRole})
 }
 
 // orgAdminRef resolves an org and requires the caller to admin it.

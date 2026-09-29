@@ -50,10 +50,11 @@ func init() {
 		Examples: []string{"repo show krz/gitbay"},
 		ReadOnly: true, Run: runRepoShow})
 	register(Command{Path: []string{"repo", "transfer"},
-		Summary:  "move a repository to another owner",
-		Usage:    "repo transfer <owner/name> <new-owner> (clone URLs change)",
-		Examples: []string{"repo transfer krz/gitbay krazywarez"},
-		Run:      runRepoTransfer})
+		NeedsRecentSignIn: true,
+		Summary:           "move a repository to another owner",
+		Usage:             "repo transfer <owner/name> <new-owner> (clone URLs change)",
+		Examples:          []string{"repo transfer krz/gitbay krazywarez"},
+		Run:               runRepoTransfer})
 	register(Command{Path: []string{"repo", "rename"},
 		Summary:  "rename a repository",
 		Usage:    "repo rename <owner/name> <new-name> (clone URLs change)",
@@ -68,10 +69,11 @@ func init() {
 		Examples: []string{"repo delete cmc/scratch --yes"},
 		Run:      runRepoDelete})
 	register(Command{Path: []string{"repo", "access", "grant"},
-		Summary:  "grant access",
-		Usage:    "repo access grant <owner/name> <user> read|write|admin",
-		Examples: []string{"repo access grant krz/gitbay cmc write"},
-		Run:      runAccessGrant})
+		NeedsRecentSignIn: true,
+		Summary:           "grant access",
+		Usage:             "repo access grant <owner/name> <user> read|write|admin",
+		Examples:          []string{"repo access grant krz/gitbay cmc write"},
+		Run:               runAccessGrant})
 	register(Command{Path: []string{"repo", "access", "revoke"},
 		Summary:  "revoke access",
 		Usage:    "repo access revoke <owner/name> <user>",

@@ -16,8 +16,8 @@ func init() {
 	register(Command{Path: []string{"web", "login"},
 		Summary:         "mint a one-time browser login URL",
 		Usage:           "web login",
-		MintsCredential: true,
-		Examples:        []string{"web login"}, Run: runWebLogin})
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Examples: []string{"web login"}, Run: runWebLogin})
 	register(Command{Path: []string{"web", "sessions", "list"},
 		Summary:  "list your browser sessions",
 		Usage:    "web sessions list",

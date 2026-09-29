@@ -32,17 +32,18 @@ func init() {
 		},
 		Examples:        []string{"admin user create alice --email alice@example.org --key - < key.pub"},
 		ReadsStdin:      true,
-		MintsCredential: true, Run: runAdminUserCreate})
+		MintsCredential: true, NeedsRecentSignIn: true, Run: runAdminUserCreate})
 	register(Command{Path: []string{"admin", "user", "disable"},
 		Summary:  "suspend an account: SSH, web sessions and API tokens refused until re-enabled",
 		Usage:    "admin user disable <username>",
 		Examples: []string{"admin user disable alice"},
 		Run:      runAdminUserDisable})
 	register(Command{Path: []string{"admin", "user", "enable"},
-		Summary:  "restore a suspended account",
-		Usage:    "admin user enable <username>",
-		Examples: []string{"admin user enable alice"},
-		Run:      runAdminUserEnable})
+		NeedsRecentSignIn: true,
+		Summary:           "restore a suspended account",
+		Usage:             "admin user enable <username>",
+		Examples:          []string{"admin user enable alice"},
+		Run:               runAdminUserEnable})
 	register(Command{Path: []string{"admin", "user", "delete"},
 		Summary: "delete an account that anchors nothing (keys, emails and sessions go with it)",
 		Usage:   "admin user delete <username> --yes",
@@ -55,8 +56,8 @@ func init() {
 		Summary:         "mark an address verified by admin assertion",
 		Usage:           "admin email verify <username> <address>",
 		Examples:        []string{"admin email verify alice alice@example.org"},
-		MintsCredential: true,
-		Run:             runAdminEmailVerify})
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Run: runAdminEmailVerify})
 	register(Command{Path: []string{"admin", "invite"},
 		Summary: "issue a registration invite and mail its code",
 		Usage:   "admin invite --email <address>",
@@ -64,8 +65,8 @@ func init() {
 			{"--email", "<address>", "who the invite is for", ""},
 		},
 		Examples:        []string{"admin invite --email alice@example.org"},
-		MintsCredential: true,
-		Run:             runAdminInvite})
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Run: runAdminInvite})
 	register(Command{Path: []string{"admin", "stats"},
 		Summary:  "instance statistics: counts and per-repository disk usage",
 		Usage:    "admin stats",

@@ -31,10 +31,11 @@ func init() {
 		Examples: []string{"admin user show alice"},
 		ReadOnly: true, Run: runAdminUserShow})
 	register(Command{Path: []string{"admin", "user", "promote"},
-		Summary:  "make an account an instance admin",
-		Usage:    "admin user promote <username>",
-		Examples: []string{"admin user promote alice"},
-		Run:      runAdminUserPromote})
+		NeedsRecentSignIn: true,
+		Summary:           "make an account an instance admin",
+		Usage:             "admin user promote <username>",
+		Examples:          []string{"admin user promote alice"},
+		Run:               runAdminUserPromote})
 	register(Command{Path: []string{"admin", "user", "demote"},
 		Summary:  "remove instance admin from an account (never the last one)",
 		Usage:    "admin user demote <username>",

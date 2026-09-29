@@ -37,8 +37,9 @@ func init() {
 		},
 		Examples: []string{"org delete krz --yes"}, Run: runOrgDelete})
 	register(Command{Path: []string{"org", "members", "add"},
-		Summary: "add or update a member",
-		Usage:   "org members add <org> <user> [--role member|admin]",
+		NeedsRecentSignIn: true,
+		Summary:           "add or update a member",
+		Usage:             "org members add <org> <user> [--role member|admin]",
 		Flags: []Flag{
 			{"--role", "member|admin", "the member's role", "member"},
 		},

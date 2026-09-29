@@ -16,8 +16,9 @@ import (
 
 func init() {
 	register(Command{Path: []string{"repo", "mirror", "add"},
-		Summary: "mirror to or from a remote",
-		Usage:   "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
+		NeedsRecentSignIn: true,
+		Summary:           "mirror to or from a remote",
+		Usage:             "repo mirror add <owner/name> <https-url> --direction push|pull [--username <u>] [--token-stdin]",
 		Flags: []Flag{
 			{"--direction", "push|pull", "which way the mirror syncs", ""},
 			{"--username", "<u>", "the remote's username", ""},

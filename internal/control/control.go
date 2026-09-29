@@ -69,6 +69,27 @@ type Ctx struct {
 	Stopping <-chan struct{}
 }
 
+// SourceWeb is Ctx.Source for a request from a browser session. Its
+// User.SignedInAt is when that session signed in.
+const SourceWeb = "web"
+
+// ReauthWindow is how long after signing in a browser session may run a
+// NeedsRecentSignIn command. A session lasts days and its cookie is a
+// bearer credential; what it creates or grants must come from a recent
+// sign-in (#297).
+const ReauthWindow = 15 * time.Minute
+
+// ReauthRefusal is what a web session signed in longer ago than
+// ReauthWindow gets; the web shows a sign-in link beside it.
+var ReauthRefusal = fmt.Sprintf("this action from the web needs a sign-in from the last %d minutes; sign in again, then submit the form again",
+	int(ReauthWindow/time.Minute))
+
+// staleSignIn reports whether a web session that signed in at at is too
+// old, at now, to run a NeedsRecentSignIn command. A zero at is stale.
+func staleSignIn(at, now time.Time) bool {
+	return now.Sub(at) > ReauthWindow
+}
+
 // usage reports a bad invocation with the command's registered usage,
 // the one source of it.
 func (c *Ctx) usage() int {
@@ -104,7 +125,12 @@ type Command struct {
 	// to obtain one: tokens, keys, login links, invites, accounts,
 	// verified addresses. An expiring credential may not run it.
 	MintsCredential bool
-	Run             func(c *Ctx, args []string) int
+	// NeedsRecentSignIn marks a command a browser session may run only
+	// within ReauthWindow of signing in: every MintsCredential command,
+	// and those that give an account lasting access or open a standing
+	// channel out of the instance.
+	NeedsRecentSignIn bool
+	Run               func(c *Ctx, args []string) int
 }
 
 var registry []Command
@@ -211,6 +237,9 @@ func runChecked(c *Ctx, cmd Command, args []string) int {
 	// API and the web reach Dispatch directly, so the check lives here too.
 	if c.User.Disabled {
 		return c.fail(protocol.ExitDenied, "this account is disabled; ask an instance admin to enable it")
+	}
+	if cmd.NeedsRecentSignIn && c.Source == SourceWeb && staleSignIn(c.User.SignedInAt, time.Now()) {
+		return c.fail(protocol.ExitDenied, "%s", ReauthRefusal)
 	}
 	// The admin noun is gated here as well as in each handler, so a new
 	// admin command that forgets requireInstanceAdmin is still refused.

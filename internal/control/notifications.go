@@ -48,8 +48,9 @@ func init() {
 		Examples: []string{"notifications settings watch on"},
 		Run:      runNotificationsSettingsWatch})
 	register(Command{Path: []string{"notifications", "device", "add"},
-		Summary: "register an Apple device for push, token on stdin",
-		Usage:   "notifications device add [--label <name>] < token",
+		NeedsRecentSignIn: true,
+		Summary:           "register an Apple device for push, token on stdin",
+		Usage:             "notifications device add [--label <name>] < token",
 		Flags: []Flag{
 			{"--label", "<name>", "a name for the device", ""},
 		},

@@ -69,10 +69,11 @@ func init() {
 	// repo's builds as environment variables. Same discipline as mirror
 	// tokens — the value never appears in argv, logs, or output.
 	register(Command{Path: []string{"repo", "secret", "set"},
-		Summary:    "set a build secret",
-		Usage:      "repo secret set <owner/name> <NAME> (value on stdin)",
-		Examples:   []string{"repo secret set krz/gitbay DEPLOY_TOKEN"},
-		ReadsStdin: true, Run: runSecretSet})
+		NeedsRecentSignIn: true,
+		Summary:           "set a build secret",
+		Usage:             "repo secret set <owner/name> <NAME> (value on stdin)",
+		Examples:          []string{"repo secret set krz/gitbay DEPLOY_TOKEN"},
+		ReadsStdin:        true, Run: runSecretSet})
 	register(Command{Path: []string{"repo", "secret", "remove"},
 		Summary:  "remove a build secret",
 		Usage:    "repo secret remove <owner/name> <NAME>",

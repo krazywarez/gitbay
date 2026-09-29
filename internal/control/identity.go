@@ -42,8 +42,8 @@ func init() {
 		},
 		Examples:        []string{"keys add --label laptop < key.pub", "keys add --scope git --ttl 90d < ci.pub"},
 		ReadsStdin:      true,
-		MintsCredential: true,
-		Run:             runKeysAdd,
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Run: runKeysAdd,
 	})
 	register(Command{
 		Path:     []string{"keys", "label"},

@@ -18,10 +18,11 @@ import (
 
 func init() {
 	register(Command{Path: []string{"pgp", "add"},
-		Summary:    "register an OpenPGP public key (armored)",
-		Usage:      "pgp add < key.asc",
-		Examples:   []string{"pgp add < key.asc"},
-		ReadsStdin: true, Run: runPGPAdd})
+		NeedsRecentSignIn: true,
+		Summary:           "register an OpenPGP public key (armored)",
+		Usage:             "pgp add < key.asc",
+		Examples:          []string{"pgp add < key.asc"},
+		ReadsStdin:        true, Run: runPGPAdd})
 	register(Command{Path: []string{"pgp", "list"},
 		Summary:  "list registered OpenPGP keys",
 		Usage:    "pgp list",

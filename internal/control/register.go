@@ -38,8 +38,8 @@ func init() {
 	register(Command{Path: []string{"email", "verify"},
 		Summary:         "confirm a verification code",
 		Usage:           "email verify <code>",
-		MintsCredential: true,
-		Examples:        []string{"email verify abc123"}, Run: runEmailVerify})
+		MintsCredential: true, NeedsRecentSignIn: true,
+		Examples: []string{"email verify abc123"}, Run: runEmailVerify})
 	register(Command{Path: []string{"email", "list"},
 		Summary:  "list the addresses on your account",
 		Usage:    "email list",
