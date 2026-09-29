@@ -61,9 +61,25 @@ func (s *Store) CreateBuild(repoID int64, job, sha, ref, stepsJSON, image, tree 
 	if err := tx.QueryRow("SELECT build_counter FROM repos WHERE id = ?", repoID).Scan(&n); err != nil {
 		return 0, err
 	}
+	// A runner names a build by id in runner log and runner done, so an id
+	// is never handed out twice, including after a repository's deletion
+	// takes the newest builds with it (#306). builds is not AUTOINCREMENT
+	// because rebuilding it would copy every stored log; the high-water
+	// mark lives in settings instead.
+	var id int64
+	if err := tx.QueryRow(`SELECT MAX(
+			COALESCE((SELECT MAX(id) FROM builds), 0),
+			COALESCE((SELECT CAST(value AS INTEGER) FROM settings WHERE key = 'build_id_seq'), 0)) + 1`).
+		Scan(&id); err != nil {
+		return 0, err
+	}
 	if _, err := tx.Exec(
-		"INSERT INTO builds (repo_id, number, job, sha, ref, steps, image, tree, trusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		repoID, n, job, sha, ref, stepsJSON, image, tree, trusted); err != nil {
+		"INSERT INTO builds (id, repo_id, number, job, sha, ref, steps, image, tree, trusted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		id, repoID, n, job, sha, ref, stepsJSON, image, tree, trusted); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`INSERT INTO settings (key, value) VALUES ('build_id_seq', ?)
+		ON CONFLICT (key) DO UPDATE SET value = excluded.value`, strconv.FormatInt(id, 10)); err != nil {
 		return 0, err
 	}
 	return n, tx.Commit()

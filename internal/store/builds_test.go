@@ -601,3 +601,51 @@ func TestSetBuildFailure(t *testing.T) {
 		t.Fatalf("rewrote a finished build: %v", err)
 	}
 }
+
+// A runner names its build by id in runner log and runner done. Deleting
+// the repository that holds the newest build must not hand that id to
+// the next build in another repository (#306).
+func TestBuildIDsNotReusedAfterRepoDelete(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := s.CreateUser("cmc", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep, err := s.CreateRepo("user", uid, "keep", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := s.CreateRepo("user", uid, "gone", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	newest := func() int64 {
+		var id int64
+		if err := s.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM builds").Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	if _, err := s.CreateBuild(keep, "test", "abc", "main", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateBuild(gone, "test", "abc", "main", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	claimed := newest()
+	if err := s.DeleteRepo(gone); err != nil {
+		t.Fatal(err)
+	}
+	if newest() >= claimed {
+		t.Fatal("the deleted repository's build survived")
+	}
+	if _, err := s.CreateBuild(keep, "test", "def", "main", `["true"]`, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := newest(); got <= claimed {
+		t.Fatalf("next build took id %d; a runner may still hold %d", got, claimed)
+	}
+}

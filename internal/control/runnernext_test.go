@@ -336,3 +336,51 @@ func TestRunnerDoneToleratesMissingOrBadStep(t *testing.T) {
 		}
 	}
 }
+
+// A runner still holding a build whose repository was deleted reports
+// on an id no later build takes: its runner done finds nothing rather
+// than finishing another repository's running build (#306).
+func TestRunnerDoneAfterRepositoryDeleted(t *testing.T) {
+	st, keep, uid := newQueueTestRepo(t)
+	goneID, err := st.CreateRepo("user", uid, "gone", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateBuild(keep.ID, "unit", "aaa", "main", "[]", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateBuild(goneID, "unit", "bbb", "main", "[]", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	var stale store.Build
+	for range 2 {
+		b, ok, err := st.ClaimBuild(nil, false)
+		if err != nil || !ok {
+			t.Fatalf("claim: %v ok=%v", err, ok)
+		}
+		if b.RepoID == goneID {
+			stale = b
+		}
+	}
+	if err := st.DeleteRepo(goneID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateBuild(keep.ID, "unit", "ccc", "main", "[]", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	next, ok, err := st.ClaimBuild(nil, false)
+	if err != nil || !ok {
+		t.Fatalf("claim: %v ok=%v", err, ok)
+	}
+	if next.ID == stale.ID {
+		t.Fatalf("the next build took the deleted repository's build id %d", stale.ID)
+	}
+
+	c, out := runnerCtx(st, uid, t.TempDir())
+	if code := runRunnerDone(c, []string{fmt.Sprint(stale.ID), "success"}); code != protocol.ExitNotFound {
+		t.Fatalf("runner done on the deleted build: exit %d, want %d: %s", code, protocol.ExitNotFound, out)
+	}
+	if b, err := st.BuildByID(next.ID); err != nil || b.Status != "running" {
+		t.Fatalf("the other build after the stale report: %+v, %v", b, err)
+	}
+}
