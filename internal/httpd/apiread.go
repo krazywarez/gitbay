@@ -82,6 +82,15 @@ func (s *Server) apiRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ctx.Busy {
+		// Not cacheable: the next try may succeed.
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", busyRetryAfter)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write(payload)
+		return
+	}
+
 	// Responses are authorized per account, so the ETag is salted with the
 	// caller: two users asking the same question may get different answers,
 	// and neither should ever be served the other's.

@@ -130,6 +130,7 @@ func runRepoDownload(c *Ctx, args []string) int {
 			transport = "api"
 		}
 		c.Packs.Refused(transport, principal, err)
+		c.Busy = true
 		if errors.Is(err, packlimit.ErrBusy) {
 			return c.fail(protocol.ExitFailure, "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
 		}

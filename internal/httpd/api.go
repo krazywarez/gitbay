@@ -97,12 +97,20 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 		body["stderr"] = msg
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if ctx.Busy {
+		status = http.StatusServiceUnavailable
+		w.Header().Set("Retry-After", busyRetryAfter)
+	}
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(body)
 }
 
 // statusForExit maps a command's exit code onto an HTTP status, shared by
 // both API surfaces so they cannot answer the same failure differently.
+// busyRetryAfter is the Retry-After on a 503 for a command a limiter
+// turned away.
+const busyRetryAfter = "60"
+
 func statusForExit(code int) int {
 	switch code {
 	case protocol.ExitOK:

@@ -71,6 +71,9 @@ type Ctx struct {
 	// Packs is the pack-generation limiter a command that runs git to
 	// produce an archive takes a slot from; nil is no limit.
 	Packs *packlimit.Limiter
+	// Busy is set when a limiter turned the command away, so the API
+	// can answer 503 with Retry-After rather than a failure.
+	Busy bool
 }
 
 // SourceWeb is Ctx.Source for a request from a browser session. Its
