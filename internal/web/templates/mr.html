@@ -95,6 +95,12 @@
   <div class="grp">
     <h2>Merge</h2>
     {{if .Unresolved}}<p class="row none">{{.Unresolved}} unresolved thread{{if ne .Unresolved 1}}s{{end}}</p>{{end}}
+    {{if .MR.QueuedAt}}<p class="row"><span class="dot pend"></span>Queued to merge by <a href="/{{.MR.QueuedBy}}">{{.MR.QueuedBy}}</a>{{if .MR.QueueStrategy}} ({{.MR.QueueStrategy}}){{end}}<span class="sub">{{when .MR.QueuedAt}}</span></p>
+    {{with .MR.QueueReason}}<p class="row none">waiting: {{.}}</p>{{end}}
+    <form method="post" action="{{$base}}/merge" class="actions">
+      <input type="hidden" name="cancel" value="on">
+      <button type="submit" class="btn">Cancel queued merge</button>
+    </form>{{end}}
     <form method="post" action="{{$base}}/merge" class="actions">
       <label class="none" for="strategy">Strategy</label>
       <select id="strategy" name="strategy">
@@ -105,6 +111,7 @@
         <option value="rebase">Rebase</option>
       </select>
       <button type="submit">Merge</button>
+      <button type="submit" name="when_ready" value="on" class="btn">Merge when ready</button>
     </form>
     <form method="post" action="{{$base}}/close" class="actions">
       <label class="vh" for="by">Closed in favour of</label>

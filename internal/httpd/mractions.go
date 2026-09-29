@@ -78,8 +78,15 @@ func (s *Server) mrLabelSubmit(w http.ResponseWriter, r *http.Request, u store.U
 
 func (s *Server) mrMergeSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	args := []string{}
-	if st := strings.TrimSpace(r.FormValue("strategy")); st != "" && st != "auto" {
-		args = append(args, "--strategy", st)
+	if r.FormValue("cancel") == "on" {
+		args = append(args, "--cancel")
+	} else {
+		if st := strings.TrimSpace(r.FormValue("strategy")); st != "" && st != "auto" {
+			args = append(args, "--strategy", st)
+		}
+		if r.FormValue("when_ready") == "on" {
+			args = append(args, "--when-ready")
+		}
 	}
 	_, msg, code := s.runControlCode(u, mrArgs(r, "merge", args...))
 	s.done(w, r, code, msg, s.mrRedirect)
