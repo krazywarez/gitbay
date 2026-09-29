@@ -934,11 +934,15 @@ other repositories' builds queue until =-repos= is removed again, which
 is a pause, not an outage.
 
 #+begin_src sh
+# on a machine with an admin gitbay identity (root on the host has none),
+# with the runner's public key copied from the host:
 gitbay repo create cmc/runner-scratch   # then push a .gitbay/ci.yml naming the image
+scp -P 2222 root@<host>:/var/lib/gitbay-runner/.ssh/id_ed25519.pub runner.pub
+gitbay repo runner add cmc/runner-scratch < runner.pub
 # on the host:
-gitbay repo runner add cmc/runner-scratch < /var/lib/gitbay-runner/.ssh/id_ed25519.pub
 sed -i 's#^ExecStart=/usr/local/bin/gitbay-runner #&-repos cmc/runner-scratch #' /etc/systemd/system/gitbay-runner.service.d/override.conf
 systemctl daemon-reload && systemctl restart gitbay-runner
+# back on the admin machine:
 gitbay build log cmc/runner-scratch 1   # green: remove -repos, redeploy, delete the scratch repository
 #+end_src
 
