@@ -332,11 +332,33 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "the source branch moved; reload and retry")
 	}
 	RefsUpdated(c.Store, c.Cfg, src.ID, c.User.ID, c.Scope, updates)
-	if err := c.Store.SetThreadResolved(mr.ID, threadID, c.User.ID, true); err != nil {
-		return c.failErr(err)
+
+	// The commit has landed, so from here nothing fails the command: a
+	// thread that cannot be resolved is left open and the output says so.
+	resolved, warning := false, ""
+	switch ok, err := canResolveThread(c, repo, mr, threadID); {
+	case err != nil:
+		warning = fmt.Sprintf("thread %d is still open: %v", threadID, err)
+	case !ok:
+		warning = fmt.Sprintf("thread %d is still open: %s", threadID, cannotResolve)
+	default:
+		if err := c.Store.SetThreadResolved(mr.ID, threadID, c.User.ID, true); err != nil {
+			warning = fmt.Sprintf("thread %d is still open: %v", threadID, err)
+		} else {
+			resolved = true
+			TryQueuedMerge(c.Store, c.Cfg, mr.ID)
+		}
 	}
-	TryQueuedMerge(c.Store, c.Cfg, mr.ID)
-	return c.emit(map[string]any{"thread": threadID, "sha": sha, "source": source, "resolved": true}, func(w io.Writer) {
-		fmt.Fprintf(w, "applied thread %d to %s at %.10s; thread resolved\n", threadID, source, sha)
+	d := map[string]any{"thread": threadID, "sha": sha, "source": source, "resolved": resolved}
+	if warning != "" {
+		d["warning"] = warning
+	}
+	return c.emit(d, func(w io.Writer) {
+		if resolved {
+			fmt.Fprintf(w, "applied thread %d to %s at %.10s; thread resolved\n", threadID, source, sha)
+			return
+		}
+		fmt.Fprintf(w, "applied thread %d to %s at %.10s\n", threadID, source, sha)
+		fmt.Fprintln(c.Stderr, "warning:", warning)
 	})
 }

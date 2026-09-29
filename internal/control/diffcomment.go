@@ -300,20 +300,15 @@ func setThreadResolved(c *Ctx, args []string, resolved bool) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "bad thread id %q", args[2])
 	}
-	// Thread author, MR author, or anyone with write may resolve.
-	author, err := c.Store.DiffCommentAuthor(mr.ID, threadID)
+	ok, err := canResolveThread(c, repo, mr, threadID)
 	if errors.Is(err, store.ErrNotFound) {
 		return c.fail(protocol.ExitNotFound, "no thread %d on %s!%d", threadID, repo.Path(), mr.Number)
 	}
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if author != c.User.ID && mr.Author != c.User.Username && !policy.CanWrite(c.User, repo, grant) {
-		return c.fail(protocol.ExitDenied, "only the thread author, the MR author, or users with write access can resolve threads")
+	if !ok {
+		return c.fail(protocol.ExitDenied, "%s", cannotResolve)
 	}
 	if err := c.Store.SetThreadResolved(mr.ID, threadID, c.User.ID, resolved); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -331,6 +326,22 @@ func setThreadResolved(c *Ctx, args []string, resolved bool) int {
 	return c.emit(map[string]any{"thread": threadID, "resolved": resolved}, func(w io.Writer) {
 		fmt.Fprintf(w, "%s thread %d on %s!%d\n", verb, threadID, repo.Path(), mr.Number)
 	})
+}
+
+const cannotResolve = "only the thread author, the MR author, or users with write access can resolve threads"
+
+// canResolveThread reports whether the caller may resolve a thread: its
+// author, the MR author, or anyone with write on the target.
+func canResolveThread(c *Ctx, repo store.Repo, mr store.MR, threadID int64) (bool, error) {
+	author, err := c.Store.DiffCommentAuthor(mr.ID, threadID)
+	if err != nil {
+		return false, err
+	}
+	grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+	if err != nil {
+		return false, err
+	}
+	return author == c.User.ID || mr.Author == c.User.Username || policy.CanWrite(c.User, repo, grant), nil
 }
 
 func runMRResolve(c *Ctx, args []string) int   { return setThreadResolved(c, args, true) }

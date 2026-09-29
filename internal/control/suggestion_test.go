@@ -464,6 +464,30 @@ func TestApplySuggestionFork(t *testing.T) {
 	if !said {
 		t.Fatalf("timeline does not say why the merge was dequeued: %+v", cs)
 	}
+	// carol writes to the fork and is neither the thread's author, the
+	// merge request's, nor a writer of the target: her apply lands and
+	// leaves the thread open, saying so.
+	carolID, _ := f.st.CreateUser("carol", false)
+	carol, _ := f.st.UserByID(carolID)
+	f.verified(carol)
+	if err := f.st.GrantAccess(forkID, carolID, "write"); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errOut.Reset()
+	c.Stdin = strings.NewReader("```suggestion\nTWO\n```\n")
+	if code := Dispatch(c, []string{"mr", "diff-comment", f.repo.Path(), "2", "--path", "lib.txt", "--line", "2", "--file", "-"}); code != protocol.ExitOK {
+		t.Fatalf("diff-comment: %s", errOut.String())
+	}
+	json.Unmarshal([]byte(out.String()), &env)
+	second := strconv.Itoa(int(env.Data.Thread))
+	stdout := f.mustWrite(carol, "mr", "apply-suggestion", f.repo.Path(), "2", second, "--json")
+	if !strings.Contains(stdout, `"resolved":false`) || !strings.Contains(stdout, "still open") {
+		t.Fatalf("carol's apply = %s, want it applied and the thread left open", stdout)
+	}
+	if n, _ := f.st.UnresolvedThreadCount(mr.ID); n != 1 {
+		t.Fatalf("unresolved threads = %d, want carol's left open", n)
+	}
 }
 
 // Reading suggestions costs git processes per file and commit, not per
