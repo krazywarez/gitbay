@@ -93,6 +93,10 @@ func runRepoImport(c *Ctx, args []string) int {
 		// land in process listings and logs.
 		return c.fail(protocol.ExitUsage, "do not embed credentials in the URL; use --token-stdin")
 	}
+	if strings.ContainsAny(from, "?#") {
+		// The URL is logged and recorded; a query could carry a token.
+		return c.fail(protocol.ExitUsage, "use the plain clone URL, without a query or fragment; credentials go on stdin with --token-stdin, never in the URL")
+	}
 
 	// Resolve and check the host now and hold git to those addresses,
 	// as mirror sync does (#298).
@@ -160,7 +164,7 @@ func runRepoImport(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "import failed: %v", err)
 	}
 
-	branch, err := gitutil.RemoteDefaultBranch(ctx, from, remote.Args(), env)
+	branch, err := gitutil.RemoteDefaultBranch(ctx, dir, from, remote.Args(), env)
 	if err != nil {
 		branch = "main" // remote gone quiet after the fetch; keep the default
 	}

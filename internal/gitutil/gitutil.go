@@ -255,10 +255,10 @@ func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraE
 	return nil
 }
 
-// RemoteDefaultBranch asks the remote which branch HEAD points at. pin
-// and env are as for FetchMirror.
-func RemoteDefaultBranch(ctx context.Context, url string, pin, env []string) (string, error) {
-	args := append(append([]string{}, pin...), "ls-remote", "--symref", url, "HEAD")
+// RemoteDefaultBranch asks the remote which branch HEAD points at,
+// running in the repository at dir. pin and env are as for FetchMirror.
+func RemoteDefaultBranch(ctx context.Context, dir, url string, pin, env []string) (string, error) {
+	args := append(append([]string{}, pin...), "-C", dir, "ls-remote", "--symref", url, "HEAD")
 	cmd := exec.CommandContext(ctx, toolpath.Look("git"), args...)
 	cmd.Env = env
 	out, err := cmd.Output()

@@ -64,12 +64,13 @@ func TestRepoImportRefusesGitScheme(t *testing.T) {
 	}
 }
 
-// A source on loopback is refused on a default instance, and nothing is
-// left behind.
+// A reachable source on loopback is refused on a default instance, and
+// nothing is left behind.
 func TestRepoImportRefusesALocalAddress(t *testing.T) {
+	remote, _ := importUpstream(t)
 	c, errOut, st, root := importCtx(t, false)
-	code := Dispatch(c, []string{"repo", "import", "alice/x", "--from", "http://127.0.0.1:9/x.git"})
-	if code != protocol.ExitFailure || !strings.Contains(errOut.String(), "127.0.0.1") {
+	code := Dispatch(c, []string{"repo", "import", "alice/x", "--from", remote})
+	if code != protocol.ExitFailure || !strings.Contains(errOut.String(), "private or local address") {
 		t.Fatalf("exit %d, %q", code, errOut.String())
 	}
 	if _, err := st.RepoByPath("alice/x"); err == nil {
@@ -80,11 +81,47 @@ func TestRepoImportRefusesALocalAddress(t *testing.T) {
 	}
 }
 
+// A query or fragment could carry a credential into the log and the
+// event row; import refuses it before either.
+func TestRepoImportRefusesAQuery(t *testing.T) {
+	for _, from := range []string{"https://git.example/x.git?token=abc", "https://git.example/x.git#abc"} {
+		c, errOut, st, _ := importCtx(t, true)
+		code := Dispatch(c, []string{"repo", "import", "alice/x", "--from", from})
+		if code != protocol.ExitUsage || !strings.Contains(errOut.String(), "plain clone URL") || strings.Contains(errOut.String(), "abc") {
+			t.Fatalf("%s: exit %d, %q", from, code, errOut.String())
+		}
+		if _, err := st.RepoByPath("alice/x"); err == nil {
+			t.Fatalf("%s: a refused import created a repository", from)
+		}
+	}
+}
+
 // import.test does not resolve; the import works only because git was
 // pinned to the address import looked up and checked.
 func TestRepoImportConnectsToTheCheckedAddress(t *testing.T) {
+	importThroughPin(t, func(string) {})
+}
+
+// git runs with its own environment, not the daemon's: a proxy or a
+// global URL rewrite there would take it around the pin.
+func TestRepoImportIgnoresTheDaemonEnvironment(t *testing.T) {
+	importThroughPin(t, func(port string) {
+		t.Setenv("http_proxy", "http://127.0.0.1:1")
+		t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
+		global := filepath.Join(t.TempDir(), "gitconfig")
+		rewrite := "[url \"http://127.0.0.1:1/\"]\n\tinsteadOf = http://import.test:" + port + "/\n"
+		if err := os.WriteFile(global, []byte(rewrite), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GIT_CONFIG_GLOBAL", global)
+	})
+}
+
+func importThroughPin(t *testing.T, setup func(port string)) {
+	t.Helper()
 	remote, sha := importUpstream(t)
 	u, _ := url.Parse(remote)
+	setup(u.Port())
 	c, errOut, _, root := importCtx(t, true)
 	var asked []string
 	prev := importLookup
