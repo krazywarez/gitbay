@@ -9,8 +9,9 @@ anything beyond "replace the binary and restart" is needed.
 - =webhook add= reads the signing secret from stdin with =--secret -=;
   a value on the command line is refused, since argv shows in process
   listings and shell history. A script that passed the value must pipe
-  it: =printf %s "$SECRET" | gitbay webhook add <repo> <url> --secret -=
-  (#284).
+  it: =printf %s "$SECRET" | gitbay webhook add <repo> <url> --secret -=.
+  The iOS app's webhook add breaks until it sends the secret on stdin
+  (krz/gitbay-ios#21) (#284).
 - =repo import --from= takes http and https URLs only; =git://= is
   refused, since its connection cannot be held to a checked address.
   The host is resolved and checked like a mirror's, git connects only
@@ -18,15 +19,6 @@ anything beyond "replace the binary and restart" is needed.
   global gitconfig are ignored. A source that redirects (a renamed
   repository) fails; import from the URL it redirects to. Needs git
   2.37 or later on the server (#298).
-*Upgrade note.* =repo import= and mirror sync now refuse a =git://=
-source and a =--from=/remote URL carrying a query or fragment. A
-mirror or import whose host is written numerically (=127.1=,
-=2130706433=, =0x7f.1=) rather than as a dotted address is refused
-too; rewrite it before upgrading.
-- A web session older than 15 minutes cannot mint a credential or grant
-  access — keys, PGP keys, tokens, org membership, and the admin
-  promote/enable actions — and the form it tried shows a sign-in link
-  that returns there (#297).
 - A browser session creates credentials and grants access — keys, PGP
   keys, tokens, verified addresses, org and repository roles, transfers,
   webhooks, secrets, mirrors, and the admin promote/enable actions —
@@ -94,6 +86,12 @@ a repository. An archive written before this release lacks those
 entries; if extracting one leaves a repository's =refs/= directory
 missing, =gitbayd admin backup --verify <archive>= names it, and
 =mkdir -p <root>/repos/<owner>/<name>.git/refs= fixes it.
+
+*Upgrade note.* =repo import= now refuses a =git://= source and a
+=--from= URL carrying a query or fragment. Mirrors and imports whose
+host is written numerically (=127.1=, =2130706433=, =0x7f.1=) rather
+than as a dotted address are refused too; rewrite the URL before
+upgrading (#298).
 
 - A token with a =--ttl= is refused on every command that creates a
   credential: tokens, keys, deploy keys, runner keys, login links,
@@ -294,7 +292,10 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   hour (#285). *Operators:* tokens minted before the upgrade are
   refused. git-lfs asks =git-lfs-authenticate= for a token each time
   it runs, so only a transfer running across the restart fails, with
-  "repository not found"; running the command again fixes it.
+  "repository not found"; running the command again fixes it. A
+  download from a public repository that presents a token issued
+  before the upgrade is refused the same way, not served anonymously,
+  and needs the same rerun.
 - Every LFS request also repeats the repository check for the token's
   key: a collaborator whose access is revoked or reduced, or a reader
   of a public repository made private, loses the token's use with the
