@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -30,8 +31,10 @@ func TestMarkdownMath(t *testing.T) {
 		{"fenced code", "```\n$x^2$\n$$\ny\n$$\n```\n", []string{"$x^2$", "$$\ny\n$$"}, []string{"<math"}},
 		{"indented code", "    $x$\n", []string{"$x$"}, []string{"<math"}},
 		{"invalid inline", `see $\frac{a$ here`, []string{`see $\frac{a$ here`}, []string{"<math"}},
-		{"invalid block", "$$\n\\frac{\n$$\n", []string{"<pre tabindex=\"0\">$$\\frac{\n$$</pre>"}, []string{"<math"}},
-		{"unclosed block", "$$\nx\n", []string{"<pre"}, []string{"<math"}},
+		{"invalid block", "$$\n\\frac{\n$$\n", []string{"<pre tabindex=\"0\">$$\n\\frac{\n$$</pre>"}, []string{"<math"}},
+		{"unclosed block", "$$\nx\n", []string{"<p>$$\nx</p>"}, []string{"<math", "<pre"}},
+		{"blank line ends block", "$$\nx\n\ny $$\n", []string{"<p>$$\nx</p>", "<p>y $$</p>"}, []string{"<math", "<pre"}},
+		{"block keeps source", "$$\na\nb $$\n", []string{`<math display="block"><mi>a</mi><mi>b</mi></math>`}, nil},
 		{"markup is escaped", "$\\text{<b>&</b>}$", []string{`<mtext>&lt;b&gt;&amp;&lt;/b&gt;</mtext>`}, []string{"<b>"}},
 	}
 	for _, c := range cases {
@@ -82,16 +85,15 @@ func TestOrgMath(t *testing.T) {
 	}
 }
 
-// ugcPolicy admits the MathML texmath writes and nothing else, which is
-// what an .html README or org's raw export would otherwise carry through.
-func TestUGCPolicyMathML(t *testing.T) {
+// mathPolicy admits the MathML texmath writes and nothing else.
+func TestMathPolicy(t *testing.T) {
 	hostile := `<math display="block" xmlns:xlink="http://www.w3.org/1999/xlink" style="x" onclick="x()">` +
 		`<mi href="javascript:alert(1)" xlink:href="javascript:alert(2)" mathvariant="bold" style="color:red" onmouseover="x()">x</mi>` +
 		`<mo stretchy="true" form="prefix">(</mo><mspace width="expression(alert(3))"></mspace><mspace width="1em"></mspace>` +
 		`<semantics><annotation-xml encoding="text/html"><img src=x onerror="alert(4)"></annotation-xml></semantics>` +
 		`<maction actiontype="statusline"><mi>y</mi></maction><mstyle mathcolor="red"><mi>z</mi></mstyle>` +
 		`<mtext><style>*{}</style><script>alert(5)</script></mtext></math><math display="inline"></math>`
-	out := ugcPolicy.Sanitize(hostile)
+	out := mathPolicy.Sanitize(hostile)
 	for _, bad := range []string{"href", "xlink", "style", "onclick", "onmouseover", "onerror", "javascript",
 		"annotation", "semantics", "maction", "mstyle", "mathcolor", "script", "expression",
 		`mathvariant="bold"`, `stretchy="true"`, "form=", `display="inline"`} {
@@ -179,5 +181,79 @@ func TestIssuePageRendersMath(t *testing.T) {
 	}
 	if !strings.Contains(body, `<mtext>#1</mtext>`) {
 		t.Errorf("autolink rewrote text inside <math>:\n%s", body)
+	}
+}
+
+// MathML written by hand is user HTML, and ugcPolicy strips it: only the
+// converter's output, through mathPolicy, reaches the page.
+func TestRawMathMLStripped(t *testing.T) {
+	raw := `<math display="block"><mi>q</mi></math>`
+	for name, out := range map[string]string{
+		"html readme":   string(renderReadme("README.html", []byte(raw))),
+		"markdown html": string(renderReadme("README.md", []byte("para "+raw+"\n\n"+raw+"\n"))),
+		"org export":    string(renderReadme("README.org", []byte("#+begin_export html\n"+raw+"\n#+end_export\n"))),
+		"org inline":    string(renderReadme("README.org", []byte("@@html:"+raw+"@@\n"))),
+	} {
+		if strings.Contains(out, "<math") || strings.Contains(out, "<mi>") {
+			t.Errorf("%s keeps raw MathML:\n%s", name, out)
+		}
+	}
+	for name, out := range map[string]string{
+		"markdown": string(renderReadme("README.md", []byte("$q$\n"))),
+		"org":      string(renderReadme("README.org", []byte("$q$\n"))),
+	} {
+		if !strings.Contains(out, "<math><mi>q</mi></math>") {
+			t.Errorf("%s: no MathML:\n%s", name, out)
+		}
+	}
+}
+
+// Org placeholders: a document cannot spell one, and one that lands in an
+// attribute is filled with escaped source, not markup.
+func TestMathSlots(t *testing.T) {
+	out := string(ugcHTML("gitbaymath0z $x$ gitbaymath00000000000000000000000000n0z", "org"))
+	if strings.Count(out, "<math>") != 1 || !strings.Contains(out, "gitbaymath0z") {
+		t.Errorf("forged placeholder: %s", out)
+	}
+	m := newMathSlots()
+	a := m.put(`<math><mi>x</mi></math>`, `$x" onmouseover="y$`)
+	b := m.put(`<math><mi>y</mi></math>`, `$y$`)
+	got := m.fill(`<a title="` + a + `">` + b + `</a>`)
+	want := `<a title="$x&#34; onmouseover=&#34;y$"><math><mi>y</mi></math></a>`
+	if got != want {
+		t.Errorf("fill:\n got %s\nwant %s", got, want)
+	}
+	if other := newMathSlots(); other.prefix == m.prefix {
+		t.Error("placeholder prefix repeats across renders")
+	}
+}
+
+// Many openers without closers on one line scan in linear time, and the
+// per-document budget leaves later math as text.
+func TestMathLinear(t *testing.T) {
+	for _, src := range []string{
+		strings.Repeat("$a ", 1<<20/3),
+		strings.Repeat("$$a ", 1<<20/4),
+		strings.Repeat("$$\na\n", 1<<20/5),
+	} {
+		for _, format := range []string{"md", "org"} {
+			start := time.Now()
+			ugcHTML(src, format)
+			if d := time.Since(start); d > 2*time.Second {
+				t.Errorf("%s: %.12q x %d took %v", format, src[:4], len(src), d)
+			}
+		}
+	}
+	src := strings.Repeat("$x$ ", maxMathExprs+10)
+	out := string(ugcHTML(src, "md"))
+	if n := strings.Count(out, "<math>"); n != maxMathExprs {
+		t.Errorf("markdown rendered %d expressions, budget %d", n, maxMathExprs)
+	}
+	out = string(ugcHTML(src, "org"))
+	if n := strings.Count(out, "<math>"); n != maxMathExprs {
+		t.Errorf("org rendered %d expressions, budget %d", n, maxMathExprs)
+	}
+	if regexp.MustCompile(`gitbaymath[0-9a-f]+n`).MatchString(out) {
+		t.Error("a placeholder survived")
 	}
 }

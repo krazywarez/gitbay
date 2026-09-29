@@ -1353,7 +1353,6 @@ var ugcPolicy = func() *bluemonday.Policy {
 	p.AllowAttrs("class").
 		Matching(regexp.MustCompile(`^(chroma|[a-z0-9]{1,3})( (chroma|[a-z0-9]{1,3}))*$`)).
 		OnElements("span", "pre", "code", "div")
-	allowMath(p)
 	return p
 }()
 
@@ -1401,21 +1400,24 @@ func renderOrg(name string, raw []byte, contents bool, fallback func() template.
 		}
 		return fenceHighlight(source, lang)
 	}
-	writer.ExtendingWriter = &orgWriter{writer}
+	ow := &orgWriter{HTMLWriter: writer, math: newMathSlots()}
+	writer.ExtendingWriter = ow
 	out, err := doc.Write(writer)
 	if err != nil {
 		return fallback()
 	}
-	return imageAlt(template.HTML(ugcPolicy.Sanitize(out)))
+	return imageAlt(template.HTML(ow.math.fill(ugcPolicy.Sanitize(out))))
 }
 
 // orgWriter overrides go-org's autolink rendering. go-org ends a bare URL
 // at the first character outside RFC 3986's set, and that set includes
 // `.`, `,` and `)`, so a URL closing a sentence or a parenthesis took the
 // punctuation with it. Org stops a plain link before trailing punctuation
-// and keeps a `)` only when a `(` inside the link opened it.
+// and keeps a `)` only when a `(` inside the link opened it. It also
+// renders LaTeX fragments and blocks (math.go).
 type orgWriter struct {
 	*org.HTMLWriter
+	math *mathSlots
 }
 
 func (w *orgWriter) WriteRegularLink(l org.RegularLink) {

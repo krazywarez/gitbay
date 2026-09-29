@@ -49,9 +49,11 @@ anything beyond "replace the binary and restart" is needed.
   keeps at most 50 saved queries, 10 pinned (#292).
 - TeX math renders server-side as MathML in markdown (=$…$=, =$$…$$=)
   and org (=$…$=, =\(…\)=, =\[…\]=, LaTeX environments) wherever
-  markup renders, through a subset converter in =internal/texmath=;
-  the sanitizer admits exactly the elements and attributes it emits,
-  and anything outside the subset shows as source (#294).
+  markup renders, through a subset converter in =internal/texmath=.
+  Its output is cleaned by a policy admitting exactly the elements and
+  attributes it emits; MathML written as raw HTML is still stripped.
+  Anything outside the subset, and math past 1000 expressions or
+  256 KiB of TeX in one document, shows as source (#294).
 
 * v1.38.0 — 2026-09-29
 

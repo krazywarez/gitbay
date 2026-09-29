@@ -311,8 +311,12 @@ numbers, operators, scripts, =\frac=, =\sqrt=, Greek and common symbols,
 =\left=/=\right=, accents, =\text=, the =\math…= fonts, matrices,
 =cases= and =aligned=; the full list heads =internal/texmath/texmath.go=).
 Anything outside it, including macros, colours and links, shows as
-source, as does an expression over 8 KiB or nested more than 64 deep.
-The CLI shows the source.
+source, as does an expression over 8 KiB or nested more than 64 deep,
+and so does all math in a document after its first 1000 expressions or
+256 KiB of TeX. A =$$= line opens display math only when a line ending
+in =$$= follows before a blank line. MathML typed as raw HTML is
+stripped like any other markup the sanitizer does not allow. The CLI
+shows the source.
 
 * Organizations
 
