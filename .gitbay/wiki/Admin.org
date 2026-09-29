@@ -831,8 +831,10 @@ The first drill ran on the operator's laptop rather than a provisioned
 host, so its time to service has no provisioning in it, and it could
 not check secrets: no copy of =secret.key= was on the machine, and
 gitbayd refuses to start while any sealed value does not open. The
-sealed values were cleared in the drill copy to reach service; #305
-tracks proving the off-host key.
+sealed values were cleared in the drill copy to reach service. The
+off-host copy of the key is confirmed to exist (#305); the next drill
+restores it with the snapshot and runs =admin secrets check= on the
+restored copy.
 
 | Date | Host | Snapshot restored (UTC) | Newest issue / comment / push | Time to service | DB integrity | Connectivity | LFS | Release assets | Host key | Secrets | Notes |
 |------+------+-------------------------+-------------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|

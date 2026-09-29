@@ -99,6 +99,6 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Concurrency limit on git pack generation    | in place | global, per-principal, bounded queue across SSH, HTTP and git:// (=internal/packlimit=); not in system SSH mode |
 | Service hardening                           | in place | systemd sandboxing ([[file:03-Deployment.org][3]])                                     |
 | Backups offsite and append-only             | in place | restic with append-only credentials (documented)                 |
-| Restore tested                              | partial  | drill 2026-09-29 from the offsite copy (Admin wiki "Restore drill"); secrets not checked, the off-host =secret.key= unproven (#305) |
+| Restore tested                              | partial  | drill 2026-09-29 from the offsite copy (Admin wiki "Restore drill"); secrets not checked in that drill; the off-host =secret.key= exists (#305) and is checked in the next |
 | Migrations validated before commit          | in place | =PRAGMA foreign_key_check= runs inside the migration transaction, before commit (=internal/store/store.go=) |
 | Signed, reviewed changes to production      | in place | signed commits, =require-mr=, ff-only merges, clean-tree deploys |

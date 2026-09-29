@@ -10,7 +10,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 
 | Issue | Area             | Gap                                                                   | Severity |
 |-------+------------------+-----------------------------------------------------------------------+----------|
-| #305  | Recovery         | The off-host =secret.key= has not been shown to open a restored database; without it a restore does not start | high |
 
 * Not filed
 
