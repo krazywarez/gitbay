@@ -188,6 +188,8 @@ rather than the one the web page shows.
 | one commit with its patch   | yes | yes | yes |
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
+| find a definition (symbols) | yes | yes | no  |
+| jump to definition from a file | n/a | yes | no  |
 | compare two refs            | yes | yes | yes |
 | branches and tags           | yes | yes | yes |
 | wiki (read)                 | yes | yes | yes |
@@ -322,6 +324,11 @@ now render the way the reference does. go-org is not yet on the corpus.
 | profile about as a file          | yes | yes | yes |
 | activity feed                    | yes | yes | yes |
 | command reference                | yes | no  | n/a |
+
+=repo symbols= and =/{owner}/{repo}/symbols= answer from the same
+store query and ranking. Jumping to a definition is a link on a name in
+the blob view, which a terminal has no place for; =repo symbols= with
+the name is its CLI form.
 
 =explore= is the listing without a query; =repo search= is the one with.
 =search= is both plus the title and body of every issue and merge
@@ -464,6 +471,7 @@ when there is none.
 | worker queues                   | yes | yes | no  |
 | runners                         | yes | no  | no  |
 | repository list, archive, visibility | yes | no | no |
+| rebuild a symbol index          | yes | no  | no  |
 | audit log                       | yes | no  | no  |
 | instance statistics             | yes | no  | no  |
 
@@ -489,7 +497,8 @@ key, the other cannot be undone.
 
 * Pagination
 
-=issue list=, =mr list=, =repo list=, =feed= and =build list= take
+=issue list=, =mr list=, =repo list=, =feed=, =build list= and =repo
+symbols= take
 =--limit <n>= and =--cursor <c>=. Cursors are opaque; each page carries
 the next one. Without the flags a list stays as it was, so existing
 scripts are unchanged — for =build list= that means the newest fifty

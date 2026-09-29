@@ -54,6 +54,16 @@ anything beyond "replace the binary and restart" is needed.
   attributes it emits; MathML written as raw HTML is still stripped.
   Anything outside the subset, and math past 1000 expressions or
   256 KiB of TeX in one document, shows as source (#294).
+- Code navigation. A push or merge to the default branch queues a symbol
+  index of its tree, built by a background worker and keyed by the tree
+  id, so an unchanged tree is not indexed again. =repo symbols
+  <owner/name> <query>= finds definitions by name or prefix, and the
+  blob view links names to their definitions, with a results page at
+  =/{owner}/{repo}/symbols= and a per-file symbol list. Go is parsed;
+  Swift, Rust, Python, JavaScript/TypeScript, C headers, shell, org and
+  Markdown are matched by line. =admin symbols reindex= forces a
+  rebuild. Migration: =symbol_indexes=, =symbols= and
+  =symbol_requests=. (#293)
 
 * v1.38.0 — 2026-09-29
 

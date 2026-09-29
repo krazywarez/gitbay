@@ -12,6 +12,10 @@
   <span class="actions">{{if .Renderable}}{{if .Rendered}}<strong>rendered</strong> · <a href="?view=source">source</a>{{else}}<a href="?">rendered</a> · <strong>source</strong>{{end}} · {{end}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/log/{{.Ref}}?path={{.Path}}">history</a> · {{if not .Binary}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/blame/{{.Ref}}/{{.Path}}">blame</a> · {{end}}<a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">raw</a>{{if .Viewer}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/edit/{{.Ref}}/{{.Path}}">edit</a>{{end}}</span>
 </div>
 <p class="filefacts">{{if .Lines}}{{.Lines}} lines · {{end}}{{.Size}} bytes{{if .Exec}} · executable{{end}}{{if .Symlink}} · symlink{{end}}</p>
+{{if .Symbols}}<details class="symlist"><summary>{{len .Symbols}} symbol{{if ne (len .Symbols) 1}}s{{end}} in this file</summary>
+<ul>{{range .Symbols}}<li><a href="{{if $.Rendered}}?view=source{{end}}#L{{.Line}}"><code>{{.Name}}</code></a> <span class="meta">{{.Kind}}, line {{.Line}}</span></li>
+{{end}}</ul>
+</details>{{end}}
 {{if .Image}}<div class="blobimage"><a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}"><img src="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}" alt="{{.Base}}"></a><p class="meta">{{.Size}} bytes</p></div>
 {{else if .Binary}}<p class="empty-note">binary file, {{.Size}} bytes — <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/raw/{{.Ref}}/{{.Path}}">download</a></p>
 {{else if .Rendered}}<section class="readme"><div class="rendered">{{.RenderedHTML}}</div></section>

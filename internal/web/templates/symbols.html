@@ -1,0 +1,32 @@
+{{define "width"}}wide{{end}}
+{{define "title"}}symbols · {{.Repo.OwnerName}}/{{.Repo.Name}}{{end}}
+{{define "content"}}
+<h1>Symbols</h1>
+<form method="get" action="/{{.Repo.OwnerName}}/{{.Repo.Name}}/symbols" class="searchform">
+  <input type="search" name="q" aria-label="Find a definition" value="{{.Query}}" placeholder="a name or its start, on {{.Repo.DefaultBranch}}">
+  <select name="kind" aria-label="Kind">
+    <option value="">any kind</option>
+    {{range .Kinds}}<option value="{{.}}"{{if eq . $.Kind}} selected{{end}}>{{.}}</option>
+    {{end}}
+  </select>
+  <button type="submit" class="btn">Find</button>
+</form>
+{{if .Problem}}<p class="empty-note">{{.Problem}}</p>
+{{else if .Query}}
+{{if .Note}}<p class="meta">{{.Note}}</p>{{end}}
+{{if .Rows}}
+<div class="tablewrap"><table class="refs">
+<thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Defined at</th></tr></thead>
+<tbody>
+{{range .Rows}}<tr>
+  <td><a href="/{{$.Repo.OwnerName}}/{{$.Repo.Name}}/blob/{{$.Commit}}/{{.Path}}#L{{.Line}}"><code>{{.Name}}</code></a></td>
+  <td>{{.Kind}}</td>
+  <td class="sha">{{.Path}}:{{.Line}}</td>
+</tr>
+{{end}}
+</tbody>
+</table></div>
+{{if .Next}}<p><a href="{{.Next}}">next page</a></p>{{end}}
+{{else}}<p class="empty-note">no definitions matching “{{.Query}}”</p>{{end}}
+{{end}}
+{{end}}

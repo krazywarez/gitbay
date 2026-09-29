@@ -242,11 +242,53 @@ gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
 gitbay repo search forge                            # find repos by name/description/topic
 gitbay repo grep you/project "some string"          # literal git grep over the default branch
+gitbay repo symbols you/project Dispatch            # where a name is defined, from the symbol index
 gitbay repo pin you/project                         # pin to your web dashboard
 gitbay repo unpin you/project
 gitbay repo archive you/project                     # read-only: pushes and issue/MR
 gitbay repo unarchive you/project                   #   writes refused, browsing intact
 #+end_src
+
+A push to the default branch queues a symbol index of its tree, built in
+the background after the push completes; a tree that is already indexed
+is not indexed again. =repo symbols <owner/name> [--kind k] <query>=
+lists definitions whose name starts with the query, exact matches
+first, case-sensitive before case-insensitive, as name, kind, path and
+line; =--limit= and =--cursor= page it, and without them it stops at
+200 rows. A Go method is listed as =Type.Method= and also matches on
+=Method=. Only the default branch is indexed: =--ref= accepts another
+ref only when its tree is the indexed one. The index follows read
+access: a repository you cannot read has no symbols either.
+
+What is indexed:
+
+| language                       | kinds                                                     |
+|--------------------------------+-----------------------------------------------------------|
+| Go (parsed)                    | function, method, type, const, var                        |
+| Swift                          | function, class, struct, enum, interface (protocol), type |
+| Rust                           | function, struct, enum, interface (trait), type, module, const, macro |
+| Python                         | function, method, class                                   |
+| JavaScript, TypeScript         | function, class, interface, type, enum, const             |
+| C and C++ headers (=.h=, =.hpp=) | function (prototype), struct, enum, class, type, macro  |
+| shell (=.sh=, =.bash=, =.zsh=) | function                                                  |
+| org, Markdown                  | section (a heading)                                       |
+
+Languages other than Go are matched a line at a time, so unusual
+definition shapes are missed. Files over 1 MiB, anything under
+=vendor/= or =node_modules/=, =*_gen.go=, =*.pb.go=, Go files marked
+=Code generated ... DO NOT EDIT.=, and =*.min.js= are skipped. One run
+stops at 200,000 symbols or two minutes and records the index as
+partial; an index that cannot be built is recorded as failed. Either
+record stands for its tree: a push that changes the tree builds again,
+one that does not is left alone. A repository that has not been pushed
+to since the index existed has none until its next push to the default
+branch. =admin symbols reindex <owner/name>= rebuilds one regardless.
+
+On the web, a file viewed at the indexed tree (the default branch's
+head, or any commit with the same tree) links each name the index
+holds: to its definition when there is one, to the results page at
+=/{owner}/{repo}/symbols?q=<name>= when there are several. The file's
+own definitions are listed above its source.
 
 Import from another forge — git data first, then optionally the issue
 and PR history from GitHub or any Forgejo instance such as Codeberg

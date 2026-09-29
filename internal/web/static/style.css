@@ -1101,6 +1101,14 @@ article.release { padding: var(--sp-4); margin: var(--sp-4) 0; }
 ul.matchlist { list-style: none; margin: var(--sp-3) 0; padding: 0; }
 ul.matchlist li { margin-bottom: var(--sp-3); }
 .matchpath { font-family: var(--mono); font-size: var(--fs-1); }
+/* a name in highlighted source that links to its definition keeps its
+   token colour; the dotted underline is what marks it as a link */
+.chroma a.sym { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.chroma a.sym:hover { text-decoration-style: solid; }
+details.symlist { margin: 0 0 var(--sp-3); font-size: var(--fs-1); }
+details.symlist summary { cursor: pointer; color: var(--muted); }
+details.symlist ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; columns: 16rem; }
+details.symlist li { break-inside: avoid; padding: 2px 0; }
 pre.matchline {
   background: var(--inset);
   border: 1px solid var(--line);

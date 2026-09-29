@@ -706,6 +706,10 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 	if !binary && !image {
 		codeHTML = highlight(filePath, data)
 	}
+	var fileSymbols []store.SymbolRow
+	if !binary && !image {
+		codeHTML, fileSymbols = s.blobSymbols(p, filePath, codeHTML)
+	}
 	// Markdown and org render like a README, with the source one click
 	// away; ?view=source shows the text instead.
 	renderable := markupFile(filePath) && !binary
@@ -752,8 +756,9 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request) {
 		Rendered     bool // this response shows the rendering
 		RenderedHTML template.HTML
 		Nav          fileNav
+		Symbols      []store.SymbolRow
 	}{p, cs, base, filePath, filePath, "blob", binary, image, len(data), lines,
-		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML, renderable, rendered, renderedHTML, nav})
+		entry.Mode == "100755", entry.Mode == "120000", branches, codeHTML, renderable, rendered, renderedHTML, nav, fileSymbols})
 }
 
 // releases lists tag-anchored releases with notes and assets.
