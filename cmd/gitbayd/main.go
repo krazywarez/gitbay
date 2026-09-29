@@ -455,6 +455,7 @@ func adminCmd() *cobra.Command {
 		hostCmd("runners [--json]", "runner accounts: last poll, scope, the build each holds", "admin", "runners"),
 		auditCmd,
 		backupCmd(),
+		restoreDrillCmd(),
 		secretsCmd(),
 		gcCmd(),
 		adminMigrateCommitRefsCmd(),

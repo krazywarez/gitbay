@@ -467,6 +467,19 @@ func addDir(tw *tar.Writer, path, name string) error {
 // checked for integrity alone and says so. Repositories are extracted to
 // a temporary directory for the check, so it needs free space for them.
 func verifyBackup(path, identity string) error {
+	tmp, err := os.MkdirTemp("", "gitbay-verify-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	return checkArchive(path, identity, tmp, false)
+}
+
+// checkArchive extracts the archive at path into dest and runs verify's
+// checks on it. With full unset it extracts only the database and the
+// repositories; with full set, every member, so dest is a restored
+// server.root. Alternates and commondir are left out either way.
+func checkArchive(path, identity, dest string, full bool) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -481,11 +494,6 @@ func verifyBackup(path, identity string) error {
 		return fmt.Errorf("%s: not a gzip archive: %w", path, err)
 	}
 	tr := tar.NewReader(gz)
-	tmp, err := os.MkdirTemp("", "gitbay-verify-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmp)
 	dbPath := ""
 	inArchive := map[string]bool{}
 	members := 0
@@ -502,7 +510,7 @@ func verifyBackup(path, identity string) error {
 		members++
 		switch {
 		case h.Name == "gitbay.db":
-			dbPath = filepath.Join(tmp, "gitbay.db")
+			dbPath = filepath.Join(dest, "gitbay.db")
 			if err := extractTo(tr, dbPath); err != nil {
 				return fmt.Errorf("%s: extracting the database: %w", path, err)
 			}
@@ -510,18 +518,26 @@ func verifyBackup(path, identity string) error {
 			// Objects are named by their sha256, so each is checked as it
 			// streams past and none is extracted.
 			lfsObjects++
+			if !filepath.IsLocal(h.Name) {
+				return fmt.Errorf("%s: member %q leaves the archive root", path, h.Name)
+			}
 			sum := sha256.New()
-			if _, err := io.Copy(sum, tr); err != nil {
+			if full {
+				err = extractTo(io.TeeReader(tr, sum), filepath.Join(dest, filepath.FromSlash(h.Name)))
+			} else {
+				_, err = io.Copy(sum, tr)
+			}
+			if err != nil {
 				return fmt.Errorf("%s: reading %s: %w", path, h.Name, err)
 			}
 			if hex.EncodeToString(sum.Sum(nil)) != filepath.Base(h.Name) {
 				badLFS = append(badLFS, h.Name)
 			}
-		case strings.HasPrefix(h.Name, "repos/"):
+		case full || strings.HasPrefix(h.Name, "repos/"):
 			trimmed := strings.TrimSuffix(h.Name, "/")
 			// repos/<owner>/<name>.git/HEAD marks one repository present.
 			parts := strings.Split(trimmed, "/")
-			if len(parts) == 4 && parts[3] == "HEAD" && strings.HasSuffix(parts[2], ".git") {
+			if len(parts) == 4 && parts[0] == "repos" && parts[3] == "HEAD" && strings.HasSuffix(parts[2], ".git") {
 				inArchive[parts[1]+"/"+strings.TrimSuffix(parts[2], ".git")] = true
 			}
 			if !filepath.IsLocal(trimmed) {
@@ -530,7 +546,7 @@ func verifyBackup(path, identity string) error {
 			if borrowsObjects(trimmed) {
 				continue
 			}
-			dest := filepath.Join(tmp, filepath.FromSlash(trimmed))
+			dest := filepath.Join(dest, filepath.FromSlash(trimmed))
 			switch h.Typeflag {
 			case tar.TypeDir:
 				// The archive's directory modes do not matter to fsck, and
@@ -592,7 +608,7 @@ func verifyBackup(path, identity string) error {
 	var failed []error
 	var broken []string
 	for _, r := range repos {
-		dir := filepath.Join(tmp, "repos", r.OwnerName, r.Name+".git")
+		dir := filepath.Join(dest, "repos", r.OwnerName, r.Name+".git")
 		if err := gitutil.FsckConnectivity(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", r.Path(), err)
 			broken = append(broken, r.Path())
@@ -603,7 +619,7 @@ func verifyBackup(path, identity string) error {
 	} else {
 		fmt.Printf("connectivity ok on %d repositories\n", len(repos))
 	}
-	assets, badAssets, err := checkReleaseAssets(st, repos, tmp)
+	assets, badAssets, err := checkReleaseAssets(st, repos, dest)
 	if err != nil {
 		return err
 	}
