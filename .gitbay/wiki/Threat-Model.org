@@ -124,9 +124,41 @@ things are required together, because neither is enough alone:
   mail host echoes into its header (a quoted MAIL FROM local part, a
   reason) cannot read as a result; =FuzzAuthResults= checks that. That rests on
   the mail host removing incoming headers that claim its id (RFC 8601
-  §5); Gmail, Fastmail and Migadu do. Unset, the daemon warns at start,
-  and a leaked token plus a forged From posts. The Admin page calls it
-  required for any exposed instance.
+  §5); Gmail, Fastmail and Migadu do. With =require_dkim= set, gitbayd
+  verifies the message's DKIM signatures itself, on the bytes as
+  fetched, and requires one whose =d= has the same organizational
+  domain as From; this depends on the sender's domain signing, not on
+  the mail host, and is what an instance whose host adds no
+  =Authentication-Results= for some senders (gitbay.org, at Migadu)
+  relies on. The signature's =h= must cover From, the To or Cc the
+  reply address is read from (a signed message cannot be redirected to
+  another token by adding an unsigned Cc or by Bcc), Content-Type, and
+  Message-ID when present. An unsigned Content-Transfer-Encoding is
+  accepted only as 7bit, 8bit or binary, identity encodings, so adding
+  one cannot change what the signed body decodes to; the encodings in
+  MIME parts are inside the body and covered by =bh=. Header field
+  names are checked on the raw header before anything reads it: a name
+  outside RFC 5322 =ftext= such as =From : x= is one net/mail and the
+  DKIM verifier would file under different names, so a forged From
+  could be read while the signature covers another; such a message is
+  refused, as is one without exactly one From or with a repeated To,
+  Cc, Message-ID, Content-Type or Content-Transfer-Encoding. Signatures
+  with a body length tag are refused, since content appended after the
+  signed length would verify, as are rsa-sha1, keys under 1024 bits and
+  expired signatures. Each passing signature's =b= is recorded with the
+  Message-ID, so a replayed copy does not post twice. Keys are cached
+  for fifteen minutes, so a revoked key is still honoured for up to
+  that long. A DNS failure that may pass
+  delays the reply rather than refusing it; the key lookup is bounded by
+  a five-second timeout and only the first five signatures are checked,
+  so a message cannot make gitbayd wait on many lookups. The key comes
+  from the system resolver and gitbayd does not validate DNSSEC itself;
+  whoever can forge the resolver's answers can forge the key. With both
+  set, either passing is enough; with only =trusted_authserv_id=, the
+  reply address may come from any recipient field, as the mail host
+  vouches for the sender and not for the fields. With neither, the daemon warns at start, and
+  a leaked token plus a forged From posts. The Admin page recommends
+  =require_dkim= for any exposed instance.
 - *Reused ids.* Account and repository ids are reused after a hard
   delete. A reply is refused when the account or repository was
   created after its token was minted, so a token cannot post into a

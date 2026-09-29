@@ -163,6 +163,7 @@ password_file = "/etc/gitbay/imap.pass"  # one line, mode 0600, owned by gitbayd
 mailbox       = "INBOX"                  # default
 poll_interval = "1m"                     # default; at least 10s
 reply_address = "reply@gitbay.example"
+require_dkim  = true                     # recommended; see below
 trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Results id
 #+end_src
 
@@ -192,9 +193,48 @@ trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Result
   server that sends more than about 11 MiB, or more than a thousand
   untagged responses, for one command has its connection closed; one
   poll handles at most ten thousand messages.
-- =trusted_authserv_id= is required on any instance reachable from the
-  internet. It names the authserv-id the mail host writes at the start
-  of its =Authentication-Results= header (Gmail's is =mx.google.com=).
+- Whatever the settings, a message is refused when a header field name
+  is not RFC 5322 =ftext= (=From : x=, a space or a non-ASCII byte in a
+  name), when it does not have exactly one =From=, or when it has more
+  than one =To=, =Cc=, =Message-ID=, =Content-Type= or
+  =Content-Transfer-Encoding=.
+- =require_dkim= (default false) should be on for any instance
+  reachable from the internet. With it, a reply is posted only when
+  gitbayd itself verifies one of its DKIM signatures (RFC 6376) with a
+  =d== in relaxed alignment with the From domain (the same
+  organizational domain by the public suffix list; =d=github.io= aligns
+  with nothing) and an =h== that covers =From=, the =To= or =Cc= holding
+  the reply address, =Content-Type=, and =Message-ID= when the message
+  has one. A =Content-Transfer-Encoding= outside =h== is accepted only
+  when it is =7bit=, =8bit= or =binary=, which leave the decoded body as
+  it is; Thunderbird, for one, does not sign it. An unsigned
+  =quoted-printable= or =base64= is refused. The reply
+  address is read only from =To= or =Cc=: a reply that reached the
+  mailbox by Bcc, with the address only in =Delivered-To=, is refused
+  ("reply address not in To or Cc"). It needs nothing from the mail
+  host, so it works where the host adds no =Authentication-Results=.
+  rsa-sha256 (keys of 1024 bits or more) and ed25519-sha256 are
+  accepted, with simple or relaxed canonicalization; rsa-sha1, a body
+  length tag (=l==), an expired =x== and a =t== more than fifteen
+  minutes ahead are refused. Only the first five signatures are
+  checked. The key is looked up at =<s>._domainkey.<d>= with a
+  five-second timeout and cached for fifteen minutes (the resolver does
+  not report the record's TTL); a lookup that fails for a reason that
+  may pass (a timeout, SERVFAIL) leaves the message for the next poll,
+  up to the five tries above, while a missing key refuses it.
+  Signatures are checked on the message as fetched. Each passing
+  signature is recorded with the =Message-ID=, so a copy of the same
+  signed message posts once even with unsigned fields changed.
+- Either =require_dkim= or =trusted_authserv_id= passing is enough to
+  authenticate =From=; when both are set, a reply needs only one of
+  them, and a refusal names both reasons. With only
+  =trusted_authserv_id=, the reply address may come from any recipient
+  field (=Delivered-To=, =X-Original-To=, =Envelope-To=, =To=, =Cc=),
+  since the mail host vouches for the sender and not for the fields.
+  Set both when the mail host adds =Authentication-Results= for most
+  senders but not all.
+- =trusted_authserv_id= names the authserv-id the mail host writes at
+  the start of its =Authentication-Results= header (Gmail's is =mx.google.com=).
   With it set, a reply is posted only when the topmost header with that
   id shows =dmarc=pass= with =header.from= equal to the From domain, or
   =dkim=pass= with a =header.d= in relaxed alignment with it (the same
@@ -205,19 +245,24 @@ trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Result
   claiming the same id are the sender's and are not read. This is only safe when the mail host
   removes incoming =Authentication-Results= headers that claim its id,
   as RFC 8601 asks; Gmail, Fastmail and Migadu do. Check yours before
-  relying on it. Unset, the daemon logs a warning at start and =admin
-  mail inbound check= repeats it: without it, =From= is whatever the
-  sender wrote. Mail between two addresses at the same host may carry
-  no =Authentication-Results= at all: at Migadu, mail from another
+  relying on it. With neither this nor =require_dkim= set, the daemon
+  logs a warning at start and =admin mail inbound check= repeats it:
+  =From= is then whatever the sender wrote. Mail between two addresses
+  at the same host may carry no =Authentication-Results= at all: at
+  Migadu, mail from another
   Migadu-hosted domain is delivered through its outbound path and gets
-  none, so setting the id refuses every reply from such users.
-  gitbay.org runs without it for that reason until gitbayd verifies
-  DKIM itself (#307).
+  none, so setting the id alone refuses every reply from such users.
+  That mail does carry a DKIM signature aligned with =From= (for
+  example =d=cleberg.net; s=key1; a=rsa-sha256; c=simple/simple;
+  h=from:to:subject:date:message-id:mime-version:content-type=), which
+  is why gitbay.org sets =require_dkim= instead.
 - =gitbay admin mail inbound check= logs in, opens the mailbox
-  read-only (EXAMINE) and reports the message and unseen counts, so a
-  check never marks a reply seen before the poller reads it. With
-  inbound off it says so and exits 0. Poll failures are logged as
-  =mail reply: poll failed= with the server and the IMAP error.
+  read-only (EXAMINE) and reports the message and unseen counts and how
+  =From= is authenticated (=require_dkim=, =trusted_authserv_id=), so a
+  check never marks a reply seen before the poller reads it. It warns
+  when neither is set. With inbound off it says so and exits 0. Poll
+  failures are logged as =mail reply: poll failed= with the server and
+  the IMAP error.
 
 A reply is posted when all of these hold, checked when it is read:
 
@@ -230,7 +275,8 @@ A reply is posted when all of these hold, checked when it is read:
    by a delete and reused is not the account the token named. The same
    holds for the repository.
 4. =From= is one of that account's verified addresses, and, with
-   =trusted_authserv_id= set, the mail host authenticated it.
+   =require_dkim= or =trusted_authserv_id= set, a DKIM signature
+   gitbayd verified or the mail host's result authenticated it.
 5. The message has a =text/plain= part (HTML-only mail is refused, not
    converted), and what is left after quoted text and the signature
    are removed is not empty and fits a comment (64 KiB).

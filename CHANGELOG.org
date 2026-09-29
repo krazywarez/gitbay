@@ -4,6 +4,26 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* Unreleased
+
+- =[mail.inbound] require_dkim= makes gitbayd verify a reply's DKIM
+  signature itself: one of the first five signatures must verify
+  (rsa-sha256 with a key of 1024 bits or more, or ed25519-sha256), have
+  a =d== in relaxed alignment with the From domain, and cover From, the
+  To or Cc holding the reply address, Content-Type, and Message-ID when
+  present; an unsigned Content-Transfer-Encoding must be 7bit, 8bit or
+  binary. The reply address is then
+  read only from To or Cc. =l==, rsa-sha1, an expired =x== and a =t==
+  in the future are refused; a temporary DNS failure retries on the
+  next poll; keys are cached for fifteen minutes; a passing signature
+  is recorded so a copy posts once. Off by default; either it or
+  =trusted_authserv_id= passing is enough. The start-up warning and
+  =admin mail inbound check= now warn only when neither is set, and the
+  check reports both settings. (#307)
+- A reply whose header has a field name outside RFC 5322 =ftext=
+  (=From : x=), no single From, or a repeated To, Cc, Message-ID,
+  Content-Type or Content-Transfer-Encoding is refused. (#307)
+
 * v1.39.0 — 2026-09-29
 
 Suggested changes, split diffs, reactions, saved
