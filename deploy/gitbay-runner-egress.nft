@@ -9,7 +9,8 @@
 # nftables sees them exactly as it sees the runner's own ssh, so this
 # table cannot tell a build from its runner. It limits what that user
 # reaches on this host, and the runner needs little: 127.0.0.1:22, to
-# poll, clone and stream logs.
+# poll, clone and stream logs. gitbay-runner-builds.nft tells them apart
+# by cgroup and narrows this per build, trusted or not.
 #
 # Every packet to one of the host's own addresses, loopback or public,
 # leaves through lo, so the output hook sees host-bound traffic as

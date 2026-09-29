@@ -13,6 +13,11 @@
 #
 # Stop uses destroy, which succeeds when the table is already gone (a
 # flush ruleset removes it); delete would fail and leave the unit failed.
+#
+# The builds table (gitbay-runner-builds.nft) is loaded by the runner's
+# own start, against its cgroups. Reload loads it again when those
+# cgroups exist, so after a restart of nftables.service one reload puts
+# both tables back.
 [Unit]
 Description=Host egress rule for CI builds
 After=nftables.service ufw.service
@@ -23,7 +28,9 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
 ExecReload=/usr/sbin/nft -f /etc/gitbay-runner/egress.nft
+ExecReload=/bin/sh -c 'if [ -d /sys/fs/cgroup/system.slice/gitbay-runner.service/builds/untrusted ]; then exec /usr/sbin/nft -f /etc/gitbay-runner/builds.nft; fi'
 ExecStop=/usr/sbin/nft destroy table inet gitbay_runner
+ExecStop=/usr/sbin/nft destroy table inet gitbay_builds
 
 [Install]
 WantedBy=multi-user.target

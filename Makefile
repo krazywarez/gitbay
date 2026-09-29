@@ -77,9 +77,13 @@ deploy-runner: preflight
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-prune.timer /etc/systemd/system/gitbay-runner-prune.timer
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.nft /etc/gitbay-runner/egress.nft
 	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-egress.service /etc/systemd/system/gitbay-runner-egress.service
+	./deploy/copy.sh $(HOST) $(PORT) deploy/gitbay-runner-builds.nft /etc/gitbay-runner/builds.nft
 	@echo "==> loading the egress rule"
+	@# builds.nft names the runner's class cgroups, which may not exist yet;
+	@# its syntax is checked against system.slice, which always does.
 	ssh -p $(PORT) root@$(HOST) 'set -eu; \
 	  nft -c -f /etc/gitbay-runner/egress.nft; \
+	  sed "s|level 4 \"system.slice/gitbay-runner.service/builds/[a-z]*\"|level 1 \"system.slice\"|" /etc/gitbay-runner/builds.nft | nft -c -f /dev/stdin; \
 	  systemctl daemon-reload; \
 	  systemctl enable gitbay-runner-egress.service; \
 	  systemctl reload-or-restart gitbay-runner-egress.service'
@@ -89,5 +93,6 @@ deploy-runner: preflight
 	  mv /usr/local/bin/gitbay-runner.new /usr/local/bin/gitbay-runner; \
 	  systemctl enable --now gitbay-runner-prune.timer; \
 	  systemctl restart gitbay-runner; \
+	  nft list table inet gitbay_builds >/dev/null; \
 	  systemctl --no-pager --lines=3 status gitbay-runner; \
 	  systemctl --no-pager list-timers gitbay-runner-prune.timer'
