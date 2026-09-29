@@ -56,7 +56,7 @@ job=flood260
 tmp=$(mktemp -d)
 fp=
 cleanup() {
-    if [ -n "$fp" ]; then gitbay keys remove "$fp" >/dev/null || echo "remove key $fp by hand" >&2; fi
+    if [ -n "$fp" ]; then gitbay auth keys remove "$fp" >/dev/null || echo "remove key $fp by hand" >&2; fi
     fp=
     rm -rf "$tmp"
 }
@@ -65,7 +65,7 @@ trap 'cleanup; exit 130' INT TERM
 
 echo "==> an expired key"
 ssh-keygen -q -t ed25519 -N '' -C auth-flood-260 -f "$tmp/key"
-gitbay keys add --scope git --label auth-flood-260 --ttl 1s <"$tmp/key.pub" >/dev/null
+gitbay auth keys add --scope git --label auth-flood-260 --ttl 1s <"$tmp/key.pub" >/dev/null
 fp=$(ssh-keygen -lf "$tmp/key.pub" | awk '{print $2}')
 sleep 2
 
