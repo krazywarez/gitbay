@@ -121,7 +121,8 @@ button and the displayed status (=internal/control/mr.go=):
 - Commands that create a credential (SSH, deploy and runner keys, API
   tokens, email verification, login links, PGP keys, device tokens) or
   grant access (repository and organization roles, teams, transfers,
-  admin promote and enable, webhooks, secrets, mirrors) are refused
+  repository visibility, admin promote and enable, webhooks, secrets,
+  mirrors) are refused
   from a browser session that signed in more than 15 minutes ago
   (=control.ReauthWindow=, =Command.NeedsRecentSignIn=). The sign-in
   time is =web_sessions.created_at=, which idle renewal does not move;

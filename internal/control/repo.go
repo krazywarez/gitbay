@@ -118,7 +118,9 @@ func init() {
 		Summary:  "set repository visibility",
 		Usage:    "repo settings visibility <owner/name> public|private",
 		Examples: []string{"repo settings visibility krz/gitbay public"},
-		Run:      runSetVisibility})
+		// Making a repository public shows it to everyone.
+		NeedsRecentSignIn: true,
+		Run:               runSetVisibility})
 	register(Command{Path: []string{"repo", "settings", "website"},
 		Summary:  "set the repository website",
 		Usage:    "repo settings website <owner/name> <url> ('' clears)",

@@ -125,6 +125,7 @@ func TestNeedsRecentSignInSet(t *testing.T) {
 		"repo mirror add",
 		"repo runner add",
 		"repo secret set",
+		"repo settings visibility",
 		"repo transfer",
 		"token create",
 		"web login",

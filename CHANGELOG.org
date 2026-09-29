@@ -24,10 +24,10 @@ anything beyond "replace the binary and restart" is needed.
   first sync (#298).
 - A browser session creates credentials and grants access — keys, PGP
   keys, tokens, verified addresses, org and repository roles, transfers,
-  webhooks, secrets, mirrors, and the admin promote/enable actions —
-  only within 15 minutes of signing in. An older session gets the form
-  back with a "Sign in again" link, and the login returns to it. SSH and
-  API tokens are unaffected (#297).
+  repository visibility, webhooks, secrets, mirrors, and the admin
+  promote/enable actions — only within 15 minutes of signing in. An
+  older session gets the form back with a "Sign in again" link, and the
+  login returns to it. SSH and API tokens are unaffected (#297).
 - The builds page's status badge section gives an org-mode snippet
   beside the Markdown one, for a README.org (#299).
 - API tokens on the settings page: create with a scope and optional

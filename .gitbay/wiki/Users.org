@@ -702,7 +702,8 @@ or =--all= ends them from the terminal, which is where a lost laptop is
 handled.
 
 Actions that create a credential or grant access (adding a key, token
-or email, org and repository roles, transfers) ask you to sign in again
+or email, org and repository roles, transfers, a repository's
+visibility) ask you to sign in again
 when your web sign-in is older than 15 minutes. The form shows a "Sign
 in again" link and the login returns to the page. Idle renewal does not
 extend this window.
