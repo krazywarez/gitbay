@@ -98,7 +98,8 @@ To check a runner, run =deploy/runner-auth-flood-test.sh= against a
 scratch repository, once as a push and once with =--untrusted=: the
 build probes what it reaches, then fails SSH logins with an expired key
 until the limiter locks its address, and the script checks that the
-runner still reported the build and kept polling.
+runner still reported the build and kept polling, and that the build's
+log shows what the table allowed and refused.
 
 * The table
 

@@ -22,7 +22,9 @@ anything beyond "replace the binary and restart" is needed.
   private range; a trusted build keeps the internet and the forge's public 22,
   80 and 443; an untrusted build gets TCP 80 and 443 and DNS, and not
   the forge. The runner's drop-in creates the cgroups and loads the
-  table on every start, and the start fails without it. =make
+  table on every start, and the start fails without it. A runner
+  with =-untrusted= or a loopback =-remote= refuses to start without
+  build cgroups, which the table needs to match anything. =make
   deploy-runner= installs it. =deploy/runner-auth-flood-test.sh= runs
   the scratch-repository test: a build failing SSH logins must not
   lock the runner out. Run it before pointing the runner back at real
