@@ -26,6 +26,7 @@ type settingsPage struct {
 	Runners     []store.RepoRunner
 	Notice      string
 	Saved       bool
+	Reauth      bool // Notice is the stale-session refusal: link to sign in
 	Submitted   map[string]string
 }
 
@@ -70,6 +71,7 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 		Runners:   runners,
 		Notice:    notice,
 		Saved:     strings.HasPrefix(notice, "Saved "),
+		Reauth:    s.reauthNotice(w, notice, r.URL.Path),
 		Submitted: subm,
 	})
 }

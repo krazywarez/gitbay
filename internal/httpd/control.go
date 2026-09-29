@@ -34,7 +34,7 @@ func (s *Server) runControlCode(u store.User, argv []string) (out string, msg st
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
-		Source: "web",
+		Source: control.SourceWeb,
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
@@ -58,7 +58,7 @@ func (s *Server) runControlStream(u store.User, argv []string, out io.Writer, do
 	var stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:     u,
-		Source:   "web",
+		Source:   control.SourceWeb,
 		Scope:    "full",
 		Store:    s.st,
 		Cfg:      s.cfg,
@@ -104,7 +104,7 @@ func (s *Server) runControlStdinCode(u store.User, argv []string, stdin string) 
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
-		Source: "web",
+		Source: control.SourceWeb,
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
@@ -146,7 +146,7 @@ func (s *Server) dispatchIntoStdin(u store.User, argv []string, stdin string, ta
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
-		Source: "web",
+		Source: control.SourceWeb,
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,
@@ -187,7 +187,7 @@ func (s *Server) dispatchJSON(u store.User, argv []string, stdin string) (code i
 	var stdout, stderr bytes.Buffer
 	ctx := &control.Ctx{
 		User:   u,
-		Source: "web",
+		Source: control.SourceWeb,
 		Scope:  "full",
 		Store:  s.st,
 		Cfg:    s.cfg,

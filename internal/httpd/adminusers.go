@@ -62,6 +62,7 @@ func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request, viewer store
 		}
 		next = "?" + q.Encode()
 	}
+	notice := s.takeFlash(w, r)
 	s.render(w, "adminusers.html", struct {
 		basePage
 		Tab    string
@@ -69,7 +70,8 @@ func (s *Server) adminUsers(w http.ResponseWriter, r *http.Request, viewer store
 		Users  []adminUserRow
 		Next   string
 		Notice string
-	}{s.baseFor(viewer), "admin", state, page.Items, next, s.takeFlash(w, r)})
+		Reauth bool // Notice is the stale-session refusal: link to sign in
+	}{s.baseFor(viewer), "admin", state, page.Items, next, notice, s.reauthNotice(w, notice, r.URL.Path)})
 }
 
 // adminUsersSubmit runs one account action. Each is the command an

@@ -83,7 +83,7 @@
 
 {{if eq .Tab "people"}}{{$org := .Owner}}
 <h2>people <span class="count">{{len .Members}}</span></h2>
-{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}{{if .Reauth}} <a href="/login">Sign in again</a>{{end}}</p>{{end}}
 <div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">member</th><th scope="col">role</th><th scope="col"><span class="vh">actions</span></th></tr>
 {{range .Members}}<tr>

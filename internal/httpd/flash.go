@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"gitbay.org/gitbay/internal/control"
 )
 
 // A form action that fails redirects back to the page it came from with
@@ -42,6 +44,18 @@ func (s *Server) takeFlash(w http.ResponseWriter, r *http.Request) string {
 		return ""
 	}
 	return msg
+}
+
+// reauthNotice reports whether notice is Dispatch's refusal for a session
+// that signed in too long ago to mint a credential or grant access and,
+// when it is, remembers path so the sign-in the page links to returns
+// there (#297).
+func (s *Server) reauthNotice(w http.ResponseWriter, notice, path string) bool {
+	if notice != control.ReauthRefusal {
+		return false
+	}
+	s.setNext(w, path)
+	return true
 }
 
 const nextCookie = "gitbay_next"

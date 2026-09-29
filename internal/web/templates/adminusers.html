@@ -7,7 +7,7 @@
 {{define "content"}}
 <h1>Accounts</h1>
 <p class="meta"><a href="/admin">Admin</a> · the same read as <code>gitbay admin user list</code>.</p>
-{{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
+{{if .Notice}}<p class="notice" role="status">{{.Notice}}{{if .Reauth}} <a href="/login">Sign in again</a>{{end}}</p>{{end}}
 
 <nav class="filters">
   <a {{if eq .State "all"}}class="active" aria-current="page" {{end}}href="?state=all">all</a>

@@ -3,7 +3,7 @@
 {{define "content"}}
 {{$base := printf "/%s/%s/settings" .Repo.OwnerName .Repo.Name}}
 <h1>Settings</h1>
-{{if .Notice}}{{if .Saved}}<p class="notice" role="status">{{.Notice}}</p>{{else}}<p class="error" role="alert">{{.Notice}}</p>{{end}}{{end}}
+{{if .Notice}}{{if .Saved}}<p class="notice" role="status">{{.Notice}}</p>{{else}}<p class="error" role="alert">{{.Notice}}{{if .Reauth}} <a href="/login">Sign in again</a>{{end}}</p>{{end}}{{end}}
 <div class="withcol narrow">
 <nav class="sidecol" aria-label="Sections">
 <details class="sidedrop">

@@ -2,7 +2,7 @@
 {{define "title"}}account settings{{end}}
 {{define "content"}}
 <h1>Account settings</h1>
-{{if .Notice}}<p class="error" role="alert">{{.Notice}}</p>{{end}}
+{{if .Notice}}<p class="error" role="alert">{{.Notice}}{{if .Reauth}} <a href="/login">Sign in again</a>{{end}}</p>{{end}}
 {{if .Message}}<p class="notice" role="status">{{.Message}}</p>{{end}}
 
 <div class="withcol narrow">

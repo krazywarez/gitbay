@@ -517,6 +517,7 @@ type ownerPage struct {
 	Self          bool
 	Snippets      int
 	Notice        string
+	Reauth        bool // Notice is the stale-session refusal: link to sign in
 	Feed          string
 }
 
@@ -572,6 +573,7 @@ func (s *Server) ownerProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	notice := s.takeFlash(w, r)
 	s.render(w, "owner.html", ownerPage{
 		basePage:      s.baseFor(viewer),
 		Owner:         name,
@@ -592,7 +594,8 @@ func (s *Server) ownerProfile(w http.ResponseWriter, r *http.Request) {
 		CanAdmin:      canAdmin,
 		Self:          self,
 		Snippets:      d.Snippets,
-		Notice:        s.takeFlash(w, r),
+		Notice:        notice,
+		Reauth:        s.reauthNotice(w, notice, r.URL.Path),
 		Feed:          "/" + name + "/activity.atom",
 	})
 }

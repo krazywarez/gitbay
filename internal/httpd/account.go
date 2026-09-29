@@ -128,6 +128,9 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 		aboutEdit = "/" + aboutRepo + "/edit/main/" + profile.AboutPath
 	}
 
+	notice := s.takeFlash(w, r)
+	reauth := s.reauthNotice(w, notice, "/settings")
+
 	s.render(w, "account.html", struct {
 		basePage
 		Tab          string // marks the rail's Settings row as current
@@ -148,10 +151,11 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 		ThemeSetting string // system, light or dark: the form's selected option
 		Tokens       []accountToken
 		TokenShown   string // a token minted by this request, shown once
+		Reauth       bool   // Notice is the stale-session refusal: link to sign in
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
 		aboutRepo, aboutEdit, s.cfg.SiteHost(),
-		s.takeFlash(w, r), r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme,
-		tokens, tokenShown})
+		notice, r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme,
+		tokens, tokenShown, reauth})
 }
 
 // accountExport hands the browser the same bundle `account export`

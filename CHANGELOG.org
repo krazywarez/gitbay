@@ -23,6 +23,10 @@ source and a =--from=/remote URL carrying a query or fragment. A
 mirror or import whose host is written numerically (=127.1=,
 =2130706433=, =0x7f.1=) rather than as a dotted address is refused
 too; rewrite it before upgrading.
+- A web session older than 15 minutes cannot mint a credential or grant
+  access — keys, PGP keys, tokens, org membership, and the admin
+  promote/enable actions — and the form it tried shows a sign-in link
+  that returns there (#297).
 - The builds page's status badge section gives an org-mode snippet
   beside the Markdown one, for a README.org (#299).
 - API tokens on the settings page: create with a scope and optional
