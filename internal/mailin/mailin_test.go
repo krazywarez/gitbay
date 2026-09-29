@@ -336,7 +336,26 @@ func TestDrainRetriesTransientFailure(t *testing.T) {
 	}
 }
 
-// A repository id freed by a delete and taken by a later repository does
+// A deleted repository's id is not handed to the next repository
+// (#306), so a reply meant for it finds no repository.
+func TestDeletedRepositoryID(t *testing.T) {
+	f := setup(t)
+	m := []byte(f.message(t, "bob@example.test", "hi"))
+	if err := f.st.DeleteRepo(f.repo.ID); err != nil {
+		t.Fatal(err)
+	}
+	alice, _ := f.st.UserByUsername("alice")
+	id, err := f.st.CreateRepo("user", alice.ID, "other", "public")
+	if err != nil || id == f.repo.ID {
+		t.Fatalf("new repository has id %d (%v), the deleted one's", id, err)
+	}
+	res := f.p.Handle(m)
+	if res.Posted || !strings.Contains(res.Reason, "repository no longer exists") {
+		t.Fatalf("result %+v", res)
+	}
+}
+
+// A repository id freed and taken before ids stopped being reused does
 // not accept replies meant for the old one.
 func TestReusedRepositoryID(t *testing.T) {
 	f := setup(t)
@@ -345,9 +364,11 @@ func TestReusedRepositoryID(t *testing.T) {
 		t.Fatal(err)
 	}
 	alice, _ := f.st.UserByUsername("alice")
-	id, err := f.st.CreateRepo("user", alice.ID, "other", "public")
-	if err != nil || id != f.repo.ID {
-		t.Fatalf("new repository has id %d (%v), want the freed %d", id, err, f.repo.ID)
+	id := f.repo.ID
+	if _, err := f.st.DB.Exec(
+		"INSERT INTO repos (id, owner_kind, owner_id, name, visibility) VALUES (?, 'user', ?, 'other', 'public')",
+		id, alice.ID); err != nil {
+		t.Fatal(err)
 	}
 	f.st.CreateIssue(id, alice.ID, "t", "", "md")
 	// Created after the token, as it would be outside a fast test.

@@ -187,8 +187,9 @@ func (p *Processor) Handle(raw []byte) Result {
 	case u.Pending:
 		return p.refuse(u.ID, msgID, "account not active")
 	}
-	// Ids are reused after a hard delete: an account created after the
-	// token was minted is not the one it named.
+	// An id freed before ids stopped being reused (#306) may have been
+	// taken: an account created after the token was minted is not the
+	// one it named.
 	if code := p.createdAfter("users", u.ID, target, msgID, "account"); code != nil {
 		return *code
 	}

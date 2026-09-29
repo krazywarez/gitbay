@@ -253,9 +253,10 @@ func TestLFSUploadTokenRefusedOnceArchived(t *testing.T) {
 	}
 }
 
-// SQLite gives a new key the id of the highest deleted one. A token
-// minted for the deleted key is refused when presented against the new
-// key; the new key's own token works (#303).
+// A removed key's id is not handed to the next key (#306), so its token
+// names no live key. An id freed and taken before ids stopped being
+// reused is still refused by the fingerprint pin; the new key's own token
+// works (#303).
 func TestLFSTokenRefusedOnReusedKeyID(t *testing.T) {
 	s, st, u := newTokenTestServer(t)
 	repo := lfsTestRepo(t, st, u.ID, "app", "private")
@@ -269,14 +270,44 @@ func TestLFSTokenRefusedOnReusedKeyID(t *testing.T) {
 	if err := st.RemoveSSHKey(u.ID, "SHA256:old"); err != nil {
 		t.Fatal(err)
 	}
-	newID := lfsTestKey(t, st, u.ID, "SHA256:new", "full")
-	if newID != oldID {
-		t.Fatalf("new key got id %d, want the reused %d", newID, oldID)
+	nextID := lfsTestKey(t, st, u.ID, "SHA256:next", "full")
+	if nextID == oldID {
+		t.Fatalf("new key took the removed key's id %d", oldID)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(old), repo); op != "" {
+		t.Errorf("removed key's token: %q", op)
+	}
+	if _, err := st.DB.Exec("INSERT INTO ssh_keys (id, user_id, fingerprint, algo, blob) VALUES (?, ?, 'SHA256:new', 'ssh-ed25519', x'00')",
+		oldID, u.ID); err != nil {
+		t.Fatal(err)
 	}
 	if op, _ := s.lfsAuth(lfsRequest(old), repo); op != "" {
 		t.Errorf("old key's token on the reused id: %q", op)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, newID, "SHA256:new", "upload", now)), repo); op != "upload" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, oldID, "SHA256:new", "upload", now)), repo); op != "upload" {
 		t.Errorf("new key's own token: %q", op)
+	}
+}
+
+// A token names its repository by id. Deleting the repository does not
+// let the next one take that id and the token with it (#306).
+func TestLFSTokenForDeletedRepository(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	gone := lfsTestRepo(t, st, u.ID, "gone", "private")
+	secret, err := s.lfsSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := lfsTestKey(t, st, u.ID, "SHA256:owner", "full")
+	tok := lfs.Sign(secret, gone.ID, key, "SHA256:owner", "upload", time.Now())
+	if err := st.DeleteRepo(gone.ID); err != nil {
+		t.Fatal(err)
+	}
+	next := lfsTestRepo(t, st, u.ID, "next", "private")
+	if next.ID == gone.ID {
+		t.Fatalf("new repository took the deleted one's id %d", gone.ID)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(tok), next); op != "" {
+		t.Errorf("deleted repository's token on the next repository: %q", op)
 	}
 }

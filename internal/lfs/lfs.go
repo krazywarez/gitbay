@@ -130,9 +130,10 @@ const TokenTTL = time.Hour
 // Sign mints a token for op ("download" or "upload") on repoID, bound
 // to keyID: the SSH key, user or deploy, that asked for it, or 0 for an
 // anonymous download of a public repository. fingerprint is that key's
-// fingerprint, "" for key 0. SQLite reuses the id of a deleted key, so
-// the token carries a hash of the fingerprint as well and a new key
-// given the old id does not inherit the old key's tokens (#303).
+// fingerprint, "" for key 0. Key ids freed before they stopped being
+// reused (#306) may belong to a later key, so the token carries a hash
+// of the fingerprint as well and a new key given the old id does not
+// inherit the old key's tokens (#303).
 func Sign(secret []byte, repoID, keyID int64, fingerprint, op string, now time.Time) string {
 	payload := fmt.Sprintf("%d:%d:%s:%s:%d", repoID, keyID, KeyPin(fingerprint), op, now.Add(TokenTTL).Unix())
 	mac := hmac.New(sha256.New, secret)
