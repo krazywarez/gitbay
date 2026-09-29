@@ -232,7 +232,7 @@ func TestWhenReadyReviewMerges(t *testing.T) {
 // Resolving the last open thread merges the queued request.
 func TestWhenReadyThreadResolveMerges(t *testing.T) {
 	f := newQueueFixture(t, func(s *store.RepoSettings) { s.RequireResolved = true })
-	id, err := f.st.AddDiffComment(f.mr().ID, f.alice.ID, f.headSHA, "feature.txt", "new", 1, "why?", 0, false)
+	id, err := f.st.AddDiffComment(f.mr().ID, f.alice.ID, f.headSHA, "feature.txt", "new", 1, 0, "why?", 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}

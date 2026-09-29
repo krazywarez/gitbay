@@ -12,15 +12,17 @@ import (
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/suggest"
 )
 
 func init() {
 	register(Command{Path: []string{"mr", "diff-comment"},
 		Summary: "comment on a diff line",
-		Usage:   "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]",
+		Usage:   "mr diff-comment <owner/name> <n> --path <file> --line <l> [--start-line <s>] [--old] [--pending] [--reply <id>] [--message <m> | --file -]",
 		Flags: []Flag{
 			{"--path", "<file>", "the file the comment is on", ""},
-			{"--line", "<l>", "the line the comment is on", ""},
+			{"--line", "<l>", "the line the comment is on, or the last line of a range", ""},
+			{"--start-line", "<s>", "the first line of a range ending at --line", ""},
 			{"--old", "", "the line is on the old side of the diff", ""},
 			{"--pending", "", "hold the comment for `mr review --comment`", ""},
 			{"--reply", "<id>", "reply to this thread instead of opening one", ""},
@@ -30,6 +32,7 @@ func init() {
 		Examples: []string{
 			`mr diff-comment krz/gitbay 431 --path internal/control/build.go --line 42 --message "why is this a switch"`,
 			"mr diff-comment krz/gitbay 431 --reply 12 --file - < notes.md",
+			"mr diff-comment krz/gitbay 431 --path go.mod --start-line 3 --line 4 --file - < suggestion.md",
 		},
 		ReadsStdin: true, Run: runDiffComment})
 	register(Command{Path: []string{"mr", "threads"},
@@ -50,21 +53,28 @@ func init() {
 }
 
 func runDiffComment(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{Values: []string{"--path", "--line", "--reply", "--message", "--file"},
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--path", "--line", "--start-line", "--reply", "--message", "--file"},
 		Bools: []string{"--old", "--pending"}, MaxPos: -1,
-		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--old] [--pending] [--reply <id>] [--message <m> | --file -]"})
+		Usage: "mr diff-comment <owner/name> <n> --path <file> --line <l> [--start-line <s>] [--old] [--pending] [--reply <id>] [--message <m> | --file -]"})
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
 	rest := f.Pos
 	path, message, file, old := f.Value("--path"), f.Value("--message"), f.Value("--file"), f.Has("--old")
-	var line, replyTo int64
+	var line, startLine, replyTo int64
 	if f.Has("--line") {
 		n, err := strconv.ParseInt(f.Value("--line"), 10, 64)
 		if err != nil || n < 1 {
 			return c.fail(protocol.ExitUsage, "--line must be a positive number")
 		}
 		line = n
+	}
+	if f.Has("--start-line") {
+		n, err := strconv.ParseInt(f.Value("--start-line"), 10, 64)
+		if err != nil || n < 1 || (line != 0 && n > line) {
+			return c.fail(protocol.ExitUsage, "--start-line must be a positive number no greater than --line")
+		}
+		startLine = n
 	}
 	if f.Has("--reply") {
 		n, err := strconv.ParseInt(f.Value("--reply"), 10, 64)
@@ -90,6 +100,19 @@ func runDiffComment(c *Ctx, args []string) int {
 	if strings.TrimSpace(body) == "" {
 		return c.fail(protocol.ExitUsage, "empty comment; use --message or --file -")
 	}
+	if replyTo != 0 && startLine != 0 {
+		return c.fail(protocol.ExitUsage, "a reply takes its thread's lines; drop --start-line")
+	}
+	_, hasSuggestion, err := suggest.Parse(body)
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	if hasSuggestion && replyTo != 0 {
+		return c.fail(protocol.ExitUsage, "a suggestion opens its own thread: post it with --path and --line, not --reply")
+	}
+	if hasSuggestion && old {
+		return c.fail(protocol.ExitUsage, "a suggestion replaces lines of the new file; drop --old")
+	}
 
 	side := "new"
 	if old {
@@ -113,10 +136,20 @@ func runDiffComment(c *Ctx, args []string) int {
 		if !slices.Contains(files, path) {
 			return c.fail(protocol.ExitUsage, "%s is not part of this merge request's diff", path)
 		}
+		if hasSuggestion {
+			first := firstNonZero(startLine, line)
+			content, _, err := readAnchored(dir, mr.HeadSHA, path)
+			if err != nil {
+				return c.fail(protocol.ExitUsage, "%v", err)
+			}
+			if _, ok := suggest.Range(content, int(first), int(line)); !ok {
+				return c.fail(protocol.ExitUsage, "%s has no lines %d-%d at the head", path, first, line)
+			}
+		}
 	}
 
 	pending := f.Has("--pending")
-	id, err := c.Store.AddDiffComment(mr.ID, c.User.ID, mr.HeadSHA, path, side, line, body, replyTo, pending)
+	id, err := c.Store.AddDiffComment(mr.ID, c.User.ID, mr.HeadSHA, path, side, line, startLine, body, replyTo, pending)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return c.fail(protocol.ExitNotFound, "%v", err)
@@ -175,22 +208,25 @@ func runMRThreads(c *Ctx, args []string) int {
 		CreatedAt string `json:"created_at"`
 	}
 	type threadOut struct {
-		ID       int64        `json:"id"`
-		Path     string       `json:"path"`
-		Side     string       `json:"side"`
-		Line     int64        `json:"line"`
-		Stale    bool         `json:"stale"`
-		Resolved string       `json:"resolved_by,omitempty"`
-		Comments []commentOut `json:"comments"`
+		ID         int64          `json:"id"`
+		Path       string         `json:"path"`
+		Side       string         `json:"side"`
+		StartLine  int64          `json:"start_line,omitempty"`
+		Line       int64          `json:"line"`
+		Stale      bool           `json:"stale"`
+		Resolved   string         `json:"resolved_by,omitempty"`
+		Suggestion *SuggestionOut `json:"suggestion,omitempty"`
+		Comments   []commentOut   `json:"comments"`
 	}
 	byRoot := map[int64]*threadOut{}
 	var order []int64
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
 			byRoot[cm.ID] = &threadOut{
-				ID: cm.ID, Path: cm.Path, Side: cm.Side, Line: cm.Line,
+				ID: cm.ID, Path: cm.Path, Side: cm.Side, StartLine: cm.StartLine, Line: cm.Line,
 				Stale: cm.HeadSHA != mr.HeadSHA, Resolved: cm.ResolvedBy,
-				Comments: []commentOut{{cm.ID, cm.Author, cm.Body, cm.CreatedAt}},
+				Suggestion: ThreadSuggestion(c.Store, c.Cfg.Server.Root, repo, mr, cm),
+				Comments:   []commentOut{{cm.ID, cm.Author, cm.Body, cm.CreatedAt}},
 			}
 			order = append(order, cm.ID)
 		} else if th, ok := byRoot[cm.ReplyTo]; ok {
@@ -201,7 +237,6 @@ func runMRThreads(c *Ctx, args []string) int {
 	for _, id := range order {
 		ds = append(ds, *byRoot[id])
 	}
-	_ = repo
 	return c.emit(ds, func(w io.Writer) {
 		for _, th := range ds {
 			marks := ""
@@ -211,12 +246,42 @@ func runMRThreads(c *Ctx, args []string) int {
 			if th.Stale {
 				marks += " [stale]"
 			}
-			fmt.Fprintf(w, "thread %d  %s:%d (%s)%s\n", th.ID, th.Path, th.Line, th.Side, marks)
-			for _, cm := range th.Comments {
-				fmt.Fprintf(w, "  %s: %s\n", cm.Author, cm.Body)
+			lines := fmt.Sprint(th.Line)
+			if th.StartLine != 0 && th.StartLine != th.Line {
+				lines = fmt.Sprintf("%d-%d", th.StartLine, th.Line)
+			}
+			fmt.Fprintf(w, "thread %d  %s:%s (%s)%s\n", th.ID, th.Path, lines, th.Side, marks)
+			for i, cm := range th.Comments {
+				body := cm.Body
+				if i == 0 && th.Suggestion != nil {
+					body = suggest.Strip(body)
+				}
+				if body != "" {
+					fmt.Fprintf(w, "  %s: %s\n", cm.Author, body)
+				}
+				if i == 0 && th.Suggestion != nil {
+					writeSuggestion(w, repo, mr, th.ID, cm.Author, th.Suggestion)
+				}
 			}
 		}
 	})
+}
+
+// writeSuggestion prints a suggestion as the diff it proposes and how to
+// apply it, or why it can no longer be applied.
+func writeSuggestion(w io.Writer, repo store.Repo, mr store.MR, thread int64, author string, s *SuggestionOut) {
+	switch {
+	case s.Outdated:
+		fmt.Fprintf(w, "  %s suggests (outdated: %s):\n", author, s.Reason)
+	default:
+		fmt.Fprintf(w, "  %s suggests (gitbay mr apply-suggestion %s %d %d):\n", author, repo.Path(), mr.Number, thread)
+	}
+	for _, l := range suggest.FromText(strings.ReplaceAll(s.Original, "\r\n", "\n")) {
+		fmt.Fprintf(w, "  - %s\n", l)
+	}
+	for _, l := range suggest.FromText(s.Replacement) {
+		fmt.Fprintf(w, "  + %s\n", l)
+	}
 }
 
 func setThreadResolved(c *Ctx, args []string, resolved bool) int {

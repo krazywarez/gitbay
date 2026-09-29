@@ -13,6 +13,7 @@ type DiffComment struct {
 	Path       string
 	Side       string
 	Line       int64
+	StartLine  int64 // first line of a range ending at Line; 0 for Line alone
 	Body       string
 	ReplyTo    int64 // 0 for thread roots
 	ResolvedBy string
@@ -23,8 +24,9 @@ type DiffComment struct {
 }
 
 // AddDiffComment creates a thread root (replyTo 0) or a reply. Replies
-// inherit the root's anchor and must belong to the same MR.
-func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string, line int64, body string, replyTo int64, pending bool) (int64, error) {
+// inherit the root's anchor and must belong to the same MR. startLine is
+// the first line of a range ending at line, or 0.
+func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string, line, startLine int64, body string, replyTo int64, pending bool) (int64, error) {
 	if replyTo != 0 {
 		var rootMR int64
 		var rootReply sql.NullInt64
@@ -43,8 +45,8 @@ func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string,
 			return 0, fmt.Errorf("reply to the thread root %d, not to a reply", rootReply.Int64)
 		}
 		err = s.DB.QueryRow(
-			"SELECT head_sha, path, side, line FROM mr_diff_comments WHERE id = ?", replyTo).
-			Scan(&headSHA, &path, &side, &line)
+			"SELECT head_sha, path, side, line, start_line FROM mr_diff_comments WHERE id = ?", replyTo).
+			Scan(&headSHA, &path, &side, &line, &startLine)
 		if err != nil {
 			return 0, err
 		}
@@ -54,9 +56,9 @@ func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string,
 		reply = replyTo
 	}
 	res, err := s.DB.Exec(`
-		INSERT INTO mr_diff_comments (mr_id, author_id, head_sha, path, side, line, body, reply_to, pending)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		mrID, authorID, headSHA, path, side, line, body, reply, pending)
+		INSERT INTO mr_diff_comments (mr_id, author_id, head_sha, path, side, line, start_line, body, reply_to, pending)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		mrID, authorID, headSHA, path, side, line, startLine, body, reply, pending)
 	if err != nil {
 		return 0, err
 	}
@@ -68,8 +70,7 @@ func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string,
 // anonymous reader, who sees only what is published.
 func (s *Store) ListDiffComments(mrID, viewer int64) ([]DiffComment, error) {
 	rows, err := s.DB.Query(`
-		SELECT c.id, u.username, c.head_sha, c.path, c.side, c.line, c.body,
-		       COALESCE(c.reply_to, 0), COALESCE(r.username, ''), c.pending, c.created_at
+		SELECT `+diffCommentCols+`
 		FROM mr_diff_comments c
 		JOIN users u ON u.id = c.author_id
 		LEFT JOIN users r ON r.id = c.resolved_by
@@ -81,14 +82,37 @@ func (s *Store) ListDiffComments(mrID, viewer int64) ([]DiffComment, error) {
 	defer rows.Close()
 	var out []DiffComment
 	for rows.Next() {
-		var c DiffComment
-		if err := rows.Scan(&c.ID, &c.Author, &c.HeadSHA, &c.Path, &c.Side, &c.Line, &c.Body,
-			&c.ReplyTo, &c.ResolvedBy, &c.Pending, &c.CreatedAt); err != nil {
+		c, err := scanDiffComment(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+const diffCommentCols = `c.id, u.username, c.head_sha, c.path, c.side, c.line, c.start_line, c.body,
+		       COALESCE(c.reply_to, 0), COALESCE(r.username, ''), c.pending, c.created_at`
+
+func scanDiffComment(row interface{ Scan(...any) error }) (DiffComment, error) {
+	var c DiffComment
+	err := row.Scan(&c.ID, &c.Author, &c.HeadSHA, &c.Path, &c.Side, &c.Line, &c.StartLine, &c.Body,
+		&c.ReplyTo, &c.ResolvedBy, &c.Pending, &c.CreatedAt)
+	return c, err
+}
+
+// DiffCommentByID returns one comment on an MR, published or pending.
+func (s *Store) DiffCommentByID(mrID, id int64) (DiffComment, error) {
+	c, err := scanDiffComment(s.DB.QueryRow(`
+		SELECT `+diffCommentCols+`
+		FROM mr_diff_comments c
+		JOIN users u ON u.id = c.author_id
+		LEFT JOIN users r ON r.id = c.resolved_by
+		WHERE c.mr_id = ? AND c.id = ?`, mrID, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return c, ErrNotFound
+	}
+	return c, err
 }
 
 // SetThreadResolved resolves or unresolves a thread root.

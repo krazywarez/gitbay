@@ -208,14 +208,14 @@ func TestMRCommentCounts(t *testing.T) {
 	if err := s.AddMRSystemComment(mr1.ID, uid, "merged"); err != nil {
 		t.Fatal(err)
 	}
-	rootID, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, "root", 0, false)
+	rootID, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, 0, "root", 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, "reply", rootID, false); err != nil {
+	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 1, 0, "reply", rootID, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 2, "pending root", 0, true); err != nil {
+	if _, err := s.AddDiffComment(mr1.ID, uid, "abc123", "file.txt", "new", 2, 0, "pending root", 0, true); err != nil {
 		t.Fatal(err)
 	}
 

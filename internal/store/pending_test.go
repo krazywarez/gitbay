@@ -35,10 +35,10 @@ func pendingFixture(t *testing.T) (*Store, int64, int64, int64) {
 // else, until they submit.
 func TestPendingCommentsArePrivate(t *testing.T) {
 	s, mrID, author, other := pendingFixture(t)
-	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 3, "half a thought", 0, true); err != nil {
+	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 3, 0, "half a thought", 0, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 9, "said out loud", 0, false); err != nil {
+	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 9, 0, "said out loud", 0, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestPendingCommentsArePrivate(t *testing.T) {
 // so nobody else could resolve it.
 func TestPendingThreadsDoNotBlockMerges(t *testing.T) {
 	s, mrID, _, other := pendingFixture(t)
-	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 3, "pending", 0, true); err != nil {
+	if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", 3, 0, "pending", 0, true); err != nil {
 		t.Fatal(err)
 	}
 	n, err := s.UnresolvedThreadCount(mrID)
@@ -88,12 +88,12 @@ func TestPendingThreadsDoNotBlockMerges(t *testing.T) {
 func TestPublishAndDiscardPending(t *testing.T) {
 	s, mrID, author, other := pendingFixture(t)
 	for i := 0; i < 3; i++ {
-		if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", int64(i+1), "note", 0, true); err != nil {
+		if _, err := s.AddDiffComment(mrID, other, "abc123", "a.go", "new", int64(i+1), 0, "note", 0, true); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Another reviewer's batch is untouched by either operation.
-	if _, err := s.AddDiffComment(mrID, author, "abc123", "b.go", "new", 1, "mine", 0, true); err != nil {
+	if _, err := s.AddDiffComment(mrID, author, "abc123", "b.go", "new", 1, 0, "mine", 0, true); err != nil {
 		t.Fatal(err)
 	}
 
