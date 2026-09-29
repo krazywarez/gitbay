@@ -829,6 +829,17 @@ gitbayd admin restore-drill /var/backups/gitbay/gitbay-20260927-090000.tar.gz --
 gitbayd admin restore-drill <archive>.tar.gz.age --identity backup-identity.txt --into /srv/drill
 #+end_src
 
+=admin backup --verify= extracts the archive under =$TMPDIR=. A host
+whose =/tmp= is a tmpfs smaller than a full archive (bay1's is 3.9 GB
+of memory) fails with "no space left on device"; point =TMPDIR= at a
+directory on disk that the backup's user owns:
+
+#+begin_src sh
+install -d -o gitbay -g gitbay -m 700 /var/backups/gitbay/verify-tmp
+cd /var/backups/gitbay
+sudo -u gitbay env TMPDIR=/var/backups/gitbay/verify-tmp gitbayd admin backup --verify <archive>
+#+end_src
+
 What to restore, and from where:
 
 | Item                          | Source                                                      | Path on the drill host                         |
