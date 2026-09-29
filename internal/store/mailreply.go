@@ -1,9 +1,28 @@
 package store
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 )
+
+// CreatedAt is when the account (table "users") or repository ("repos")
+// with id was created.
+func (s *Store) CreatedAt(table string, id int64) (time.Time, error) {
+	if table != "users" && table != "repos" {
+		return time.Time{}, errors.New("CreatedAt: unknown table " + table)
+	}
+	var v string
+	err := s.DB.QueryRow("SELECT created_at FROM "+table+" WHERE id = ?", id).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, ErrNotFound
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Parse("2006-01-02T15:04:05.000Z", v)
+}
 
 // ClaimMailReply records that the reply identified by key is being
 // posted. False means an earlier fetch of the same message already

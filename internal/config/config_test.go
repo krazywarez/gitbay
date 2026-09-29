@@ -434,6 +434,7 @@ func TestMailInbound(t *testing.T) {
 		minimal + smtp + "[mail.inbound]\nenabled = true\n":                                            "mail.inbound.password_file is required",
 		minimal + smtp + strings.Replace(inbound, "reply@gitbay.example", "reply+x@gitbay.example", 1): "no + in it",
 		minimal + smtp + strings.Replace(inbound, "reply@gitbay.example", "gitbay.example", 1):         "bare address",
+		minimal + smtp + inbound + "trusted_authserv_id = \"mx; x\"\n":                                 "trusted_authserv_id",
 		minimal + smtp + inbound + "password = \"x\"\n":                                                "unknown config key",
 	} {
 		if _, err := Load(writeConfig(t, body)); err == nil || !strings.Contains(err.Error(), want) {

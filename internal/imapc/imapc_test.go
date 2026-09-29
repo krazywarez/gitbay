@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,6 +20,9 @@ type fakeServer struct {
 	msgs map[uint32]string
 	seen map[uint32]bool
 	cmds []string
+	// raw, when set, answers a command in place of the default: it
+	// writes whatever it likes and reports whether it handled it.
+	raw func(conn net.Conn, tag, cmd string) bool
 }
 
 func (f *fakeServer) serve(conn net.Conn) {
@@ -34,6 +38,9 @@ func (f *fakeServer) serve(conn net.Conn) {
 		tag, cmd, _ := strings.Cut(line, " ")
 		f.cmds = append(f.cmds, cmd)
 		up := strings.ToUpper(cmd)
+		if f.raw != nil && f.raw(conn, tag, cmd) {
+			continue
+		}
 		switch {
 		case strings.HasPrefix(up, "STARTTLS"):
 			fmt.Fprintf(conn, "%s OK begin\r\n", tag)
@@ -58,6 +65,10 @@ func (f *fakeServer) serve(conn net.Conn) {
 				}
 			}
 			fmt.Fprintf(conn, "* SEARCH %s\r\n%s OK done\r\n", strings.Join(ids, " "), tag)
+		case strings.HasPrefix(up, "UID FETCH") && strings.HasSuffix(up, "RFC822.SIZE"):
+			var uid uint32
+			fmt.Sscanf(cmd, "UID FETCH %d", &uid)
+			fmt.Fprintf(conn, "* 1 FETCH (UID %d RFC822.SIZE %d)\r\n%s OK done\r\n", uid, len(f.msgs[uid]), tag)
 		case strings.HasPrefix(up, "UID FETCH"):
 			var uid uint32
 			fmt.Sscanf(cmd, "UID FETCH %d", &uid)
@@ -192,6 +203,131 @@ func TestLiteralSize(t *testing.T) {
 		n, ok := literalSize(line)
 		if (want < 0) == ok || (ok && n != want) {
 			t.Errorf("literalSize(%q) = %d, %v", line, n, ok)
+		}
+	}
+}
+
+// session dials f over implicit TLS and logs in.
+func session(t *testing.T, f *fakeServer) *Client {
+	t.Helper()
+	setupTLS(t)
+	if f.msgs == nil {
+		f.msgs, f.seen = map[uint32]string{}, map[uint32]bool{}
+	}
+	c, err := Dial(listen(t, f, true), false, 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	if err := c.Login("u", `p"w`); err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+// A server that answers one FETCH with literal after literal is cut off
+// at the command's byte budget, however it labels them.
+func TestHostileRepeatedLiterals(t *testing.T) {
+	chunk := strings.Repeat("x", 10<<20)
+	f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+		if !strings.HasPrefix(cmd, "UID FETCH 1 BODY") {
+			return false
+		}
+		for i := 0; i < 5; i++ {
+			if _, err := fmt.Fprintf(conn, "* 1 FETCH (FLAGS {%d}\r\n%s)\r\n", len(chunk), chunk); err != nil {
+				return true
+			}
+		}
+		fmt.Fprintf(conn, "%s OK done\r\n", tag)
+		return true
+	}}
+	c := session(t, f)
+	f.msgs[1] = "small"
+	if _, err := c.Fetch(1); !errors.Is(err, ErrLimit) {
+		t.Fatalf("Fetch = %v, want ErrLimit", err)
+	}
+}
+
+// A body literal over MaxMessage is refused even when RFC822.SIZE lied.
+func TestLyingSize(t *testing.T) {
+	big := strings.Repeat("x", MaxMessage+10)
+	f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+		if !strings.HasPrefix(cmd, "UID FETCH 1 BODY") {
+			return false
+		}
+		fmt.Fprintf(conn, "* 1 FETCH (BODY[] {%d}\r\n%s)\r\n%s OK done\r\n", len(big), big, tag)
+		return true
+	}}
+	c := session(t, f)
+	f.msgs[1] = "small"
+	if _, err := c.Fetch(1); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("Fetch = %v, want ErrTooLarge", err)
+	}
+}
+
+func TestSizeRefusedBeforeFetch(t *testing.T) {
+	f := &fakeServer{}
+	c := session(t, f)
+	f.msgs[1] = strings.Repeat("x", MaxMessage+1)
+	if _, err := c.Fetch(1); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("Fetch = %v, want ErrTooLarge", err)
+	}
+	for _, cmd := range f.cmds {
+		if strings.Contains(cmd, "BODY.PEEK") {
+			t.Fatal("fetched the body of an oversized message")
+		}
+	}
+}
+
+func TestHugeSearch(t *testing.T) {
+	var b strings.Builder
+	for i := 1; i <= 20000; i++ {
+		fmt.Fprintf(&b, " %d", i)
+	}
+	f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+		if cmd != "UID SEARCH UNSEEN" {
+			return false
+		}
+		fmt.Fprintf(conn, "* SEARCH%s\r\n%s OK done\r\n", b.String(), tag)
+		return true
+	}}
+	c := session(t, f)
+	uids, err := c.Unseen()
+	if err != nil || len(uids) != MaxUnseen {
+		t.Fatalf("Unseen = %d uids, %v", len(uids), err)
+	}
+}
+
+func TestTooManyUntagged(t *testing.T) {
+	f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+		if cmd != "UID SEARCH UNSEEN" {
+			return false
+		}
+		for i := 0; i < maxUntagged+10; i++ {
+			fmt.Fprint(conn, "* OK noise\r\n")
+		}
+		fmt.Fprintf(conn, "%s OK done\r\n", tag)
+		return true
+	}}
+	c := session(t, f)
+	if _, err := c.Unseen(); !errors.Is(err, ErrLimit) {
+		t.Fatalf("Unseen = %v, want ErrLimit", err)
+	}
+}
+
+func TestEmptyBody(t *testing.T) {
+	for _, form := range []string{"NIL", `""`} {
+		f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+			if !strings.HasPrefix(cmd, "UID FETCH 1 BODY") {
+				return false
+			}
+			fmt.Fprintf(conn, "* 1 FETCH (UID 1 BODY[] %s)\r\n%s OK done\r\n", form, tag)
+			return true
+		}}
+		c := session(t, f)
+		f.msgs[1] = ""
+		if b, err := c.Fetch(1); err != nil || len(b) != 0 {
+			t.Fatalf("%s: Fetch = %q, %v", form, b, err)
 		}
 	}
 }

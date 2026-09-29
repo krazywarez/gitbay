@@ -18,14 +18,27 @@ import (
 	"time"
 )
 
-// MaxMessage is the largest message Fetch returns. A larger one is read
-// and discarded, and Fetch returns ErrTooLarge.
+// MaxMessage is the largest message Fetch returns; a larger one is
+// refused by its RFC822.SIZE before its body is fetched (ErrTooLarge).
 const MaxMessage = 10 << 20
 
-// maxLine bounds one response line outside literals.
-const maxLine = 1 << 20
+// Limits on what one command may make the client read. A server that
+// exceeds one has its connection closed and the command returns
+// ErrLimit.
+const (
+	cmdBudget   = MaxMessage + 1<<20 // bytes read for one command
+	maxUntagged = 1000               // untagged responses to one command
+	maxLine     = 1 << 20            // one response line outside literals
+)
 
-var ErrTooLarge = errors.New("message larger than the fetch limit")
+// MaxUnseen is the most UIDs Unseen returns; the rest wait for the next
+// poll.
+const MaxUnseen = 10000
+
+var (
+	ErrTooLarge = errors.New("message larger than the fetch limit")
+	ErrLimit    = errors.New("IMAP server exceeded a response limit; connection closed")
+)
 
 // rootCAs verifies the server's certificate; nil is the system pool.
 // Tests set it.
@@ -36,6 +49,7 @@ type Client struct {
 	conn net.Conn
 	r    *bufio.Reader
 	tag  int
+	left int64 // bytes the current command may still read
 }
 
 // Dial connects to addr (host:port) and reads the greeting. With
@@ -88,7 +102,9 @@ func New(conn net.Conn) *Client {
 func (c *Client) SetDeadline(t time.Time) error { return c.conn.SetDeadline(t) }
 
 func (c *Client) greeting() error {
-	line, _, err := c.readResponse()
+	c.left = cmdBudget
+	resp, err := c.readResponse()
+	line := resp.line
 	if err != nil {
 		return err
 	}
@@ -157,15 +173,34 @@ func (c *Client) Unseen() ([]uint32, error) {
 			if err != nil {
 				return nil, fmt.Errorf("UID SEARCH: bad uid %q", clip(s))
 			}
-			uids = append(uids, uint32(n))
+			if len(uids) < MaxUnseen {
+				uids = append(uids, uint32(n))
+			}
 		}
 	}
 	return uids, nil
 }
 
-// Fetch returns the whole message without setting \Seen.
+// Fetch returns the whole message without setting \Seen. A message
+// over MaxMessage is refused by its size first. A server answering
+// BODY[] with NIL or "" returns an empty message.
 func (c *Client) Fetch(uid uint32) ([]byte, error) {
-	untagged, err := c.cmd(fmt.Sprintf("UID FETCH %d BODY.PEEK[]", uid))
+	untagged, err := c.cmd(fmt.Sprintf("UID FETCH %d RFC822.SIZE", uid))
+	if err != nil {
+		return nil, fmt.Errorf("UID FETCH: %w", err)
+	}
+	for _, u := range untagged {
+		up := strings.ToUpper(u.line)
+		if i := strings.Index(up, "RFC822.SIZE "); i >= 0 && strings.Contains(up, " FETCH ") {
+			f := strings.Fields(strings.TrimRight(up[i+len("RFC822.SIZE "):], ")"))
+			if len(f) > 0 {
+				if n, err := strconv.ParseInt(strings.TrimRight(f[0], ")"), 10, 64); err == nil && n > MaxMessage {
+					return nil, ErrTooLarge
+				}
+			}
+		}
+	}
+	untagged, err = c.cmd(fmt.Sprintf("UID FETCH %d BODY.PEEK[]", uid))
 	if err != nil {
 		return nil, fmt.Errorf("UID FETCH: %w", err)
 	}
@@ -174,20 +209,16 @@ func (c *Client) Fetch(uid uint32) ([]byte, error) {
 		if len(f) < 3 || !strings.EqualFold(f[2], "FETCH") {
 			continue
 		}
-		// The literal is the one after BODY[]; a server may send other
-		// items (FLAGS, UID) around it.
-		i := strings.Index(strings.ToUpper(u.line), "BODY[] {")
-		if i < 0 {
-			continue
-		}
-		idx := strings.Count(u.line[:i], "{")
-		if idx >= len(u.literals) {
-			continue
-		}
-		if u.literals[idx] == nil {
+		if u.tooLarge {
 			return nil, ErrTooLarge
 		}
-		return u.literals[idx], nil
+		if u.body != nil {
+			return u.body, nil
+		}
+		up := strings.ToUpper(u.line)
+		if strings.Contains(up, "BODY[] NIL") || strings.Contains(up, `BODY[] ""`) {
+			return []byte{}, nil
+		}
 	}
 	return nil, fmt.Errorf("UID FETCH %d: no message body in the response", uid)
 }
@@ -207,24 +238,27 @@ func (c *Client) Close() error {
 }
 
 type response struct {
-	line     string   // the response with each literal's bytes left out
-	literals [][]byte // nil for a literal over MaxMessage
+	line     string // the response with each literal's bytes left out
+	body     []byte // the BODY[] literal, when the response carried one
+	tooLarge bool   // the BODY[] literal was over MaxMessage and not kept
 }
 
 // cmd sends one tagged command and collects the untagged responses up to
 // its completion. A NO or BAD completion is an error.
 func (c *Client) cmd(command string) ([]response, error) {
 	c.tag++
+	c.left = cmdBudget
 	tag := "g" + strconv.Itoa(c.tag)
 	if _, err := io.WriteString(c.conn, tag+" "+command+"\r\n"); err != nil {
 		return nil, err
 	}
 	var untagged []response
 	for {
-		line, lits, err := c.readResponse()
+		resp, err := c.readResponse()
 		if err != nil {
 			return nil, err
 		}
+		line := resp.line
 		if rest, ok := strings.CutPrefix(line, tag+" "); ok {
 			status, _, _ := strings.Cut(rest, " ")
 			if strings.EqualFold(status, "OK") {
@@ -236,41 +270,61 @@ func (c *Client) cmd(command string) ([]response, error) {
 			return nil, fmt.Errorf("server closed the session: %s", clip(line))
 		}
 		if strings.HasPrefix(line, "*") {
-			untagged = append(untagged, response{line, lits})
+			if len(untagged) >= maxUntagged {
+				return nil, c.limit()
+			}
+			untagged = append(untagged, resp)
 		}
 		// A "+" continuation is not expected: no command here sends a
 		// literal.
 	}
 }
 
+// limit closes a connection whose server exceeded a limit.
+func (c *Client) limit() error {
+	c.conn.Close()
+	return ErrLimit
+}
+
 // readResponse reads one response: a line, and for each literal it
 // announces ("{n}" at the end of a line) the n bytes and the rest of the
-// response after them.
-func (c *Client) readResponse() (string, [][]byte, error) {
+// response after them. Only the literal after "BODY[]" is kept; any
+// other is read and discarded. Everything read counts against the
+// command's budget.
+func (c *Client) readResponse() (response, error) {
 	var b strings.Builder
-	var lits [][]byte
+	var resp response
 	for {
 		line, err := c.readLine()
 		if err != nil {
-			return "", nil, err
+			return response{}, err
 		}
 		b.WriteString(line)
 		n, ok := literalSize(line)
 		if !ok {
-			return b.String(), lits, nil
+			resp.line = b.String()
+			return resp, nil
 		}
-		if n > MaxMessage {
+		if n > c.left {
+			return response{}, c.limit()
+		}
+		c.left -= n
+		prefix := strings.TrimRight(line[:strings.LastIndexByte(line, '{')], " ")
+		keep := resp.body == nil && !resp.tooLarge && strings.HasSuffix(strings.ToUpper(prefix), "BODY[]")
+		if !keep || n > MaxMessage {
 			if _, err := io.CopyN(io.Discard, c.r, n); err != nil {
-				return "", nil, err
+				return response{}, err
 			}
-			lits = append(lits, nil)
+			if keep {
+				resp.tooLarge = true
+			}
 			continue
 		}
 		buf := make([]byte, n)
 		if _, err := io.ReadFull(c.r, buf); err != nil {
-			return "", nil, err
+			return response{}, err
 		}
-		lits = append(lits, buf)
+		resp.body = buf
 	}
 }
 
@@ -282,8 +336,9 @@ func (c *Client) readLine() (string, error) {
 			return "", err
 		}
 		b = append(b, chunk...)
-		if len(b) > maxLine {
-			return "", errors.New("response line too long")
+		c.left -= int64(len(chunk)) + 2
+		if len(b) > maxLine || c.left < 0 {
+			return "", c.limit()
 		}
 		if !isPrefix {
 			return string(b), nil

@@ -297,6 +297,11 @@ type MailInbound struct {
 	// from: reply@example.org becomes reply+<token>@example.org, so the
 	// mailbox must receive plus-addressed mail for it (or a catch-all).
 	ReplyAddress string `toml:"reply_address"`
+	// TrustedAuthservID is the authserv-id the mail host writes in its
+	// Authentication-Results header. When set, a reply must carry DMARC
+	// pass, or an aligned DKIM pass, in the topmost such header. Only
+	// safe when the mail host removes incoming headers claiming its id.
+	TrustedAuthservID string `toml:"trusted_authserv_id"`
 }
 
 // DefaultInboundPoll is the poll interval when poll_interval is unset.
@@ -377,6 +382,9 @@ func (m MailInbound) validate() []error {
 		if d, err := time.ParseDuration(m.PollInterval); err != nil || d < 10*time.Second {
 			errs = append(errs, fmt.Errorf("mail.inbound.poll_interval %q must be a duration of at least 10s", m.PollInterval))
 		}
+	}
+	if id := m.TrustedAuthservID; id != "" && strings.ContainsAny(id, " \t;()\"\r\n") {
+		errs = append(errs, fmt.Errorf("mail.inbound.trusted_authserv_id %q must be a bare host name such as mx.google.com", id))
 	}
 	if a := m.ReplyAddress; a != "" {
 		local, domain, ok := strings.Cut(a, "@")

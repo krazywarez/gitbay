@@ -17,6 +17,8 @@ func init() {
 		ReadOnly: true, Run: runAdminMailInboundCheck})
 }
 
+const unauthenticatedWarning = "trusted_authserv_id is unset: a reply's From is not checked against the mail host's DMARC and DKIM results"
+
 // runAdminMailInboundCheck logs in to the [mail.inbound] mailbox and
 // opens it with EXAMINE, which changes no flag, so a check never marks a
 // reply seen before the poller reads it.
@@ -34,6 +36,7 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 		Mailbox  string `json:"mailbox,omitempty"`
 		Messages int    `json:"messages"`
 		Unseen   int    `json:"unseen"`
+		Warning  string `json:"warning,omitempty"`
 	}
 	if !in.Enabled {
 		return c.emit(out{}, func(w io.Writer) {
@@ -50,6 +53,10 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%s: %v", in.Addr(), err)
 	}
 	d := out{Enabled: true, Server: in.Addr(), Mailbox: in.MailboxName(), Messages: n, Unseen: len(unseen)}
+	if in.TrustedAuthservID == "" {
+		d.Warning = unauthenticatedWarning
+		fmt.Fprintln(c.Stderr, "warning: "+d.Warning)
+	}
 	return c.emit(d, func(w io.Writer) {
 		c.view(w).fields(
 			"server", d.Server,

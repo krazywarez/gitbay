@@ -81,14 +81,29 @@ func (p *Processor) Drain(mb Mailbox) error {
 		return err
 	}
 	for _, uid := range uids {
+		// A message that failed in earlier polls before it could be
+		// handled (a fetch the server cut off) is given up on unread.
+		if p.tries[uid] >= maxTries {
+			p.audit(0, "", "gave up after "+strconv.Itoa(maxTries)+" tries")
+			delete(p.tries, uid)
+			if err := mb.MarkSeen(uid); err != nil {
+				return err
+			}
+			continue
+		}
 		raw, err := mb.Fetch(uid)
 		var res Result
 		switch {
 		case errors.Is(err, imapc.ErrTooLarge):
 			res = refused("message larger than %d bytes", imapc.MaxMessage)
 			p.audit(0, "", res.Reason)
-		case err != nil:
+		case errors.Is(err, imapc.ErrLimit):
+			// The connection is closed; the message counts a try and
+			// the poll ends.
+			p.tries[uid]++
 			return err
+		case err != nil:
+			res = Result{Retry: true, Reason: "fetch: " + err.Error()}
 		default:
 			res = p.Handle(raw)
 		}
@@ -111,6 +126,9 @@ func (p *Processor) Drain(mb Mailbox) error {
 // Handle checks one message and posts it when every check passes.
 // Refusals are audited here.
 func (p *Processor) Handle(raw []byte) Result {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return p.refuse(0, "", "empty message")
+	}
 	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		return p.refuse(0, "", "unreadable message")
@@ -154,6 +172,11 @@ func (p *Processor) Handle(raw []byte) Result {
 	case u.Pending:
 		return p.refuse(u.ID, msgID, "account not active")
 	}
+	// Ids are reused after a hard delete: an account created after the
+	// token was minted is not the one it named.
+	if code := p.createdAfter("users", u.ID, target, msgID, "account"); code != nil {
+		return *code
+	}
 	// The token alone is not enough: the reply must come from one of
 	// the account's verified addresses.
 	from, err := msg.Header.AddressList("From")
@@ -166,6 +189,11 @@ func (p *Processor) Handle(raw []byte) Result {
 	}
 	if !ok {
 		return p.refuse(u.ID, msgID, "From is not a verified address of the account")
+	}
+	if id := p.Cfg.Mail.Inbound.TrustedAuthservID; id != "" {
+		if reason := authenticated(msg.Header, id, from[0].Address); reason != "" {
+			return p.refuse(u.ID, msgID, reason)
+		}
 	}
 	if on, err := p.St.ReplyEnabled(u.ID); err != nil {
 		return Result{Retry: true, Reason: err.Error()}
@@ -197,12 +225,18 @@ func (p *Processor) Handle(raw []byte) Result {
 	case err != nil:
 		return Result{Retry: true, Reason: err.Error()}
 	}
-
-	key := msgID
-	if key == "" {
-		sum := sha256.Sum256(raw)
-		key = "sha256:" + hex.EncodeToString(sum[:])
+	if code := p.createdAfter("repos", repo.ID, target, msgID, "repository"); code != nil {
+		return *code
 	}
+
+	// The claim names the thread and the account as well as the
+	// message, so one account's Message-ID cannot suppress another's.
+	id := msgID
+	if id == "" {
+		sum := sha256.Sum256(raw)
+		id = "sha256:" + hex.EncodeToString(sum[:])
+	}
+	key := fmt.Sprintf("%d/%s/%d/%d/%s", u.ID, target.Kind, target.RepoID, target.Number, id)
 	claimed, err := p.St.ClaimMailReply(key)
 	if err != nil {
 		return Result{Retry: true, Reason: err.Error()}
@@ -228,6 +262,21 @@ func (p *Processor) Handle(raw []byte) Result {
 	// Dispatch has audited a denied or not-found refusal already; this
 	// row says it came by mail and why.
 	return p.refuse(u.ID, msgID, "comment refused: "+reason)
+}
+
+// createdAfter refuses when the row was created after the token was
+// minted: a later account or repository that took a freed id. Created
+// times are compared to the second, the token's precision.
+func (p *Processor) createdAfter(table string, id int64, target mailreply.Target, msgID, what string) *Result {
+	created, err := p.St.CreatedAt(table, id)
+	if err != nil {
+		return &Result{Retry: true, Reason: err.Error()}
+	}
+	if created.Truncate(time.Second).After(target.Issued()) {
+		r := p.refuse(0, msgID, what+" created after the reply token was issued")
+		return &r
+	}
+	return nil
 }
 
 func (p *Processor) now() time.Time {

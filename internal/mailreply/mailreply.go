@@ -33,7 +33,14 @@ type Target struct {
 	RepoID int64
 	Kind   string // "issue" or "mr"
 	Number int64
+	// Expires is set by Verify; Mint takes the expiry separately.
+	Expires time.Time
 }
+
+// Issued is when the token was minted: every token is minted to expire
+// Lifetime later. An account or repository created after it is not the
+// one the token named, but a later row that took a freed id.
+func (t Target) Issued() time.Time { return t.Expires.Add(-Lifetime) }
 
 var (
 	ErrMalformed = errors.New("malformed reply token")
@@ -46,7 +53,7 @@ var (
 var enc = base32.StdEncoding.WithPadding(base32.NoPadding)
 
 // Mint returns the token for t, valid until expires, authenticated under
-// keys[0].
+// keys[0]. expires is the mint time plus Lifetime (Target.Issued).
 func Mint(keys [][]byte, t Target, expires time.Time) (string, error) {
 	if len(keys) == 0 {
 		return "", errors.New("no key to mint a reply token under")
@@ -67,7 +74,7 @@ func Mint(keys [][]byte, t Target, expires time.Time) (string, error) {
 	p = binary.AppendUvarint(p, uint64(t.UserID))
 	p = binary.AppendUvarint(p, uint64(t.RepoID))
 	p = binary.AppendUvarint(p, uint64(t.Number))
-	p = binary.AppendUvarint(p, uint64(expires.Unix()/3600))
+	p = binary.AppendUvarint(p, uint64(expires.Unix()))
 	p = append(p, mac(keys[0], p)...)
 	return strings.ToLower(enc.EncodeToString(p)), nil
 }
@@ -118,7 +125,8 @@ func Verify(keys [][]byte, token string, now time.Time) (Target, error) {
 		return Target{}, ErrMalformed
 	}
 	t.UserID, t.RepoID, t.Number = int64(v[0]), int64(v[1]), int64(v[2])
-	if !now.Before(time.Unix(int64(v[3])*3600, 0)) {
+	t.Expires = time.Unix(int64(v[3]), 0).UTC()
+	if !now.Before(t.Expires) {
 		return t, ErrExpired
 	}
 	return t, nil

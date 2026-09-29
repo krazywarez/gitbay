@@ -373,8 +373,8 @@ func TestNotifyReplyTo(t *testing.T) {
 			}
 			secrets, _ := ring.Derive(mailreply.Purpose)
 			target, err := mailreply.Verify(secrets, tok, time.Now())
-			want := mailreply.Target{UserID: bob, RepoID: repo.ID, Kind: tc.kind, Number: 1}
-			if err != nil || target != want {
+			want := mailreply.Target{UserID: bob, RepoID: repo.ID, Kind: tc.kind, Number: 1, Expires: target.Expires}
+			if err != nil || target != want || time.Since(target.Issued()) > time.Minute {
 				t.Fatalf("token names %+v, %v; want %+v", target, err, want)
 			}
 		})

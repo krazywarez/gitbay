@@ -15,7 +15,9 @@ func (s *Store) EnqueueMail(recipient, subject, body string) error {
 	return s.EnqueueMailReplyTo(recipient, "", subject, body)
 }
 
-// EnqueueMailReplyTo queues mail with a Reply-To address.
+// EnqueueMailReplyTo queues mail with a Reply-To address. The address
+// carries a reply token, so it is blanked once the row is sent or
+// dead-lettered.
 func (s *Store) EnqueueMailReplyTo(recipient, replyTo, subject, body string) error {
 	_, err := s.DB.Exec(
 		"INSERT INTO notifications (recipient, reply_to, subject, body) VALUES (?, ?, ?, ?)",
@@ -46,14 +48,14 @@ func (s *Store) DueMail(limit int) ([]QueuedMail, error) {
 
 func (s *Store) MarkMailSent(id int64) error {
 	_, err := s.DB.Exec(
-		"UPDATE notifications SET sent_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1 WHERE id = ?", id)
+		"UPDATE notifications SET sent_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1, reply_to = '' WHERE id = ?", id)
 	return err
 }
 
 func (s *Store) MarkMailFailed(id int64, errMsg string, nextAt *time.Time) error {
 	if nextAt == nil {
 		_, err := s.DB.Exec(
-			"UPDATE notifications SET failed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1, last_error = ? WHERE id = ?",
+			"UPDATE notifications SET failed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), attempts = attempts + 1, last_error = ?, reply_to = '' WHERE id = ?",
 			errMsg, id)
 		return err
 	}

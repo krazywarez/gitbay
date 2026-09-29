@@ -36,8 +36,12 @@ func TestRoundTrip(t *testing.T) {
 			t.Errorf("local part is %d octets", l)
 		}
 		got, err := Verify([][]byte{keyA}, tok, now)
+		tg.Expires = now.Add(Lifetime)
 		if err != nil || got != tg {
 			t.Errorf("Verify = %+v, %v; want %+v", got, err, tg)
+		}
+		if !got.Issued().Equal(now) {
+			t.Errorf("Issued = %v, want %v", got.Issued(), now)
 		}
 		// A mail system that upper-cases the local part does not break it.
 		if got, err := Verify([][]byte{keyA}, strings.ToUpper(tok), now); err != nil || got != tg {
@@ -84,6 +88,7 @@ func TestExpiry(t *testing.T) {
 		t.Fatalf("before expiry: %v", err)
 	}
 	got, err := Verify([][]byte{keyA}, tok, now.Add(Lifetime+time.Hour))
+	tg.Expires = now.Add(Lifetime)
 	if !errors.Is(err, ErrExpired) || got != tg {
 		t.Fatalf("after expiry: %+v, %v", got, err)
 	}

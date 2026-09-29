@@ -213,6 +213,9 @@ func serveCmd() *cobra.Command {
 				if _, err := in.Password(); err != nil {
 					return err
 				}
+				if in.TrustedAuthservID == "" {
+					slog.Warn("mail reply: [mail.inbound] trusted_authserv_id is unset, so a reply's From is not checked against the mail host's DMARC and DKIM results; set it on any instance reachable from the internet")
+				}
 				go (&mailin.Poller{P: &mailin.Processor{St: st, Cfg: cfg}, In: in}).Run(whCtx)
 			}
 			if cfg.Push.Enabled {

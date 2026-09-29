@@ -1,6 +1,7 @@
 package mailin
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -22,6 +23,7 @@ type fixture struct {
 	issueID int64
 	bob     int64
 	secrets [][]byte
+	issued  time.Time // when the fixture's tokens are minted
 }
 
 // setup is alice's public repository alice/app with issue #1, and bob,
@@ -84,13 +86,13 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	return &fixture{p: &Processor{St: st, Cfg: cfg}, st: st, repo: repo,
-		issueID: issueID, bob: bob, secrets: secrets}
+		issueID: issueID, bob: bob, secrets: secrets, issued: time.Now()}
 }
 
 func (f *fixture) token(t *testing.T, user int64) string {
 	t.Helper()
 	tok, err := mailreply.Mint(f.secrets, mailreply.Target{UserID: user, RepoID: f.repo.ID, Kind: "issue", Number: 1},
-		time.Now().Add(mailreply.Lifetime))
+		f.issued.Add(mailreply.Lifetime))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,8 +104,15 @@ var msgSeq int
 func (f *fixture) message(t *testing.T, from, body string) string {
 	t.Helper()
 	msgSeq++
-	return fmt.Sprintf("From: Bob <%s>\r\nTo: gitbay <%s>\r\nSubject: Re: [alice/app] #1: title\r\nMessage-ID: <m%d@example.test>\r\n"+
-		"Content-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", from, mailreply.Address(replyBase, f.token(t, f.bob)), msgSeq, body)
+	return f.messageAs(t, f.bob, from, fmt.Sprintf("<m%d@example.test>", msgSeq), "", body)
+}
+
+// messageAs is a reply from user's token with the given Message-ID and
+// extra header lines (each ending in CRLF).
+func (f *fixture) messageAs(t *testing.T, user int64, from, msgID, headers, body string) string {
+	t.Helper()
+	return fmt.Sprintf("%sFrom: Someone <%s>\r\nTo: gitbay <%s>\r\nSubject: Re: [alice/app] #1: title\r\nMessage-ID: %s\r\n"+
+		"Content-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", headers, from, mailreply.Address(replyBase, f.token(t, user)), msgID, body)
 }
 
 func (f *fixture) comments(t *testing.T) []store.IssueComment {
@@ -253,6 +262,7 @@ func TestRefusalLeavesNoClaim(t *testing.T) {
 type fakeMailbox struct {
 	msgs map[uint32][]byte
 	seen map[uint32]bool
+	errs map[uint32]error
 }
 
 func (m *fakeMailbox) Unseen() ([]uint32, error) {
@@ -266,6 +276,9 @@ func (m *fakeMailbox) Unseen() ([]uint32, error) {
 }
 
 func (m *fakeMailbox) Fetch(uid uint32) ([]byte, error) {
+	if err := m.errs[uid]; err != nil {
+		return nil, err
+	}
 	if m.msgs[uid] == nil {
 		return nil, imapc.ErrTooLarge
 	}
@@ -317,5 +330,157 @@ func TestDrainRetriesTransientFailure(t *testing.T) {
 	f.p.Drain(mb)
 	if !mb.seen[1] {
 		t.Fatal("not given up on")
+	}
+}
+
+// A repository id freed by a delete and taken by a later repository does
+// not accept replies meant for the old one.
+func TestReusedRepositoryID(t *testing.T) {
+	f := setup(t)
+	m := []byte(f.message(t, "bob@example.test", "hi"))
+	if err := f.st.DeleteRepo(f.repo.ID); err != nil {
+		t.Fatal(err)
+	}
+	alice, _ := f.st.UserByUsername("alice")
+	id, err := f.st.CreateRepo("user", alice.ID, "other", "public")
+	if err != nil || id != f.repo.ID {
+		t.Fatalf("new repository has id %d (%v), want the freed %d", id, err, f.repo.ID)
+	}
+	f.st.CreateIssue(id, alice.ID, "t", "", "md")
+	// Created after the token, as it would be outside a fast test.
+	f.st.DB.Exec("UPDATE repos SET created_at = ? WHERE id = ?",
+		time.Now().Add(5*time.Second).UTC().Format("2006-01-02T15:04:05.000Z"), id)
+	res := f.p.Handle(m)
+	if res.Posted || !strings.Contains(res.Reason, "repository created after the reply token") {
+		t.Fatalf("result %+v", res)
+	}
+	if !strings.Contains(f.refusalReasons(t), "repository created after") {
+		t.Fatal("refusal not audited")
+	}
+}
+
+func TestReusedUserID(t *testing.T) {
+	f := setup(t)
+	f.st.DB.Exec("UPDATE users SET created_at = ? WHERE id = ?",
+		time.Now().Add(5*time.Second).UTC().Format("2006-01-02T15:04:05.000Z"), f.bob)
+	res := f.p.Handle([]byte(f.message(t, "bob@example.test", "hi")))
+	if res.Posted || !strings.Contains(res.Reason, "account created after the reply token") {
+		t.Fatalf("result %+v", res)
+	}
+}
+
+// One account's Message-ID does not suppress another account's reply.
+func TestDedupePerAccount(t *testing.T) {
+	f := setup(t)
+	carol, err := f.st.CreateUser("carol", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.st.AddEmail(carol, "carol@example.test", "admin", true)
+	f.st.SetReplyEnabled(carol, true)
+	if res := f.p.Handle([]byte(f.messageAs(t, f.bob, "bob@example.test", "<same@x>", "", "from bob"))); !res.Posted {
+		t.Fatalf("bob: %+v", res)
+	}
+	if res := f.p.Handle([]byte(f.messageAs(t, carol, "carol@example.test", "<same@x>", "", "from carol"))); !res.Posted {
+		t.Fatalf("carol: %+v", res)
+	}
+	if n := len(f.comments(t)); n != 2 {
+		t.Fatalf("%d comments", n)
+	}
+}
+
+func TestEmptyMessage(t *testing.T) {
+	f := setup(t)
+	if res := f.p.Handle([]byte{}); res.Posted || res.Reason != "empty message" {
+		t.Fatalf("result %+v", res)
+	}
+}
+
+// A fetch that keeps failing counts tries for that message alone; the
+// rest of the mailbox is handled, and after maxTries the failing one is
+// marked seen and audited.
+func TestDrainFetchErrors(t *testing.T) {
+	f := setup(t)
+	mb := &fakeMailbox{seen: map[uint32]bool{},
+		msgs: map[uint32][]byte{1: []byte("x"), 2: []byte(f.message(t, "bob@example.test", "hi"))},
+		errs: map[uint32]error{1: errors.New("NO [UNAVAILABLE] try later")}}
+	for i := 1; i < maxTries; i++ {
+		if err := f.p.Drain(mb); err != nil {
+			t.Fatal(err)
+		}
+		if mb.seen[1] {
+			t.Fatalf("marked seen after %d tries", i)
+		}
+		if !mb.seen[2] {
+			t.Fatal("the next message was not handled")
+		}
+	}
+	f.p.Drain(mb)
+	if !mb.seen[1] || !strings.Contains(f.refusalReasons(t), "gave up after") {
+		t.Fatal("not given up on and audited")
+	}
+}
+
+// A fetch the server cut off ends the poll; the message is given up on
+// unread once it has cost maxTries polls.
+func TestDrainLimitEndsPoll(t *testing.T) {
+	f := setup(t)
+	mb := &fakeMailbox{seen: map[uint32]bool{}, msgs: map[uint32][]byte{1: []byte("x")},
+		errs: map[uint32]error{1: imapc.ErrLimit}}
+	for i := 0; i < maxTries; i++ {
+		if err := f.p.Drain(mb); !errors.Is(err, imapc.ErrLimit) {
+			t.Fatalf("poll %d: %v", i, err)
+		}
+	}
+	if err := f.p.Drain(mb); err != nil || !mb.seen[1] {
+		t.Fatalf("not given up on: %v", err)
+	}
+}
+
+func TestAuthenticationResults(t *testing.T) {
+	const id = "mx.example.net"
+	for _, tc := range []struct {
+		name, headers, from, reason string
+	}{
+		{"dmarc pass",
+			"Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=example.test; dmarc=pass (p=REJECT) header.from=example.test\r\n",
+			"bob@example.test", ""},
+		{"aligned dkim pass, gmail header.i",
+			"Authentication-Results: mx.example.net;\r\n dkim=pass header.i=@mail.example.test header.s=s1 header.b=abc\r\n",
+			"bob@example.test", ""},
+		{"dmarc fail",
+			"Authentication-Results: mx.example.net; dkim=fail header.d=example.test; dmarc=fail header.from=example.test\r\n",
+			"bob@example.test", "sender not authenticated"},
+		{"missing header", "", "bob@example.test", "no Authentication-Results from mx.example.net"},
+		{"spoofed lower header with the same id",
+			"Authentication-Results: mx.example.net; dmarc=fail header.from=example.test\r\nAuthentication-Results: mx.example.net; dmarc=pass header.from=example.test\r\n",
+			"bob@example.test", "sender not authenticated"},
+		{"other authserv only",
+			"Authentication-Results: evil.example; dmarc=pass header.from=example.test\r\n",
+			"bob@example.test", "no Authentication-Results from mx.example.net"},
+		{"misaligned dkim domain",
+			"Authentication-Results: mx.example.net; dkim=pass header.d=attacker.example; dmarc=none header.from=example.test\r\n",
+			"bob@example.test", "sender not authenticated"},
+		{"dmarc pass for another domain",
+			"Authentication-Results: mx.example.net; dmarc=pass header.from=attacker.example\r\n",
+			"bob@example.test", "sender not authenticated"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setup(t)
+			f.p.Cfg.Mail.Inbound.TrustedAuthservID = id
+			res := f.p.Handle([]byte(f.messageAs(t, f.bob, tc.from, "<a@x>", tc.headers, "hi")))
+			if tc.reason == "" {
+				if !res.Posted {
+					t.Fatalf("not posted: %+v", res)
+				}
+				return
+			}
+			if res.Posted || !strings.Contains(res.Reason, tc.reason) {
+				t.Fatalf("result %+v, want %q", res, tc.reason)
+			}
+			if !strings.Contains(f.refusalReasons(t), tc.reason) {
+				t.Fatal("refusal not audited")
+			}
+		})
 	}
 }
