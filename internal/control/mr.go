@@ -105,19 +105,23 @@ func init() {
 		Run:      runMRReady})
 	register(Command{Path: []string{"mr", "list"},
 		Summary: "list merge requests",
-		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--label <l>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]",
+		Usage:   "mr list <owner/name> [--state open|merged|closed|source_gone|all] [--label <l>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>] | mr list --query <name> | --q <query> [--limit <n>] [--cursor <c>]",
 		Flags: []Flag{
 			{"--state", "open|merged|closed|source_gone|all", "which merge requests", "open"},
 			{"--label", "<l>", "only MRs carrying this label", ""},
 			{"--author", "<user>", "only MRs opened by this user", ""},
 			{"--milestone", "<title>|none", "only MRs in this milestone, or in none", ""},
 			{"--search", "<text>", "match title and body", ""},
+			{"--query", "<name>", "a saved query, across repositories, in place of a repository and filters", ""},
+			{"--q", "<query>", "a query written out, as query save takes it", ""},
 			{"--limit", "<n>", "rows per page", ""},
 			{"--cursor", "<c>", "continue from the previous page", ""},
 		},
 		Examples: []string{
 			"mr list krz/gitbay --state open",
 			"mr list krz/gitbay --author cmc --state all",
+			"mr list --query reviews",
+			`mr list --q "repo:krz/* is:open author:@me"`,
 		},
 		ReadOnly: true, Run: runMRList})
 	register(Command{Path: []string{"mr", "show"},
@@ -619,6 +623,17 @@ func mrToOut(repo store.Repo, m store.MR, withBody bool) mrOut {
 }
 
 func runMRList(c *Ctx, args []string) int {
+	if usesQuery(args) {
+		args, p, code := parsePageFlags(c, args, "query", false)
+		if code >= 0 {
+			return code
+		}
+		fl, err := c.parseArgs(args, flagSpec{Values: []string{"--query", "--q", "--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
+		if err != nil {
+			return c.fail(protocol.ExitUsage, "%v", err)
+		}
+		return listByQuery(c, fl, "mr", p)
+	}
 	args, p, code := parsePageFlags(c, args, "mr", true)
 	if code >= 0 {
 		return code

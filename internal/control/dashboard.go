@@ -82,6 +82,8 @@ type DashboardOut struct {
 	Pinned   []PinnedOut      `json:"pinned"`
 	Activity []FeedOut        `json:"recent_activity"`
 	Builds   []DashboardBuild `json:"builds"`
+	// Queries is each pinned saved query with its first rows.
+	Queries []DashboardQuery `json:"queries"`
 	// Unread is the notification inbox badge, so a client showing one
 	// does not need a second read to fill it.
 	Unread int        `json:"unread"`
@@ -161,6 +163,9 @@ func runDashboard(c *Ctx, args []string) int {
 	for _, b := range builds {
 		d.Builds = append(d.Builds, DashboardBuild{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
 	}
+	if d.Queries, err = PinnedQueries(c.Store, c.User); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	d.Unread = c.Store.UnreadNotices(c.User.ID)
 	if c.User.IsAdmin {
 		d.Server = &ServerOut{Commit: buildinfo.String()}
@@ -217,6 +222,17 @@ func runDashboard(c *Ctx, args []string) int {
 		section("assigned to you:", itemHeader, itemRows(d.Assigned, "#"))
 		section("open merge requests:", itemHeader, itemRows(d.MRs, "!"))
 		section("open issues:", itemHeader, itemRows(d.Issues, "#"))
+		for _, q := range d.Queries {
+			rows := make([][]cell, 0, len(q.Items))
+			for _, it := range q.Items {
+				rows = append(rows, []cell{cRef(it.Ref()), cFlex(it.Title), cText(it.Author)})
+			}
+			title := fmt.Sprintf("query %s (%d):", q.Name, q.Count)
+			if q.Error != "" {
+				title = fmt.Sprintf("query %s: %s", q.Name, q.Error)
+			}
+			section(title, itemHeader, rows)
+		}
 
 		pinnedRows := make([][]cell, len(d.Pinned))
 		for i, p := range d.Pinned {

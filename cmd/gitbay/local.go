@@ -672,3 +672,13 @@ func gitRaw(env, stdin string, args ...string) (string, int) {
 	}
 	return string(out), 0
 }
+
+// anyFlag reports whether any of flags is in args.
+func anyFlag(args, flags []string) bool {
+	for _, f := range flags {
+		if hasFlag(args, f) {
+			return true
+		}
+	}
+	return false
+}

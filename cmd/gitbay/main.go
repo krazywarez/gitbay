@@ -59,6 +59,15 @@ func newRoot() *cobra.Command {
 		pass("feed", passOpts{server: []string{"feed"}}),
 		withShort(pass("explore", passOpts{server: []string{"explore"}}), "public repositories on this instance"),
 		withShort(pass("search", passOpts{server: []string{"search"}}), "find repositories, issues and merge requests"),
+		group("query", "saved issue and merge request queries across repositories",
+			pass("save", passOpts{server: []string{"query", "save"}}),
+			pass("list", passOpts{server: []string{"query", "list"}}),
+			pass("show", passOpts{server: []string{"query", "show"}}),
+			pass("run", passOpts{server: []string{"query", "run"}}),
+			pass("remove", passOpts{server: []string{"query", "remove"}}),
+			pass("pin", passOpts{server: []string{"query", "pin"}}),
+			pass("unpin", passOpts{server: []string{"query", "unpin"}}),
+		),
 		group("notifications", "your notification inbox",
 			pass("list", passOpts{server: []string{"notifications", "list"}}),
 			pass("read", passOpts{server: []string{"notifications", "read"}}),
@@ -159,7 +168,7 @@ type rootSection struct {
 }
 
 var rootSections = []rootSection{
-	{"WORK", []string{"issue", "mr", "build", "release", "milestone", "label", "search"}},
+	{"WORK", []string{"issue", "mr", "build", "release", "milestone", "label", "search", "query"}},
 	{"REPOSITORIES", []string{"repo", "wiki", "status", "webhook", "init"}},
 	{"YOU", []string{"dashboard", "feed", "notifications", "auth", "profile", "snippet", "web"}},
 	{"INSTANCE", []string{"org", "explore", "register", "migrate", "remote", "admin", "audit", "man"}},
@@ -213,6 +222,7 @@ const stdinWhat = "gitbay.stdin_what"
 type passOpts struct {
 	server      []string // server-side command path
 	needsRepo   bool     // prepend inferred owner/name unless given
+	crossRepo   []string // flags that span repositories: with one, no repository is inferred
 	stdinOK     bool     // wire local stdin through when --file - asks for it
 	alwaysStdin bool     // stdin is the payload, named by no flag: a bare redirect
 	// stdinWhat names the payload for the prompt shown when stdin is a
@@ -294,7 +304,7 @@ func runPass(o passOpts, cliPath string, args []string) int {
 		return protocol.ExitFailure
 	}
 	explicitRepo := len(args) > 0 && !strings.HasPrefix(args[0], "-") && strings.Contains(args[0], "/")
-	if o.needsRepo {
+	if o.needsRepo && !anyFlag(args, o.crossRepo) {
 		args, err = withRepo(t, args)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "gitbay:", err)
@@ -632,7 +642,7 @@ func repoCmd() *cobra.Command {
 func issueCmd() *cobra.Command {
 	return group("issue", "issues",
 		pass("create", passOpts{server: []string{"issue", "create"}, needsRepo: true, stdinOK: true, editor: "issue"}),
-		pass("list", passOpts{server: []string{"issue", "list"}, needsRepo: true}),
+		pass("list", passOpts{server: []string{"issue", "list"}, needsRepo: true, crossRepo: []string{"--query", "--q"}}),
 		pass("show", passOpts{server: []string{"issue", "show"}, needsRepo: true}),
 		pass("comment", passOpts{server: []string{"issue", "comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("close", passOpts{server: []string{"issue", "close"}, needsRepo: true}),
@@ -675,7 +685,7 @@ func mrCmd() *cobra.Command {
 	review.AddCommand(pass("request", passOpts{server: []string{"mr", "review", "request"}, needsRepo: true}))
 	return group("mr", "merge requests",
 		pass("create", passOpts{server: []string{"mr", "create"}, needsRepo: true, stdinOK: true, editor: "merge request", inferSource: true}),
-		pass("list", passOpts{server: []string{"mr", "list"}, needsRepo: true}),
+		pass("list", passOpts{server: []string{"mr", "list"}, needsRepo: true, crossRepo: []string{"--query", "--q"}}),
 		pass("show", passOpts{server: []string{"mr", "show"}, needsRepo: true}),
 		pass("diff", passOpts{server: []string{"mr", "diff"}, needsRepo: true}),
 		local("checkout", "fetch and check out the MR head locally: gitbay mr checkout <n>", cmdMRCheckout),

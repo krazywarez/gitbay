@@ -49,6 +49,7 @@ var nounSummaries = map[string]string{
 	"repo":          "create and manage repositories",
 	"runner":        "the claim/report loop CI runners use",
 	"search":        "find repositories, issues and merge requests",
+	"query":         "saved issue and merge request queries across repositories",
 	"snippet":       "shared text files, outside any repository",
 	"status":        "commit statuses (CI)",
 	"token":         "API tokens (minted over SSH, used with the JSON API)",

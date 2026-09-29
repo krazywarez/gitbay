@@ -35,7 +35,7 @@ func init() {
 		ReadsStdin: true, Run: runIssueCreate})
 	register(Command{Path: []string{"issue", "list"},
 		Summary: "list issues",
-		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>]",
+		Usage:   "issue list <owner/name> [--state open|closed|all] [--label <l>] [--assignee <user>] [--author <user>] [--milestone <title>|none] [--search <text>] [--limit <n>] [--cursor <c>] | issue list --query <name> | --q <query> [--limit <n>] [--cursor <c>]",
 		Flags: []Flag{
 			{"--state", "open|closed|all", "which issues", "open"},
 			{"--label", "<l>", "only issues carrying this label", ""},
@@ -43,12 +43,16 @@ func init() {
 			{"--author", "<user>", "only issues opened by this user", ""},
 			{"--milestone", "<title>|none", "only issues in this milestone, or in none", ""},
 			{"--search", "<text>", "match title and body", ""},
+			{"--query", "<name>", "a saved query, across repositories, in place of a repository and filters", ""},
+			{"--q", "<query>", "a query written out, as query save takes it", ""},
 			{"--limit", "<n>", "rows per page", ""},
 			{"--cursor", "<c>", "continue from the previous page", ""},
 		},
 		Examples: []string{
 			"issue list krz/gitbay --label bug --state all",
 			"issue list krz/gitbay --assignee cmc",
+			"issue list --query mine",
+			`issue list --q "owner:krz is:open assignee:@me"`,
 		},
 		ReadOnly: true, Run: runIssueList})
 	register(Command{Path: []string{"issue", "show"},
@@ -279,6 +283,17 @@ func runIssueCreate(c *Ctx, args []string) int {
 }
 
 func runIssueList(c *Ctx, args []string) int {
+	if usesQuery(args) {
+		args, p, code := parsePageFlags(c, args, "query", false)
+		if code >= 0 {
+			return code
+		}
+		fl, err := c.parseArgs(args, flagSpec{Values: []string{"--query", "--q", "--state", "--label", "--assignee", "--author", "--milestone", "--search"}, MaxPos: 1, Usage: c.Cmd.Usage})
+		if err != nil {
+			return c.fail(protocol.ExitUsage, "%v", err)
+		}
+		return listByQuery(c, fl, "issue", p)
+	}
 	args, p, code := parsePageFlags(c, args, "issue", true)
 	if code >= 0 {
 		return code
