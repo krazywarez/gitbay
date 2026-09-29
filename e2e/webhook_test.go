@@ -112,8 +112,8 @@ func TestWebhooks(t *testing.T) {
 
 	recv := startHookReceiver(t)
 	hookURL := "http://" + recv.addr + "/hook"
-	if _, errOut, code := inst.ssh(t, aliceKey, "",
-		"webhook", "add", "alice/proj", hookURL, "--secret", "s3cret"); code != 0 {
+	if _, errOut, code := inst.ssh(t, aliceKey, "s3cret\n",
+		"webhook", "add", "alice/proj", hookURL, "--secret", "-"); code != 0 {
 		t.Fatalf("webhook add: %s", errOut)
 	}
 

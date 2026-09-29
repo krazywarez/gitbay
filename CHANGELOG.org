@@ -6,8 +6,11 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
-- ~webhook add~'s ~--secret~ now reads the signing secret from stdin
-  (~--secret -~) instead of taking it as a command-line value (#284).
+- =webhook add= reads the signing secret from stdin with =--secret -=;
+  a value on the command line is refused, since argv shows in process
+  listings and shell history. A script that passed the value must pipe
+  it: =printf %s "$SECRET" | gitbay webhook add <repo> <url> --secret -=
+  (#284).
 - The builds page's status badge section gives an org-mode snippet
   beside the Markdown one, for a README.org (#299).
 - API tokens on the settings page: create with a scope and optional

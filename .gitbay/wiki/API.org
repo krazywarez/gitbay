@@ -150,12 +150,16 @@ Per-repository outbound POSTs for repository events. Managed by repo
 admins:
 
 #+begin_src sh
-gitbay webhook add <url> --secret s3cret [--events push,issue.created]  # default *
+printf %s "$SECRET" | gitbay webhook add <url> --secret - [--events push,issue.created]  # default *
 gitbay webhook list
 gitbay webhook deliveries [--limit 50]     # status, attempts, last error
 gitbay webhook redeliver <delivery-id>     # requeue, including dead letters
 gitbay webhook remove <id>
 #+end_src
+
+The signing secret is read from stdin with =--secret -=; a value on the
+command line is refused, since argv shows in process listings and shell
+history. Over the JSON API it goes in the request's =stdin= field.
 
 ** Events
 
