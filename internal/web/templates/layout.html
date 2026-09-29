@@ -235,6 +235,7 @@
     <input type="hidden" name="path" value="{{.Path}}">
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
     <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
+    {{if ne .Class "del"}}<p><label>From line <input type="number" name="start_line" min="1" max="{{.NewLine}}" placeholder="{{.NewLine}}"></label> to {{.NewLine}}; a <code>```suggestion</code> block proposes replacement lines</p>{{end}}
     <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
     <p><button type="submit" class="btn">Comment</button>
        <button type="submit" name="pending" value="on" class="btn">Add to review</button>
@@ -255,7 +256,7 @@
 {{define "thread"}}{{$t := .T}}<div class="thread{{if $t.Resolved}} resolved{{end}}{{if $t.Pending}} pending{{end}}{{if .Class}} {{.Class}}{{end}}" id="thread-{{$t.ID}}">
 {{if $t.Pending}}<p class="threadstate">pending — only you can see this until you submit your review</p>{{end}}
 {{if or $t.Resolved (and .Class $t.Stale)}}<p class="threadstate">{{if and .Class $t.Stale}}stale{{end}}{{if $t.Resolved}}{{if and .Class $t.Stale}} · {{end}}resolved by {{$t.Resolved}}{{end}}</p>{{end}}
-{{range $t.Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{end}}
+{{range $i, $c := $t.Comments}}<p class="commenthead"><strong>{{.Author}}</strong> <span class="when">{{when .CreatedAt}}</span></p><div class="rendered">{{.BodyHTML}}</div>{{if and (eq $i 0) $t.Suggestion}}{{template "suggestion" dict "S" $t.Suggestion "T" $t.ID "Base" $.Base}}{{end}}{{end}}
 {{if .Viewer}}<details class="threadreply"><summary>Reply</summary>
 <form method="post" action="{{.Base}}/diff-comment">
   <input type="hidden" name="reply" value="{{$t.ID}}">
@@ -264,3 +265,16 @@
 </form></details>{{end}}
 {{if $t.CanResolve}}<form method="post" action="{{.Base}}/thread" class="threadact"><input type="hidden" name="thread" value="{{$t.ID}}"><button type="submit" name="action" value="{{if $t.Resolved}}unresolve{{else}}resolve{{end}}" class="linklike">{{if $t.Resolved}}Reopen thread{{else}}Resolve thread{{end}}</button></form>{{end}}
 </div>{{end}}
+
+{{/* suggestion renders the lines a thread's suggestion replaces and the
+     ones it proposes, with the apply button, or the command to run where
+     the server cannot sign the commit. */}}
+{{define "suggestion"}}{{$s := .S}}<div class="suggestion">
+<p class="threadstate">{{if $s.Outdated}}outdated suggestion: {{$s.Reason}}{{else}}suggested change{{end}}</p>
+<div class="tablewrap"><table class="difftable">
+{{range $s.Old}}<tr class="del"><td class="ln">{{.N}}</td><td class="src">{{.Text}}</td></tr>
+{{end}}{{range $s.New}}<tr class="add"><td class="ln">{{.N}}</td><td class="src">{{.Text}}</td></tr>
+{{end}}</table></div>
+{{if and $s.CanApply (not $s.Outdated)}}{{if $s.Local}}<p class="threadstate">This repository requires signed commits, which the server cannot make. Apply it from a clone: <code>{{$s.Command}}</code></p>
+{{else}}<form method="post" action="{{.Base}}/suggestion" class="threadact"><input type="hidden" name="thread" value="{{.T}}"><button type="submit" class="btn">Apply suggestion</button></form>
+{{end}}{{end}}</div>{{end}}

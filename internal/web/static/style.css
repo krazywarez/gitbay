@@ -1293,6 +1293,8 @@ a.authorlink:hover { color: var(--link); }
 .thread textarea { width: 100%; }
 .thread.composing p, .thread details.threadreply p { margin: var(--sp-2) 0 0; }
 form.threadact { margin: var(--sp-1) 0 0; padding: 0 var(--sp-3) var(--sp-2); }
+.thread .suggestion { margin: var(--sp-2) 0 0; }
+.thread .suggestion table.difftable { margin: var(--sp-1) 0 0; }
 
 nav.subtabs {
   display: flex;

@@ -140,6 +140,13 @@ func (s *Server) mrDiffCommentSubmit(w http.ResponseWriter, r *http.Request, u s
 			return
 		}
 		extra = []string{"--path", path, "--line", line}
+		if start := strings.TrimSpace(r.FormValue("start_line")); start != "" {
+			if n, err := strconv.ParseInt(start, 10, 64); err != nil || n < 1 {
+				s.mrDiffRedirect(w, r, "the first line is a line number")
+				return
+			}
+			extra = append(extra, "--start-line", start)
+		}
 		if r.FormValue("side") == "old" {
 			extra = append(extra, "--old")
 		}
@@ -177,6 +184,17 @@ func (s *Server) mrThreadSubmit(w http.ResponseWriter, r *http.Request, u store.
 	}
 	_, msg, code := s.runControlCode(u, mrArgs(r, verb, id))
 	s.done(w, r, code, msg, s.mrRedirect)
+}
+
+// mrSuggestionSubmit commits a thread's suggestion to the source branch.
+func (s *Server) mrSuggestionSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
+	id := strings.TrimSpace(r.FormValue("thread"))
+	if _, err := strconv.ParseInt(id, 10, 64); err != nil {
+		s.mrDiffRedirect(w, r, "bad thread id")
+		return
+	}
+	_, msg, code := s.runControlCode(u, mrArgs(r, "apply-suggestion", id))
+	s.done(w, r, code, msg, s.mrDiffRedirect)
 }
 
 // mrNewPage is the create form: branches to choose from, plus whatever

@@ -39,6 +39,7 @@ import (
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/sig"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/suggest"
 	"gitbay.org/gitbay/internal/web"
 )
 
@@ -1494,6 +1495,38 @@ type diffThread struct {
 	Pending    bool
 	CanResolve bool
 	Comments   []renderedComment
+	Suggestion *suggestionView
+}
+
+// suggestionView is a thread's suggestion as the page shows it: the lines
+// it replaces and the ones it proposes, numbered from Start, and whether
+// the viewer can apply it here or needs the CLI.
+type suggestionView struct {
+	Start    int64
+	Old, New []suggestionLine
+	Outdated bool
+	Reason   string
+	Local    bool   // the repositories require signed commits: apply from a clone
+	CanApply bool   // the viewer can push to the source branch of an open MR
+	Command  string // the CLI command that applies it
+}
+
+type suggestionLine struct {
+	N    int64
+	Text string
+}
+
+// newSuggestionView lays out s for the page.
+func newSuggestionView(s *control.SuggestionOut, canApply bool, command string) *suggestionView {
+	v := &suggestionView{Start: s.StartLine, Outdated: s.Outdated, Reason: s.Reason,
+		Local: s.Apply == "local", CanApply: canApply, Command: command}
+	for i, l := range suggest.FromText(strings.ReplaceAll(s.Original, "\r\n", "\n")) {
+		v.Old = append(v.Old, suggestionLine{s.StartLine + int64(i), l})
+	}
+	for i, l := range suggest.FromText(s.Replacement) {
+		v.New = append(v.New, suggestionLine{s.StartLine + int64(i), l})
+	}
+	return v
 }
 
 // reviewRights decides which thread controls a viewer sees. mr resolve
@@ -1511,8 +1544,10 @@ func (r reviewRights) canResolve(threadAuthor string) bool {
 
 // attachThreads injects review threads under their anchored diff lines;
 // threads whose anchor no longer appears (stale after force-push, or on a
-// context line outside the current diff) are returned separately.
-func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md ugcRenderer, rights reviewRights) ([]diffFile, []diffThread) {
+// context line outside the current diff) are returned separately. A
+// thread root in suggestions renders its suggestion as a diff, and its
+// body without the block.
+func attachThreads(files []diffFile, comments []store.DiffComment, headSHA string, md ugcRenderer, rights reviewRights, suggestions map[int64]*suggestionView) ([]diffFile, []diffThread) {
 	type anchor struct {
 		path string
 		side string
@@ -1525,10 +1560,15 @@ func attachThreads(files []diffFile, comments []store.DiffComment, headSHA strin
 	var order []int64
 	for _, cm := range comments {
 		if cm.ReplyTo == 0 {
+			body := cm.Body
+			if suggestions[cm.ID] != nil {
+				body = suggest.Strip(body)
+			}
 			threads[cm.ID] = &diffThread{ID: cm.ID, Resolved: cm.ResolvedBy, Stale: cm.HeadSHA != headSHA,
 				Pending:    cm.Pending,
 				CanResolve: rights.canResolve(cm.Author),
-				Comments:   []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(cm.Body, "md")}}}
+				Suggestion: suggestions[cm.ID],
+				Comments:   []renderedComment{{Author: cm.Author, CreatedAt: cm.CreatedAt, BodyHTML: md(body, "md")}}}
 			anchors[cm.ID] = anchor{cm.Path, cm.Side, cm.Line}
 			order = append(order, cm.ID)
 		} else if th, ok := threads[cm.ReplyTo]; ok {
@@ -2186,9 +2226,25 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 	}
 	md := s.ugcFor(r, p.Repo)
 	canWrite := s.canWriteRepo(r, p.Repo)
+	// Applying a suggestion pushes to the source branch, so the button
+	// follows write on the source repository, which for a fork is not
+	// the one this page is in.
+	canApply := false
+	if p.Viewer != "" && m.State == "open" {
+		if src, err := s.st.RepoByID(m.SourceRepoID); err == nil {
+			canApply = s.canWriteRepo(r, src)
+		}
+	}
+	suggestions := map[int64]*suggestionView{}
+	for _, cm := range diffComments {
+		if sg := control.ThreadSuggestion(s.st, s.cfg.Server.Root, p.Repo, m, cm); sg != nil {
+			suggestions[cm.ID] = newSuggestionView(sg, canApply && !cm.Pending,
+				fmt.Sprintf("gitbay mr apply-suggestion %s %d %d", p.Repo.Path(), m.Number, cm.ID))
+		}
+	}
 	var detachedThreads []diffThread
 	files, detachedThreads = attachThreads(files, diffComments, m.HeadSHA, md,
-		reviewRights{Viewer: p.Viewer, MRAuthor: m.Author, Write: canWrite})
+		reviewRights{Viewer: p.Viewer, MRAuthor: m.Author, Write: canWrite}, suggestions)
 	if p.Viewer != "" {
 		markCompose(files, r.URL.Query())
 	}
