@@ -95,6 +95,7 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 	mailOn, _ := s.st.MailEnabled(u.ID)
 	watchOn, _ := s.st.WatchEnabled(u.ID)
 	pushOn, _ := s.st.PushEnabled(u.ID)
+	replyOn, _ := s.st.ReplyEnabled(u.ID)
 	theme, _ := s.st.Theme(u.ID)
 	diffPref, _ := s.st.DiffLayout(u.ID)
 
@@ -148,6 +149,8 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 		MailOn       bool
 		WatchOn      bool
 		PushOn       bool
+		ReplyOn      bool
+		ReplyOffered bool // the instance reads replies to its mail
 		Devices      []accountDevice
 		ThemeSetting string // system, light or dark: the form's selected option
 		DiffSetting  string // unified or split: the form's selected option
@@ -156,7 +159,8 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 		Reauth       bool   // Notice is the stale-session refusal: link to sign in
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
 		aboutRepo, aboutEdit, s.cfg.SiteHost(),
-		notice, r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme, diffPref,
+		notice, r.URL.Query().Get("m"), mailOn, watchOn, pushOn,
+		replyOn, s.cfg.Mail.Inbound.Enabled, devices, theme, diffPref,
 		tokens, tokenShown, reauth})
 }
 
@@ -350,7 +354,7 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "diff layout saved")
-	case "notify-mail", "notify-watch", "notify-push":
+	case "notify-mail", "notify-watch", "notify-push", "notify-reply":
 		pref := strings.TrimPrefix(r.FormValue("field"), "notify-")
 		state := "off"
 		if r.FormValue(pref) == "on" {

@@ -30,6 +30,7 @@ import (
 	"gitbay.org/gitbay/internal/gitd"
 	"gitbay.org/gitbay/internal/hookd"
 	"gitbay.org/gitbay/internal/httpd"
+	"gitbay.org/gitbay/internal/mailin"
 	"gitbay.org/gitbay/internal/mirror"
 	"gitbay.org/gitbay/internal/notify"
 	"gitbay.org/gitbay/internal/packlimit"
@@ -205,6 +206,14 @@ func serveCmd() *cobra.Command {
 			go webhook.New(st, cfg.Webhooks.AllowLocal, retryBase).Run(whCtx)
 			if cfg.Mail.SMTPHost != "" {
 				go notify.New(st, cfg, retryBase).Run(whCtx)
+			}
+			if in := cfg.Mail.Inbound; in.Enabled {
+				// An unreadable password file is a misconfiguration:
+				// refuse to start rather than poll and fail every tick.
+				if _, err := in.Password(); err != nil {
+					return err
+				}
+				go (&mailin.Poller{P: &mailin.Processor{St: st, Cfg: cfg}, In: in}).Run(whCtx)
 			}
 			if cfg.Push.Enabled {
 				p, err := push.New(st, cfg.Push, cfg.Server.SiteURL, retryBase)

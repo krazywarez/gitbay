@@ -411,3 +411,55 @@ func TestBackupRecipients(t *testing.T) {
 		t.Fatalf("default: %v, %v", cfg.Backup, err)
 	}
 }
+
+func TestMailInbound(t *testing.T) {
+	const smtp = "\n[mail]\nsmtp_host = \"mx.example\"\nfrom = \"gitbay@example\"\n"
+	const inbound = "[mail.inbound]\nenabled = true\nimap_host = \"imap.example\"\nuser = \"reply@example\"\npassword_file = \"/etc/gitbay/imap.pass\"\nreply_address = \"reply@gitbay.example\"\n"
+	cfg, err := Load(writeConfig(t, minimal+smtp+inbound))
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := cfg.Mail.Inbound
+	if in.Addr() != "imap.example:993" || in.MailboxName() != "INBOX" || in.Poll() != DefaultInboundPoll {
+		t.Fatalf("defaults: %q %q %v", in.Addr(), in.MailboxName(), in.Poll())
+	}
+	in.TLS = "starttls"
+	if in.Addr() != "imap.example:143" {
+		t.Fatalf("starttls default port: %q", in.Addr())
+	}
+	for body, want := range map[string]string{
+		minimal + inbound: "requires [mail] smtp_host",
+		minimal + smtp + inbound + "tls = \"none\"\n":                                                  "IMAP in clear is not supported",
+		minimal + smtp + inbound + "poll_interval = \"1s\"\n":                                          "poll_interval",
+		minimal + smtp + "[mail.inbound]\nenabled = true\n":                                            "mail.inbound.password_file is required",
+		minimal + smtp + strings.Replace(inbound, "reply@gitbay.example", "reply+x@gitbay.example", 1): "no + in it",
+		minimal + smtp + strings.Replace(inbound, "reply@gitbay.example", "gitbay.example", 1):         "bare address",
+		minimal + smtp + inbound + "password = \"x\"\n":                                                "unknown config key",
+	} {
+		if _, err := Load(writeConfig(t, body)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("want %q, got %v\n%s", want, err, body)
+		}
+	}
+	// Off, nothing is required.
+	if _, err := Load(writeConfig(t, minimal+"\n[mail.inbound]\nenabled = false\n")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMailInboundPassword(t *testing.T) {
+	dir := t.TempDir()
+	in := MailInbound{PasswordFile: dir + "/pass"}
+	os.WriteFile(in.PasswordFile, []byte("hunter2\n"), 0o600)
+	if p, err := in.Password(); err != nil || p != "hunter2" {
+		t.Fatalf("Password = %q, %v", p, err)
+	}
+	os.Chmod(in.PasswordFile, 0o644)
+	if _, err := in.Password(); err == nil || strings.Contains(err.Error(), "hunter2") {
+		t.Fatalf("group-readable file: %v", err)
+	}
+	os.WriteFile(in.PasswordFile, []byte("a\nb\n"), 0o600)
+	os.Chmod(in.PasswordFile, 0o600)
+	if _, err := in.Password(); err == nil {
+		t.Fatal("two lines accepted")
+	}
+}

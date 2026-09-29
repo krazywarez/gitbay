@@ -232,3 +232,34 @@ func TestReadKeysRefusesDuplicatesDirectoriesAndLargeFiles(t *testing.T) {
 		t.Error("read a file over the size limit")
 	}
 }
+
+// Derive lists the current key's derivation first and keeps the retired
+// key's, and differs by purpose.
+func TestDerive(t *testing.T) {
+	old, cur := newKey(t), newKey(t)
+	one, err := Load(keyFile(t, old))
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := Load(keyFile(t, old, cur))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := one.Derive("p")
+	if err != nil || len(a) != 1 || len(a[0]) != 32 {
+		t.Fatalf("Derive = %x, %v", a, err)
+	}
+	b, err := two.Derive("p")
+	if err != nil || len(b) != 2 {
+		t.Fatalf("Derive = %x, %v", b, err)
+	}
+	if string(b[1]) != string(a[0]) || string(b[0]) == string(a[0]) {
+		t.Fatal("rotated ring does not list the current key first and the old one after")
+	}
+	if c, _ := one.Derive("q"); string(c[0]) == string(a[0]) {
+		t.Fatal("two purposes derived the same key")
+	}
+	if _, err := one.Derive(""); err == nil {
+		t.Fatal("empty purpose accepted")
+	}
+}

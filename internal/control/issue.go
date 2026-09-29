@@ -14,6 +14,9 @@ import (
 
 const maxBodyBytes = 64 << 10
 
+// MaxCommentBytes is the most of a comment body a command reads.
+const MaxCommentBytes = maxBodyBytes
+
 func init() {
 	register(Command{Path: []string{"issue", "create"},
 		Summary: "open an issue",
@@ -250,7 +253,7 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, n))
 	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
-		notify(c, targets, notice{repo: repo, kind: "issue",
+		notify(c, targets, notice{repo: repo, kind: "issue", number: n,
 			subject: issueSubject(repo, n, title),
 			action:  fmt.Sprintf("opened issue #%d", n),
 			excerpt: b, path: fmt.Sprintf("%s/issues/%d", repo.Path(), n)})
@@ -429,7 +432,7 @@ func setIssueState(c *Ctx, args []string, state string) int {
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue."+state, fmt.Sprintf(`{"number":%d}`, issue.Number))
 	if parts, err := c.Store.IssueParticipants(issue.ID); err == nil {
 		verb := map[string]string{"open": "reopened", "closed": "closed"}[state]
-		notify(c, parts, notice{repo: repo, kind: "issue",
+		notify(c, parts, notice{repo: repo, kind: "issue", number: issue.Number,
 			subject: issueSubject(repo, issue.Number, issue.Title),
 			action:  fmt.Sprintf("%s #%d", verb, issue.Number),
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
@@ -509,7 +512,7 @@ func runIssueEdit(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "issue.edited", fmt.Sprintf(`{"number":%d}`, issue.Number))
 	if parts, err := c.Store.IssueParticipants(issue.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "issue",
+		notify(c, parts, notice{repo: repo, kind: "issue", number: issue.Number,
 			subject: issueSubject(repo, issue.Number, issue.Title),
 			action:  fmt.Sprintf("edited #%d", issue.Number),
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
@@ -674,7 +677,7 @@ func assignIssue(c *Ctx, repo store.Repo, issue store.Issue, adds, removes []sto
 		// and widening it to watchers would tell them "assigned you".
 		// Removals file nothing, and notify drops the actor, so assigning
 		// yourself is silent.
-		notify(c, added, notice{repo: repo, kind: "issue", direct: true,
+		notify(c, added, notice{repo: repo, kind: "issue", number: issue.Number, direct: true,
 			subject: issueSubject(repo, issue.Number, issue.Title),
 			action:  fmt.Sprintf("assigned you to #%d", issue.Number),
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})

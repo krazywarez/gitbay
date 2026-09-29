@@ -140,3 +140,26 @@ func TestImplicitTLS(t *testing.T) {
 		t.Fatalf("delivered %d, want 1", n)
 	}
 }
+
+func TestReplyToHeader(t *testing.T) {
+	relay := startRelay(t, nil)
+	cfg := mailCfg(relay.addr)
+	if err := SendReplyTo(cfg, "a@example.test", "reply+tok@example.test", "subject", "body"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Send(cfg, "a@example.test", "subject", "body"); err != nil {
+		t.Fatal(err)
+	}
+	relay.mu.Lock()
+	with, without := relay.data[0], relay.data[1]
+	relay.mu.Unlock()
+	if !strings.Contains(with, "\nReply-To: reply+tok@example.test\n") {
+		t.Fatalf("no Reply-To:\n%s", with)
+	}
+	if strings.Contains(without, "Reply-To:") {
+		t.Fatalf("Send added a Reply-To:\n%s", without)
+	}
+	if err := SendReplyTo(cfg, "a@example.test", "x@example.test\r\nBcc: b@example.test", "s", "b"); err == nil {
+		t.Fatal("a line break in the reply address was sent")
+	}
+}

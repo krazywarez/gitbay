@@ -6,8 +6,10 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/autolink"
+	"gitbay.org/gitbay/internal/mailreply"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -42,6 +44,11 @@ func init() {
 		Usage:    "notifications settings mail on|off",
 		Examples: []string{"notifications settings mail on"},
 		Run:      runNotificationsSettingsMail})
+	register(Command{Path: []string{"notifications", "settings", "reply"},
+		Summary:  "reply to issue and merge request mail to comment",
+		Usage:    "notifications settings reply on|off",
+		Examples: []string{"notifications settings reply on"},
+		Run:      runNotificationsSettingsReply})
 	register(Command{Path: []string{"notifications", "settings", "watch"},
 		Summary:  "every issue and merge request on repositories you can write to",
 		Usage:    "notifications settings watch on|off",
@@ -96,6 +103,7 @@ func init() {
 type notice struct {
 	repo    store.Repo
 	kind    string // issue, mr, or build
+	number  int64  // the issue or merge request; 0 for a build
 	subject string // mail subject
 	action  string // "opened issue #12" — also the inbox summary
 	excerpt string // quoted into the mail, not the inbox
@@ -136,8 +144,41 @@ func notify(c *Ctx, userIDs []int64, n notice) {
 		if err != nil || email == "" {
 			continue
 		}
+		if replyTo := replyAddress(c, id, n); replyTo != "" {
+			c.Store.EnqueueMailReplyTo(email, replyTo, n.subject, body+replyFooter)
+			continue
+		}
 		c.Store.EnqueueMail(email, n.subject, body)
 	}
+}
+
+// replyFooter ends mail that carries a reply address.
+const replyFooter = "\nReply to this mail to comment. Replies are accepted from your verified addresses.\n"
+
+// replyAddress is the Reply-To for recipient's mail about n (#295): an
+// address carrying a token for the recipient and the thread, when the
+// instance polls for replies and the recipient turned replies on. ""
+// otherwise, or when no token can be minted.
+func replyAddress(c *Ctx, recipient int64, n notice) string {
+	in := c.Cfg.Mail.Inbound
+	keys := c.Store.Keyring()
+	if !in.Enabled || keys == nil || n.number == 0 || (n.kind != "issue" && n.kind != "mr") {
+		return ""
+	}
+	if on, err := c.Store.ReplyEnabled(recipient); err != nil || !on {
+		return ""
+	}
+	secrets, err := keys.Derive(mailreply.Purpose)
+	if err != nil {
+		return ""
+	}
+	tok, err := mailreply.Mint(secrets, mailreply.Target{
+		UserID: recipient, RepoID: n.repo.ID, Kind: n.kind, Number: n.number,
+	}, time.Now().Add(mailreply.Lifetime))
+	if err != nil {
+		return ""
+	}
+	return mailreply.Address(in.ReplyAddress, tok)
 }
 
 // notifyMentions files an inbox row for every account text mentions by
@@ -170,7 +211,7 @@ func notifyMentions(c *Ctx, repo store.Repo, t thread, itemID, number int64, tit
 		return
 	}
 	c.Store.AddMentions(repo.ID, t.kind, itemID, ids)
-	notify(c, ids, notice{repo: repo, kind: t.kind, direct: true,
+	notify(c, ids, notice{repo: repo, kind: t.kind, number: number, direct: true,
 		subject: fmt.Sprintf("[%s] %s%d: %s", repo.Path(), t.symbol, number, title),
 		action:  fmt.Sprintf("mentioned you in %s%d", t.symbol, number),
 		excerpt: text, path: fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)})
@@ -223,7 +264,11 @@ func emitNotificationSettings(c *Ctx) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]bool{"mail": mail, "watch": watch, "push": push}, func(w io.Writer) {
+	reply, err := c.Store.ReplyEnabled(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return c.emit(map[string]bool{"mail": mail, "watch": watch, "push": push, "reply": reply}, func(w io.Writer) {
 		onOff := func(on bool) string {
 			if on {
 				return "on"
@@ -233,6 +278,7 @@ func emitNotificationSettings(c *Ctx) int {
 		v := c.view(w)
 		v.fields(
 			"mail", onOff(mail),
+			"reply", onOff(reply),
 			"watch", onOff(watch),
 			"push", onOff(push),
 		)
@@ -253,6 +299,24 @@ func runNotificationsSettingsMail(c *Ctx, args []string) int {
 		return c.usage()
 	}
 	if err := c.Store.SetMailEnabled(c.User.ID, args[0] == "on"); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return emitNotificationSettings(c)
+}
+
+// runNotificationsSettingsReply turns on a Reply-To on the account's
+// issue and merge request mail (#295). Turning it on is refused where
+// nothing reads the replies.
+func runNotificationsSettingsReply(c *Ctx, args []string) int {
+	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
+		return c.usage()
+	}
+	on := args[0] == "on"
+	if on && !c.Cfg.Mail.Inbound.Enabled {
+		return c.fail(protocol.ExitFailure,
+			"this instance does not read replies to its mail ([mail.inbound] enabled = false); ask an admin")
+	}
+	if err := c.Store.SetReplyEnabled(c.User.ID, on); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return emitNotificationSettings(c)

@@ -541,3 +541,39 @@ func TestNotificationsReadDispatches(t *testing.T) {
 		t.Fatalf("unread after all = %d, want 0", n)
 	}
 }
+
+// The reply toggle is offered only where the instance reads replies, and
+// posting it dispatches notifications settings reply (#295).
+func TestAccountNotifyReply(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	page := func(s *Server) string {
+		rr := httptest.NewRecorder()
+		s.accountPage(rr, httptest.NewRequest("GET", "/settings", nil), u)
+		return rr.Body.String()
+	}
+	if strings.Contains(page(New(config.Default(), st, nil)), `value="notify-reply"`) {
+		t.Fatal("reply toggle offered without [mail.inbound]")
+	}
+	cfg := config.Default()
+	cfg.Mail.Inbound.Enabled = true
+	s := New(cfg, st, nil)
+	if !strings.Contains(page(s), `value="notify-reply"`) {
+		t.Fatal("no reply toggle")
+	}
+	submitAccountForm(t, s, u, url.Values{"field": {"notify-reply"}, "reply": {"on"}})
+	if on, err := st.ReplyEnabled(uid); err != nil || !on {
+		t.Fatalf("ReplyEnabled after notify-reply=on: %v %v", on, err)
+	}
+}

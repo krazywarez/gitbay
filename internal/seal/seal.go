@@ -10,7 +10,9 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -180,6 +182,8 @@ type Keyring struct {
 	fi   os.FileInfo
 	cur  string
 	aead map[string]cipher.AEAD
+	// secrets holds every key's secret, the current key's first.
+	secrets [][]byte
 }
 
 // Load reads the key file at path and returns a Keyring over it. It
@@ -206,6 +210,10 @@ func (k *Keyring) refresh() error {
 		return err
 	}
 	aead := make(map[string]cipher.AEAD, len(keys))
+	secrets := make([][]byte, 0, len(keys))
+	for i := len(keys) - 1; i >= 0; i-- {
+		secrets = append(secrets, keys[i].Secret)
+	}
 	for _, key := range keys {
 		block, err := aes.NewCipher(key.Secret)
 		if err != nil {
@@ -217,8 +225,30 @@ func (k *Keyring) refresh() error {
 		}
 		aead[key.ID] = g
 	}
-	k.fi, k.cur, k.aead = fi, keys[len(keys)-1].ID, aead
+	k.fi, k.cur, k.aead, k.secrets = fi, keys[len(keys)-1].ID, aead, secrets
 	return nil
+}
+
+// Derive returns a 32-byte key for purpose from every key in the file,
+// the current key's first: HMAC-SHA256 of purpose under each secret. A
+// value authenticated under the first still verifies under the others
+// after a rotation, while the retired key stays in the file.
+func (k *Keyring) Derive(purpose string) ([][]byte, error) {
+	if purpose == "" {
+		return nil, errors.New("seal: a purpose is required")
+	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if err := k.refresh(); err != nil {
+		return nil, err
+	}
+	out := make([][]byte, 0, len(k.secrets))
+	for _, s := range k.secrets {
+		m := hmac.New(sha256.New, s)
+		m.Write([]byte(purpose))
+		out = append(out, m.Sum(nil))
+	}
+	return out, nil
 }
 
 // CurrentID is the id of the key that seals new values.

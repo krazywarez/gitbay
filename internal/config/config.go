@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -273,6 +274,117 @@ type Mail struct {
 	// TLS is "starttls" (the default, also when empty) or "implicit":
 	// TLS from the first byte, as relays on port 465 expect.
 	TLS string `toml:"tls,omitempty"`
+	// Inbound polls a mailbox for replies to notification mail (#295).
+	Inbound MailInbound `toml:"inbound"`
+}
+
+// MailInbound is the IMAP mailbox replies to notification mail arrive
+// in. Off unless enabled. The connection is always encrypted; there is
+// no setting for plaintext.
+type MailInbound struct {
+	Enabled bool `toml:"enabled"`
+	// IMAPHost is host:port; the port defaults to 993 with tls =
+	// "implicit" (the default) and 143 with tls = "starttls".
+	IMAPHost string `toml:"imap_host"`
+	TLS      string `toml:"tls"`
+	User     string `toml:"user"`
+	// PasswordFile holds the mailbox password, read at each connection.
+	// Never inline in this file.
+	PasswordFile string `toml:"password_file"`
+	Mailbox      string `toml:"mailbox"`       // default INBOX
+	PollInterval string `toml:"poll_interval"` // default 1m
+	// ReplyAddress is the address a notification's Reply-To is built
+	// from: reply@example.org becomes reply+<token>@example.org, so the
+	// mailbox must receive plus-addressed mail for it (or a catch-all).
+	ReplyAddress string `toml:"reply_address"`
+}
+
+// DefaultInboundPoll is the poll interval when poll_interval is unset.
+const DefaultInboundPoll = time.Minute
+
+// Poll is the configured poll interval.
+func (m MailInbound) Poll() time.Duration {
+	if d, err := time.ParseDuration(m.PollInterval); err == nil && d > 0 {
+		return d
+	}
+	return DefaultInboundPoll
+}
+
+// Addr is IMAPHost with the default port filled in.
+func (m MailInbound) Addr() string {
+	if _, _, err := net.SplitHostPort(m.IMAPHost); err == nil {
+		return m.IMAPHost
+	}
+	if m.TLS == "starttls" {
+		return net.JoinHostPort(m.IMAPHost, "143")
+	}
+	return net.JoinHostPort(m.IMAPHost, "993")
+}
+
+// MailboxName is Mailbox, INBOX when unset.
+func (m MailInbound) MailboxName() string {
+	if m.Mailbox == "" {
+		return "INBOX"
+	}
+	return m.Mailbox
+}
+
+// Password reads PasswordFile: its first line, which must be all it
+// holds. The file must be readable by its owner alone.
+func (m MailInbound) Password() (string, error) {
+	f, err := os.Open(m.PasswordFile)
+	if err != nil {
+		return "", fmt.Errorf("mail.inbound.password_file: %w", err)
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("mail.inbound.password_file: %w", err)
+	}
+	if perm := fi.Mode().Perm(); perm&0o077 != 0 {
+		return "", fmt.Errorf("mail.inbound.password_file %s is mode %04o; it must be readable by its owner alone (0600)", m.PasswordFile, perm)
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, 4097))
+	if err != nil {
+		return "", fmt.Errorf("mail.inbound.password_file: %w", err)
+	}
+	pass := strings.TrimRight(string(raw), "\r\n")
+	if pass == "" || len(raw) > 4096 || strings.ContainsAny(pass, "\r\n") {
+		return "", fmt.Errorf("mail.inbound.password_file %s must hold the password on one line", m.PasswordFile)
+	}
+	return pass, nil
+}
+
+func (m MailInbound) validate() []error {
+	if !m.Enabled {
+		return nil
+	}
+	var errs []error
+	for _, f := range []struct{ name, val string }{
+		{"mail.inbound.imap_host", m.IMAPHost},
+		{"mail.inbound.user", m.User},
+		{"mail.inbound.password_file", m.PasswordFile},
+		{"mail.inbound.reply_address", m.ReplyAddress},
+	} {
+		if f.val == "" {
+			errs = append(errs, fmt.Errorf("%s is required when mail.inbound.enabled", f.name))
+		}
+	}
+	if t := m.TLS; t != "" && t != "implicit" && t != "starttls" {
+		errs = append(errs, fmt.Errorf("mail.inbound.tls must be implicit or starttls, got %q: IMAP in clear is not supported", t))
+	}
+	if m.PollInterval != "" {
+		if d, err := time.ParseDuration(m.PollInterval); err != nil || d < 10*time.Second {
+			errs = append(errs, fmt.Errorf("mail.inbound.poll_interval %q must be a duration of at least 10s", m.PollInterval))
+		}
+	}
+	if a := m.ReplyAddress; a != "" {
+		local, domain, ok := strings.Cut(a, "@")
+		if !ok || local == "" || domain == "" || strings.ContainsAny(a, "+ <>\"\r\n") || strings.Contains(domain, "@") {
+			errs = append(errs, fmt.Errorf("mail.inbound.reply_address %q must be a bare address such as reply@example.org, with no + in it", a))
+		}
+	}
+	return errs
 }
 
 // TLSRequired reports whether mail must not go to the relay in clear.
@@ -562,6 +674,10 @@ func (c Config) Validate() error {
 	}
 	if t := c.Mail.TLS; t != "" && t != "starttls" && t != "implicit" {
 		errs = append(errs, fmt.Errorf("mail.tls must be starttls or implicit, got %q", t))
+	}
+	errs = append(errs, c.Mail.Inbound.validate()...)
+	if c.Mail.Inbound.Enabled && c.Mail.SMTPHost == "" {
+		errs = append(errs, errors.New("mail.inbound.enabled requires [mail] smtp_host: replies answer notification mail, which is not sent without SMTP"))
 	}
 	if c.Registration.Mode != "closed" && c.Mail.SMTPHost == "" {
 		errs = append(errs, fmt.Errorf(

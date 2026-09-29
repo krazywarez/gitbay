@@ -160,7 +160,7 @@ func runDiffComment(c *Ctx, args []string) int {
 	// not reach anyone's inbox. `mr review` is what says it out loud.
 	if !pending {
 		if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-			notify(c, parts, notice{repo: repo, kind: "mr",
+			notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 				subject: mrSubject(repo, mr.Number, mr.Title),
 				action:  fmt.Sprintf("commented on %s:%d in !%d", path, line, mr.Number),
 				excerpt: body, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})

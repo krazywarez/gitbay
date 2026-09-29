@@ -73,6 +73,10 @@ type Ctx struct {
 // User.SignedInAt is when that session signed in.
 const SourceWeb = "web"
 
+// SourceMail is Ctx.Source for a comment posted by replying to
+// notification mail (#295).
+const SourceMail = "mail"
+
 // ReauthWindow is how long after signing in a browser session may run a
 // NeedsRecentSignIn command. A session lasts days and its cookie is a
 // bearer credential; what it creates or grants must come from a recent

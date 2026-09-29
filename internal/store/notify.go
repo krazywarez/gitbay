@@ -5,21 +5,27 @@ import "time"
 type QueuedMail struct {
 	ID        int64
 	Recipient string
+	ReplyTo   string // "" for none
 	Subject   string
 	Body      string
 	Attempts  int
 }
 
 func (s *Store) EnqueueMail(recipient, subject, body string) error {
+	return s.EnqueueMailReplyTo(recipient, "", subject, body)
+}
+
+// EnqueueMailReplyTo queues mail with a Reply-To address.
+func (s *Store) EnqueueMailReplyTo(recipient, replyTo, subject, body string) error {
 	_, err := s.DB.Exec(
-		"INSERT INTO notifications (recipient, subject, body) VALUES (?, ?, ?)",
-		recipient, subject, body)
+		"INSERT INTO notifications (recipient, reply_to, subject, body) VALUES (?, ?, ?, ?)",
+		recipient, replyTo, subject, body)
 	return err
 }
 
 func (s *Store) DueMail(limit int) ([]QueuedMail, error) {
 	rows, err := s.DB.Query(`
-		SELECT id, recipient, subject, body, attempts FROM notifications
+		SELECT id, recipient, reply_to, subject, body, attempts FROM notifications
 		WHERE sent_at IS NULL AND failed_at IS NULL
 		  AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
 		ORDER BY id LIMIT ?`, fmtTime(time.Now()), limit)
@@ -30,7 +36,7 @@ func (s *Store) DueMail(limit int) ([]QueuedMail, error) {
 	var out []QueuedMail
 	for rows.Next() {
 		var m QueuedMail
-		if err := rows.Scan(&m.ID, &m.Recipient, &m.Subject, &m.Body, &m.Attempts); err != nil {
+		if err := rows.Scan(&m.ID, &m.Recipient, &m.ReplyTo, &m.Subject, &m.Body, &m.Attempts); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

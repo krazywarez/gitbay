@@ -22,9 +22,22 @@ var rootCAs *x509.CertPool
 
 // Send delivers one plain-text message. cfg.Mail.SMTPHost is host:port.
 func Send(cfg config.Config, to, subject, body string) error {
+	return SendReplyTo(cfg, to, "", subject, body)
+}
+
+// SendReplyTo is Send with a Reply-To header, left out when replyTo is
+// empty.
+func SendReplyTo(cfg config.Config, to, replyTo, subject, body string) error {
 	m := cfg.Mail
 	if m.SMTPHost == "" || m.From == "" {
 		return fmt.Errorf("[mail] smtp_host and from must be configured")
+	}
+	if strings.ContainsAny(replyTo, "\r\n") {
+		return fmt.Errorf("reply-to address contains a line break")
+	}
+	header := ""
+	if replyTo != "" {
+		header = "Reply-To: " + replyTo + "\n"
 	}
 	implicit := m.TLS == "implicit"
 	host := m.SMTPHost
@@ -39,8 +52,8 @@ func Send(cfg config.Config, to, subject, body string) error {
 	tlsCfg := &tls.Config{ServerName: hostname, RootCAs: rootCAs}
 
 	msg := strings.NewReplacer("\n", "\r\n").Replace(fmt.Sprintf(
-		"From: %s\nTo: %s\nSubject: %s\nDate: %s\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\n%s\n",
-		m.From, to, subject, time.Now().Format(time.RFC1123Z), body))
+		"From: %s\nTo: %s\n%sSubject: %s\nDate: %s\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\n%s\n",
+		m.From, to, header, subject, time.Now().Format(time.RFC1123Z), body))
 
 	c, err := dial(host, hostname, implicit, tlsCfg)
 	if err != nil {

@@ -48,6 +48,9 @@ var secretColumns = []secretColumn{
 // SetKeyring sets the keys the secret columns are sealed under.
 func (s *Store) SetKeyring(k *seal.Keyring) { s.secrets = k }
 
+// Keyring is the loaded key file, nil when none is set.
+func (s *Store) Keyring() *seal.Keyring { return s.secrets }
+
 // sealValue seals v for storage. An empty value stays empty: for
 // webhooks and mirrors it means there is no secret.
 func (s *Store) sealValue(aad, v string) (string, error) {

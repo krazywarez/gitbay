@@ -518,7 +518,7 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.created", fmt.Sprintf(`{"number":%d}`, n))
 	if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
-		notify(c, targets, notice{repo: repo, kind: "mr",
+		notify(c, targets, notice{repo: repo, kind: "mr", number: n,
 			subject: mrSubject(repo, n, title),
 			action:  fmt.Sprintf("opened merge request !%d (%s -> %s)", n, source, target),
 			excerpt: b, path: fmt.Sprintf("%s/mrs/%d", repo.Path(), n)})
@@ -1081,7 +1081,7 @@ func runMRRetarget(c *Ctx, args []string) int {
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.retargeted",
 		fmt.Sprintf(`{"number":%d,"from":%q,"to":%q}`, mr.Number, old, target))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "mr",
+		notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
 			action:  fmt.Sprintf("retargeted !%d from %s to %s", mr.Number, old, target),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
@@ -1157,7 +1157,7 @@ func runMRReview(c *Ctx, args []string) int {
 		fmt.Sprintf(`{"number":%d,"verdict":%q}`, mr.Number, verdict))
 	TryQueuedMerge(c.Store, c.Cfg, mr.ID)
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "mr",
+		notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
 			action:  reviewAction(mr.Number, verdict, published),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
@@ -1217,7 +1217,7 @@ func runMRReviewRequest(c *Ctx, args []string) int {
 		for i, u := range added {
 			ids[i] = u.ID
 		}
-		notify(c, ids, notice{repo: repo, kind: "mr",
+		notify(c, ids, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
 			action:  fmt.Sprintf("asked for a review on !%d", mr.Number),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
@@ -1597,7 +1597,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		}
 		c.Store.AddMRSystemComment(k.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s: !%d merged", mr.SourceRef, mr.TargetRef, mr.Number))
 		if parts, err := c.Store.MRParticipants(k.ID); err == nil {
-			notify(c, parts, notice{repo: repo, kind: "mr",
+			notify(c, parts, notice{repo: repo, kind: "mr", number: k.Number,
 				subject: mrSubject(repo, k.Number, k.Title),
 				action:  fmt.Sprintf("retargeted !%d from %s to %s: !%d merged", k.Number, mr.SourceRef, mr.TargetRef, mr.Number),
 				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), k.Number)})
@@ -1623,7 +1623,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		repo, c.User.ID, mr.TargetRef, targetSHA, newSHA, time.Now())
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "mr",
+		notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
 			action:  fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
@@ -1907,7 +1907,7 @@ func setMRDraft(c *Ctx, args []string, draft bool) int {
 		if targets, err := c.Store.RepoNotifyTargets(repo); err == nil {
 			parts, _ := c.Store.MRParticipants(mr.ID)
 			reviewers, _ := c.Store.MRReviewRequestIDs(mr.ID)
-			notify(c, append(append(targets, parts...), reviewers...), notice{repo: repo, kind: "mr",
+			notify(c, append(append(targets, parts...), reviewers...), notice{repo: repo, kind: "mr", number: mr.Number,
 				subject: mrSubject(repo, mr.Number, mr.Title),
 				action:  fmt.Sprintf("marked !%d ready for review", mr.Number),
 				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
@@ -1959,7 +1959,7 @@ func runMRClose(c *Ctx, args []string) int {
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.closed", eventData)
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
-		notify(c, parts, notice{repo: repo, kind: "mr",
+		notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
 			action:  fmt.Sprintf("closed !%d", mr.Number),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})

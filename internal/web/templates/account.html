@@ -138,7 +138,14 @@ account and where notifications go.</p>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">Enable to receive activity alerts by email. Login links will arrive regardless of this setting.</p>
-<form method="post" action="/settings" class="setform">
+{{if .ReplyOffered}}<form method="post" action="/settings" class="setform">
+  <input type="hidden" name="field" value="notify-reply">
+  <label for="notify-reply">Reply to mail to comment</label>
+  <div class="check"><input type="checkbox" id="notify-reply" name="reply" value="on"{{if .ReplyOn}} checked{{end}}></div>
+  <button type="submit" class="btn">Save</button>
+</form>
+<p class="meta">Issue and merge request mail gets a reply address. A reply posts a comment as you when it comes from one of your verified addresses; quoted text and signatures are removed.</p>
+{{end}}<form method="post" action="/settings" class="setform">
   <input type="hidden" name="field" value="notify-watch">
   <label for="notify-watch">Watch repositories you can write to</label>
   <div class="check"><input type="checkbox" id="notify-watch" name="watch" value="on"{{if .WatchOn}} checked{{end}}></div>

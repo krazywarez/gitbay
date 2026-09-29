@@ -110,6 +110,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"admin runners":               {},
 		"admin repo list":             {},
 		"admin stats":                 {},
+		"admin mail inbound check":    {},
 		"admin user show":             {"alice"},
 		"profile show":                {"alice"},
 		"org show":                    {"theorg"},

@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/mailreply"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/seal"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -308,5 +311,93 @@ func TestNotificationsListEmptyUnreadSaysHowToSeeRead(t *testing.T) {
 	// subject ("s"); check the path instead, which is unique to this row.
 	if !strings.Contains(out.String(), "x") {
 		t.Errorf("--all did not show the read notice: %q", out.String())
+	}
+}
+
+// The Reply-To is on issue and merge request mail only when the instance
+// reads replies and the recipient turned them on (#295).
+func TestNotifyReplyTo(t *testing.T) {
+	key, err := seal.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyFile := t.TempDir() + "/secret.key"
+	if err := seal.WriteKeys(keyFile, []seal.Key{key}); err != nil {
+		t.Fatal(err)
+	}
+	ring, err := seal.Load(keyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name           string
+		instance, user bool
+		kind           string
+		number         int64
+		want           bool
+	}{
+		{"both", true, true, "issue", 1, true},
+		{"merge request", true, true, "mr", 1, true},
+		{"instance off", false, true, "issue", 1, false},
+		{"user off", true, false, "issue", 1, false},
+		{"build", true, true, "build", 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, repo, bob := testRepoWithWatcher(t)
+			c.Store.SetKeyring(ring)
+			c.Cfg.Push.Enabled = false
+			c.Cfg.Mail.SMTPHost, c.Cfg.Mail.From = "mx.example", "gitbay@example.test"
+			c.Cfg.Mail.Inbound = config.MailInbound{Enabled: tc.instance, ReplyAddress: "reply@gitbay.example"}
+			if err := c.Store.AddEmail(bob, "bob@example.test", "admin", true); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Store.SetReplyEnabled(bob, tc.user); err != nil {
+				t.Fatal(err)
+			}
+			notify(c, []int64{bob}, notice{repo: repo, kind: tc.kind, number: tc.number,
+				subject: "s", action: "commented", path: "alice/app/issues/1"})
+			due, err := c.Store.DueMail(20)
+			if err != nil || len(due) != 1 {
+				t.Fatalf("DueMail = %v, %v", due, err)
+			}
+			got := due[0].ReplyTo
+			if !tc.want {
+				if got != "" || strings.Contains(due[0].Body, "Reply to this mail") {
+					t.Fatalf("Reply-To %q, body %q", got, due[0].Body)
+				}
+				return
+			}
+			tok, ok := mailreply.TokenFrom("reply@gitbay.example", got)
+			if !ok {
+				t.Fatalf("Reply-To %q", got)
+			}
+			secrets, _ := ring.Derive(mailreply.Purpose)
+			target, err := mailreply.Verify(secrets, tok, time.Now())
+			want := mailreply.Target{UserID: bob, RepoID: repo.ID, Kind: tc.kind, Number: 1}
+			if err != nil || target != want {
+				t.Fatalf("token names %+v, %v; want %+v", target, err, want)
+			}
+		})
+	}
+}
+
+func TestNotificationsSettingsReply(t *testing.T) {
+	c := notifTestCtx(t, "alice")
+	if code := Dispatch(c, []string{"notifications", "settings", "reply", "on"}); code != protocol.ExitFailure {
+		t.Fatalf("on without [mail.inbound]: exit %d", code)
+	}
+	c.Cfg.Mail.Inbound.Enabled = true
+	if code := Dispatch(c, []string{"notifications", "settings", "reply", "on"}); code != protocol.ExitOK {
+		t.Fatalf("on: exit %d: %s", code, c.Stdout)
+	}
+	if on, _ := c.Store.ReplyEnabled(c.User.ID); !on {
+		t.Fatal("reply not on")
+	}
+	c.Cfg.Mail.Inbound.Enabled = false
+	if code := Dispatch(c, []string{"notifications", "settings", "reply", "off"}); code != protocol.ExitOK {
+		t.Fatalf("off: exit %d", code)
+	}
+	if on, _ := c.Store.ReplyEnabled(c.User.ID); on {
+		t.Fatal("reply still on")
 	}
 }

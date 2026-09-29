@@ -110,7 +110,7 @@ func runComment(c *Ctx, args []string, t thread, noun string,
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, t.event, fmt.Sprintf(`{"number":%d}`, number))
 	if parts, err := participants(id); err == nil {
-		notify(c, parts, notice{repo: repo, kind: t.kind,
+		notify(c, parts, notice{repo: repo, kind: t.kind, number: number,
 			subject: fmt.Sprintf("[%s] %s%d: %s", repo.Path(), t.symbol, number, title),
 			action:  fmt.Sprintf("commented on %s%d", t.symbol, number),
 			excerpt: body, path: fmt.Sprintf("%s/%s/%d", repo.Path(), t.segment, number)})
