@@ -40,6 +40,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | resolve a thread       | yes | yes | yes |
 | comment on a diff line | yes | yes | yes |
 | merge (all strategies) | yes | yes | yes |
+| merge when ready, cancel | yes | yes | no  |
 | close                  | yes | yes | yes |
 | close in favour of another | yes | yes | yes |
 | create                 | yes | yes | yes |

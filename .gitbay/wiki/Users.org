@@ -453,6 +453,7 @@ gitbay mr checkout 4              # local branch mr/4 from the MR head
 gitbay mr review 4 --approve      # or --request-changes / --comment
 gitbay mr label 4 --add bug --remove wontfix
 gitbay mr merge 4 [--strategy ff|merge|squash|rebase]
+gitbay mr merge 4 --when-ready      # merge once the gates pass; --cancel dequeues
 gitbay mr close 4
 #+end_src
 
@@ -510,6 +511,33 @@ is possible — and the merge request page shows the same block. =mr
 merge= names every unmet gate at once rather than the first. =mr
 review= says when a verdict is advisory, which it is from anyone
 without write access: the gates do not count it.
+
+=mr merge <n> --when-ready= queues the merge and merges once the gates
+pass, or at once if they already do. It is tried again when a status
+is reported on the head, a review is submitted, a thread is resolved,
+the request is marked ready, and the source branch is pushed; a push
+by someone who can write to the target keeps it queued, and the new
+head has to pass on its own. The merge is made as the user who queued
+it, with their rights checked at that moment. Anything the queuer can
+fix (an unmet gate, a conflict, a branch behind a
+=require_signed_commits= target that needs a rebase) leaves it queued
+with the reason shown on =mr show= and the page.
+
+The queue is bound to the credential it was made with. It is dequeued,
+with the reason on the request's timeline, when:
+
+- the queuer loses write access or their account is disabled;
+- the SSH key or API token it was queued with is removed, revoked,
+  expires, or no longer has full scope (a merge queued from the web
+  rests on the account alone);
+- someone who cannot write to the target pushes to the source branch
+  or retargets the request;
+- the source branch is deleted, or the request is closed.
+
+An expiring key or token cannot queue a merge; use one without an
+expiry, or the web. =mr merge <n> --cancel= dequeues without closing.
+=merge= and =squash= are refused at queue time on a
+=require_signed_commits= repository.
 
 Those gates apply to =mr merge=. A direct push to a protected branch
 passes none of them until =require-mr on=: then an existing protected

@@ -29,6 +29,18 @@ anything beyond "replace the binary and restart" is needed.
   the scratch-repository test: a build failing SSH logins must not
   lock the runner out. Run it before pointing the runner back at real
   repositories; the Admin page has the steps and the rollback. (#260)
+- =mr merge <n> --when-ready= queues a merge until the gates pass,
+  merging as the queuing user with their rights checked then; tried on
+  a status, a review, a resolved thread, =mr ready= and a push to the
+  source branch. A refusal the queuer can fix, such as a branch behind
+  a =require_signed_commits= target, keeps it queued with the reason
+  on =mr show= and the page. The queue is bound to the key or token it
+  was made with: removing, revoking, expiring or narrowing it
+  dequeues, as do losing write access, a push or retarget by someone
+  who cannot write to the target, deleting the source branch, and
+  closing. An expiring credential cannot queue. =--cancel= dequeues.
+  =mr show=, =mr list= and the dashboard carry =queued=. Migration
+  0067 (#289).
 
 * v1.37.0 — 2026-09-29
 
