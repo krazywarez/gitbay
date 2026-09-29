@@ -106,3 +106,74 @@ func TestLFSAnonymousTokenOnlyDownloadsPublic(t *testing.T) {
 		t.Errorf("private download: %q", op)
 	}
 }
+
+func lfsTestKey(t *testing.T, st *store.Store, uid int64, fp, scope string) int64 {
+	t.Helper()
+	if err := st.AddSSHKey(uid, fp, "ssh-ed25519", []byte(fp), scope, ""); err != nil {
+		t.Fatal(err)
+	}
+	k, err := st.SSHKeyByFingerprint(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k.ID
+}
+
+// A token carries only the access its key's account still has: a
+// collaborator removed from the repository, or a reader of a public
+// repository made private, loses the token with the access (#285).
+func TestLFSTokenNeedsCurrentAccess(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	repo := lfsTestRepo(t, st, u.ID, "app", "private")
+	secret, err := s.lfsSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+
+	bob, err := st.CreateUser("bob", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GrantAccess(repo.ID, bob, "write"); err != nil {
+		t.Fatal(err)
+	}
+	bobKey := lfsTestKey(t, st, bob, "SHA256:bob", "full")
+	up := lfs.Sign(secret, repo.ID, bobKey, "upload", now)
+	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "upload" {
+		t.Fatalf("collaborator upload: %q", op)
+	}
+	if err := st.GrantAccess(repo.ID, bob, "read"); err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "" {
+		t.Errorf("upload after write was taken away: %q", op)
+	}
+	if err := st.RevokeAccess(repo.ID, bob); err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, bobKey, "download", now)), repo); op != "" {
+		t.Errorf("download after access was revoked: %q", op)
+	}
+
+	pub := lfsTestRepo(t, st, u.ID, "big", "public")
+	carol, err := st.CreateUser("carol", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	carolKey := lfsTestKey(t, st, carol, "SHA256:carol", "full")
+	down := lfs.Sign(secret, pub.ID, carolKey, "download", now)
+	if op, _ := s.lfsAuth(lfsRequest(down), pub); op != "download" {
+		t.Fatalf("public download: %q", op)
+	}
+	if err := st.SetRepoVisibility(pub.ID, "private"); err != nil {
+		t.Fatal(err)
+	}
+	pub, err = st.RepoByID(pub.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(down), pub); op != "" {
+		t.Errorf("download after the repository went private: %q", op)
+	}
+}

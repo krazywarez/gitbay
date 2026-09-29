@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gitbay.org/gitbay/internal/lfs"
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -39,8 +40,9 @@ func (s *Server) lfsSecret() ([]byte, error) {
 // "download", or "" for no access, and the key the grant rests on (0
 // for none). A token is bound to the SSH key that obtained it and
 // works only while that key is registered, unexpired and on an enabled
-// account (#285). Without one, public repos allow anonymous download
-// only.
+// account, and while the key still has the access its operation needs
+// on the repo (#285). Without one, public repos allow anonymous
+// download only.
 func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 	auth := r.Header.Get("Authorization")
 	if tok, ok := strings.CutPrefix(auth, "Bearer "); ok {
@@ -60,7 +62,7 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 			return "", 0
 		}
 		live, err := s.st.LiveSSHKeys([]int64{g.KeyID})
-		if err != nil || !live[g.KeyID] {
+		if err != nil || !live[g.KeyID] || !s.lfsKeyAllows(g.KeyID, repo, g.Op == "upload") {
 			return "", 0
 		}
 		return g.Op, g.KeyID
@@ -69,6 +71,31 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 		return "download", 0
 	}
 	return "", 0
+}
+
+// lfsKeyAllows repeats git-lfs-authenticate's access check for the key
+// now: a deploy key by its binding, any other key by its account's
+// access narrowed by the key's scope.
+func (s *Server) lfsKeyAllows(keyID int64, repo store.Repo, write bool) bool {
+	key, err := s.st.SSHKeyByID(keyID)
+	if err != nil {
+		return false
+	}
+	if policy.IsDeployScope(key.Scope) {
+		return policy.DeployScopeAllows(key.Scope, repo.ID, write)
+	}
+	user, err := s.st.UserByID(key.UserID)
+	if err != nil {
+		return false
+	}
+	grant, err := s.st.AccessRole(repo.ID, user.ID)
+	if err != nil {
+		return false
+	}
+	if !policy.CanRead(user, repo, grant) || !policy.ScopeAllowsGit(key.Scope, repo.Path(), write) {
+		return false
+	}
+	return !write || policy.CanWrite(user, repo, grant)
 }
 
 func lfsError(w http.ResponseWriter, code int, msg string) {
