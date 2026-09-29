@@ -67,8 +67,10 @@ a database check.
 * Host firewall
 
 =deploy/cloud-init.yaml= opens 22, 80, 443 and 2222 inbound with ufw.
-Outbound traffic is not restricted, including from CI containers. See
-[[file:10-Known-Gaps.org][10. Known gaps]].
+Outbound traffic from the host is not restricted. CI builds are, by
+two nftables tables on the runner's host: trusted builds keep the
+internet, untrusted ones get TCP 80 and 443 and DNS, and neither
+reaches private ranges or the host's loopback beyond DNS (the CI wiki page, #260).
 
 * Change path
 

@@ -69,7 +69,7 @@ Who may do what:
 | Build home                 | trusted: =<workdir>/trusted-home/<owner>/<name>=, one per repository, persistent; untrusted: =<workdir>/build-<id>-home=, removed with the build (=main.go=) |
 | Secrets                    | env file 0600 outside the workspace, or =--env NAME= for multi-line values |
 | Resources                  | per-build cgroup with =memory.max= and =cpu.max= written by the runner; unit-level =MemoryMax=6G=, =CPUQuota=300%= |
-| Network                    | pasta; outbound open; a loopback runner's builds run with =--no-map-gw= (=main.go=); on the host only public 22/80/443 (=gitbay-runner-egress.nft=, #260) |
+| Network                    | pasta; a loopback runner's builds run with =--no-map-gw= (=main.go=); host limited by user (=gitbay-runner-egress.nft=) and by build cgroup, trusted or untrusted (=gitbay-runner-builds.nft=, #260) |
 | Shutdown                   | SIGTERM stops claiming and drains in-flight builds; the unit uses =KillMode=mixed= |
 
 * Integrations

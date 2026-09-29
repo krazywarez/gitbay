@@ -15,6 +15,18 @@ anything beyond "replace the binary and restart" is needed.
   recovered and the elapsed time. The Admin wiki's Restore drill
   section lists what to restore, what to check and where to record it
   (#259).
+- The runner starts each podman build under =builds/trusted= or
+  =builds/untrusted= in its service cgroup, and a second nftables
+  table (=deploy/gitbay-runner-builds.nft=) matches build traffic by
+  that cgroup: no build reaches the host's loopback beyond DNS, or a
+  private range; a trusted build keeps the internet and the forge's public 22,
+  80 and 443; an untrusted build gets TCP 80 and 443 and DNS, and not
+  the forge. The runner's drop-in creates the cgroups and loads the
+  table on every start, and the start fails without it. =make
+  deploy-runner= installs it. =deploy/runner-auth-flood-test.sh= runs
+  the scratch-repository test: a build failing SSH logins must not
+  lock the runner out. Run it before pointing the runner back at real
+  repositories; the Admin page has the steps and the rollback. (#260)
 
 * v1.37.0 — 2026-09-29
 

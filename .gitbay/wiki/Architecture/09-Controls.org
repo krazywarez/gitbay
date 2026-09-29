@@ -88,7 +88,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | No secrets for untrusted builds             | in place | =internal/control/build.go=                                  |
 | Runner limited to attached repositories     | in place | =runnerMayBuild= (=build.go=)                            |
 | Build images fixed by the operator          | in place | =--pull=never=                                                   |
-| Build network egress restricted             | partial  | host: loopback closed, public 22/80/443 only (=gitbay-runner-egress.nft=); internet outbound open by decision (#260) |
+| Build network egress restricted             | partial  | by build cgroup (=gitbay-runner-builds.nft=): host loopback (but DNS) and private ranges closed; trusted: host public 22/80/443, internet open by decision; untrusted: internet TCP 80/443 and DNS only. Not yet measured from a build (#260) |
 | Build results reused only across equal trust | in place | =SuccessBuildForTree=, =SuccessBuildFor= (=internal/store/builds.go=) |
 
 ** Availability and operations

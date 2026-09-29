@@ -77,13 +77,28 @@ failed one.
 
 * What a build can reach
 
-Builds have outbound internet access, trusted and untrusted alike. On
-the runner's host an nftables table limits them to the forge's public
-ports 22, 80 and 443, which closes the operator's sshd. The forge is
-reached at the address in =GITBAY_SSH=: on a runner that polls the
-daemon over loopback, =169.254.1.2=, which pasta translates to the
-host's public address. See the Threat-Model page, "What a build can
-reach", for how and why (krz/gitbay#260).
+| Build     | Internet         | Runner's host                               | Private ranges |
+|-----------+------------------+---------------------------------------------+----------------|
+| trusted   | open             | forge's public 22, 80, 443; DNS on loopback | closed         |
+| untrusted | TCP 80, 443; DNS | DNS on loopback                             | closed         |
+
+An untrusted build is a merge request head from a fork. It can fetch
+modules and packages over HTTPS but cannot reach the forge, send mail,
+or open ssh elsewhere. The forge is reached at the address in
+=GITBAY_SSH=: on a runner that polls the daemon over loopback,
+=169.254.1.2=, which pasta translates to the host's public address, so
+a build's logins never arrive from =127.0.0.1=, where the runner polls.
+Two nftables tables on the runner's host enforce this, one by the
+runner's user and one by the cgroup each build runs in; the Threat-Model
+page, "What a build can reach", says how and why, and the Admin page
+how to install them (krz/gitbay#260). A runner off the daemon's host
+gets none of this unless its operator adds it.
+
+To check a runner, run =deploy/runner-auth-flood-test.sh= against a
+scratch repository, once as a push and once with =--untrusted=: the
+build probes what it reaches, then fails SSH logins with an expired key
+until the limiter locks its address, and the script checks that the
+runner still reported the build and kept polling.
 
 * The table
 

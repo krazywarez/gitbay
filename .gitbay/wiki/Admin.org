@@ -956,8 +956,45 @@ unit, and runs =deploy/runner-egress-check.sh= as =ci-runner= before
 restarting the runner: =127.0.0.1:22= and the public 22 must answer,
 2222 must not. The table limits the runner's user to =127.0.0.1:22=,
 DNS on loopback, and 22, 80 and 443 on the host's public address; the
-Threat-Model page says why. A restart of =nftables.service= flushes it;
-=systemctl reload gitbay-runner-egress= restores it.
+Threat-Model page says why.
+
+That table cannot tell a build from the runner, since both run as
+=ci-runner=. =deploy/gitbay-runner-builds.nft=, shipped as
+=/etc/gitbay-runner/builds.nft=, matches by cgroup instead: the runner
+starts each build under =builds/trusted= or =builds/untrusted= in its
+service cgroup, and the table closes the host's loopback to every
+build, limits an untrusted build to TCP 80 and 443 and DNS, and closes
+private ranges to both (the CI page has the table). nftables resolves a
+cgroup path to its id when the table loads, and the service cgroup is
+new on every start, so the drop-in's =ExecStartPre= creates the two
+cgroups, hands them to =ci-runner= and loads the table before the
+runner starts; a table that does not load stops the start. =make
+deploy-runner= checks the file's syntax before the restart and that the
+table is loaded after it. If =/etc/resolv.conf= names a nameserver in a
+private range, allow it in the file first or builds resolve nothing.
+
+A restart of =nftables.service= flushes both tables;
+=systemctl reload gitbay-runner-egress= restores both.
+
+Checking the tables on a running host, during a build:
+
+#+begin_src sh
+nft list table inet gitbay_builds          # counters on the reject rules
+for p in $(pgrep -u ci-runner pasta); do cat /proc/$p/cgroup; done
+# 0::/system.slice/gitbay-runner.service/builds/trusted/build-<id>
+#+end_src
+
+A pasta process anywhere else — the runner's own =runner= cgroup, a
+user slice — means the builds table does not see that build's traffic
+and only the first table applies. Then run
+=deploy/runner-auth-flood-test.sh= on the scratch repository (below),
+once as a push and once with =--untrusted=; it prints what the build
+reached and fails if the runner was locked out.
+
+To take the builds table out: delete the three =ExecStartPre= lines
+that name =builds= from the drop-in, =systemctl daemon-reload=, and
+=nft destroy table inet gitbay_builds=. The runner needs no restart,
+and builds keep the first table.
 
 The drop-in sets =NoNewPrivileges=no=, without which rootless podman
 cannot call =newuidmap= and the runner refuses to start. That is a

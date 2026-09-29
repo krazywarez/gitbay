@@ -203,31 +203,43 @@ runner, polling over SSH, clones the commit and runs its steps.
   already has rather than naming anything on the internet. On an
   instance with open registration that is the difference between a
   curated set and arbitrary code from a registry nobody vetted.
-- *What a build can reach.* Outbound internet, trusted or not: a fork's
-  merge request to a Go repository has to fetch its modules. On the
-  runner's host, the rules below limit it to the forge's public ports
-  22, 80 and 443. Under pasta a build's container holds the host's own
-  public address, and pasta translates =169.254.1.2= (its
-  =--map-guest-addr=) to that address. A runner that polls the daemon
-  over loopback starts its containers with =--network
-  pasta:--no-map-gw=, which is podman's default stated explicitly, and
-  gives them =GITBAY_SSH= at =169.254.1.2=, with the forge's port when
-  it is not 22. The runner's source address is =127.0.0.1=. An nftables
-  table (=deploy/gitbay-runner-egress.nft=) rejects every connection
-  the runner's user makes to the host's own addresses except
+- *What a build can reach.* A trusted build has the internet; an
+  untrusted one — a fork's merge request head — has TCP 80 and 443 and
+  DNS, enough to fetch modules and packages. Neither reaches private
+  address ranges (RFC 1918, CGNAT, link-local, ULA). On the runner's
+  host a trusted build reaches the forge's public ports 22, 80 and 443
+  and the resolver on loopback; an untrusted build reaches only the
+  resolver. Under pasta a build's container holds the host's own public
+  address, and pasta translates =169.254.1.2= (its =--map-guest-addr=)
+  to that address. A runner that polls the daemon over loopback starts
+  its containers with =--network pasta:--no-map-gw=, which is podman's
+  default stated explicitly, and gives them =GITBAY_SSH= at
+  =169.254.1.2=, with the forge's port when it is not 22. The runner's
+  source address is =127.0.0.1=; a trusted build's is the host's public
+  address. Two nftables tables enforce this. The first
+  (=deploy/gitbay-runner-egress.nft=) matches the runner's user and
+  rejects every connection it makes to the host's own addresses except
   =127.0.0.1:22=, DNS on loopback, and 22, 80 and 443 on the public
   address: the operator's sshd on 2222 and anything bound to loopback
-  are closed to it. Under rootless podman a build's connections are
-  made by pasta as the runner's user, so the table cannot tell a build
-  from its runner and leaves =127.0.0.1:22= open; that no build reaches
-  the host's loopback is measured from inside a build by runbook R3.
-  The runner does not start without the table. The SSH auth limiter
+  are closed. Under rootless podman a build's connections are made by
+  pasta as that same user, so this table cannot tell a build from its
+  runner. The second (=deploy/gitbay-runner-builds.nft=) can: the runner
+  starts every podman process for a build, pasta included, inside
+  =builds/trusted/build-<id>= or =builds/untrusted/build-<id>= under its
+  service cgroup, and the table matches sockets by those cgroups
+  (=socket cgroupv2=). It closes the host's loopback, =127.0.0.1:22=
+  included, to every build except for DNS, and applies the per-trust
+  rules above. The runner does not start without either table. The SSH auth limiter
   counts failures per source address and, once an address is over the
   limit, refuses every key from it until the window passes, the
-  runner's included; with registration open or by invite an unknown
-  key never counts (krz/gitbay#260). Under =-isolation none= a build
-  runs on the host and shares its loopback; the table still applies,
-  since it runs as the same user.
+  runner's included; an unknown key counts only with registration
+  closed, an expired key always (krz/gitbay#260). No build shares
+  =127.0.0.1= with the runner, and an untrusted build cannot reach sshd
+  at all. Trusted builds share the public address with one another, so
+  one that fails logins can throttle another's push for a minute. Under
+  =-isolation none= a build runs on the host in the runner's cgroup and
+  shares its loopback; only the first table applies, and such a runner
+  must not take =-untrusted=.
 
 Under =-isolation none=, anything a step can do as the runner's user a
 pushed =ci.yml= can do. Under podman a step is confined to its
