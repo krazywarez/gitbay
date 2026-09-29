@@ -75,7 +75,7 @@ func TestIssueLifecycleOverBareSSH(t *testing.T) {
 	// --format carries, and what everything written before formats existed has.
 	wantShow := `{"data":{"assignees":["bob"],"author":"alice","body":"it is broken",` +
 		`"body_format":"md",` +
-		`"comments":[{"author":"bob","body":"me too","body_format":"md","created_at":"TS"}],` +
+		`"comments":[{"author":"bob","body":"me too","body_format":"md","created_at":"TS","id":1}],` +
 		`"created_at":"TS","labels":["bug","urgent"],"number":1,"state":"open",` +
 		`"title":"first bug"},"protocol_version":1}`
 	if g := golden(t, out); g != wantShow {

@@ -70,7 +70,7 @@ func TestIssueReactionsOnPage(t *testing.T) {
 	rr := httptest.NewRecorder()
 	s.issue(rr, req)
 	body := rr.Body.String()
-	if n := strings.Count(body, `class="react"`)+strings.Count(body, `class="react mine"`); n != 16 {
+	if n := strings.Count(body, `class="react"`) + strings.Count(body, `class="react mine"`); n != 16 {
 		t.Errorf("%d reaction buttons, want 16 (8 on the body, 8 on the comment)", n)
 	}
 	if !strings.Contains(body, `name="remove" value="&#43;1" class="react mine" aria-pressed="true"`) {

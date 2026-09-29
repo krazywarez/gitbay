@@ -335,12 +335,20 @@ gitbay issue create --title "it breaks" [--body "..." | --file -]
 gitbay issue list [--state open|closed|all]
 gitbay issue show 4
 gitbay issue comment 4 --message "same here"
+gitbay issue react 4 +1 [--comment 12] [--remove]  # the same on mr
 gitbay issue edit 4 --title "better title" [--body|--file -]  # author or write
 gitbay issue close 4 / reopen 4
 gitbay issue label 4 --add bug --remove wontfix
 gitbay issue assign 4 --add alice
 gitbay issue milestone 4 v1.0                 # or "none" to clear
 #+end_src
+
+A reaction is one of =+1 -1 laugh hooray confused heart rocket eyes=,
+given by name or as the emoji itself, on an issue or merge request or on
+one of its comments (=show= prints comment ids). Anyone who may comment
+may react; reacting twice or removing an absent reaction does nothing.
+=show= carries the counts and which are yours. A reaction sends no
+notification and appears in no activity feed.
 
 Inside a clone, the repository is inferred from the =origin= remote —
 that is why no =owner/name= appears above. Anywhere else, pass it as the

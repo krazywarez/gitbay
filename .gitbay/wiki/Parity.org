@@ -35,6 +35,7 @@ browser-only and the iOS build screen unable to say more than the log.
 | review and check times | yes | yes | yes |
 | who resolved it, when  | yes | yes | yes |
 | comment                | yes | yes | yes |
+| react to it or a comment | yes | yes | no  |
 | edit title and body    | yes | yes | yes |
 | review (approve etc.)  | yes | yes | yes |
 | resolve a thread       | yes | yes | yes |
@@ -115,6 +116,7 @@ reviews, since an approval was of the diff against the old branch.
 | search title and body | yes | yes | yes |
 | create              | yes | yes | yes |
 | comment             | yes | yes | yes |
+| react to it or a comment | yes | yes | no  |
 | edit title and body | yes | yes | yes |
 | close and reopen    | yes | yes | yes |
 | labels, assignees   | yes | yes | yes |

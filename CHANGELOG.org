@@ -26,6 +26,9 @@ anything beyond "replace the binary and restart" is needed.
   the clone instead. =repo commit-file= and applying a suggestion
   refuse once the owner's storage quota is used up, as a push does.
   Migration 0069 (#288).
+- Reactions on issues, merge requests and their comments: =issue react=
+  and =mr react= with a fixed set of eight, counts and your own in
+  =show=, comment ids in =show=, and buttons on the web pages (#291).
 
 * v1.38.0 — 2026-09-29
 
