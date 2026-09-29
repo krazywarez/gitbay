@@ -3,6 +3,8 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"io/fs"
@@ -10,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -838,5 +841,75 @@ func TestVerifyIgnoresCommondir(t *testing.T) {
 	}
 	if err := verifyBackup(archive, ""); err == nil || !strings.Contains(err.Error(), "connectivity") {
 		t.Fatalf("verify of a repository whose objects are only in its commondir: %v", err)
+	}
+}
+
+// verify checks each release asset the database names against its
+// recorded digest, and each archived LFS object against its name.
+func TestVerifyChecksReleaseAssetsAndLFS(t *testing.T) {
+	cfg := testConfig(t)
+	root := cfg.Server.Root
+	st, err := openStore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("krz", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rid, err := st.CreateRepo("user", uid, "thing", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	relID, err := st.CreateRelease(rid, "v1", "v1", "", uid, "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := []byte("binary\n")
+	sum := sha256.Sum256(asset)
+	if err := st.AddReleaseAsset(relID, "tool", int64(len(asset)), hex.EncodeToString(sum[:])); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	dir := filepath.Join(root, "repos", "krz", "thing.git")
+	gitIn(t, root, "init", "-q", "--bare", dir)
+	assetFile := filepath.Join(dir, "gitbay-releases", strconv.FormatInt(relID, 10), "tool")
+	writeFile(t, assetFile, asset)
+	obj := []byte("large\n")
+	oid := sha256.Sum256(obj)
+	o := hex.EncodeToString(oid[:])
+	writeFile(t, filepath.Join(root, "lfs", o[:2], o[2:4], o), obj)
+
+	good := filepath.Join(t.TempDir(), "good.tar.gz")
+	if err := runBackup(cfg, good, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBackup(good, ""); err != nil {
+		t.Fatalf("intact archive: %v", err)
+	}
+
+	writeFile(t, assetFile, []byte("tampered\n"))
+	wrong := strings.Repeat("0", 64)
+	writeFile(t, filepath.Join(root, "lfs", "00", "00", wrong), obj)
+	bad := filepath.Join(t.TempDir(), "bad.tar.gz")
+	if err := runBackup(cfg, bad, false); err != nil {
+		t.Fatal(err)
+	}
+	err = verifyBackup(bad, "")
+	if err == nil || !strings.Contains(err.Error(), "krz/thing release") || !strings.Contains(err.Error(), wrong) {
+		t.Fatalf("archive with a bad asset and LFS object: %v", err)
+	}
+	if strings.Contains(err.Error(), o) {
+		t.Fatalf("intact LFS object reported: %v", err)
+	}
+}
+
+func writeFile(t *testing.T, p string, b []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

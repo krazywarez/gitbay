@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,7 +74,7 @@ public keys and its name ends in .age. --verify then needs --identity
 	}
 	cmd.Flags().StringVar(&out, "out", "", "output archive path (default gitbay-backup-<utc timestamp>.tar.gz; .age is appended when [backup] age_recipients is set)")
 	cmd.Flags().BoolVar(&dbOnly, "db-only", false, "archive the database snapshot alone, without repositories")
-	cmd.Flags().StringVar(&verify, "verify", "", "check an archive instead of writing one: database integrity, its repositories against the archive's, and git connectivity of each")
+	cmd.Flags().StringVar(&verify, "verify", "", "check an archive instead of writing one: database integrity, its repositories against the archive's, git connectivity of each, release assets and LFS object digests")
 	cmd.Flags().StringVar(&identity, "identity", "", "with --verify: an age identity file that opens an encrypted archive")
 	return cmd
 }
@@ -459,7 +462,8 @@ func addDir(tw *tar.Writer, path, name string) error {
 // verifyBackup reads an archive back, decrypting it with identity when it
 // is encrypted: the database snapshot must pass SQLite's integrity check,
 // every repository it names must be in the archive, and each of those
-// must pass git fsck --connectivity-only. A database-only archive is
+// must pass git fsck --connectivity-only; release assets must match the
+// database and LFS objects their names. A database-only archive is
 // checked for integrity alone and says so. Repositories are extracted to
 // a temporary directory for the check, so it needs free space for them.
 func verifyBackup(path, identity string) error {
@@ -485,6 +489,8 @@ func verifyBackup(path, identity string) error {
 	dbPath := ""
 	inArchive := map[string]bool{}
 	members := 0
+	lfsObjects := 0
+	var badLFS []string
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -499,6 +505,17 @@ func verifyBackup(path, identity string) error {
 			dbPath = filepath.Join(tmp, "gitbay.db")
 			if err := extractTo(tr, dbPath); err != nil {
 				return fmt.Errorf("%s: extracting the database: %w", path, err)
+			}
+		case strings.HasPrefix(h.Name, "lfs/") && h.Typeflag == tar.TypeReg:
+			// Objects are named by their sha256, so each is checked as it
+			// streams past and none is extracted.
+			lfsObjects++
+			sum := sha256.New()
+			if _, err := io.Copy(sum, tr); err != nil {
+				return fmt.Errorf("%s: reading %s: %w", path, h.Name, err)
+			}
+			if hex.EncodeToString(sum.Sum(nil)) != filepath.Base(h.Name) {
+				badLFS = append(badLFS, h.Name)
 			}
 		case strings.HasPrefix(h.Name, "repos/"):
 			trimmed := strings.TrimSuffix(h.Name, "/")
@@ -572,6 +589,7 @@ func verifyBackup(path, identity string) error {
 	if extra > 0 {
 		fmt.Printf("%d repositories in the archive that the database does not name (created after the snapshot)\n", extra)
 	}
+	var failed []error
 	var broken []string
 	for _, r := range repos {
 		dir := filepath.Join(tmp, "repos", r.OwnerName, r.Name+".git")
@@ -581,10 +599,70 @@ func verifyBackup(path, identity string) error {
 		}
 	}
 	if len(broken) > 0 {
-		return fmt.Errorf("%s: %d repositories fail the connectivity check: %s", path, len(broken), strings.Join(broken, ", "))
+		failed = append(failed, fmt.Errorf("%s: %d repositories fail the connectivity check: %s", path, len(broken), strings.Join(broken, ", ")))
+	} else {
+		fmt.Printf("connectivity ok on %d repositories\n", len(repos))
 	}
-	fmt.Printf("connectivity ok on %d repositories\n", len(repos))
-	return nil
+	assets, badAssets, err := checkReleaseAssets(st, repos, tmp)
+	if err != nil {
+		return err
+	}
+	if len(badAssets) > 0 {
+		failed = append(failed, fmt.Errorf("%s: %d release assets missing or not matching their digest: %s", path, len(badAssets), strings.Join(badAssets, ", ")))
+	} else {
+		fmt.Printf("release assets ok: %d\n", assets)
+	}
+	// LFS objects are named by pointer files in git history, not by the
+	// database, so this checks the archived objects' digests and not that
+	// every pointer has its object. With [lfs] root outside server.root
+	// the archive carries none.
+	if len(badLFS) > 0 {
+		failed = append(failed, fmt.Errorf("%s: %d LFS objects do not match their digest: %s", path, len(badLFS), strings.Join(badLFS, ", ")))
+	} else {
+		fmt.Printf("LFS objects ok: %d\n", lfsObjects)
+	}
+	return errors.Join(failed...)
+}
+
+// checkReleaseAssets checks that every release asset the database names
+// is under root, extracted, with its recorded size and sha256. It
+// returns how many the database names and those that fail.
+func checkReleaseAssets(st *store.Store, repos []store.Repo, root string) (int, []string, error) {
+	byID := map[int64]store.Repo{}
+	for _, r := range repos {
+		byID[r.ID] = r
+	}
+	rows, err := st.DB.Query(`SELECT rl.repo_id, a.release_id, a.name, a.size, a.sha256
+		FROM release_assets a JOIN releases rl ON rl.id = a.release_id
+		ORDER BY rl.repo_id, a.release_id, a.name`)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	n := 0
+	var bad []string
+	for rows.Next() {
+		var repoID, relID, size int64
+		var name, want string
+		if err := rows.Scan(&repoID, &relID, &name, &size, &want); err != nil {
+			return 0, nil, err
+		}
+		n++
+		r := byID[repoID]
+		label := fmt.Sprintf("%s release %d %s", r.Path(), relID, name)
+		f, err := os.Open(filepath.Join(root, "repos", r.OwnerName, r.Name+".git", "gitbay-releases", strconv.FormatInt(relID, 10), name))
+		if err != nil {
+			bad = append(bad, label)
+			continue
+		}
+		sum := sha256.New()
+		got, err := io.Copy(sum, f)
+		f.Close()
+		if err != nil || got != size || hex.EncodeToString(sum.Sum(nil)) != want {
+			bad = append(bad, label)
+		}
+	}
+	return n, bad, rows.Err()
 }
 
 // borrowsObjects reports an archive member that would point git at

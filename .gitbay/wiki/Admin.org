@@ -491,11 +491,18 @@ each one it removes.
 
 =--verify= reads an archive back: the snapshot must pass SQLite's
 integrity check, every repository the snapshot names must be in the
-archive, and each must pass =git fsck --connectivity-only=. It
-extracts the repositories to a temporary directory for that, so it
-needs free space the size of the repositories. A database-only archive
-is checked for integrity and says so. Exit is non-zero on damage, a
-missing repository or a missing object.
+archive, and each must pass =git fsck --connectivity-only=. Every
+release asset the snapshot names must be in its repository with its
+recorded size and sha256, and every LFS object in the archive must
+hash to its name. LFS objects are named by pointer files in git
+history rather than by the database, so a pointer whose object was
+never uploaded is not caught, and with =[lfs] root= outside
+=server.root= the archive holds no LFS objects at all. It extracts the
+repositories to a temporary directory for the checks, so it needs free
+space the size of the repositories. A database-only archive is checked
+for integrity and says so. Exit is non-zero on damage, a missing
+repository, a missing object, or a missing or altered asset or LFS
+object.
 
 A full backup holds =<root>/backup.lock= from its database snapshot to
 its last repository. While it runs, =repo delete=, =repo rename=,
