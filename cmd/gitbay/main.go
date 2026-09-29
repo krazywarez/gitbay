@@ -683,6 +683,7 @@ func mrCmd() *cobra.Command {
 		pass("diff-comment", passOpts{server: []string{"mr", "diff-comment"}, needsRepo: true, stdinOK: true, editor: "comment"}),
 		pass("threads", passOpts{server: []string{"mr", "threads"}, needsRepo: true}),
 		pass("resolve", passOpts{server: []string{"mr", "resolve"}, needsRepo: true}),
+		pass("apply-suggestion", passOpts{server: []string{"mr", "apply-suggestion"}, needsRepo: true}),
 		pass("unresolve", passOpts{server: []string{"mr", "unresolve"}, needsRepo: true}),
 		review,
 		pass("merge", passOpts{server: []string{"mr", "merge"}, needsRepo: true}),

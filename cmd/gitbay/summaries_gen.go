@@ -64,6 +64,7 @@ var summaries = map[string]string{
 	"milestone create":                 "create a milestone",
 	"milestone list":                   "list milestones with progress",
 	"milestone reopen":                 "reopen a milestone",
+	"mr apply-suggestion":              "commit a review thread's suggestion to the source branch",
 	"mr close":                         "close without merging",
 	"mr comment":                       "add a comment",
 	"mr create":                        "open a merge request",
