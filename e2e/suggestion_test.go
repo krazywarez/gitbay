@@ -112,9 +112,12 @@ func TestSuggestionAppliedByServer(t *testing.T) {
 		t.Fatalf("reader applied a suggestion: exit %d %s", code, errOut)
 	}
 
-	out, errOut, code := c.run(t, dir, "", "mr", "apply-suggestion", "1", thread)
+	out, errOut, code := c.run(t, dir, "", "mr", "apply-suggestion", "1", thread, "--json")
 	if code != 0 {
 		t.Fatalf("apply-suggestion: exit %d\n%s\n%s", code, out, errOut)
+	}
+	if !strings.Contains(out, `"resolved":true`) {
+		t.Errorf("apply-suggestion --json = %s", out)
 	}
 	mustGit(t, dir, env, "fetch", "-q", "origin", "feat")
 	if got := mustGit(t, dir, env, "show", "FETCH_HEAD:lib.txt"); got != "one\nTWO\nTWO AND A HALF\nthree\n" {
@@ -174,11 +177,24 @@ func TestSuggestionAppliedLocallyWhenSigned(t *testing.T) {
 		t.Fatalf("server-side apply on a require-signed repository: exit %d %s", code, errOut)
 	}
 
-	out, errOut, code := c.run(t, dir, "", "mr", "apply-suggestion", "1", thread)
+	out, errOut, code := c.run(t, dir, "", "mr", "apply-suggestion", "1", thread, "--json")
 	if code != 0 {
 		t.Fatalf("local apply-suggestion: exit %d\n%s\n%s", code, out, errOut)
 	}
+	var res struct {
+		Data struct {
+			SHA      string `json:"sha"`
+			Branch   string `json:"branch"`
+			Resolved bool   `json:"resolved"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil || res.Data.Branch != "feat" || !res.Data.Resolved {
+		t.Fatalf("local apply-suggestion --json = %s (%v)", out, err)
+	}
 	mustGit(t, dir, env, "fetch", "-q", "origin", "feat")
+	if tip := strings.TrimSpace(mustGit(t, dir, env, "rev-parse", "FETCH_HEAD")); tip != res.Data.SHA {
+		t.Errorf("reported sha %s, branch at %s", res.Data.SHA, tip)
+	}
 	if got := mustGit(t, dir, env, "show", "FETCH_HEAD:lib.txt"); got != "one\nTWO\nTWO AND A HALF\nthree\n" {
 		t.Fatalf("lib.txt = %q", got)
 	}

@@ -471,12 +471,21 @@ func cmdMRApplySuggestion(args []string) int {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitFailure
 	}
-	if args, err = withRepo(t, args); err != nil {
+	asJSON := false
+	var rest []string
+	for _, a := range args {
+		if a == "--json" {
+			asJSON = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	if args, err = withRepo(t, rest); err != nil {
 		fmt.Fprintln(os.Stderr, "gitbay:", err)
 		return protocol.ExitUsage
 	}
 	if len(args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: gitbay mr apply-suggestion [<owner/name>] <n> <thread-id>")
+		fmt.Fprintln(os.Stderr, "usage: gitbay mr apply-suggestion [<owner/name>] <n> <thread-id> [--json]")
 		return protocol.ExitUsage
 	}
 	repo, n, thread := args[0], args[1], args[2]
@@ -516,7 +525,11 @@ func cmdMRApplySuggestion(args []string) int {
 		fmt.Fprintf(os.Stderr, "gitbay: thread %s carries no suggestion\n", thread)
 		return protocol.ExitUsage
 	case s.Apply != "local":
-		return runSSH(t, []string{"mr", "apply-suggestion", repo, n, thread}, strings.NewReader(""))
+		argv := []string{"mr", "apply-suggestion", repo, n, thread}
+		if asJSON {
+			argv = append(argv, "--json")
+		}
+		return runSSH(t, argv, strings.NewReader(""))
 	case s.Outdated:
 		fmt.Fprintf(os.Stderr, "gitbay: suggestion in thread %s is outdated: %s\n", thread, s.Reason)
 		return protocol.ExitUsage
@@ -611,10 +624,25 @@ func cmdMRApplySuggestion(args []string) int {
 	if code := runGitLocal("push", "--quiet", url, sha+":refs/heads/"+branch); code != 0 {
 		return code
 	}
-	if _, code := captureSSH(t, []string{"mr", "resolve", repo, n, thread}); code != 0 {
-		return code
+	// The commit has landed, so a thread that cannot be resolved (the
+	// server's resolve rule is narrower than who can push) is a warning,
+	// not a failure; captureSSH has already printed the server's reason.
+	_, code = captureSSH(t, []string{"mr", "resolve", repo, n, thread})
+	resolved := code == 0
+	if asJSON {
+		out, _ := json.Marshal(protocol.Envelope{ProtocolVersion: protocol.Version, Data: map[string]any{
+			"thread": tn, "sha": sha, "source": mr.Data.Source, "branch": branch, "resolved": resolved}})
+		fmt.Println(string(out))
+	} else {
+		fmt.Printf("applied thread %s to %s at %.10s", thread, mr.Data.Source, sha)
+		if resolved {
+			fmt.Print("; thread resolved")
+		}
+		fmt.Println()
 	}
-	fmt.Printf("applied thread %s to %s at %.10s; thread resolved\n", thread, mr.Data.Source, sha)
+	if !resolved {
+		fmt.Fprintf(os.Stderr, "gitbay: warning: thread %s is still open\n", thread)
+	}
 	return 0
 }
 
