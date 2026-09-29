@@ -313,3 +313,84 @@ func TestOrgMilestoneMemberSeesNoFormAndIsRefused(t *testing.T) {
 		t.Fatal("a member created an org milestone")
 	}
 }
+
+// countingBody reports how many bytes a handler read from a request.
+type countingBody struct {
+	r io.Reader
+	n int
+}
+
+func (c *countingBody) Read(b []byte) (int, error) {
+	n, err := c.r.Read(b)
+	c.n += n
+	return n, err
+}
+
+func TestReleaseAssetAuthorisesBeforeReading(t *testing.T) {
+	p := newP296b(t)
+	if _, err := p.st.CreateRepo("user", p.aliceU.ID, "secret", "private"); err != nil {
+		t.Fatal(err)
+	}
+	payload, ct := upload(t, map[string]string{"tag": "v1"}, "tool.bin", bytes.Repeat([]byte("x"), 512))
+	raw, _ := io.ReadAll(payload)
+	send := func(path string, ck *http.Cookie, length int64) (*httptest.ResponseRecorder, *countingBody) {
+		body := &countingBody{r: bytes.NewReader(raw)}
+		req := httptest.NewRequest("POST", path, body)
+		req.ContentLength = length
+		req.Header.Set("Content-Type", ct)
+		req.AddCookie(ck)
+		rr := httptest.NewRecorder()
+		p.h.ServeHTTP(rr, req)
+		return rr, body
+	}
+	for _, path := range []string{"/alice/secret/releases/assets", "/alice/nothing/releases/assets"} {
+		rr, body := send(path, p.bob, int64(len(raw)))
+		if rr.Code != http.StatusNotFound || body.n != 0 {
+			t.Errorf("%s: %d, read %d bytes", path, rr.Code, body.n)
+		}
+	}
+	// A reader of a public repo is refused without reading too.
+	rr, body := send("/alice/app/releases/assets", p.bob, int64(len(raw)))
+	if rr.Code != http.StatusSeeOther || body.n != 0 {
+		t.Errorf("reader: %d, read %d bytes", rr.Code, body.n)
+	}
+	// An announced length over the cap is refused before reading.
+	rr, body = send("/alice/app/releases/assets", p.alice, 3<<20)
+	if rr.Code != http.StatusSeeOther || body.n != 0 || !strings.Contains(p.follow(rr, p.alice), "max_asset_bytes") {
+		t.Errorf("oversized: %d, read %d bytes", rr.Code, body.n)
+	}
+}
+
+func TestReleaseAssetOneUploadAtATime(t *testing.T) {
+	p := newP296b(t)
+	p.s.uploads.Store(p.aliceU.ID, struct{}{})
+	body, ct := upload(t, map[string]string{"tag": "v1"}, "tool.bin", []byte("payload"))
+	rr := p.do("POST", "/alice/app/releases/assets", p.alice, body, ct)
+	if !strings.Contains(p.follow(rr, p.alice), "still running") {
+		t.Fatalf("second upload not refused: %d", rr.Code)
+	}
+	p.s.uploads.Delete(p.aliceU.ID)
+	body, ct = upload(t, map[string]string{"tag": "v1"}, "tool.bin", []byte("payload"))
+	if rr = p.do("POST", "/alice/app/releases/assets", p.alice, body, ct); rr.Code != http.StatusSeeOther {
+		t.Fatal(rr.Code)
+	}
+	if _, busy := p.s.uploads.Load(p.aliceU.ID); busy {
+		t.Fatal("slot not released")
+	}
+}
+
+func TestMilestoneTitleStartingWithDash(t *testing.T) {
+	p := newP296b(t)
+	p.post("/alice/app/milestones", p.alice, url.Values{"title": {"--due"}})
+	if _, err := p.st.MilestoneByTitle(p.repo, "--due"); err != nil {
+		t.Fatalf("repo milestone: %v", err)
+	}
+	p.post("/acme/-/milestones", p.alice, url.Values{"title": {"--description"}})
+	if ms, _ := p.st.ListOrgMilestones(p.orgID, "open", nil); len(ms) != 1 || ms[0].Title != "--description" {
+		t.Fatalf("org milestone: %+v", ms)
+	}
+	p.post("/acme/-/labels", p.alice, url.Values{"name": {"--color"}})
+	if ls, _ := p.st.ListOrgLabels(p.orgID, nil); len(ls) != 1 || ls[0].Name != "--color" {
+		t.Fatalf("org label: %+v", ls)
+	}
+}

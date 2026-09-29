@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -14,17 +15,17 @@ import (
 // command the CLI runs; who may do it is the command's decision, and the
 // pages only show the forms to those it will accept.
 
-// milestoneCreateArgs builds the argv tail for create: the title, and the
-// description and due date when given.
-func milestoneCreateArgs(r *http.Request, head []string) []string {
-	argv := append(head, strings.TrimSpace(r.FormValue("title")))
+// milestoneCreateArgs builds the create argv: the flags, then the
+// positionals after "--" so a title starting with "-" is not a flag.
+func milestoneCreateArgs(r *http.Request, head []string, target string) []string {
+	argv := head
 	if d := strings.TrimSpace(r.FormValue("description")); d != "" {
 		argv = append(argv, "--description", d)
 	}
 	if d := strings.TrimSpace(r.FormValue("due")); d != "" {
 		argv = append(argv, "--due", d)
 	}
-	return argv
+	return append(argv, "--", target, strings.TrimSpace(r.FormValue("title")))
 }
 
 func (s *Server) milestoneSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -42,7 +43,7 @@ func (s *Server) milestoneSubmit(w http.ResponseWriter, r *http.Request, u store
 	case "reopen":
 		argv = []string{"milestone", "reopen", repo, title}
 	default:
-		argv = milestoneCreateArgs(r, []string{"milestone", "create", repo})
+		argv = milestoneCreateArgs(r, []string{"milestone", "create"}, repo)
 	}
 	_, msg, code := s.runControlCode(u, argv)
 	s.done(w, r, code, msg, back)
@@ -61,7 +62,7 @@ func (s *Server) orgLabelSubmit(w http.ResponseWriter, r *http.Request, u store.
 		back(w, r, "name the label")
 		return
 	}
-	argv := []string{"org", "label", "set", org, name, "--color", strings.TrimSpace(r.FormValue("color"))}
+	argv := []string{"org", "label", "set", "--color", strings.TrimSpace(r.FormValue("color")), "--", org, name}
 	if r.FormValue("action") == "remove" {
 		if ok, msg := confirmed(r, name); !ok {
 			back(w, r, msg)
@@ -88,7 +89,7 @@ func (s *Server) orgMilestoneSubmit(w http.ResponseWriter, r *http.Request, u st
 	case "reopen":
 		argv = []string{"org", "milestone", "reopen", org, title}
 	default:
-		argv = milestoneCreateArgs(r, []string{"org", "milestone", "create", org})
+		argv = milestoneCreateArgs(r, []string{"org", "milestone", "create"}, org)
 	}
 	_, msg, code := s.runControlCode(u, argv)
 	s.done(w, r, code, msg, back)
@@ -103,7 +104,35 @@ func (s *Server) orgMilestoneSubmit(w http.ResponseWriter, r *http.Request, u st
 func (s *Server) releaseAssetSubmit(w http.ResponseWriter, r *http.Request, u store.User) {
 	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
 	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) }
+	// Authorise before reading a byte: a body nobody may upload is never
+	// spooled to disk.
+	rp, err := s.st.RepoByPath(repo)
+	if err == nil {
+		grant, _ := s.st.AccessRole(rp.ID, u.ID)
+		if !policyCanRead(u, rp, grant) {
+			err = store.ErrNotFound
+		} else if !policy.CanWrite(u, rp, grant) {
+			back(w, r, "you need write access to change releases")
+			return
+		} else if rp.Settings.Archived {
+			back(w, r, rp.Path()+" is archived and read-only; unarchive it first")
+			return
+		}
+	}
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
 	limit := s.cfg.Limits.MaxAssetBytes
+	if r.ContentLength > limit+1<<20 {
+		back(w, r, fmt.Sprintf("asset exceeds max_asset_bytes (%d)", limit))
+		return
+	}
+	if _, busy := s.uploads.LoadOrStore(u.ID, struct{}{}); busy {
+		back(w, r, "another upload of yours is still running; wait for it to finish")
+		return
+	}
+	defer s.uploads.Delete(u.ID)
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1<<20)
 	if err := r.ParseMultipartForm(1 << 20); err != nil && !errors.Is(err, http.ErrNotMultipart) {
 		var tooBig *http.MaxBytesError

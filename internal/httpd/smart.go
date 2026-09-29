@@ -35,6 +35,7 @@ type Server struct {
 	apiLimit *apiLimiter
 	proxies  []*net.IPNet  // http.trusted_proxies, parsed once
 	stopping chan struct{} // closed by Stop
+	uploads  sync.Map      // user id -> struct{}: release asset uploads in flight
 	stopOnce sync.Once
 }
 
