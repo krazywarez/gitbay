@@ -173,6 +173,7 @@ func runRepoImport(c *Ctx, args []string) int {
 		gitutil.SetHead(dir, branch)
 		c.Store.UpdateDefaultBranch(id, branch)
 	}
+	c.Store.RequestSymbolIndex(id, false)
 
 	c.Store.RecordEvent(id, c.User.ID, "repo.imported", fmt.Sprintf(`{"from":%q}`, from))
 	type out struct {

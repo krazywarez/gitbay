@@ -37,6 +37,7 @@ import (
 	"gitbay.org/gitbay/internal/seal"
 	"gitbay.org/gitbay/internal/sshd"
 	"gitbay.org/gitbay/internal/store"
+	"gitbay.org/gitbay/internal/symbols"
 	"gitbay.org/gitbay/internal/toolpath"
 	"gitbay.org/gitbay/internal/webhook"
 )
@@ -228,6 +229,9 @@ func serveCmd() *cobra.Command {
 			go deps.New(st, cfg, func(owner, name string) string {
 				return control.RepoDir(cfg.Server.Root, owner, name)
 			}, buildinfo.String()).Run(whCtx)
+			go symbols.New(st, func(owner, name string) string {
+				return control.RepoDir(cfg.Server.Root, owner, name)
+			}).Run(whCtx)
 
 			// One pack-generation budget for SSH, smart HTTP and git://.
 			// Anonymous clients ("ip:" principals) share all but one

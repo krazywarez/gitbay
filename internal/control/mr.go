@@ -1611,6 +1611,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, c.Scope, targetSHA, newSHA)
 		ProcessMRDescription(c.Store, repo, mr, c.User.ID, c.Scope)
 		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
+		c.Store.RequestSymbolIndex(repo.ID, false)
 	}
 	// A merge moves the ref directly, so it never reaches post-receive and
 	// none of the ref-update work fires on its own. The event webhooks

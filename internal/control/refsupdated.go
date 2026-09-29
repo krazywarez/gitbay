@@ -51,6 +51,8 @@ func RefsUpdated(st *store.Store, cfg config.Config, repoID, userID int64, scope
 			dir := RepoDir(cfg.Server.Root, pushedRepo.OwnerName, pushedRepo.Name)
 			ProcessCommitMessages(st, dir, pushedRepo, userID, scope, u.Old, u.New)
 			RecordLandedCommits(st, dir, pushedRepo, u.Old, u.New)
+			// The symbol index is rebuilt by its worker, never here.
+			st.RequestSymbolIndex(pushedRepo.ID, false)
 		}
 		// A branch push with a .gitbay/ci.yml queues one build per job.
 		if pushedRepoErr == nil && !u.IsDelete {

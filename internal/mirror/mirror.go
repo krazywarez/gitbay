@@ -84,6 +84,9 @@ func (w *Worker) sweep() {
 			w.St.SetMirrorResult(m.ID, err.Error())
 		} else {
 			w.St.SetMirrorResult(m.ID, "")
+			if m.Direction == "pull" {
+				w.St.RequestSymbolIndex(m.RepoID, false)
+			}
 		}
 	}
 }

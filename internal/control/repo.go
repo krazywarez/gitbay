@@ -790,6 +790,7 @@ func runSetDefaultBranch(c *Ctx, args []string) int {
 	if err := c.Store.UpdateDefaultBranch(repo.ID, branch); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	c.Store.RequestSymbolIndex(repo.ID, false)
 	return c.emit(map[string]string{"default_branch": branch}, func(w io.Writer) {
 		fmt.Fprintf(w, "default branch of %s is now %s\n", repo.Path(), branch)
 	})
