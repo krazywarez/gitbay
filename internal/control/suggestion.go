@@ -56,14 +56,20 @@ const (
 // listing: one ls-tree per (commit, path), and every blob through one
 // cat-file --batch process started on first use, so a merge request with
 // many suggestions on a file costs no more processes than one with a
-// single suggestion.
+// single suggestion. Blobs are kept by id up to cacheCap bytes in all;
+// past that one is read again through the same process.
 type anchoredFiles struct {
-	dir     string
-	entries map[[2]string]anchoredEntry
-	blobs   map[string][]byte
-	batch   *gitutil.BlobBatch
-	spawned int // git processes started, for the test that bounds it
+	dir      string
+	entries  map[[2]string]anchoredEntry
+	blobs    map[string][]byte
+	cached   int64
+	cacheCap int64
+	batch    *gitutil.BlobBatch
+	spawned  int // git processes started, for the test that bounds it
 }
+
+// anchoredCacheCap bounds the blobs one render keeps.
+const anchoredCacheCap = 8 << 20
 
 type anchoredEntry struct {
 	e  gitutil.TreeEntry
@@ -71,7 +77,8 @@ type anchoredEntry struct {
 }
 
 func newAnchoredFiles(dir string) *anchoredFiles {
-	return &anchoredFiles{dir: dir, entries: map[[2]string]anchoredEntry{}, blobs: map[string][]byte{}}
+	return &anchoredFiles{dir: dir, entries: map[[2]string]anchoredEntry{}, blobs: map[string][]byte{},
+		cacheCap: anchoredCacheCap}
 }
 
 func (f *anchoredFiles) close() {
@@ -114,7 +121,10 @@ func (f *anchoredFiles) read(commit, path string) ([]byte, string, string, error
 	if err != nil {
 		return nil, "", "", err
 	}
-	f.blobs[e.SHA] = content
+	if f.cached+int64(len(content)) <= f.cacheCap {
+		f.blobs[e.SHA] = content
+		f.cached += int64(len(content))
+	}
 	return content, e.Mode, e.SHA, nil
 }
 

@@ -56,15 +56,20 @@ func (b *BlobBatch) Read(oid string, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cat-file %s: %s", oid, strings.TrimSpace(head))
 	}
+	// A refused object is still on the stream, with its trailing
+	// newline; skipping it keeps the next Read in step.
+	if f[1] != "blob" || size > limit {
+		if _, err := io.CopyN(io.Discard, b.out, size+1); err != nil {
+			return nil, err
+		}
+		if f[1] != "blob" {
+			return nil, fmt.Errorf("%s is a %s, not a blob", oid, f[1])
+		}
+		return nil, fmt.Errorf("%s is larger than %d bytes", oid, limit)
+	}
 	data := make([]byte, size+1) // the object and its trailing newline
 	if _, err := io.ReadFull(b.out, data); err != nil {
 		return nil, err
-	}
-	if f[1] != "blob" {
-		return nil, fmt.Errorf("%s is a %s, not a blob", oid, f[1])
-	}
-	if size > limit {
-		return nil, fmt.Errorf("%s is larger than %d bytes", oid, limit)
 	}
 	return data[:size], nil
 }

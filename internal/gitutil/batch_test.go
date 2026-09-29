@@ -38,6 +38,9 @@ func TestBlobBatch(t *testing.T) {
 	if _, err := batch.Read(a, 3); err == nil {
 		t.Error("a blob over the limit was read")
 	}
+	if got, err := batch.Read(b, 100); err != nil || string(got) != "" {
+		t.Fatalf("read after a blob over the limit = %q, %v", got, err)
+	}
 	if _, err := batch.Read(tree, 100); err == nil {
 		t.Error("a tree was read as a blob")
 	}

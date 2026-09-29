@@ -491,16 +491,18 @@ func TestApplySuggestionFork(t *testing.T) {
 }
 
 // Reading suggestions costs git processes per file and commit, not per
-// thread: six suggestions on one file read it as one does.
+// thread: six suggestions on one file read it as one does, whether or
+// not the blobs fit the cache.
 func TestSuggestionsProcessCountPerFile(t *testing.T) {
 	f := newSuggestFixture(t, nil)
-	spawned := func() int {
+	spawnedWith := func(cacheCap int64) int {
 		t.Helper()
 		comments, err := f.st.ListDiffComments(f.mr().ID, f.alice.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		files := newAnchoredFiles(f.dir)
+		files.cacheCap = cacheCap
 		defer files.close()
 		got := suggestionsWith(files, func() bool { return false }, f.mr(), comments)
 		for _, s := range got {
@@ -508,8 +510,12 @@ func TestSuggestionsProcessCountPerFile(t *testing.T) {
 				t.Fatalf("suggestion outdated: %+v", s)
 			}
 		}
+		if files.cached > cacheCap {
+			t.Fatalf("cached %d bytes past a cap of %d", files.cached, cacheCap)
+		}
 		return files.spawned
 	}
+	spawned := func() int { return spawnedWith(anchoredCacheCap) }
 	f.suggest(f.alice, "lib.txt", 1, 1, "ONE")
 	one := spawned()
 	for i := 2; i <= 5; i++ {
@@ -518,6 +524,11 @@ func TestSuggestionsProcessCountPerFile(t *testing.T) {
 	f.suggest(f.alice, "lib.txt", 1, 2, "Y")
 	if six := spawned(); six != one || one > 2 {
 		t.Fatalf("git processes: %d for one suggestion, %d for six on the same file", one, six)
+	}
+	// With no room to cache, blobs are read again through the same
+	// process, and every suggestion still reads right.
+	if none := spawnedWith(0); none != one {
+		t.Fatalf("git processes with no cache: %d, want %d", none, one)
 	}
 }
 

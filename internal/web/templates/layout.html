@@ -219,6 +219,7 @@
     <input type="hidden" name="path" value="{{.Path}}">
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
     <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
+    {{if ne .Class "del"}}<p><label>From line <input type="number" name="start_line" min="1" max="{{.NewLine}}" placeholder="{{.NewLine}}"></label> to {{.NewLine}}; a <code>```suggestion</code> block proposes replacement lines</p>{{end}}
     <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
     <p><button type="submit" class="btn">Comment</button>
        <button type="submit" name="pending" value="on" class="btn">Add to review</button>
