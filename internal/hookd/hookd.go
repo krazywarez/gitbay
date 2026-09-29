@@ -336,6 +336,9 @@ func (s *Server) postReceive(req Request) {
 				if mr.State == "open" {
 					s.st.SetMRState(mr.ID, "source_gone")
 				}
+				if mr.QueuedAt != "" {
+					control.TryQueuedMerge(s.st, s.cfg, mr.ID) // dequeues: the source is gone
+				}
 				continue // head ref retained: the diff stays viewable
 			}
 			dstDir := control.RepoDir(s.cfg.Server.Root, target.OwnerName, target.Name)
@@ -362,10 +365,10 @@ func (s *Server) postReceive(req Request) {
 			if mr.State == "source_gone" {
 				s.st.SetMRState(mr.ID, "open") // branch came back
 			}
-			// A queued merge stays queued across a push; the new head has
-			// to pass the gates on its own.
+			// A queued merge stays queued across a push by someone who can
+			// merge it, and the new head has to pass the gates on its own.
 			if mr.QueuedAt != "" {
-				control.TryQueuedMerge(s.st, s.cfg, mr.ID)
+				control.QueuedMergePushed(s.st, s.cfg, mr.ID, req.UserID)
 			}
 		}
 	}

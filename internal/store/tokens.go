@@ -64,6 +64,19 @@ func (s *Store) APITokenUser(tokenHash string) (User, APIToken, error) {
 	return u, t, err
 }
 
+// APITokenByID loads a token by id, expired or not.
+func (s *Store) APITokenByID(id int64) (APIToken, error) {
+	var t APIToken
+	var exp sql.NullString
+	err := s.DB.QueryRow("SELECT id, name, scope, created_at, expires_at FROM api_tokens WHERE id = ?", id).
+		Scan(&t.ID, &t.Name, &t.Scope, &t.CreatedAt, &exp)
+	if errors.Is(err, sql.ErrNoRows) {
+		return t, ErrNotFound
+	}
+	t.ExpiresAt = parseTime(exp)
+	return t, err
+}
+
 func (s *Store) ListAPITokens(userID int64) ([]APIToken, error) {
 	rows, err := s.DB.Query(`
 		SELECT t.id, t.name, t.scope, t.created_at, t.expires_at, t.last_used_at, COALESCE(p.name, '')

@@ -17,7 +17,7 @@ func TestMergeQueueRoundTrip(t *testing.T) {
 	if mr.QueuedAt != "" {
 		t.Fatalf("fresh MR is queued: %+v", mr)
 	}
-	if err := s.QueueMerge(mr.ID, uid, "ff"); err != nil {
+	if err := s.QueueMerge(mr.ID, uid, "ff", 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetMergeQueueReason(mr.ID, "checks pending"); err != nil {
@@ -32,7 +32,7 @@ func TestMergeQueueRoundTrip(t *testing.T) {
 		t.Fatalf("MRByID = %+v, %v", byID, err)
 	}
 
-	if err := s.QueueMerge(mr.ID, uid, "merge"); err != nil {
+	if err := s.QueueMerge(mr.ID, uid, "merge", 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	mr, _ = s.MRByNumber(repoID, 1)
@@ -68,7 +68,7 @@ func TestMergeQueueLeftOnMergeOrClose(t *testing.T) {
 		if err := s.SetMRState(mr.ID, "open"); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.QueueMerge(mr.ID, uid, ""); err != nil {
+		if err := s.QueueMerge(mr.ID, uid, "", 0, 0); err != nil {
 			t.Fatal(err)
 		}
 		if err := mark(); err != nil {
@@ -83,9 +83,54 @@ func TestMergeQueueLeftOnMergeOrClose(t *testing.T) {
 	if err := s.SetMRState(mr.ID, "open"); err != nil {
 		t.Fatal(err)
 	}
-	s.QueueMerge(mr.ID, uid, "")
+	s.QueueMerge(mr.ID, uid, "", 0, 0)
 	s.SetMRState(mr.ID, "source_gone")
 	if got, _ := s.MRByNumber(repoID, 1); got.QueuedAt == "" {
 		t.Fatal("source_gone dropped the queued merge")
+	}
+}
+
+// A queued merge remembers the credential it was queued with, and a
+// removed key or revoked token reads back as gone rather than as some
+// later credential that reused the id.
+func TestMergeQueueCredential(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	mr, _ := s.MRByNumber(repoID, 1)
+	if err := s.AddSSHKey(uid, "SHA256:k1", "ssh-ed25519", []byte("b1"), "full", ""); err != nil {
+		t.Fatal(err)
+	}
+	key, err := s.SSHKeyByFingerprint("SHA256:k1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.QueueMerge(mr.ID, uid, "", key.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if q, err := s.MergeQueueCredential(mr.ID); err != nil || q.Kind != "key" || q.KeyID != key.ID {
+		t.Fatalf("credential = %+v, %v", q, err)
+	}
+	if err := s.RemoveSSHKey(uid, "SHA256:k1"); err != nil {
+		t.Fatal(err)
+	}
+	if q, _ := s.MergeQueueCredential(mr.ID); q.Kind != "key" || q.KeyID != 0 {
+		t.Fatalf("credential after key removal = %+v, want key with id 0", q)
+	}
+	if err := s.QueueMerge(mr.ID, uid, "", 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if q, _ := s.MergeQueueCredential(mr.ID); q.Kind != "" {
+		t.Fatalf("web-queued credential = %+v", q)
+	}
+}
+
+// A merge request whose source branch is gone is not one a status can
+// merge.
+func TestQueuedMRsAtHeadSkipsSourceGone(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	mr, _ := s.MRByNumber(repoID, 1)
+	s.QueueMerge(mr.ID, uid, "", 0, 0)
+	s.SetMRState(mr.ID, "source_gone")
+	if ids, _ := s.QueuedMRsAtHead(repoID, "abc123"); len(ids) != 0 {
+		t.Fatalf("QueuedMRsAtHead = %v, want none", ids)
 	}
 }

@@ -1047,6 +1047,16 @@ func runMRRetarget(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.AddMRSystemComment(mr.ID, c.User.ID, fmt.Sprintf("retargeted from %s to %s", old, target))
+	// A queued merge was asked for against the old target. Someone who
+	// could not merge it themselves does not get to point it elsewhere.
+	if mr.QueuedAt != "" {
+		grant, err := c.Store.AccessRole(repo.ID, c.User.ID)
+		if err != nil || !policy.CanWrite(c.User, repo, grant) {
+			mergeQueueMu.Lock()
+			dequeueWithReason(c.Store, mr, fmt.Sprintf("%s retargeted it to %s and cannot merge into %s", c.User.Username, target, repo.Path()))
+			mergeQueueMu.Unlock()
+		}
+	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.retargeted",
 		fmt.Sprintf(`{"number":%d,"from":%q,"to":%q}`, mr.Number, old, target))
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
@@ -1357,6 +1367,11 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 	// rebase when fast-forward is already possible IS a fast-forward
 	// (nothing is rewritten), so it stays legal.
 	if repo.Settings.RequireSignedCommits {
+		if c.Source == queueSource && !ffPossible {
+			return c.fail(protocol.ExitDenied,
+				"%s is behind %s and %s requires signed commits, so the server cannot rebase it; rebase and push, and the merge stays queued",
+				mr.SourceRef, mr.TargetRef, repo.Path())
+		}
 		if strategy == "merge" || strategy == "squash" || !ffPossible {
 			return c.fail(protocol.ExitDenied,
 				"%s requires signed commits, so only fast-forward merges are allowed; rebase %s onto %s locally, re-push, and merge again",
