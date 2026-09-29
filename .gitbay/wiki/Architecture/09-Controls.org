@@ -40,6 +40,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Admin functions isolated                    | in place | =admin= noun gated in =Dispatch=; =audit= admin-only             |
 | CSRF protection                             | in place | SameSite=Lax plus =checkOrigin= (=accounts.go=)               |
 | Typed confirmation for destructive web actions | in place | =internal/httpd/confirm.go=                                  |
+| Deleted rows' ids never handed out again   | in place | AUTOINCREMENT on accounts, orgs, repositories, keys, tokens and the delivery queues; build ids from a high-water mark (=internal/store/builds.go=), so a grant, deploy key, parked about text, token or claim naming a deleted row names nothing; deletes take the grants, deploy keys and about texts that name the row by id |
 
 ** Input handling and output encoding (V5)
 

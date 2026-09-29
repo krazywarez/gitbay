@@ -23,6 +23,19 @@ anything beyond "replace the binary and restart" is needed.
 - A reply whose header has a field name outside RFC 5322 =ftext=
   (=From : x=), no single From, or a repeated To, Cc, Message-ID,
   Content-Type or Content-Transfer-Encoding is refused. (#307)
+- Ids of accounts, organizations, repositories, SSH keys, API tokens,
+  webhook deliveries, queued pushes and builds are no longer handed out
+  again after a delete. Before, the next row took the id of the newest
+  deleted one, with anything that still named it: a deleted account's
+  repository grants, a deleted repository's deploy keys, signed LFS and
+  reply-by-mail tokens, a runner's claimed build. The migration rebuilds
+  those tables and starts each sequence above every id still named
+  (#306).
+- Deleting an account or organization removes its repository grants
+  and its parked profile about text, and deleting a repository removes
+  its deploy keys. On upgrade, rows of these kinds left by earlier
+  deletes are removed, and the "schema migrated" log line gives how many
+  (#306).
 
 * v1.39.0 — 2026-09-29
 
