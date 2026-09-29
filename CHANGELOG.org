@@ -19,6 +19,13 @@ anything beyond "replace the binary and restart" is needed.
   global gitconfig are ignored. A source that redirects (a renamed
   repository) fails; import from the URL it redirects to. Needs git
   2.37 or later on the server (#298).
+- =repo import-issues= resolves and checks the API host and the git
+  host once and connects only to the checked addresses: the API client
+  dials them with no proxy from the environment and follows no
+  redirect, and the pull-head fetch runs git pinned, with redirects
+  off and without the system and global gitconfig. =--api-base= refuses
+  credentials, a query or a fragment. An API that redirects (a renamed
+  repository) fails; import under the new name (#301).
 - =repo mirror add= refuses a host written numerically (=127.1=,
   =2130706433=, =0x7f.1=) when the mirror is added, rather than at its
   first sync (#298).

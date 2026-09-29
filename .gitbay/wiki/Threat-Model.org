@@ -98,16 +98,19 @@ connection to a user-supplied address, pass the same SSRF guard: the
 scheme must be http/https and, unless =webhooks.allow_local= is set,
 the resolved address must not be loopback, private, shared
 (100.64.0.0/10), link-local, or multicast. The webhook dialer re-checks
-at connect time, and mirror sync and =repo import= resolve and check
-immediately before running git and pin it to the checked addresses
-(=internal/gitpin=), so a DNS answer that changes after validation
-still cannot reach private space. Redirects are never followed.
+at connect time, and mirror sync, =repo import= and =repo
+import-issues= resolve and check immediately before running git and pin
+it to the checked addresses (=internal/gitpin=), so a DNS answer that
+changes after validation still cannot reach private space;
+=import-issues= holds its API client to the API host's checked
+addresses the same way, with no proxy taken from the environment.
+Redirects are never followed.
 =repo import= refuses =git://=, which cannot be pinned. Mirror sync
 and =repo import= refuse a host written as a bare number or in
 hex/octal (=0x7f.1=, =2130706433=, =127.1=) rather than dotted
 decimal, since that form resolves differently across parsers; =repo
-mirror add= refuses it when the mirror is saved. GitHub-history import (=repo
-import-issues --api-base=) is not yet pinned (#301).
+mirror add= refuses it when the mirror is saved, and =repo
+import-issues= refuses it in =--api-base=.
 
 * Rendering pushed markup
 

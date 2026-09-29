@@ -75,7 +75,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
-| SSRF protection on user-supplied URLs       | partial  | webhooks at save and connect; mirrors at save and sync, =repo import= before its fetch, git pinned to the checked address (=internal/gitpin=); =repo import-issues --api-base= checked once and fetched unpinned (#301) |
+| SSRF protection on user-supplied URLs       | in place | webhooks at save and connect; mirrors at save and sync, =repo import= and =repo import-issues= before they fetch, git and the import API client pinned to the checked address (=internal/gitpin=) |
 | Webhook payload integrity                   | in place | HMAC-SHA256 header                                               |
 | SMTP credentials protected in transit       | in place | STARTTLS required for non-local relays, implicit TLS optional (=internal/mail/mail.go=) |
 | Upload size limits                          | in place | per-owner storage quota at push (=internal/sshd/sshd.go=); API body 1 MiB |
