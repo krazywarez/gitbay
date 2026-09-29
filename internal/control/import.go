@@ -39,7 +39,8 @@ case "$1" in
 esac
 `
 
-// importLookup resolves an import's host; tests replace it.
+// importLookup resolves the hosts repo import and repo import-issues
+// connect to; tests replace it.
 var importLookup gitpin.Lookup = gitpin.LookupIP
 
 func runRepoImport(c *Ctx, args []string) int {

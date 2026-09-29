@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"gitbay.org/gitbay/internal/gitpin"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -361,8 +362,21 @@ esac
 // Forgejo both publish pull heads under that name. Reports whether it
 // worked; a failure is not fatal, since importing issues from a
 // repository whose git data is not here yet is a reasonable thing to do.
+// git connects only to the addresses the remote's host resolved to and
+// passed the check here, as repo import does (#298, #301).
 func fetchPullHeads(c *Ctx, dir, remote, token string) bool {
-	env := []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + c.Cfg.Server.Root}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := gitpin.CheckGit(ctx); err != nil {
+		fmt.Fprintf(c.Stderr, "pull heads not fetched: %v\n", err)
+		return false
+	}
+	pinned, err := gitpin.Resolve(ctx, importLookup, remote, c.Cfg.Webhooks.AllowLocal)
+	if err != nil {
+		fmt.Fprintf(c.Stderr, "pull heads not fetched: %v\n", err)
+		return false
+	}
+	env := gitpin.Env(c.Cfg.Server.Root)
 	if token != "" {
 		askpass := filepath.Join(c.Cfg.Server.Root, "gh-import-askpass.sh")
 		if err := os.WriteFile(askpass, []byte(ghAskpass), 0o700); err != nil {
@@ -370,9 +384,7 @@ func fetchPullHeads(c *Ctx, dir, remote, token string) bool {
 		}
 		env = append(env, "GIT_ASKPASS="+askpass, "GITBAY_GH_TOKEN="+token)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	if err := gitutil.FetchPullHeads(ctx, dir, remote, io.Discard, env); err != nil {
+	if err := gitutil.FetchPullHeads(ctx, dir, remote, io.Discard, pinned.Args(), env); err != nil {
 		return false
 	}
 	return true

@@ -242,12 +242,13 @@ func FetchMirror(ctx context.Context, dir, url string, errW io.Writer, pin, env 
 //
 // One fetch for every pull request rather than one each: the ref count is
 // the repository's history, and asking a hundred times is a hundred
-// handshakes. extraEnv carries credentials via GIT_ASKPASS; the URL must
-// never contain them.
-func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, extraEnv []string) error {
-	cmd := exec.CommandContext(ctx, toolpath.Look("git"), "-C", dir, "fetch", "--no-write-fetch-head", "--no-tags",
+// handshakes. pin and env are as for FetchMirror; env carries
+// credentials via GIT_ASKPASS, and the URL must never contain them.
+func FetchPullHeads(ctx context.Context, dir, url string, errW io.Writer, pin, env []string) error {
+	args := append(append([]string{}, pin...), "-C", dir, "fetch", "--no-write-fetch-head", "--no-tags",
 		url, "+refs/pull/*/head:refs/gh-pull/*")
-	cmd.Env = append(os.Environ(), extraEnv...)
+	cmd := exec.CommandContext(ctx, toolpath.Look("git"), args...)
+	cmd.Env = env
 	cmd.Stderr = errW
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("fetch pull heads from %s: %w", url, err)
