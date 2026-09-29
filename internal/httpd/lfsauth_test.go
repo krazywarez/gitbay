@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -175,5 +176,49 @@ func TestLFSTokenNeedsCurrentAccess(t *testing.T) {
 	}
 	if op, _ := s.lfsAuth(lfsRequest(down), pub); op != "" {
 		t.Errorf("download after the repository went private: %q", op)
+	}
+}
+
+// A deploy key's token lasts as long as the deploy key: removed from the
+// repository or on a disabled account it is refused, and a read-only
+// binding never uploads.
+func TestLFSDeployKeyToken(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	repo := lfsTestRepo(t, st, u.ID, "app", "private")
+	secret, err := s.lfsSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	rw := fmt.Sprintf("deploy:%d:rw", repo.ID)
+	ro := fmt.Sprintf("deploy:%d:ro", repo.ID)
+
+	live := lfsTestKey(t, st, u.ID, "SHA256:deploy-live", rw)
+	if op, key := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "upload", now)), repo); op != "upload" || key != live {
+		t.Fatalf("live deploy key: %q, %d", op, key)
+	}
+
+	removed := lfsTestKey(t, st, u.ID, "SHA256:deploy-removed", rw)
+	tok := lfs.Sign(secret, repo.ID, removed, "download", now)
+	if err := st.RemoveDeployKey(repo.ID, "SHA256:deploy-removed"); err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(tok), repo); op != "" {
+		t.Errorf("removed deploy key: %q", op)
+	}
+
+	readOnly := lfsTestKey(t, st, u.ID, "SHA256:deploy-ro", ro)
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "download", now)), repo); op != "download" {
+		t.Errorf("read-only deploy key download: %q", op)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "upload", now)), repo); op != "" {
+		t.Errorf("read-only deploy key upload: %q", op)
+	}
+
+	if err := st.SetUserDisabled(u.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "download", now)), repo); op != "" {
+		t.Errorf("deploy key of a disabled account: %q", op)
 	}
 }
