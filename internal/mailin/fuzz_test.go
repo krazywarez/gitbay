@@ -21,12 +21,13 @@ func FuzzReply(f *testing.F) {
 	f.Add([]byte("Subject: x\r\n\r\nOn Mon wrote:\r\n> a\r\n-- \r\nsig\r\n"))
 	key := [][]byte{[]byte("0123456789abcdef0123456789abcdef")}
 	f.Fuzz(func(t *testing.T, raw []byte) {
+		parseRawHeader(raw)
 		msg, err := mail.ReadMessage(bytes.NewReader(raw))
 		if err != nil {
 			return
 		}
 		automatic(msg.Header)
-		if tok := findToken(msg.Header, "reply@x.example"); tok != "" {
+		if tok, _ := findToken(msg.Header, "reply@x.example", recipientFields); tok != "" {
 			mailreply.Verify(key, tok, fuzzNow)
 		}
 		if s, err := textBody(textproto.MIMEHeader(msg.Header), msg.Body, 1<<16); err == nil {
@@ -60,7 +61,11 @@ func FuzzDKIM(f *testing.F) {
 		if err != nil || len(from) != 1 {
 			return
 		}
+		rh, reason := parseRawHeader(raw)
+		if reason != "" {
+			return
+		}
 		p := &Processor{LookupTXT: (&fakeDNS{}).lookup}
-		p.dkimVerified(raw, msg.Header, from[0].Address)
+		p.dkimVerified(raw, rh, from[0].Address, "to")
 	})
 }

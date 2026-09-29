@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/emersion/go-msgauth/dkim"
+
+	"gitbay.org/gitbay/internal/mailreply"
 )
 
 // Fixed test keys: RSA 2048 and Ed25519.
@@ -322,6 +324,201 @@ func TestLookupKeyErrors(t *testing.T) {
 	for _, sel := range []string{"temp", "timeout"} {
 		if _, err := p.lookupKey(sel + "._domainkey.x"); !errors.As(err, &de) || !de.Temporary() {
 			t.Fatalf("%s: %v", sel, err)
+		}
+	}
+}
+
+// "From : x" is a field net/mail files under "From " and the dkim
+// package under "From". mallory, at the same provider domain as bob,
+// signs her own From, rewrites it as "From : ..." (relaxed
+// canonicalization still verifies it) and adds "From: bob" above:
+// net/mail reads bob as the sender, the signature covers mallory.
+func TestDKIMFromWithSpaceBeforeColon(t *testing.T) {
+	f, _ := dkimSetup(t)
+	m := signMsg(t, f.messageAs(t, f.bob, "mallory@example.test", "<poc@x>", "", "hi"), "example.test", "rsa", rsaKey, dkim.CanonicalizationRelaxed, nil)
+	m = strings.Replace(m, "From: Someone <mallory@example.test>", "From: Someone <bob@example.test>\r\nFrom : Someone <mallory@example.test>", 1)
+	res := f.p.Handle([]byte(m))
+	if res.Posted || !strings.Contains(res.Reason, "malformed header field name") {
+		t.Fatalf("result %+v", res)
+	}
+	if !strings.Contains(f.refusalReasons(t), "malformed header field name") {
+		t.Fatal("refusal not audited")
+	}
+}
+
+func replyAddr(t *testing.T, f *fixture) string {
+	return mailreply.Address(replyBase, f.token(t, f.bob))
+}
+
+func TestDKIMTokenBinding(t *testing.T) {
+	var relaxed dkim.Canonicalization = dkim.CanonicalizationRelaxed
+	for _, c := range []struct {
+		name   string
+		build  func(t *testing.T, f *fixture) string
+		reason string
+	}{
+		{"reply address in Delivered-To only", func(t *testing.T, f *fixture) string {
+			m := f.messageAs(t, f.bob, "bob@example.test", "<b1@x>", "Delivered-To: "+replyAddr(t, f)+"\r\n", "hi")
+			m = strings.Replace(m, "To: gitbay <"+replyAddr(t, f)+">", "To: friend@example.test", 1)
+			return signMsg(t, m, "example.test", "rsa", rsaKey, relaxed, nil)
+		}, "reply address not in To or Cc"},
+		{"To not in h=", func(t *testing.T, f *fixture) string {
+			return signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<b2@x>", "", "hi"), "example.test", "rsa", rsaKey, relaxed,
+				func(o *dkim.SignOptions) { o.HeaderKeys = []string{"from", "subject", "message-id", "content-type"} })
+		}, "to not in h="},
+		{"replayed with the reply address added in an unsigned Cc", func(t *testing.T, f *fixture) string {
+			m := f.messageAs(t, f.bob, "bob@example.test", "<b3@x>", "", "hi")
+			m = strings.Replace(m, "To: gitbay <"+replyAddr(t, f)+">", "To: friend@example.test", 1)
+			m = signMsg(t, m, "example.test", "rsa", rsaKey, relaxed, nil)
+			return "Cc: " + replyAddr(t, f) + "\r\n" + m
+		}, "cc not in h="},
+		{"replayed with the To replaced", func(t *testing.T, f *fixture) string {
+			m := f.messageAs(t, f.bob, "bob@example.test", "<b4@x>", "", "hi")
+			m = strings.Replace(m, "To: gitbay <"+replyAddr(t, f)+">", "To: friend@example.test", 1)
+			m = signMsg(t, m, "example.test", "rsa", rsaKey, relaxed, nil)
+			return strings.Replace(m, "To: friend@example.test", "To: "+replyAddr(t, f), 1)
+		}, "signature did not verify"},
+		{"second To field", func(t *testing.T, f *fixture) string {
+			m := signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<b5@x>", "", "hi"), "example.test", "rsa", rsaKey, relaxed, nil)
+			return "To: other@example.test\r\n" + m
+		}, "more than one to field"},
+		{"Message-ID not in h=", func(t *testing.T, f *fixture) string {
+			return signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<b6@x>", "", "hi"), "example.test", "rsa", rsaKey, relaxed,
+				func(o *dkim.SignOptions) { o.HeaderKeys = []string{"from", "to", "subject", "content-type"} })
+		}, "message-id not in h="},
+		{"Content-Type not in h=", func(t *testing.T, f *fixture) string {
+			return signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<b7@x>", "", "hi"), "example.test", "rsa", rsaKey, relaxed,
+				func(o *dkim.SignOptions) { o.HeaderKeys = []string{"from", "to", "subject", "message-id"} })
+		}, "content-type not in h="},
+		{"unsigned quoted-printable Content-Transfer-Encoding", func(t *testing.T, f *fixture) string {
+			return signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<b8@x>", "Content-Transfer-Encoding: quoted-printable\r\n", "hi"),
+				"example.test", "rsa", rsaKey, relaxed, nil)
+		}, "content-transfer-encoding not in h= and not 7bit"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f, _ := dkimSetup(t)
+			res := f.p.Handle([]byte(c.build(t, f)))
+			if res.Posted || res.Retry || !strings.Contains(res.Reason, c.reason) {
+				t.Fatalf("result %+v, want %q", res, c.reason)
+			}
+			if !strings.Contains(f.refusalReasons(t), c.reason) {
+				t.Fatal("refusal not audited")
+			}
+		})
+	}
+}
+
+// Content-Transfer-Encoding in h= passes when the message has one, and
+// a reply address in a signed Cc passes.
+func TestDKIMSignedCTEAndCc(t *testing.T) {
+	f, _ := dkimSetup(t)
+	keys := append([]string{"content-transfer-encoding"}, exampleKeys...)
+	m := signMsg(t, f.messageAs(t, f.bob, "bob@example.test", "<p1@x>", "Content-Transfer-Encoding: 7bit\r\n", "hi"),
+		"example.test", "rsa", rsaKey, dkim.CanonicalizationRelaxed, func(o *dkim.SignOptions) { o.HeaderKeys = keys })
+	if res := f.p.Handle([]byte(m)); !res.Posted {
+		t.Fatalf("CTE signed: %+v", res)
+	}
+	m = f.messageAs(t, f.bob, "bob@example.test", "<p2@x>", "", "hi")
+	m = strings.Replace(m, "To: gitbay <"+replyAddr(t, f)+">", "To: friend@example.test\r\nCc: "+replyAddr(t, f), 1)
+	m = signMsg(t, m, "example.test", "rsa", rsaKey, dkim.CanonicalizationRelaxed,
+		func(o *dkim.SignOptions) { o.HeaderKeys = append([]string{"cc"}, exampleKeys...) })
+	if res := f.p.Handle([]byte(m)); !res.Posted {
+		t.Fatalf("signed Cc: %+v", res)
+	}
+}
+
+// With only trusted_authserv_id set, the reply address may still come
+// from Delivered-To.
+func TestAuthservTokenFromDeliveredTo(t *testing.T) {
+	f := setup(t)
+	f.p.Cfg.Mail.Inbound.TrustedAuthservID = "mx.example.net"
+	m := f.messageAs(t, f.bob, "bob@example.test", "<ar@x>",
+		"Authentication-Results: mx.example.net; dmarc=pass header.from=example.test\r\nDelivered-To: "+replyAddr(t, f)+"\r\n", "hi")
+	m = strings.Replace(m, "To: gitbay <"+replyAddr(t, f)+">", "To: friend@example.test", 1)
+	if res := f.p.Handle([]byte(m)); !res.Posted {
+		t.Fatalf("result %+v", res)
+	}
+}
+
+// A copy of a signed message posts once, whatever unsigned fields or
+// signatures were changed on the way.
+func TestDKIMDedupeBySignature(t *testing.T) {
+	f, _ := dkimSetup(t)
+	m := f.messageAs(t, f.bob, "bob@example.test", "<gone@x>", "", "hi")
+	m = strings.Replace(m, "Message-ID: <gone@x>\r\n", "", 1)
+	m = signMsg(t, m, "example.test", "rsa", rsaKey, dkim.CanonicalizationRelaxed, nil)
+	if res := f.p.Handle([]byte(m)); !res.Posted {
+		t.Fatalf("first: %+v", res)
+	}
+	if res := f.p.Handle([]byte("X-Resent: 1\r\n" + m)); res.Posted || !strings.Contains(res.Reason, "already posted") {
+		t.Fatalf("copy with an unsigned field added: %+v", res)
+	}
+
+	msg := f.messageAs(t, f.bob, "bob@example.test", "<dual@x>", "", "hi")
+	rsaSig := strings.TrimSuffix(signMsg(t, msg, "example.test", "rsa", rsaKey, dkim.CanonicalizationRelaxed, nil), msg)
+	edSigned := signMsg(t, msg, "example.test", "ed", edKey, dkim.CanonicalizationRelaxed, nil)
+	if res := f.p.Handle([]byte(rsaSig + edSigned)); !res.Posted {
+		t.Fatalf("dual-signed: %+v", res)
+	}
+	if res := f.p.Handle([]byte(edSigned)); res.Posted || !strings.Contains(res.Reason, "already posted") {
+		t.Fatalf("copy with one signature stripped: %+v", res)
+	}
+	if n := len(f.comments(t)); n != 2 {
+		t.Fatalf("%d comments", n)
+	}
+}
+
+func TestParseRawHeader(t *testing.T) {
+	for _, c := range []struct{ raw, reason string }{
+		{"From: a@b\r\nTo: c@d\r\n\r\nbody", ""},
+		{"From: a@b\n Subject-ish continuation\nTo: c@d\n\nbody", ""},
+		{"From : a@b\r\n\r\n", "malformed header field name"},
+		{"From\t: a@b\r\n\r\n", "malformed header field name"},
+		{"Fr\xc3\xb6m: a@b\r\nFrom: a@b\r\n\r\n", "malformed header field name"},
+		{" From: a@b\r\n\r\n", "malformed header"},
+		{"From: a@b\r\nnot a field\r\n\r\n", "malformed header"},
+		{"From: a@b\r\n: x\r\n\r\n", "malformed header"},
+		{"To: c@d\r\n\r\n", "no From field"},
+		{"From: a@b\r\nfROM: c@d\r\n\r\n", "more than one From field"},
+		{"From: a@b\r\nMessage-Id: 1\r\nMESSAGE-ID: 2\r\n\r\n", "more than one message-id field"},
+		{"From: a@b\r\n\r\nFrom : in the body is fine\r\n", ""},
+	} {
+		if _, got := parseRawHeader([]byte(c.raw)); got != c.reason {
+			t.Errorf("%q: %q, want %q", c.raw, got, c.reason)
+		}
+	}
+	h, _ := parseRawHeader([]byte("DKIM-Signature: v=1; b=ab\r\n cd ;d=x\r\nFrom: a@b\r\ndkim-signature: b= ef\r\n\r\n"))
+	if len(h.dkimB) != 2 || h.dkimB[0] != "abcd" || h.dkimB[1] != "ef" {
+		t.Fatalf("dkimB = %q", h.dkimB)
+	}
+	if h, _ := parseRawHeader([]byte("From: a@b\r\nContent-Transfer-Encoding:\r\n Quoted-Printable \r\n\r\n")); h.cte != "quoted-printable" {
+		t.Fatalf("cte = %q", h.cte)
+	}
+}
+
+// The shape Thunderbird sends through Migadu: Content-Transfer-Encoding
+// outside h=. An identity encoding posts; one that changes the decoded
+// body, added unsigned, is refused.
+func TestDKIMUnsignedCTE(t *testing.T) {
+	for _, c := range []struct {
+		cte  string
+		post bool
+	}{{"7bit", true}, {" 8BIT ", true}, {"binary", true}, {"quoted-printable", false}, {"base64", false}} {
+		f, _ := dkimSetup(t)
+		msg := "From: Bob <bob@example.test>\r\nTo: " + replyAddr(t, f) + "\r\nSubject: Re: [alice/app] #1: title\r\n" +
+			"Date: Tue, 29 Sep 2026 12:00:00 -0500\r\nMessage-ID: <tb-" + strings.TrimSpace(c.cte) + "@example.test>\r\nMIME-Version: 1.0\r\n" +
+			"Content-Type: text/plain; charset=UTF-8; format=flowed\r\nContent-Transfer-Encoding:" + c.cte + "\r\n\r\nThunderbird reply.\r\n"
+		m := signMsg(t, msg, "example.test", "rsa", rsaKey, dkim.CanonicalizationSimple, nil)
+		if !strings.Contains(m, "a=rsa-sha256;") || !strings.Contains(m, "c=simple/simple;") || !strings.Contains(m, "d=example.test;") ||
+			!strings.Contains(m, "h=from:to:subject:date:message-id:mime-version:content-type;") {
+			t.Fatalf("signature not in the expected shape:\n%s", m)
+		}
+		res := f.p.Handle([]byte(m))
+		if res.Posted != c.post {
+			t.Fatalf("CTE %q: posted %v, want %v (%+v)", c.cte, res.Posted, c.post, res)
+		}
+		if !c.post && !strings.Contains(res.Reason, "content-transfer-encoding not in h=") {
+			t.Fatalf("CTE %q: reason %q", c.cte, res.Reason)
 		}
 	}
 }

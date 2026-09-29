@@ -3,9 +3,10 @@ package mailin
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net"
-	"net/mail"
 	"strings"
 	"sync"
 	"time"
@@ -20,8 +21,11 @@ const (
 	// dnsTimeout bounds one selector key lookup.
 	dnsTimeout = 5 * time.Second
 	// futureSkew is how far ahead of this clock a signature's t= may be.
-	futureSkew   = 15 * time.Minute
-	keyCacheTTL  = time.Hour
+	futureSkew = 15 * time.Minute
+	// keyCacheTTL is how long a key record is reused. The resolver API
+	// does not report the record's TTL, so this is short: a revoked key
+	// is still honoured for up to this long.
+	keyCacheTTL  = 15 * time.Minute
 	keyCacheSize = 256
 )
 
@@ -101,32 +105,46 @@ func (p *Processor) lookupKey(name string) ([]string, error) {
 }
 
 // dkimVerified checks the DKIM signatures on raw, the message as it
-// was fetched. It returns "" when one of the first maxSignatures
-// verifies, covers From in h=, has a d= in relaxed alignment with the
-// From domain, has not expired and is not dated in the future. retry is
-// true when no signature passed and one could not be checked because
-// its key lookup failed for a reason that may pass.
-func (p *Processor) dkimVerified(raw []byte, h mail.Header, from string) (reason string, retry bool) {
-	_, fromDomain, ok := strings.Cut(strings.ToLower(from), "@")
-	if !ok || fromDomain == "" {
-		return "no From domain", false
+// was fetched. A signature passes when it is one of the first
+// maxSignatures, verifies, has a d= in relaxed alignment with the From
+// domain, has not expired, is not dated in the future, and its h=
+// covers From, tokenField (the To or Cc the reply address was read
+// from), Content-Type, and Message-ID when the message has one. An
+// unsigned Content-Transfer-Encoding is accepted only when it is an
+// identity encoding (7bit, 8bit, binary), which does not change what
+// the body decodes to; mail clients commonly leave it out of h=. It returns an id for each passing
+// signature (a hash of its b=), or the refusal's reason. retry is true
+// when none passed and one could not be checked because its key lookup
+// failed for a reason that may pass.
+func (p *Processor) dkimVerified(raw []byte, rh rawHeader, from, tokenField string) (ids []string, reason string, retry bool) {
+	fromDomain := ""
+	if i := strings.LastIndex(from, "@"); i >= 0 {
+		fromDomain = strings.ToLower(from[i+1:])
 	}
-	// A second From field could be one the signature does not cover
-	// while it is the one read as the sender.
-	if len(h["From"]) != 1 {
-		return "more than one From field", false
+	if fromDomain == "" {
+		return nil, "no From domain", false
+	}
+	need := []string{"from", tokenField, "content-type"}
+	if rh.count["message-id"] > 0 {
+		need = append(need, "message-id")
+	}
+	cteOK := true
+	switch rh.cte {
+	case "7bit", "8bit", "binary":
+	default:
+		cteOK = rh.count["content-transfer-encoding"] == 0
 	}
 	verifs, err := dkim.VerifyWithOptions(bytes.NewReader(raw), &dkim.VerifyOptions{
 		LookupTXT: p.lookupKey, MaxVerifications: maxSignatures})
 	if err != nil && !errors.Is(err, dkim.ErrTooManySignatures) {
-		return "DKIM: unreadable message", false
+		return nil, "DKIM: unreadable message", false
 	}
 	if len(verifs) == 0 {
-		return "no DKIM-Signature", false
+		return nil, "no DKIM-Signature", false
 	}
 	now := p.now()
 	var fails []string
-	for _, v := range verifs {
+	for i, v := range verifs {
 		d := strings.ToLower(v.Domain)
 		why := ""
 		switch {
@@ -135,8 +153,6 @@ func (p *Processor) dkimVerified(raw []byte, h mail.Header, from string) (reason
 			why = "key lookup failed"
 		case v.Err != nil:
 			why = strings.TrimPrefix(v.Err.Error(), "dkim: ")
-		case !signsFrom(v.HeaderKeys):
-			why = "From field not signed"
 		case !v.Expiration.IsZero() && now.After(v.Expiration):
 			why = "signature has expired"
 		case !v.Time.IsZero() && v.Time.After(now.Add(futureSkew)):
@@ -144,21 +160,43 @@ func (p *Processor) dkimVerified(raw []byte, h mail.Header, from string) (reason
 		case !aligned(d, fromDomain):
 			why = "d= not aligned with the From domain"
 		default:
-			return "", false
+			if n := unsigned(v.HeaderKeys, need); n != "" {
+				why = n + " not in h="
+			} else if !cteOK && unsigned(v.HeaderKeys, []string{"content-transfer-encoding"}) != "" {
+				why = "content-transfer-encoding not in h= and not 7bit, 8bit or binary"
+			} else if i < len(rh.dkimB) && rh.dkimB[i] != "" {
+				sum := sha256.Sum256([]byte(rh.dkimB[i]))
+				ids = append(ids, "dkim:"+hex.EncodeToString(sum[:]))
+				continue
+			} else {
+				why = "no b= tag"
+			}
 		}
 		if len(d) > 100 {
 			d = d[:100]
 		}
 		fails = append(fails, "d="+d+": "+why)
 	}
-	return "DKIM: no passing signature aligned with the From domain (" + strings.Join(fails, "; ") + ")", retry
+	if len(ids) > 0 {
+		return ids, "", false
+	}
+	return nil, "DKIM: no passing signature aligned with the From domain (" + strings.Join(fails, "; ") + ")", retry
 }
 
-func signsFrom(keys []string) bool {
-	for _, k := range keys {
-		if strings.EqualFold(k, "from") {
-			return true
+// unsigned returns the first of need that keys (a signature's h=) does
+// not list, or "".
+func unsigned(keys, need []string) string {
+	for _, n := range need {
+		found := false
+		for _, k := range keys {
+			if strings.EqualFold(k, n) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return n
 		}
 	}
-	return false
+	return ""
 }

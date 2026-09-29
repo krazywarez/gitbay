@@ -140,6 +140,10 @@ func (p *Processor) Handle(raw []byte) Result {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return p.refuse(0, "", "empty message")
 	}
+	rh, reason := parseRawHeader(raw)
+	if reason != "" {
+		return p.refuse(0, "", reason)
+	}
 	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		return p.refuse(0, "", "unreadable message")
@@ -152,7 +156,7 @@ func (p *Processor) Handle(raw []byte) Result {
 		return p.refuse(0, msgID, "automatic reply")
 	}
 	in := p.Cfg.Mail.Inbound
-	token := findToken(msg.Header, in.ReplyAddress)
+	token, _ := findToken(msg.Header, in.ReplyAddress, recipientFields)
 	if token == "" {
 		return p.refuse(0, msgID, "not addressed to a reply address")
 	}
@@ -201,7 +205,8 @@ func (p *Processor) Handle(raw []byte) Result {
 	if !ok {
 		return p.refuse(u.ID, msgID, "From is not a verified address of the account")
 	}
-	if res := p.authenticate(raw, msg.Header, from[0].Address); res != nil {
+	sigIDs, res := p.authenticate(raw, rh, msg.Header, from[0].Address, token)
+	if res != nil {
 		if res.Retry {
 			return *res
 		}
@@ -248,13 +253,24 @@ func (p *Processor) Handle(raw []byte) Result {
 		sum := sha256.Sum256(raw)
 		id = "sha256:" + hex.EncodeToString(sum[:])
 	}
-	key := fmt.Sprintf("%d/%s/%d/%d/%s", u.ID, target.Kind, target.RepoID, target.Number, id)
-	claimed, err := p.St.ClaimMailReply(key)
-	if err != nil {
-		return Result{Retry: true, Reason: err.Error()}
+	// Each passing DKIM signature is claimed too, so a copy of a signed
+	// message is not posted again under another Message-ID or with
+	// unsigned fields changed.
+	var claims []string
+	for _, id := range append([]string{id}, sigIDs...) {
+		claims = append(claims, fmt.Sprintf("%d/%s/%d/%d/%s", u.ID, target.Kind, target.RepoID, target.Number, id))
 	}
-	if !claimed {
-		return p.refuse(u.ID, msgID, "already posted")
+	for n, k := range claims {
+		claimed, err := p.St.ClaimMailReply(k)
+		if err != nil || !claimed {
+			for _, k := range claims[:n] {
+				p.St.ReleaseMailReply(k)
+			}
+			if err != nil {
+				return Result{Retry: true, Reason: err.Error()}
+			}
+			return p.refuse(u.ID, msgID, "already posted")
+		}
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -266,8 +282,10 @@ func (p *Processor) Handle(raw []byte) Result {
 	if code == protocol.ExitOK {
 		return Result{Posted: true}
 	}
-	p.St.ReleaseMailReply(key)
-	reason := strings.TrimSpace(stderr.String())
+	for _, k := range claims {
+		p.St.ReleaseMailReply(k)
+	}
+	reason = strings.TrimSpace(stderr.String())
 	if code == protocol.ExitFailure {
 		return Result{Retry: true, Reason: reason}
 	}
@@ -279,32 +297,42 @@ func (p *Processor) Handle(raw []byte) Result {
 // authenticate checks that the mail host or the sender's domain vouches
 // for From: an Authentication-Results pass from trusted_authserv_id, or
 // a DKIM signature that verifies here with require_dkim. When both are
-// set either is enough. It returns nil when From is authenticated or
-// neither is set, and the unaudited refusal or retry otherwise.
-func (p *Processor) authenticate(raw []byte, h mail.Header, from string) *Result {
+// set either is enough. A DKIM pass also needs the reply address in a
+// signed To or Cc; an Authentication-Results pass takes it from any
+// recipient field. It returns nil when From is authenticated or neither
+// is set, and the unaudited refusal or retry otherwise; sigIDs are the
+// passing DKIM signatures when DKIM authenticated the reply.
+func (p *Processor) authenticate(raw []byte, rh rawHeader, h mail.Header, from, token string) (sigIDs []string, res *Result) {
 	in := p.Cfg.Mail.Inbound
 	var reasons []string
 	if id := in.TrustedAuthservID; id != "" {
 		reason := authenticated(h, id, from)
 		if reason == "" {
-			return nil
+			return nil, nil
 		}
 		reasons = append(reasons, reason)
 	}
 	if in.RequireDKIM {
-		reason, retry := p.dkimVerified(raw, h, from)
-		if reason == "" {
-			return nil
+		// The reply address must be in a field the signature covers,
+		// or a signed message could be redirected to any token.
+		tok, field := findToken(h, in.ReplyAddress, []string{"To", "Cc"})
+		if tok != token {
+			reasons = append(reasons, "DKIM: reply address not in To or Cc")
+		} else {
+			ids, reason, retry := p.dkimVerified(raw, rh, from, field)
+			if reason == "" {
+				return ids, nil
+			}
+			if retry {
+				return nil, &Result{Retry: true, Reason: reason}
+			}
+			reasons = append(reasons, reason)
 		}
-		if retry {
-			return &Result{Retry: true, Reason: reason}
-		}
-		reasons = append(reasons, reason)
 	}
 	if len(reasons) == 0 {
-		return nil
+		return nil, nil
 	}
-	return &Result{Reason: strings.Join(reasons, "; ")}
+	return nil, &Result{Reason: strings.Join(reasons, "; ")}
 }
 
 // createdAfter refuses when the row was created after the token was
@@ -370,10 +398,13 @@ func automatic(h mail.Header) bool {
 	return h.Get("X-Autoreply") != "" || h.Get("X-Autorespond") != ""
 }
 
-// findToken returns the reply token from the first recipient header
-// that carries one.
-func findToken(h mail.Header, base string) string {
-	for _, name := range []string{"Delivered-To", "X-Original-To", "Envelope-To", "To", "Cc"} {
+// recipientFields are where a reply address is looked for, in order.
+var recipientFields = []string{"Delivered-To", "X-Original-To", "Envelope-To", "To", "Cc"}
+
+// findToken returns the reply token from the first of names that
+// carries one, and that field's name in lower case.
+func findToken(h mail.Header, base string, names []string) (token, field string) {
+	for _, name := range names {
 		for _, v := range h[textproto.CanonicalMIMEHeaderKey(name)] {
 			addrs, err := mail.ParseAddressList(v)
 			if err != nil {
@@ -381,12 +412,12 @@ func findToken(h mail.Header, base string) string {
 			}
 			for _, a := range addrs {
 				if tok, ok := mailreply.TokenFrom(base, a.Address); ok {
-					return tok
+					return tok, strings.ToLower(name)
 				}
 			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // Poller reads the configured mailbox every poll interval.
