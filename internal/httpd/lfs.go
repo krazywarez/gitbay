@@ -75,8 +75,11 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 
 // lfsKeyAllows repeats git-lfs-authenticate's access check for the key
 // now: a deploy key by its binding, any other key by its account's
-// access narrowed by the key's scope.
+// access narrowed by the key's scope. An archived repo takes no uploads.
 func (s *Server) lfsKeyAllows(keyID int64, repo store.Repo, write bool) bool {
+	if write && repo.Settings.Archived {
+		return false
+	}
 	key, err := s.st.SSHKeyByID(keyID)
 	if err != nil {
 		return false

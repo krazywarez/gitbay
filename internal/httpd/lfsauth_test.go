@@ -222,3 +222,33 @@ func TestLFSDeployKeyToken(t *testing.T) {
 		t.Errorf("deploy key of a disabled account: %q", op)
 	}
 }
+
+// An upload token minted before the repository was archived uploads
+// nothing after it, as git-lfs-authenticate would refuse to mint one.
+func TestLFSUploadTokenRefusedOnceArchived(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	repo := lfsTestRepo(t, st, u.ID, "app", "private")
+	secret, err := s.lfsSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := lfsTestKey(t, st, u.ID, "SHA256:owner", "full")
+	now := time.Now()
+	up := lfs.Sign(secret, repo.ID, key, "upload", now)
+	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "upload" {
+		t.Fatalf("upload before archiving: %q", op)
+	}
+	if _, err := st.UpdateRepoSettings(repo.ID, func(rs *store.RepoSettings) { rs.Archived = true }); err != nil {
+		t.Fatal(err)
+	}
+	repo, err = st.RepoByID(repo.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "" {
+		t.Errorf("upload after archiving: %q", op)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, key, "download", now)), repo); op != "download" {
+		t.Errorf("download after archiving: %q", op)
+	}
+}

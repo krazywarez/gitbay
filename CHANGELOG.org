@@ -276,7 +276,8 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
 - Every LFS request also repeats the repository check for the token's
   key: a collaborator whose access is revoked or reduced, or a reader
   of a public repository made private, loses the token's use with the
-  access (#285).
+  access, and an upload token stops working once its repository is
+  archived (#285).
 
 * v1.36.0 — 2026-09-23
 
