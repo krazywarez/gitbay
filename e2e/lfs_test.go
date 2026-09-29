@@ -170,3 +170,57 @@ func TestLFS(t *testing.T) {
 		t.Fatal("corrupt object was stored")
 	}
 }
+
+// A transfer token works only while the key that obtained it does:
+// removing the key ends it before its hour is up (#285). No git-lfs
+// client needed: the token comes from git-lfs-authenticate over SSH.
+func TestLFSTokenEndsWithItsKey(t *testing.T) {
+	t.Parallel()
+	inst := startInstance(t)
+	aliceKey := inst.newKey(t, "alice")
+	inst.admin(t, "admin", "user", "create", "alice", "--key", aliceKey+".pub")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "repo", "create", "alice/vault", "--private"); code != 0 {
+		t.Fatalf("repo create: %s", errOut)
+	}
+	spare := inst.newKey(t, "spare")
+	pub, err := os.ReadFile(spare + ".pub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, string(pub), "keys", "add"); code != 0 {
+		t.Fatalf("keys add: %s", errOut)
+	}
+	out, errOut, code := inst.ssh(t, spare, "", "git-lfs-authenticate", "alice/vault", "download")
+	if code != 0 {
+		t.Fatalf("authenticate: %s", errOut)
+	}
+	var grant struct {
+		Header map[string]string `json:"header"`
+	}
+	if err := json.Unmarshal([]byte(out), &grant); err != nil {
+		t.Fatalf("authenticate JSON: %v\n%s", err, out)
+	}
+	batch := func() int {
+		body := fmt.Sprintf(`{"operation":"download","transfers":["basic"],"objects":[{"oid":%q,"size":4}]}`, strings.Repeat("ab", 32))
+		req, _ := http.NewRequest("POST",
+			fmt.Sprintf("http://127.0.0.1:%d/alice/vault.git/info/lfs/objects/batch", inst.httpPort),
+			strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/vnd.git-lfs+json")
+		req.Header.Set("Authorization", grant.Header["Authorization"])
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := batch(); code != 200 {
+		t.Fatalf("batch with a live key: %d", code)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "keys", "remove", fingerprint(t, spare+".pub")); code != 0 {
+		t.Fatalf("keys remove: %s", errOut)
+	}
+	if code := batch(); code != 404 {
+		t.Fatalf("batch after the key was removed: %d, want 404", code)
+	}
+}

@@ -109,9 +109,12 @@ no HTTP write path (=internal/httpd/smart.go=,
 ** F. LFS
 
 =git-lfs-authenticate= over SSH applies the same repository checks as
-git transport and returns a one-hour HMAC token scoped to repository
-and operation (=internal/sshd/lfs.go=, =internal/lfs/lfs.go=). The
-HTTP batch, upload and download endpoints verify that token; public
+git transport and returns a one-hour HMAC token scoped to repository,
+operation and the SSH key that asked for it, deploy keys included
+(=internal/sshd/lfs.go=, =internal/lfs/lfs.go=). The HTTP batch, upload
+and download endpoints verify that token and that its key is still
+registered, unexpired and on an enabled account (=store.LiveSSHKeys=),
+and repeat the repository check for the key on each request; public
 repositories allow anonymous download. Objects are verified against
 their SHA-256 id on upload.
 

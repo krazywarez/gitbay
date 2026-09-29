@@ -25,7 +25,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Session cookie flags                        | in place | HttpOnly, SameSite=Lax, Secure with TLS (=internal/httpd/accounts.go=) |
 | Session lifetime                            | in place | 12 hours idle, 7 days absolute (=internal/store/sessions.go=)            |
 | Credential expiry                           | in place | optional =--ttl= on API tokens, SSH and deploy keys; checked at auth and per exec |
-| Revocation takes effect immediately         | in place | removing a key or disabling an account closes its connections; every exec re-reads its key (=internal/sshd/sshd.go=) |
+| Revocation takes effect immediately         | in place | removing a key or disabling an account closes its connections; every exec re-reads its key (=internal/sshd/sshd.go=); LFS transfer tokens are refused with their key (=internal/httpd/lfs.go=) |
 | Delegation bounded by the delegating credential | partial | expiring tokens refused on =MintsCredential= commands; credentials record their creating token (=internal/control/control.go=); a web session can still mint credentials that outlive it (#297) |
 
 ** Access control (V4)

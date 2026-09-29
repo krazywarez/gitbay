@@ -22,7 +22,7 @@
 | Login link         | 32 random bytes hex in a URL                    | SHA-256 hash, single use         | creates a web session                      | 15 min (mail), 5 min (SSH)    | consumed on use                     |
 | Email verification | 32 random bytes hex                             | SHA-256 hash, single use         | verifies one address for one account       | 24 h                          | consumed on use                     |
 | Invite             | random code                                     | SHA-256 hash, single use         | one registration for one email             | as issued                     | consumed on use                     |
-| LFS transfer token | HMAC-SHA256 over repo, operation, expiry        | not stored (stateless)           | one repository, upload or download         | 1 h                           | expiry only                         |
+| LFS transfer token | HMAC-SHA256 over repo, SSH key, operation, expiry | not stored (stateless)       | one repository, upload or download         | 1 h                           | with its key: refused once the key is removed or expires, its account is disabled, or it loses the access the operation needs |
 
 Generation and hashing: =internal/store/sessions.go= (=NewToken=,
 =HashToken=, =crypto/rand=). Cookie attributes: =HttpOnly=,

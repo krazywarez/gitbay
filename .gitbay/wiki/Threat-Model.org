@@ -45,7 +45,9 @@ matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Archite
   re-reads its key. Removing a key, removing a deploy key, disabling or
   deleting an account closes the connections the affected keys opened:
   a git transport is killed with its children, and a push killed before
-  its pre-receive hook answers moves no ref. A control command already
+  its pre-receive hook answers moves no ref.
+  An LFS transfer token names the key that obtained it and is refused
+  from the moment that key is. A control command already
   inside its database write finishes it; its output is lost. A
   revocation made by =gitbayd admin= on the host, another process, is
   found within 15 seconds. In =ssh.mode = "system"= each exec is its
