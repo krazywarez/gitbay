@@ -180,7 +180,8 @@ func TestStdinCommandsReadStdin(t *testing.T) {
 	for _, cmd := range Commands() {
 		u := cmd.Usage
 		wants := strings.Contains(u, "--file -") || strings.Contains(u, "< ") ||
-			strings.Contains(u, "stdin") || strings.Contains(u, "--key -")
+			strings.Contains(u, "stdin") || strings.Contains(u, "--key -") ||
+			strings.Contains(u, "--secret -")
 		if wants && !cmd.ReadsStdin {
 			t.Errorf("%s: usage %q reads stdin but ReadsStdin is not set", strings.Join(cmd.Path, " "), u)
 		}

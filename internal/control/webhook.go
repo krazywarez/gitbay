@@ -87,7 +87,7 @@ func runWebhookAdd(c *Ctx, args []string) int {
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "reading secret: %v", err)
 		}
-		secret = strings.TrimRight(string(raw), "\n")
+		secret = strings.TrimRight(string(raw), "\r\n")
 		if secret == "" {
 			return c.fail(protocol.ExitUsage, "no secret on stdin (pipe it: printf %%s SECRET | ... --secret -)")
 		}

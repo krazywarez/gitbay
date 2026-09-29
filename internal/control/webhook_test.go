@@ -70,11 +70,15 @@ func TestWebhookAddSecretFromStdin(t *testing.T) {
 	if msg, code := run("not a secret\n", "webhook", "add", repo.Path(), "http://127.0.0.1/other"); code != protocol.ExitOK {
 		t.Fatalf("no secret: exit %d, %q", code, msg)
 	}
+	// A secret from a file with CRLF line endings loses the \r too.
+	if msg, code := run("crlf\r\n", "webhook", "add", repo.Path(), "http://127.0.0.1/crlf", "--secret", "-"); code != protocol.ExitOK {
+		t.Fatalf("CRLF secret: exit %d, %q", code, msg)
+	}
 	hooks, err := st.ListWebhooks(repo.ID)
-	if err != nil || len(hooks) != 2 {
+	if err != nil || len(hooks) != 3 {
 		t.Fatalf("hooks: %+v %v", hooks, err)
 	}
-	if hooks[0].Secret != "s3cret" || hooks[1].Secret != "" {
-		t.Fatalf("secrets: %q, %q", hooks[0].Secret, hooks[1].Secret)
+	if hooks[0].Secret != "s3cret" || hooks[1].Secret != "" || hooks[2].Secret != "crlf" {
+		t.Fatalf("secrets: %q, %q, %q", hooks[0].Secret, hooks[1].Secret, hooks[2].Secret)
 	}
 }
