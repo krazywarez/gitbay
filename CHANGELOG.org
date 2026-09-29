@@ -12,6 +12,20 @@ anything beyond "replace the binary and restart" is needed.
   layout puts old and new side by side, each column's line numbers
   comment on their own side, and a narrow window stacks the rows as a
   unified diff. Migration 0068 adds =users.diff_layout=. (#290)
+- Suggested changes in review threads: a fenced =suggestion= block in
+  an =mr diff-comment= body proposes replacement lines for the
+  anchored range, and =--start-line= anchors a thread to a range.
+  =mr threads= and the page show it as a diff, marked outdated once
+  the lines change at the head or the file is renamed or deleted;
+  the JSON carries it as =suggestion=. =mr apply-suggestion= and the
+  page's button commit it to the source branch as the applier, under
+  the branch's push policy and write rules; a queued merge sees it as
+  a push. The thread is resolved when the applier could resolve it by
+  hand, and otherwise stays open with the output saying so. On a
+  repository requiring signed commits the CLI commits and signs it in
+  the clone instead. =repo commit-file= and applying a suggestion
+  refuse once the owner's storage quota is used up, as a push does.
+  Migration 0069 (#288).
 
 * v1.38.0 — 2026-09-29
 

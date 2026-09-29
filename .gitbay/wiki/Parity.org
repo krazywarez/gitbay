@@ -39,6 +39,8 @@ browser-only and the iOS build screen unable to say more than the log.
 | review (approve etc.)  | yes | yes | yes |
 | resolve a thread       | yes | yes | yes |
 | comment on a diff line | yes | yes | yes |
+| suggest a change       | yes | yes | no  |
+| apply a suggestion     | yes | yes | no  |
 | merge (all strategies) | yes | yes | yes |
 | merge when ready, cancel | yes | yes | no  |
 | close                  | yes | yes | yes |
@@ -479,6 +481,12 @@ refused outright on the other surfaces; the refusal is gone, so each is
 now a page waiting to be built rather than a rule. A credential still
 travels on stdin wherever it is set, since argv is world-readable in
 /proc and the audit log keeps flag values.
+
+Applying a suggestion on a repository that requires signed commits is
+CLI-only by mechanism: the server has no key to sign the commit with,
+so =gitbay mr apply-suggestion= makes and signs it in a clone with the
+user's own git signing configuration and pushes it. The web shows that
+command in place of the button.
 
 Deleting or transferring a repository stays CLI-only on purpose, as
 does deleting an organization and pruning merge request heads (=admin

@@ -566,6 +566,48 @@ Threads render inline on the MR page. A force-push marks them stale
 anchors; =mr show= reports the unresolved count. Resolving is for the
 thread author, the MR author, or anyone with write.
 
+A thread can span lines: =--start-line 12 --line 13= anchors it to
+lines 12 and 13 of the new file. A fenced =suggestion= block in the
+comment proposes replacement lines for that range; an empty block
+proposes deleting it.
+
+#+begin_src sh
+gitbay mr diff-comment 4 --path main.go --start-line 12 --line 13 --file - < suggestion.md
+gitbay mr apply-suggestion 4 9       # commit thread 9's suggestion
+#+end_src
+
+where =suggestion.md= is
+
+#+begin_example
+one call does both
+```suggestion
+	log.Printf("starting %s", name)
+```
+#+end_example
+
+The page and =mr threads= show a suggestion as the lines it replaces
+and the lines it proposes; =mr threads --json= carries it as
+=suggestion= with the path, the line range, the commit and blob it was
+made against, the original and replacement text, =outdated= with a
+reason, and =apply= (=server= or =local=). A suggestion is outdated
+once the lines it replaces differ at the head from what it was made
+against, or the file is renamed or deleted; it cannot be applied then.
+
+Applying commits the replacement to the source branch as the applying
+user, with a message naming the merge request and thread, and resolves
+the thread if the applier could resolve it by hand (the thread author,
+the MR author, or a writer of the target); otherwise the thread stays
+open and the output says so. It is a push: only the source branch's
+writers can apply (for a merge request from a fork, the fork's
+writers), the branch's protection, =require-mr= and the owner's storage
+quota apply, and a queued merge treats it as a push by the applier. The web's Apply suggestion button and =mr
+apply-suggestion= commit it on the server. The server cannot sign, so
+where the source or target requires signed commits (=apply= is
+=local=) the CLI fetches the source branch into the clone it runs in,
+builds the commit without touching the working tree, signs it with
+=git commit-tree -S= under your git signing configuration, pushes it,
+and resolves the thread; the page shows that command.
+
 * CI builds
 
 A =.gitbay/ci.yml= in the repo runs jobs on every branch push:
