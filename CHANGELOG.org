@@ -8,6 +8,9 @@ anything beyond "replace the binary and restart" is needed.
 
 - Marking notifications read from the web dispatches =notifications
   read=, so it counts against the write budget and is audited (#261).
+- =gitbay <cli path> --help= for commands the CLI regroups (=auth keys
+  add=, =auth email list=, =repo topics list=) prints EXAMPLES under the
+  CLI's path instead of the registered one (#304).
 - =gitbayd admin backup --verify= also checks every release asset the
   database names against its recorded size and sha256, and every
   archived LFS object against its name (#259).

@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"gitbay.org/gitbay/internal/control"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 // TestServerPathMismatches pins the commands whose CLI path differs from
@@ -77,5 +82,52 @@ func TestHelpArgvSendsThePathForAMismatchedGroup(t *testing.T) {
 	want := []string{"--path=auth keys", "help", "keys"}
 	if !slices.Equal(got, want) {
 		t.Errorf("helpArgv(keys, auth keys) = %v, want %v", got, want)
+	}
+}
+
+// TestRenamedCommandHelpNamesTheCLIPath runs the server's help for every
+// command whose CLI path differs from its registered path, sent as the
+// CLI sends it, and fails if the text names the registered path where the
+// CLI's belongs (#304).
+func TestRenamedCommandHelpNamesTheCLIPath(t *testing.T) {
+	type renamed struct{ cli, server string }
+	var cmds []renamed
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if p := c.Annotations[serverPath]; p != "" && p != "help" {
+			if cli := cliPathOf(c); cli != p {
+				cmds = append(cmds, renamed{cli, p})
+			}
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	root := newRoot()
+	root.InitDefaultHelpCmd()
+	walk(root)
+	if len(cmds) == 0 {
+		t.Fatal("no renamed commands found")
+	}
+	for _, rc := range cmds {
+		argv := withCLIPath(rc.cli, rc.server, append([]string{"help"}, strings.Fields(rc.server)...))
+		var out, errOut bytes.Buffer
+		c := &control.Ctx{Stdout: &out, Stderr: &errOut, Scope: "full"}
+		c.Cfg.Server.SiteURL = "https://forge.test"
+		if code := control.Dispatch(c, argv); code != protocol.ExitOK {
+			t.Errorf("%v: exit %d: %s", argv, code, errOut.String())
+			continue
+		}
+		// What the CLI path itself contains (repo topics list holds the
+		// registered repo topics) is not a mismatch.
+		// SEE ALSO names sibling commands, which keep their own paths.
+		text, _, _ := strings.Cut(out.String(), "SEE ALSO")
+		text = strings.ReplaceAll(text, "gitbay "+rc.cli, "")
+		for _, line := range strings.Split(text, "\n") {
+			if strings.Contains(line, "gitbay "+rc.server+" ") || strings.HasSuffix(line, "gitbay "+rc.server) {
+				t.Errorf("%s: help names the registered path %q:\n%s", rc.cli, rc.server, out.String())
+				break
+			}
+		}
 	}
 }

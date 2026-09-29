@@ -310,7 +310,7 @@ func (c *Ctx) helpVerb(w io.Writer, cmd Command, below []Command) {
 		fmt.Fprintln(w)
 		c.heading(w, "EXAMPLES")
 		for _, ex := range cmd.Examples {
-			c.wrapLine(w, "  "+c.program()+" ", ex)
+			c.wrapLine(w, "  "+c.program()+" ", c.shownAs(registered, ex))
 		}
 	}
 	if len(below) > 0 {
