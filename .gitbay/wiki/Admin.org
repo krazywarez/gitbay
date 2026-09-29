@@ -193,12 +193,14 @@ push=.
   means no credential-bearing HTTP endpoint exists at all.
 
 ** [webhooks]
-- =allow_local= (false) — permit webhook and mirror targets on
+- =allow_local= (false) — permit webhook, mirror and import targets on
   loopback, private, shared (100.64.0.0/10), link-local or multicast
   addresses. Leave off unless you know why you need it (SSRF).
 
 ** [limits]
-- =clone_timeout= (3600s) — cap on =repo import= fetches.
+- =clone_timeout= (3600s) — cap on =repo import= fetches. An import
+  takes http and https URLs only, passes the same address check as a
+  mirror sync and is pinned the same way, so it needs git 2.37 too.
 - =max_blob_bytes= (100MB) — cap on raw file serving over the web.
 - =max_asset_bytes= (512MB) — cap per uploaded release asset.
 - =max_snippet_bytes= (1MB) — cap per snippet file.

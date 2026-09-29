@@ -91,18 +91,21 @@ no inbound HMAC.
 
 * Network-facing request forgery
 
-Webhook delivery, GitHub-history import =--api-base= and mirror
-remotes, which make the *server* open an outbound connection to a
-user-supplied address, pass the same SSRF guard: the scheme
-must be http/https and, unless =webhooks.allow_local= is set, the
-resolved address must not be loopback, private, shared
+Webhook delivery, GitHub-history import =--api-base=, mirror remotes
+and =repo import --from=, which make the *server* open an outbound
+connection to a user-supplied address, pass the same SSRF guard: the
+scheme must be http/https and, unless =webhooks.allow_local= is set,
+the resolved address must not be loopback, private, shared
 (100.64.0.0/10), link-local, or multicast. The webhook dialer re-checks
-at connect time, and the mirror worker resolves and checks before each
-sync and pins git to the checked addresses, so a DNS answer that
-changes after validation still cannot reach private space. Redirects
-are never followed. =repo import --from= is the exception: its clone
-checks the scheme but not the address, and follows git's default
-redirect rule (#298).
+at connect time, and mirror sync and =repo import= resolve and check
+immediately before running git and pin it to the checked addresses
+(=internal/gitpin=), so a DNS answer that changes after validation
+still cannot reach private space. Redirects are never followed.
+=repo import= refuses =git://=, which cannot be pinned, and a host
+written as a bare number or in hex/octal (=0x7f.1=, =2130706433=,
+=127.1=) rather than dotted decimal, since that form resolves
+differently across parsers. GitHub-history import (=repo
+import-issues --api-base=) is not yet pinned (#301).
 
 * Rendering pushed markup
 

@@ -11,6 +11,18 @@ anything beyond "replace the binary and restart" is needed.
   listings and shell history. A script that passed the value must pipe
   it: =printf %s "$SECRET" | gitbay webhook add <repo> <url> --secret -=
   (#284).
+- =repo import --from= takes http and https URLs only; =git://= is
+  refused, since its connection cannot be held to a checked address.
+  The host is resolved and checked like a mirror's, git connects only
+  to the checked addresses with redirects off, and the system and
+  global gitconfig are ignored. A source that redirects (a renamed
+  repository) fails; import from the URL it redirects to. Needs git
+  2.37 or later on the server (#298).
+*Upgrade note.* =repo import= and mirror sync now refuse a =git://=
+source and a =--from=/remote URL carrying a query or fragment. A
+mirror or import whose host is written numerically (=127.1=,
+=2130706433=, =0x7f.1=) rather than as a dotted address is refused
+too; rewrite it before upgrading.
 - The builds page's status badge section gives an org-mode snippet
   beside the Markdown one, for a README.org (#299).
 - API tokens on the settings page: create with a scope and optional

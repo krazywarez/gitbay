@@ -11,7 +11,7 @@ import (
 
 func TestRepoImport(t *testing.T) {
 	t.Parallel()
-	inst := startInstance(t)
+	inst := startInstanceWith(t, "[webhooks]\nallow_local = true\n")
 	aliceKey := inst.newKey(t, "alice")
 	inst.admin(t, "admin", "user", "create", "alice",
 		"--key", aliceKey+".pub", "--email", "alice@example.test", "--verified")
@@ -82,15 +82,6 @@ func TestRepoImport(t *testing.T) {
 		t.Fatalf("hooks not wired on imported repo:\n%s", pushOut)
 	}
 
-	// Import over git:// too.
-	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "settings", "git-daemon", "alice/src", "on"); code != 0 {
-		t.Fatalf("git-daemon on: %s", errOut)
-	}
-	gitURL := fmt.Sprintf("git://127.0.0.1:%d/alice/src.git", inst.gitPort)
-	if _, errOut, code = inst.ssh(t, aliceKey, "", "repo", "import", "alice/mirror2", "--from", gitURL); code != 0 {
-		t.Fatalf("git:// import: %s", errOut)
-	}
-
 	// Org-owned imports: allowed for org admins, refused for non-members.
 	if _, errOut, code := inst.ssh(t, aliceKey, "", "org", "create", "imports"); code != 0 {
 		t.Fatalf("org create: %s", errOut)
@@ -102,12 +93,13 @@ func TestRepoImport(t *testing.T) {
 		t.Fatalf("org import log: %d\n%s", code, out)
 	}
 
-	// Refusals: bad scheme, credentials in URL, existing name, foreign owner.
+	// Refusals: bad scheme, git://, credentials in URL, existing name, foreign owner.
 	cases := []struct {
 		args []string
 		want string
 	}{
-		{[]string{"repo", "import", "alice/x", "--from", "file:///etc"}, "https://, http://, and git://"},
+		{[]string{"repo", "import", "alice/x", "--from", "file:///etc"}, "http:// and https:// only"},
+		{[]string{"repo", "import", "alice/x", "--from", "git://127.0.0.1:1/alice/src.git"}, "use the repository's https:// URL"},
 		{[]string{"repo", "import", "alice/x", "--from", "https://token@github.com/a/b"}, "--token-stdin"},
 		{[]string{"repo", "import", "alice/mirror", "--from", httpURL}, "already exists"},
 		{[]string{"repo", "import", "bob/x", "--from", httpURL}, "not you and not an organization"},

@@ -32,6 +32,7 @@ the hidden =hook= used by git (=cmd/gitbayd/main.go=,
 | =internal/lfs=       | Content-addressed LFS store and HMAC transfer tokens.                           |
 | =internal/webhook=   | Outbound webhook delivery with SSRF checks, HMAC signing, retries.              |
 | =internal/mirror=    | Push and pull mirror worker.                                                   |
+| =internal/gitpin=    | Resolves and checks a user-supplied http(s) remote and pins git to the checked addresses; mirror sync and =repo import=. |
 | =internal/notify=, =internal/mail= | Mail queue drain and SMTP.                                      |
 | =internal/push=      | APNs queue drain and provider-token signing.                                    |
 | =internal/deps=      | Dependency manifest parsing and registry checks (opt-in per repository).        |

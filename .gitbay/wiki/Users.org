@@ -256,6 +256,10 @@ gitbay repo import-issues you/mirror --from you/repo \
     --api-base https://codeberg.org/api/v1    # Forgejo: the site's /api/v1
 #+end_src
 
+=repo import= fetches over http and https only, from an address that
+passes the same check as a webhook target; a =git://= URL is refused,
+so use the repository's https URL.
+
 Sourcehut has no API of that shape; =repo import= takes its git data
 and the todo.sr.ht tracker is not read.
 
