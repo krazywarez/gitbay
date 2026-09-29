@@ -134,3 +134,26 @@ func TestBuildsTableNamesTheClassCgroups(t *testing.T) {
 		t.Error("the drop-in does not load the builds table")
 	}
 }
+
+// Without build cgroups a podman runner may carry on only where nothing
+// depends on them: no limits, no untrusted builds, and not on the
+// daemon's host, where the builds table matches by cgroup (#260).
+func TestBuildCgroupsRequired(t *testing.T) {
+	cases := []struct {
+		memory, cpus        string
+		untrusted, loopback bool
+		want                string
+	}{
+		{"", "", false, false, ""},
+		{"6g", "", false, false, "-memory/-cpus"},
+		{"", "3", false, false, "-memory/-cpus"},
+		{"", "", true, false, "-untrusted"},
+		{"", "", false, true, "a loopback -remote"},
+		{"", "", true, true, "-untrusted"},
+	}
+	for _, c := range cases {
+		if got := buildCgroupsRequired(c.memory, c.cpus, c.untrusted, c.loopback); got != c.want {
+			t.Errorf("buildCgroupsRequired(%q, %q, %v, %v) = %q, want %q", c.memory, c.cpus, c.untrusted, c.loopback, got, c.want)
+		}
+	}
+}

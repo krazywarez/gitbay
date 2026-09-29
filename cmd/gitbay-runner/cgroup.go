@@ -31,6 +31,25 @@ func buildCgroupDir(builds string, id int64, trusted bool) string {
 	return filepath.Join(builds, class, fmt.Sprintf("build-%d", id))
 }
 
+// buildCgroupsRequired names what makes build cgroups mandatory, or ""
+// when a podman runner may run its builds in its own service cgroup.
+// Limits that cannot be applied are refused, not dropped: a runner that
+// accepted -memory and ran uncapped is what #188 was. A runner taking
+// untrusted builds, or polling over loopback on the daemon's host, is
+// the shape the builds nftables table guards, and that table matches
+// builds by these cgroups; without them it matches nothing (#260).
+func buildCgroupsRequired(memory, cpus string, untrusted, loopback bool) string {
+	switch {
+	case memory != "" || cpus != "":
+		return "-memory/-cpus"
+	case untrusted:
+		return "-untrusted"
+	case loopback:
+		return "a loopback -remote"
+	}
+	return ""
+}
+
 // memoryBytes parses podman's memory units — a whole number with an
 // optional b, k, m or g suffix — into bytes.
 func memoryBytes(s string) (int64, error) {

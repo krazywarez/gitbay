@@ -132,14 +132,11 @@ func main() {
 		// cgroup of the first invocation, and that must be the runner's
 		// leaf, not a build's.
 		cg, err := prepareBuildCgroups()
-		switch {
+		switch why := buildCgroupsRequired(r.memory, r.cpus, *untrusted, r.loopbackRemote()); {
 		case err == nil:
 			r.cgroups = cg
-		case r.memory != "" || r.cpus != "":
-			// Limits that cannot be applied are refused, not dropped:
-			// a runner that accepted -memory and ran uncapped is what
-			// #188 was.
-			log.Fatalf("-memory/-cpus: build cgroups unavailable: %v", err)
+		case why != "":
+			log.Fatalf("%s: build cgroups unavailable: %v", why, err)
 		default:
 			log.Printf("build cgroups unavailable (%v); builds run unconfined in the service cgroup", err)
 		}
