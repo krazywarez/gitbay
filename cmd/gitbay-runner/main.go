@@ -557,8 +557,9 @@ func (r *runner) buildSSH(public string) string {
 // polls from; the SSH auth limiter counts failures per source address
 // (#260). podman passes --no-map-gw to pasta by default; it is stated
 // here so the build's view of the host does not depend on that default.
-// The host's nftables table (deploy/gitbay-runner-egress.nft) limits
-// what a build reaches on the host to 22, 80 and 443.
+// The host's nftables tables (deploy/gitbay-runner-egress.nft and
+// gitbay-runner-builds.nft) limit what a build reaches on the host to
+// 22, 80 and 443, and an untrusted build to nothing but DNS.
 func (r *runner) buildNetwork() []string {
 	if !r.loopbackRemote() {
 		return nil

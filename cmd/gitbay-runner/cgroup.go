@@ -17,6 +17,20 @@ import (
 // process for that build from inside it with podman's own cgroup handling
 // off. What follows is the portable half: parsing and the file writes.
 
+// buildClasses are the cgroups a build is placed under, by the claim's
+// trust flag. deploy/gitbay-runner-builds.nft matches a build's sockets,
+// pasta's included, by these two cgroups (#260), so the names are fixed.
+var buildClasses = []string{"trusted", "untrusted"}
+
+// buildCgroupDir is build id's cgroup under the runner's builds cgroup.
+func buildCgroupDir(builds string, id int64, trusted bool) string {
+	class := buildClasses[1]
+	if trusted {
+		class = buildClasses[0]
+	}
+	return filepath.Join(builds, class, fmt.Sprintf("build-%d", id))
+}
+
 // memoryBytes parses podman's memory units — a whole number with an
 // optional b, k, m or g suffix — into bytes.
 func memoryBytes(s string) (int64, error) {

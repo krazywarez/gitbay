@@ -14,7 +14,7 @@ func prepareBuildCgroups() (*buildCgroups, error) {
 	return nil, errors.New("build cgroups need Linux")
 }
 
-func (c *buildCgroups) create(id int64, memory, cpus string) (string, *os.File, error) {
+func (c *buildCgroups) create(id int64, trusted bool, memory, cpus string) (string, *os.File, error) {
 	return "", nil, errors.New("build cgroups need Linux")
 }
 

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +90,47 @@ func TestWriteLimits(t *testing.T) {
 	}
 	if err := writeLimits(t.TempDir(), "lots", ""); err == nil {
 		t.Error("a bad memory limit was accepted")
+	}
+}
+
+// A build's cgroup sits under its trust class, which is what the builds
+// nftables table matches on (#260).
+func TestBuildCgroupDir(t *testing.T) {
+	builds := "/sys/fs/cgroup/system.slice/gitbay-runner.service/builds"
+	if got := buildCgroupDir(builds, 7, true); got != builds+"/trusted/build-7" {
+		t.Errorf("trusted: %s", got)
+	}
+	if got := buildCgroupDir(builds, 8, false); got != builds+"/untrusted/build-8" {
+		t.Errorf("untrusted: %s", got)
+	}
+}
+
+// The builds table and the drop-in that creates its cgroups and loads it
+// name the same class cgroups the runner places builds in. A rename on
+// one side alone would leave builds unmatched, with only the uid table
+// between them and the host.
+func TestBuildsTableNamesTheClassCgroups(t *testing.T) {
+	read := func(name string) string {
+		t.Helper()
+		b, err := os.ReadFile(filepath.Join("..", "..", "deploy", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	const unit = "system.slice/gitbay-runner.service"
+	table, dropin := read("gitbay-runner-builds.nft"), read("gitbay-runner.override.conf")
+	for _, class := range buildClasses {
+		match := fmt.Sprintf(`socket cgroupv2 level 4 "%s/builds/%s" jump %s`, unit, class, class)
+		if !strings.Contains(table, match) {
+			t.Errorf("gitbay-runner-builds.nft lacks %q", match)
+		}
+		dir := "/sys/fs/cgroup/" + unit + "/builds/" + class
+		if !strings.Contains(dropin, dir) {
+			t.Errorf("the drop-in does not create %s", dir)
+		}
+	}
+	if !strings.Contains(dropin, "ExecStartPre=+/usr/sbin/nft -f /etc/gitbay-runner/builds.nft") {
+		t.Error("the drop-in does not load the builds table")
 	}
 }

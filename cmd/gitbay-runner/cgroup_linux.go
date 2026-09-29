@@ -17,7 +17,8 @@ import (
 // Delegate=yes hands the runner its service cgroup; the runner parks
 // itself in a leaf so the service cgroup can enable controllers for
 // children (a cgroup may hold processes or controller-enabled children,
-// not both), and creates one child per build under builds/.
+// not both), and creates one child per build under builds/trusted or
+// builds/untrusted.
 type buildCgroups struct {
 	builds string // <service cgroup>/builds
 }
@@ -25,7 +26,11 @@ type buildCgroups struct {
 const cgroupControllers = "+cpu +memory +pids"
 
 // prepareBuildCgroups moves the runner into <own>/runner, enables the
-// controllers on its original cgroup, and creates builds/. It fails
+// controllers on its original cgroup, and creates builds/ with a child
+// per trust class. The unit's drop-in may have created those before the
+// runner started, to load the builds nftables table against them; they
+// are used as found, never recreated, since the table holds their ids.
+// It fails
 // where the cgroup is not writable, which is a unit without
 // Delegate=yes; the caller decides whether that is fatal.
 func prepareBuildCgroups() (*buildCgroups, error) {
@@ -55,13 +60,23 @@ func prepareBuildCgroups() (*buildCgroups, error) {
 	if err := os.WriteFile(filepath.Join(builds, "cgroup.subtree_control"), []byte(cgroupControllers), 0o644); err != nil {
 		return nil, fmt.Errorf("enabling controllers on %s: %w", builds, err)
 	}
+	for _, class := range buildClasses {
+		dir := filepath.Join(builds, class)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "cgroup.subtree_control"), []byte(cgroupControllers), 0o644); err != nil {
+			return nil, fmt.Errorf("enabling controllers on %s: %w", dir, err)
+		}
+	}
 	return &buildCgroups{builds: builds}, nil
 }
 
-// create makes the cgroup for one build with its limits written, and
-// returns its path and an open directory fd for placing processes.
-func (c *buildCgroups) create(id int64, memory, cpus string) (string, *os.File, error) {
-	dir := filepath.Join(c.builds, fmt.Sprintf("build-%d", id))
+// create makes the cgroup for one build under its trust class with its
+// limits written, and returns its path and an open directory fd for
+// placing processes.
+func (c *buildCgroups) create(id int64, trusted bool, memory, cpus string) (string, *os.File, error) {
+	dir := buildCgroupDir(c.builds, id, trusted)
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		return "", nil, err
 	}

@@ -134,7 +134,7 @@ func (r *runner) runStepsPodman(j job, dir string, env []string, sink io.Writer,
 	// from the runner's cgroup would run the step outside the limit.
 	var cgroupFD *os.File
 	if r.cgroups != nil {
-		dir, f, err := r.cgroups.create(j.ID, r.memory, r.cpus)
+		dir, f, err := r.cgroups.create(j.ID, j.Trusted, r.memory, r.cpus)
 		if err != nil {
 			fmt.Fprintf(sink, "preparing the build cgroup: %v\n", err)
 			return &failure{Reason: "preparing the build cgroup failed"}
