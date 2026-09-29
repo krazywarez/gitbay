@@ -46,6 +46,11 @@ func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (R
 	if host == "" {
 		return Remote{}, fmt.Errorf("URL has no host")
 	}
+	if net.ParseIP(host) == nil && numericHost(host) {
+		// 127.1, 2130706433 and 0x7f.1 are loopback to curl's parser
+		// but not to Go's; refuse rather than leave them to a resolver.
+		return Remote{}, fmt.Errorf("host %q is a numeric address in a form other than dotted decimal; write it as a.b.c.d", host)
+	}
 	ips, err := lookup(ctx, host)
 	if err != nil {
 		return Remote{}, fmt.Errorf("resolving %s: %w", host, err)
@@ -60,8 +65,24 @@ func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (R
 	return Remote{URL: u, IPs: ips}, nil
 }
 
+// numericHost reports whether every label of host is a decimal, octal
+// or hex number, the shapes inet_aton reads as an IPv4 address.
+func numericHost(host string) bool {
+	for _, label := range strings.Split(strings.TrimSuffix(host, "."), ".") {
+		digits, base := label, "0123456789"
+		if rest, ok := strings.CutPrefix(strings.ToLower(label), "0x"); ok {
+			digits, base = rest, "0123456789abcdef"
+		}
+		if strings.Trim(strings.ToLower(digits), base) != "" || label == "" {
+			return false
+		}
+	}
+	return true
+}
+
 // Args are git's leading -c options for r: curl's resolve list pins
-// the host to the checked addresses, and with redirects off a server
+// the host, and any other name on the same port, to the checked
+// addresses, and with redirects off a server
 // cannot send git on to a host nobody checked. An address literal
 // needs no pin.
 func (r Remote) Args() []string {
@@ -85,7 +106,11 @@ func (r Remote) Args() []string {
 			addrs[i] = ip.String()
 		}
 	}
-	return append(args, "-c", "http.curloptResolve="+host+":"+port+":"+strings.Join(addrs, ","))
+	pinned := port + ":" + strings.Join(addrs, ",")
+	// The wildcard entry catches a lookup under any other spelling of
+	// the host, so it too lands on the checked addresses.
+	return append(args, "-c", "http.curloptResolve="+host+":"+pinned,
+		"-c", "http.curloptResolve=*:"+pinned)
 }
 
 // Env is git's whole environment for a pinned remote. No system or

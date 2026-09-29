@@ -46,16 +46,38 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+// Numeric hosts other than a dotted quad are refused before any lookup:
+// curl reads them as addresses the check never saw.
+func TestResolveRefusesOddNumericHosts(t *testing.T) {
+	never := func(_ context.Context, host string) ([]net.IP, error) {
+		t.Fatalf("looked up %s", host)
+		return nil, nil
+	}
+	for _, host := range []string{"127.1", "2130706433", "0x7f.1", "0x7F000001", "017700000001", "127.0.0.01", "127.0.0.1."} {
+		if _, err := Resolve(context.Background(), never, "http://"+host+"/x.git", true); err == nil || !strings.Contains(err.Error(), "numeric address") {
+			t.Errorf("%s: %v", host, err)
+		}
+	}
+	// Names with a numeric label, and real literals, still pass.
+	for _, host := range []string{"1.example", "0x7f.example", "203.0.113.5", "[2001:db8::1]"} {
+		if _, err := Resolve(context.Background(), answer("203.0.113.5"), "http://"+host+"/x.git", false); err != nil {
+			t.Errorf("%s: %v", host, err)
+		}
+	}
+}
+
 func TestArgs(t *testing.T) {
 	u, _ := url.Parse("https://git.example/x.git")
 	got := Remote{u, []net.IP{net.ParseIP("203.0.113.5"), net.ParseIP("2001:db8::1")}}.Args()
 	want := []string{"-c", "http.followRedirects=false",
-		"-c", "http.curloptResolve=git.example:443:203.0.113.5,[2001:db8::1]"}
+		"-c", "http.curloptResolve=git.example:443:203.0.113.5,[2001:db8::1]",
+		"-c", "http.curloptResolve=*:443:203.0.113.5,[2001:db8::1]"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("https: %q", got)
 	}
 	u, _ = url.Parse("http://git.example:8080/x.git")
-	if got := (Remote{u, []net.IP{net.ParseIP("203.0.113.5")}}).Args(); got[3] != "http.curloptResolve=git.example:8080:203.0.113.5" {
+	if got := (Remote{u, []net.IP{net.ParseIP("203.0.113.5")}}).Args(); got[3] != "http.curloptResolve=git.example:8080:203.0.113.5" ||
+		got[5] != "http.curloptResolve=*:8080:203.0.113.5" {
 		t.Fatalf("http with port: %q", got)
 	}
 	// An address literal is its own resolution; there is nothing to pin.
