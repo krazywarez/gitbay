@@ -4,7 +4,18 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.39.0 — 2026-09-29
+
+Suggested changes, split diffs, reactions, saved
+queries, TeX math, code navigation, reply by mail, and web pages for
+the repository rows Parity listed as no.
+
+*Upgrade note.* Migrations 0068–0073 run on start. Existing
+repositories have no symbol index until their next push to the default
+branch; =gitbay admin symbols reindex <owner/name>= builds one. Reply by mail is off until
+=[mail.inbound]= is configured; set =trusted_authserv_id= for any
+instance reachable from the internet (Admin wiki). On the web, =repo
+delete= and =repo rename= now need a recent sign-in, like transfer.
 
 - The releases page uploads and removes release assets (the file is
   streamed to =release asset add=; removal asks for the name). The
