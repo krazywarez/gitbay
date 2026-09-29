@@ -80,15 +80,18 @@ func (s *Store) CreateWebSession(hash string, userID int64, ttl time.Duration) e
 	return err
 }
 
-// WebSessionUser resolves a session cookie hash to its user and renews
-// the session's idle expiry. A session is written at most once a
-// minute, so a burst of requests costs one UPDATE.
+// WebSessionUser resolves a session cookie hash to its user, with the
+// session's sign-in time, and renews the session's idle expiry. A
+// session is written at most once a minute, so a burst of requests
+// costs one UPDATE. Renewal never moves created_at: only a login
+// creates a session, so created_at is when it signed in.
 func (s *Store) WebSessionUser(hash string) (User, error) {
 	now := time.Now()
 	var userID int64
+	var created string
 	err := s.DB.QueryRow(
-		"SELECT user_id FROM web_sessions WHERE token_hash = ? AND expires_at > ?",
-		hash, fmtTime(now)).Scan(&userID)
+		"SELECT user_id, created_at FROM web_sessions WHERE token_hash = ? AND expires_at > ?",
+		hash, fmtTime(now)).Scan(&userID, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -98,7 +101,14 @@ func (s *Store) WebSessionUser(hash string) (User, error) {
 	s.DB.Exec(`UPDATE web_sessions SET last_used_at = ?, expires_at = min(absolute_expires_at, ?)
 		WHERE token_hash = ? AND last_used_at < ?`,
 		fmtTime(now), fmtTime(now.Add(WebSessionIdle)), hash, fmtTime(now.Add(-time.Minute)))
-	return s.UserByID(userID)
+	u, err := s.UserByID(userID)
+	if err != nil {
+		return User{}, err
+	}
+	if t := parseTime(sql.NullString{String: created, Valid: true}); t != nil {
+		u.SignedInAt = *t
+	}
+	return u, nil
 }
 
 func (s *Store) DeleteWebSession(hash string) error {

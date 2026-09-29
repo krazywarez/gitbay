@@ -14,6 +14,9 @@ type User struct {
 	IsAdmin  bool
 	Pending  bool // self-registered, email not yet verified
 	Disabled bool // administratively suspended
+	// SignedInAt is when the browser session this user came from was
+	// created by a login. Set by WebSessionUser only; zero elsewhere.
+	SignedInAt time.Time
 }
 
 type SSHKey struct {

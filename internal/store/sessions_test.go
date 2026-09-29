@@ -117,3 +117,43 @@ func TestWebSessionRenewsUpToTheCap(t *testing.T) {
 		t.Fatalf("list: %+v %v", list, err)
 	}
 }
+
+// A session's sign-in time is its creation; using the session renews
+// its idle expiry and leaves the sign-in time alone (#297).
+func TestWebSessionUserSignedInAt(t *testing.T) {
+	s, uid := sessionFixture(t)
+	_, hash, err := NewToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateWebSession(hash, uid, 7*24*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	u, err := s.WebSessionUser(hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if age := time.Since(u.SignedInAt); age < 0 || age > time.Minute {
+		t.Fatalf("fresh session signed in %v ago", age)
+	}
+
+	signedIn := time.Now().Add(-2 * time.Hour)
+	if _, err := s.DB.Exec("UPDATE web_sessions SET created_at = ?, last_used_at = ? WHERE token_hash = ?",
+		fmtTime(signedIn), fmtTime(signedIn), hash); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.WebSessionUser(hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var last string
+	if err := s.DB.QueryRow("SELECT last_used_at FROM web_sessions WHERE token_hash = ?", hash).Scan(&last); err != nil {
+		t.Fatal(err)
+	}
+	if last == fmtTime(signedIn) {
+		t.Fatal("using the session did not renew it")
+	}
+	if want := signedIn.UTC().Truncate(time.Millisecond); !u.SignedInAt.Equal(want) {
+		t.Fatalf("SignedInAt = %v, want %v", u.SignedInAt, want)
+	}
+}
