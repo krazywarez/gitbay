@@ -75,7 +75,7 @@ the product activity feed, not an audit trail.
   cannot destroy its own history (documented: Admin wiki).
 - Recovery point: about one hour for database-only data (issues, merge
   requests, reviews), one day for repositories.
-- Recovery time: see the Admin wiki's Restore drill table.
+- Recovery time: 8m43s from the offsite copy to a working clone in the 2026-09-29 drill, without host provisioning; the Admin wiki's Restore drill table has each drill.
 
 Restore procedure: extract the archive into an empty directory, point
 =server.root= at it, start =gitbayd=; hooks regenerate and the host key

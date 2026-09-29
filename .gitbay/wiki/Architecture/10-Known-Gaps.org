@@ -10,7 +10,7 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 
 | Issue | Area             | Gap                                                                   | Severity |
 |-------+------------------+-----------------------------------------------------------------------+----------|
-| #259  | Recovery         | No restore has been exercised; the procedure and tooling (=admin restore-drill=, =backup --verify=) are in place, the clean-host drill is pending | high |
+| #305  | Recovery         | The off-host =secret.key= has not been shown to open a restored database; without it a restore does not start | high |
 
 * Not filed
 
@@ -26,6 +26,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 
 | Question                                                  | Status                                   |
 |-----------------------------------------------------------+------------------------------------------|
-| What is the measured recovery time?                       | unmeasured (#259)                        |
+| What is the measured recovery time?                       | 8m43s from the offsite copy to a clone, laptop drill 2026-09-29, no host provisioning (Admin wiki) |
 | How many concurrent clones does the host sustain?         | unmeasured (#262)                        |
 | Have the collaboration features been used by independent users? | no; one human user, tests only     |

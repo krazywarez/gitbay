@@ -728,12 +728,16 @@ the time of the newest restic snapshot restored; record beside it the
 newest issue, comment and push =restore-drill= printed, which show how
 much activity the restore carries.
 
-No drill has been run yet; the procedure above is written but
-unexercised, and #259 stays open until the first row below is
-recorded.
+The first drill ran on the operator's laptop rather than a provisioned
+host, so its time to service has no provisioning in it, and it could
+not check secrets: no copy of =secret.key= was on the machine, and
+gitbayd refuses to start while any sealed value does not open. The
+sealed values were cleared in the drill copy to reach service; #305
+tracks proving the off-host key.
 
 | Date | Host | Snapshot restored (UTC) | Newest issue / comment / push | Time to service | DB integrity | Connectivity | LFS | Release assets | Host key | Secrets | Notes |
 |------+------+-------------------------+-------------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|
+| 2026-09-29 | laptop (macOS), restic from offsite | 2026-09-29 00:19:15 (ccd646cf) | 00:05:17 / 00:09:44 / 00:15:31 | 8m43s (restore 1m49s, checks 33s) | ok | ok, 69/69 | ok, 2 | ok, 529 | matches | not checked (#305) | 4.99 GiB restored; 71 sealed values cleared in the drill copy to start |
 
 * Upgrades
 
