@@ -10,14 +10,15 @@
 #   deploy/runner-auth-flood-test.sh cmc/runner-scratch              # trusted: a push to main
 #   deploy/runner-auth-flood-test.sh cmc/runner-scratch --untrusted  # a merge request from a fork
 #
-# The build's logins use a key registered with --ttl 1s and expired by
-# the time the build runs. With registration open an unknown key is
-# admitted to run register and never counts against the SSH auth
-# limiter; an expired key counts (internal/sshd/sshd.go, authenticate).
+# The build's logins use a git-scoped key registered with --ttl 1s and
+# expired by the time the build runs. With registration open an
+# unknown key is admitted to run register and never counts against the
+# SSH auth limiter; an expired key counts (internal/sshd/sshd.go, authenticate).
 # The key is removed from the account when the script exits.
 #
-# The step probes what the build reaches, then makes 12 logins without
-# pause, so the limiter (ssh_auth_rate, 10 a minute per address) locks
+# The step waits a minute, so the operator can find pasta's cgroup
+# (Admin page), probes what the build reaches, then makes 12 logins
+# without pause, so the limiter (ssh_auth_rate, 10 a minute per address) locks
 # the address those logins come from for most of the next minute. The
 # runner reports the result right after the step; its report retries
 # for half a minute.
@@ -34,6 +35,14 @@
 # names that address, the build succeeds and the runner keeps polling.
 # Untrusted: every login is refused by the builds table before it
 # reaches sshd, and no auth.* entry comes from the build at all.
+#
+# The script also requires lines in the build log, so a missing ssh or
+# bash in the image, or a table that matches nothing, fails rather than
+# passes. Trusted: "logins 12 denied" (every login reached sshd) and
+# 10.0.0.1:80 refused, not timed out. Untrusted: 169.254.1.2:22 and
+# github.com:22 refused and "12 refused". The untrusted lines are the
+# proof that pasta's sockets are in the build's cgroup: the uid table
+# lets ci-runner reach both.
 set -eu
 
 repo=${1:-}
@@ -48,13 +57,15 @@ tmp=$(mktemp -d)
 fp=
 cleanup() {
     if [ -n "$fp" ]; then gitbay keys remove "$fp" >/dev/null || echo "remove key $fp by hand" >&2; fi
+    fp=
     rm -rf "$tmp"
 }
 trap cleanup EXIT
+trap 'cleanup; exit 130' INT TERM
 
 echo "==> an expired key"
 ssh-keygen -q -t ed25519 -N '' -C auth-flood-260 -f "$tmp/key"
-gitbay keys add --label auth-flood-260 --ttl 1s <"$tmp/key.pub" >/dev/null
+gitbay keys add --scope git --label auth-flood-260 --ttl 1s <"$tmp/key.pub" >/dev/null
 fp=$(ssh-keygen -lf "$tmp/key.pub" | awk '{print $2}')
 sleep 2
 
@@ -87,6 +98,7 @@ cat >.gitbay/flood.sh <<'EOF'
 #!/bin/sh
 # Written by deploy/runner-auth-flood-test.sh (#260).
 set -u
+sleep 60
 key=/tmp/flood.key
 cp .gitbay/flood.key "$key"
 chmod 600 "$key"
@@ -104,7 +116,7 @@ probe() {
     esac
 }
 getent hosts proxy.golang.org >/dev/null && echo "dns      ok" || echo "dns      failed"
-for t in 127.0.0.1:22 127.0.0.1:2222 "$host:22" "$host:80" "$host:443" "$host:2222" \
+for t in "$host:22" "$host:80" "$host:443" "$host:2222" \
     10.0.0.1:80 192.168.0.1:80 proxy.golang.org:443 github.com:22; do
     probe "${t%:*}" "${t##*:}"
 done
@@ -159,7 +171,8 @@ second=$(seen)
 echo "   $account last seen $first, then $second"
 
 echo "==> build log"
-gitbay build log "$repo" "$n" | sed -n '/^dns /,$p'
+log=$(gitbay build log "$repo" "$n")
+printf '%s\n' "$log" | sed -n '/dns /,$p'
 
 echo "==> auth audit, last 15 minutes"
 gitbay audit --action auth. --since 15m --json |
@@ -172,6 +185,17 @@ fail=0
 if gitbay audit --action auth.throttled --since 15m --json | jq -e '.data[] | select((.data | fromjson | .ip) == "127.0.0.1")' >/dev/null; then
     echo "FAIL: 127.0.0.1, the runner's address, was throttled"
     fail=1
+fi
+need() {
+    printf '%s\n' "$log" | grep -Eq "$1" || { echo "FAIL: the build log lacks \"$2\""; fail=1; }
+}
+if [ "$mode" = trusted ]; then
+    need 'logins +12 denied' "logins 12 denied"
+    need 'refused +10\.0\.0\.1:80( |$)' "refused 10.0.0.1:80"
+else
+    need 'refused +169\.254\.1\.2:22( |$)' "refused 169.254.1.2:22"
+    need 'refused +github\.com:22( |$)' "refused github.com:22"
+    need '12 refused' "12 refused"
 fi
 [ $fail = 0 ] && echo "PASS ($mode): the build's failed logins did not lock the runner out"
 exit $fail

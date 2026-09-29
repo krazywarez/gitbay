@@ -976,7 +976,12 @@ private range, allow it in the file first or builds resolve nothing.
 A restart of =nftables.service= flushes both tables;
 =systemctl reload gitbay-runner-egress= restores both.
 
-Checking the tables on a running host, during a build:
+The egress unit's stop and the rollback below use =nft destroy=,
+which needs nftables 1.0.8 or later; check =nft --version= on a new
+host.
+
+Checking the tables on a running host, during a build (the flood test
+below waits a minute before its first probe, for this):
 
 #+begin_src sh
 nft list table inet gitbay_builds          # counters on the reject rules
@@ -986,15 +991,32 @@ for p in $(pgrep -u ci-runner pasta); do cat /proc/$p/cgroup; done
 
 A pasta process anywhere else — the runner's own =runner= cgroup, a
 user slice — means the builds table does not see that build's traffic
-and only the first table applies. Then run
+and only the first table applies. Run
 =deploy/runner-auth-flood-test.sh= on the scratch repository (below),
-once as a push and once with =--untrusted=; it prints what the build
-reached and fails if the runner was locked out.
+once as a push and once with =--untrusted=. It fails if the runner was
+locked out or if the build log lacks the lines only a working table
+produces. The authoritative proof that pasta's sockets are in the
+build's cgroup is the untrusted run: =169.254.1.2:22= and
+=github.com:22= refused, all twelve logins refused, and the counters on
+the =untrusted= chain's rejects rising. The first table lets
+=ci-runner= reach both of those addresses.
 
-To take the builds table out: delete the three =ExecStartPre= lines
-that name =builds= from the drop-in, =systemctl daemon-reload=, and
-=nft destroy table inet gitbay_builds=. The runner needs no restart,
-and builds keep the first table.
+To take the builds table out, on the host:
+
+#+begin_src sh
+sed -i '/^ExecStartPre=+.*builds/d' /etc/systemd/system/gitbay-runner.service.d/override.conf
+rm /etc/gitbay-runner/builds.nft
+systemctl daemon-reload
+nft destroy table inet gitbay_builds
+#+end_src
+
+The runner needs no restart. It still places builds under
+=builds/trusted= and =builds/untrusted=, but with the file gone neither
+a runner start nor =systemctl reload gitbay-runner-egress= loads the
+table again, and builds keep the first table and =--no-map-gw=. A
+runner that takes =-untrusted= or polls over loopback refuses to start
+without build cgroups at all, since the table would match nothing. The
+next =make deploy-runner= installs the file and the lines again.
 
 The drop-in sets =NoNewPrivileges=no=, without which rootless podman
 cannot call =newuidmap= and the runner refuses to start. That is a
