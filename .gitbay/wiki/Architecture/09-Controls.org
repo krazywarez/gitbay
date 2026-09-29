@@ -9,7 +9,7 @@ chapter names of OWASP ASVS 4.0 where one fits.
 
 | Control                                     | Status   | Evidence                                                         |
 |---------------------------------------------+----------+------------------------------------------------------------------|
-| One authorization path for every surface     | partial  | all surfaces call =control.Dispatch= (=internal/control/control.go=); three web toggles write the store directly (#261) |
+| One authorization path for every surface     | in place | all surfaces call =control.Dispatch= (=internal/control/control.go=); web form handlers, including the pin, watch and mark-read toggles, dispatch commands; login and session bookkeeping are not commands |
 | No server-side signing key                  | in place | =internal/sig= verifies only                                     |
 | Least functionality by default              | in place | API, web accounts, git://, push and registration default off (=internal/config/config.go=) |
 | No git library; git runs as a subprocess with built argv | in place | =internal/gitutil=                                     |
@@ -100,5 +100,5 @@ chapter names of OWASP ASVS 4.0 where one fits.
 | Service hardening                           | in place | systemd sandboxing ([[file:03-Deployment.org][3]])                                     |
 | Backups offsite and append-only             | in place | restic with append-only credentials (documented)                 |
 | Restore tested                              | gap      | tooling in place (=admin restore-drill=, Admin wiki "Restore drill"); clean-host drill pending (#259) |
-| Migrations validated before commit          | gap      | foreign-key check runs after commit (#261)                       |
+| Migrations validated before commit          | in place | =PRAGMA foreign_key_check= runs inside the migration transaction, before commit (=internal/store/store.go=) |
 | Signed, reviewed changes to production      | in place | signed commits, =require-mr=, ff-only merges, clean-tree deploys |

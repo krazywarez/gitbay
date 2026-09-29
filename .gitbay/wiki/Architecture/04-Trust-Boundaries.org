@@ -93,8 +93,8 @@ no HTTP write path (=internal/httpd/smart.go=,
    decode the JSON result into the template (=internal/httpd/control.go=).
 3. Form posts pass =checkOrigin= (=accounts.go=), dispatch the
    matching command, and map the exit code to a redirect or an error on
-   the page. Three toggles (pin, watch, mark read) write the store
-   directly instead (#261).
+   the page. The pin, watch and mark-read toggles dispatch =repo pin=,
+   =repo watch=/=mute=/=unwatch= and =notifications read= the same way.
 
 ** E. JSON API
 
