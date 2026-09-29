@@ -357,7 +357,7 @@ func isEmptyReader(r io.Reader) bool {
 // usesStdin reports whether the arguments request stdin content.
 func usesStdin(args []string) bool {
 	for i, a := range args {
-		if (a == "--file" || a == "--key") && i+1 < len(args) && args[i+1] == "-" {
+		if (a == "--file" || a == "--key" || a == "--secret") && i+1 < len(args) && args[i+1] == "-" {
 			return true
 		}
 		if a == "--token-stdin" {
@@ -750,7 +750,7 @@ func webCmd() *cobra.Command {
 
 func webhookCmd() *cobra.Command {
 	return group("webhook", "outbound event delivery",
-		pass("add", passOpts{server: []string{"webhook", "add"}, needsRepo: true}),
+		pass("add", passOpts{server: []string{"webhook", "add"}, needsRepo: true, stdinOK: true, stdinWhat: "the webhook secret", stdinSecret: true}),
 		pass("list", passOpts{server: []string{"webhook", "list"}, needsRepo: true}),
 		pass("remove", passOpts{server: []string{"webhook", "remove"}, needsRepo: true}),
 		pass("deliveries", passOpts{server: []string{"webhook", "deliveries"}, needsRepo: true}),

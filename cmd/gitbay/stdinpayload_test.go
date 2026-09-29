@@ -114,3 +114,14 @@ func swapTerminal(f func(*os.File) bool) func() {
 	isTerminal = f
 	return func() { isTerminal = prev }
 }
+
+// webhook add --secret - reads the secret on the server, so the CLI must
+// forward stdin for it the way it does for --file - (#284).
+func TestUsesStdinForSecretDash(t *testing.T) {
+	if !usesStdin([]string{"alice/app", "https://ci.example/hook", "--secret", "-"}) {
+		t.Error("--secret - does not forward stdin")
+	}
+	if usesStdin([]string{"alice/app", "https://ci.example/hook", "--events", "push"}) {
+		t.Error("forwarded stdin with no flag asking for it")
+	}
+}
