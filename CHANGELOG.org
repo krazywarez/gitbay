@@ -4,7 +4,18 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.38.0 — 2026-09-29
+
+Merge when ready, build egress by trust class, and restore-drill
+tooling.
+
+*Upgrade note.* The runner's host needs the builds table: run =make
+deploy-runner= (or install =deploy/gitbay-runner-builds.nft= and the
+drop-in by hand), scoped to a scratch repository first, and run
+=deploy/runner-auth-flood-test.sh= before pointing it back at real
+repositories. A runner started with =-untrusted= or a loopback
+=-remote= refuses to start without build cgroups. Runners off the
+daemon's host and =-isolation none= are unaffected.
 
 - Marking notifications read from the web dispatches =notifications
   read=, so it counts against the write budget and is audited (#261).
