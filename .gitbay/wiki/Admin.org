@@ -925,16 +925,19 @@ at real ones.* Every deploy that switched the whole instance to
 containers and failed took CI down with it. Instead: create a throwaway
 repository the runner account can read (public, or granted read — a
 private one is "not found" to the runner and the build stays pending),
-give it one job that names the CI image, and deploy the runner with
-=-repos= naming only that repository. The production unit, with its real
-hardening, then claims nothing else; other repositories' builds queue
-until =-repos= is switched back, which is a pause, not an outage.
+give it one job that names the CI image, attach the runner's key to it,
+and deploy the runner with =-repos= naming only that repository. The
+production unit, with its real hardening, then claims nothing else;
+other repositories' builds queue until =-repos= is removed again, which
+is a pause, not an outage.
 
 #+begin_src sh
-gitbay repo create cmc/ci-smoke          # then push a .gitbay/ci.yml naming the image
-sed -i 's#-repos krz/gitbay #-repos cmc/ci-smoke #' /etc/systemd/system/gitbay-runner.service.d/override.conf
+gitbay repo create cmc/runner-scratch   # then push a .gitbay/ci.yml naming the image
+# on the host:
+gitbay repo runner add cmc/runner-scratch < /var/lib/gitbay-runner/.ssh/id_ed25519.pub
+sed -i 's#^ExecStart=/usr/local/bin/gitbay-runner #&-repos cmc/runner-scratch #' /etc/systemd/system/gitbay-runner.service.d/override.conf
 systemctl daemon-reload && systemctl restart gitbay-runner
-gitbay build log cmc/ci-smoke 1         # green: switch -repos back, redeploy
+gitbay build log cmc/runner-scratch 1   # green: remove -repos, redeploy, delete the scratch repository
 #+end_src
 
 *Do not deploy an isolating runner to a host that has not been
@@ -950,8 +953,6 @@ management and =ReadWritePaths= for podman's store under
 make read-only. Those paths are prefixed =-= so they are ignored when
 absent: the drop-in installs on unprepared hosts too, and a unit that
 refused to start would stop every build.
-The nightly canary on =cmc/ci-smoke= only runs if the runner's =-repos=
-names that repository too; a scoped runner claims nothing else.
 =gitbay-runner-prune.timer= prunes unused images weekly, as the runner's
 user: rootless storage belongs to that user, and root's prune would not
 see it. An unpruned image store on a 40GB host is a slow outage.
