@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/policy"
@@ -196,5 +197,35 @@ func TestRefusedPushCapsRefs(t *testing.T) {
 	}
 	if len(data.Refs) != auditedRefs || data.MoreRefs != 500-auditedRefs || data.Refs[0] != "refs/merge-requests/0/head" {
 		t.Fatalf("refs %d, more %d", len(data.Refs), data.MoreRefs)
+	}
+}
+
+// A push's pre-receive reaching hookd closes the channel sshd waits on;
+// a request that fails the token check does not.
+func TestPreReceiveSignalsItsPush(t *testing.T) {
+	sock, st, repoID, uid := serveSocket(t)
+	token, err := st.CreatePushToken(repoID, uid, "full")
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, forget := AwaitPreReceive(token)
+	defer forget()
+	forged := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "read", Token: token}
+	if resp, err := Ask(sock, forged, nil); err != nil || resp.Allow {
+		t.Fatalf("forged: %+v, %v", resp, err)
+	}
+	select {
+	case <-started:
+		t.Fatal("a refused request signalled the push")
+	default:
+	}
+	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: token}
+	if resp, err := Ask(sock, req, nil); err != nil || !resp.Allow {
+		t.Fatalf("pre-receive: %+v, %v", resp, err)
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pre-receive did not signal the push")
 	}
 }

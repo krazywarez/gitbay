@@ -3,6 +3,7 @@
 package sshd
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -529,6 +530,7 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 		return protocol.ExitUsage
 	}
 	write := service == "git-receive-pack"
+	cancel, keepAlive := revoked, 0
 
 	repo, err := st.RepoByPath(argv[1])
 	if err != nil {
@@ -612,6 +614,7 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 		if code != protocol.ExitOK {
 			return code
 		}
+		slotAt := time.Now()
 		// Deferred before Transport runs, so it fires after receive-pack
 		// has exited, on every path: the client hanging up ends its
 		// stdin and receive-pack with it, and a revoked key kills it.
@@ -624,8 +627,62 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 		}
 		defer st.DeletePushToken(token)
 		env = append(env, hookd.EnvToken+"="+token)
+		idleFor, receiveFor := cfg.Limits.PushTimeouts()
+		keepAlive = pushKeepAlive(idleFor)
+		if pushes != nil {
+			// A client that holds its slot while sending nothing, or
+			// trickles its pack, is cut: when pre-receive has not
+			// started receiveFor after the slot was taken, or after
+			// idleFor with no byte either way once the pack has begun
+			// or pre-receive has started, whichever is first.
+			// receive-pack's keepalives count, so indexing and hooks do
+			// not end it. The idle rule waits for the pack because the
+			// client sends nothing while pack-objects counts and
+			// compresses, and receive-pack sends no keepalive then.
+			// Once pre-receive starts only the idle rule applies, so
+			// post-receive is never cut short by the clock.
+			client, clientOut := stdin, stdout
+			var idle <-chan struct{}
+			var arm, unwatch func()
+			stdin, stdout, idle, arm, unwatch = packlimit.Idle(stdin, stdout, idleFor)
+			stdin = &packStart{r: stdin, seen: arm}
+			defer unwatch()
+			started, forget := hookd.AwaitPreReceive(token)
+			defer forget()
+			deadline := time.NewTimer(time.Until(slotAt.Add(receiveFor)))
+			defer deadline.Stop()
+			kill := make(chan struct{})
+			finished := make(chan struct{})
+			defer close(finished)
+			go func() {
+				receiving := deadline.C
+				for {
+					select {
+					case <-finished:
+						return
+					case <-started:
+						arm()
+						started, receiving = nil, nil
+						continue
+					case <-revoked:
+					case <-idle:
+					case <-receiving:
+					}
+					close(kill)
+					// A read blocked on a silent client outlives git;
+					// closing the channel ends it and the stdin copy, so
+					// Transport's Wait returns.
+					for _, c := range []any{client, clientOut} {
+						if c, ok := c.(io.Closer); ok {
+							c.Close()
+						}
+					}
+					return
+				}
+			}()
+			cancel = kill
+		}
 	}
-	cancel := revoked
 	if !write {
 		// Pack generation shares one budget with smart HTTP and git://.
 		release, code := takeSlot(packs, "user:"+strconv.FormatInt(user.ID, 10), done, stderr,
@@ -679,7 +736,7 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 		}()
 		cancel = kill
 	}
-	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, cancel); err != nil {
+	if err := gitutil.Transport(service, dir, stdin, stdout, stderr, env, maxPack, keepAlive, cancel); err != nil {
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK
@@ -701,4 +758,36 @@ func takeSlot(l *packlimit.Limiter, principal string, done <-chan struct{}, stde
 		fmt.Fprintln(stderr, "the server is restarting; try again in a minute")
 	}
 	return nil, protocol.ExitFailure
+}
+
+// pushKeepAlive is receive.keepAlive, in seconds, for a push idle limit
+// of idle: several keepalives fit in one idle period, and never more
+// than five seconds apart.
+func pushKeepAlive(idle time.Duration) int {
+	return max(1, min(5, int(idle/(4*time.Second))))
+}
+
+// packStart calls seen once the pack signature "PACK" has passed
+// through r, which may split it across reads. It can fire early on a
+// command or push option that holds the word; that only starts the idle
+// rule sooner.
+type packStart struct {
+	r    io.Reader
+	seen func()
+	tail []byte // up to three bytes carried from the previous read
+	done bool
+}
+
+func (p *packStart) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 && !p.done {
+		buf := append(p.tail, b[:n]...)
+		if bytes.Contains(buf, []byte("PACK")) {
+			p.done, p.tail = true, nil
+			p.seen()
+		} else {
+			p.tail = append([]byte(nil), buf[max(0, len(buf)-3):]...)
+		}
+	}
+	return n, err
 }

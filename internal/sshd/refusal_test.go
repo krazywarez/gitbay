@@ -345,26 +345,51 @@ func TestPushPerPrincipalCap(t *testing.T) {
 	}
 }
 
-// A revoked key kills a push waiting on its client, and the slot comes
-// back.
+// A revoked key kills a push waiting on its client, and the slot it
+// held comes back.
 func TestPushKilledWhenKeyRevokedReleasesSlot(t *testing.T) {
 	cfg, st, alice := cloneFixture(t)
 	key := store.SSHKey{ID: 1, Scope: "full", Fingerprint: "SHA256:test"}
 	pushes := packlimit.New(1, 1, 0, time.Second)
+	revoked := make(chan struct{})
 	codec := make(chan int, 1)
 	go func() {
 		codec <- Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-			silentStdin(t), io.Discard, io.Discard, nil, nil, closed())
+			silentStdin(t), io.Discard, io.Discard, nil, nil, revoked)
 	}()
+	slotTaken(t, pushes)
+	close(revoked)
+	pushEnded(t, codec, pushes, 5*time.Second)
+}
+
+// slotTaken waits until l's one slot is held.
+func slotTaken(t *testing.T, l *packlimit.Limiter) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		r, err := l.Acquire(closed(), "probe")
+		if err != nil {
+			return
+		}
+		r()
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the push never took the slot")
+}
+
+// pushEnded requires a push to end, killed, within within, with l's
+// slot free again.
+func pushEnded(t *testing.T, codec <-chan int, l *packlimit.Limiter, within time.Duration) {
+	t.Helper()
 	select {
 	case code := <-codec:
 		if code != protocol.ExitFailure {
 			t.Fatalf("exit %d, want the push killed", code)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(within):
 		t.Fatal("push still running")
 	}
-	r, err := pushes.Acquire(nil, "elsewhere")
+	r, err := l.Acquire(nil, "elsewhere")
 	if err != nil {
 		t.Fatalf("slot not released after the kill: %v", err)
 	}

@@ -59,3 +59,64 @@ func (p *progressWriter) Write(b []byte) (int, error) {
 	}
 	return n, err
 }
+
+// Idle wraps both directions of a transport, r from the client and w to
+// it, so that once arm has been called idle closes when no byte has
+// moved either way for d. The window starts at arm; before it idle
+// never closes. stop ends the watch.
+func Idle(r io.Reader, w io.Writer, d time.Duration) (in io.Reader, out io.Writer, idle <-chan struct{}, arm, stop func()) {
+	var last atomic.Int64
+	var armed atomic.Bool
+	st := make(chan struct{})
+	quit := make(chan struct{})
+	go func() {
+		t := time.NewTicker(d / 4)
+		defer t.Stop()
+		for {
+			select {
+			case <-quit:
+				return
+			case <-t.C:
+				if armed.Load() && time.Since(time.Unix(0, last.Load())) >= d {
+					close(st)
+					return
+				}
+			}
+		}
+	}()
+	var armOnce, stopOnce sync.Once
+	return &progressReader{r: r, last: &last}, &stampWriter{w: w, last: &last}, st,
+		func() {
+			armOnce.Do(func() {
+				last.Store(time.Now().UnixNano())
+				armed.Store(true)
+			})
+		},
+		func() { stopOnce.Do(func() { close(quit) }) }
+}
+
+type progressReader struct {
+	r    io.Reader
+	last *atomic.Int64
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.last.Store(time.Now().UnixNano())
+	}
+	return n, err
+}
+
+type stampWriter struct {
+	w    io.Writer
+	last *atomic.Int64
+}
+
+func (s *stampWriter) Write(b []byte) (int, error) {
+	n, err := s.w.Write(b)
+	if n > 0 {
+		s.last.Store(time.Now().UnixNano())
+	}
+	return n, err
+}

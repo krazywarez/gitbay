@@ -19,7 +19,7 @@ func TestTransportCancelKillsGit(t *testing.T) {
 	in, w := io.Pipe()
 	cancel := make(chan struct{})
 	errc := make(chan error, 1)
-	go func() { errc <- Transport("git-upload-pack", dir, in, io.Discard, io.Discard, nil, 0, cancel) }()
+	go func() { errc <- Transport("git-upload-pack", dir, in, io.Discard, io.Discard, nil, 0, 0, cancel) }()
 	close(cancel)
 	time.AfterFunc(500*time.Millisecond, func() { w.Close() })
 	select {

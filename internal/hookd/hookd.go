@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
@@ -139,6 +140,7 @@ func (s *Server) handle(conn net.Conn) {
 	}
 	switch req.Hook {
 	case "pre-receive":
+		preReceiveStarted(req.Token)
 		s.preReceive(req, dec, enc)
 	case "post-receive":
 		s.postReceive(req)
@@ -323,4 +325,37 @@ func WriteHookScripts(hooksDir, gitbaydPath string) error {
 		}
 	}
 	return nil
+}
+
+// awaiting holds, per push token, a channel closed when that push's
+// pre-receive reaches hookd. sshd uses it to tell a pack still arriving
+// from one being checked.
+var (
+	awaitMu  sync.Mutex
+	awaiting = map[string]chan struct{}{}
+)
+
+// AwaitPreReceive returns a channel that closes when pre-receive for
+// the push holding token reaches this process's hookd, and forget,
+// which drops the registration. Under ssh.mode = "system" the push runs
+// in another process and the channel never closes.
+func AwaitPreReceive(token string) (started <-chan struct{}, forget func()) {
+	ch := make(chan struct{})
+	awaitMu.Lock()
+	awaiting[token] = ch
+	awaitMu.Unlock()
+	return ch, func() {
+		awaitMu.Lock()
+		delete(awaiting, token)
+		awaitMu.Unlock()
+	}
+}
+
+func preReceiveStarted(token string) {
+	awaitMu.Lock()
+	defer awaitMu.Unlock()
+	if ch, ok := awaiting[token]; ok {
+		close(ch)
+		delete(awaiting, token)
+	}
 }

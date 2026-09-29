@@ -76,13 +76,19 @@ func TestPushLimits(t *testing.T) {
 	if max != 0 || per != 0 || queue != math.MaxInt || wait != 5*time.Second {
 		t.Fatalf("off: %d %d %d %s", max, per, queue, wait)
 	}
-	cfg, err := Load(writeConfig(t, minimal+"\n[limits]\npush_concurrency = 4\npush_per_principal = 2\npush_queue = 8\npush_queue_wait = \"30s\"\n"))
+	cfg, err := Load(writeConfig(t, minimal+"\n[limits]\npush_concurrency = 4\npush_per_principal = 2\npush_queue = 8\npush_queue_wait = \"30s\"\npush_idle = \"20s\"\npush_receive_timeout = \"5m\"\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	max, per, queue, wait = cfg.Limits.PushLimits()
 	if max != 4 || per != 2 || queue != 8 || wait != 30*time.Second {
 		t.Fatalf("loaded: %d %d %d %s", max, per, queue, wait)
+	}
+	if idle, receive := cfg.Limits.PushTimeouts(); idle != 20*time.Second || receive != 5*time.Minute {
+		t.Fatalf("timeouts: %s %s", idle, receive)
+	}
+	if idle, receive := (Limits{}).PushTimeouts(); idle != time.Minute || receive != 15*time.Minute {
+		t.Fatalf("default timeouts: %s %s", idle, receive)
 	}
 	// The pack budget is not read from the push settings.
 	if pm, _, _, _ := cfg.Limits.PackLimits(); pm != DefaultPackConcurrency {
@@ -105,6 +111,16 @@ func TestContradictions(t *testing.T) {
 			"bad push_queue_wait",
 			minimal + "\n[limits]\npush_queue_wait = \"-5s\"\n",
 			"limits.push_queue_wait",
+		},
+		{
+			"bad push_idle",
+			minimal + "\n[limits]\npush_idle = \"0s\"\n",
+			"limits.push_idle",
+		},
+		{
+			"bad push_receive_timeout",
+			minimal + "\n[limits]\npush_receive_timeout = \"later\"\n",
+			"limits.push_receive_timeout",
 		},
 		{
 			"registration open without smtp",

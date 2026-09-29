@@ -35,15 +35,21 @@ func InitBare(path, defaultBranch, hooksPath string) error {
 // Transport streams one git transport service (upload-pack, receive-pack,
 // upload-archive). extraEnv entries are appended to the process environment;
 // hooks read the GITBAY_* variables from it. maxPack caps incoming pack
-// bytes on receive-pack (0 = unlimited). Closing cancel kills the service
+// bytes on receive-pack (0 = unlimited), and keepAlive sets its
+// receive.keepAlive in seconds (0 = git's default). Closing cancel kills the service
 // and everything it started; a push killed before its pre-receive hook
 // answers updates no refs. A nil cancel never fires.
-func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string, maxPack int64, cancel <-chan struct{}) error {
+func Transport(service, repoPath string, stdin io.Reader, stdout, errW io.Writer, extraEnv []string, maxPack int64, keepAlive int, cancel <-chan struct{}) error {
 	var args []string
 	switch service {
 	case "git-upload-pack", "git-receive-pack", "git-upload-archive":
 		if service == "git-receive-pack" && maxPack > 0 {
 			args = []string{"-c", fmt.Sprintf("receive.maxInputSize=%d", maxPack)}
+		}
+		if service == "git-receive-pack" && keepAlive > 0 {
+			// Seconds of silence after which receive-pack sends a
+			// keepalive while it indexes the pack and runs hooks.
+			args = append(args, "-c", fmt.Sprintf("receive.keepAlive=%d", keepAlive))
 		}
 		if service == "git-upload-pack" {
 			// Keepalives while pack-objects is still counting keep a

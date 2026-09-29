@@ -99,7 +99,7 @@ func (s *Server) handle(conn net.Conn) {
 	}()
 
 	dir := control.RepoDir(s.cfg.Server.Root, repo.OwnerName, repo.Name)
-	gitutil.Transport("git-upload-pack", dir, conn, out, io.Discard, protoEnv, 0, kill)
+	gitutil.Transport("git-upload-pack", dir, conn, out, io.Discard, protoEnv, 0, 0, kill)
 }
 
 // principal is the pack-limit principal for a client at addr.

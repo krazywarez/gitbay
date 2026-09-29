@@ -43,6 +43,11 @@ const (
 	DefaultPushPerPrincipal = 1
 	DefaultPushQueue        = 16
 	DefaultPushQueueWait    = time.Minute
+	// A push is killed when nothing has moved either way for
+	// DefaultPushIdle, or when its pre-receive has not started
+	// DefaultPushReceiveTimeout after it took its slot.
+	DefaultPushIdle           = time.Minute
+	DefaultPushReceiveTimeout = 15 * time.Minute
 )
 
 type Config struct {
@@ -253,6 +258,15 @@ type Limits struct {
 	PushPerPrincipal int    `toml:"push_per_principal"`
 	PushQueue        int    `toml:"push_queue"`
 	PushQueueWait    string `toml:"push_queue_wait"`
+	// PushIdle ("60s") kills a push when no byte has been read from the
+	// client and none written to it for that long, counted from when
+	// the pack begins or pre-receive starts; receive-pack sends a
+	// keepalive while it indexes and runs hooks. PushReceiveTimeout
+	// ("15m") kills a push whose pre-receive has not started that long
+	// after it took its slot, bounding how long a pack may take to
+	// arrive. Both apply only where the push limit is in force.
+	PushIdle           string `toml:"push_idle"`
+	PushReceiveTimeout string `toml:"push_receive_timeout"`
 }
 
 // PackLimits resolves the pack_* settings for packlimit.New. A zero
@@ -268,6 +282,18 @@ func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
 func (l Limits) PushLimits() (max, per, queue int, wait time.Duration) {
 	return resolveLimits(l.PushConcurrency, l.PushPerPrincipal, l.PushQueue, l.PushQueueWait,
 		DefaultPushConcurrency, DefaultPushPerPrincipal, DefaultPushQueue, DefaultPushQueueWait)
+}
+
+// PushTimeouts resolves push_idle and push_receive_timeout.
+func (l Limits) PushTimeouts() (idle, receive time.Duration) {
+	idle, receive = DefaultPushIdle, DefaultPushReceiveTimeout
+	if d, err := time.ParseDuration(l.PushIdle); err == nil && d > 0 {
+		idle = d
+	}
+	if d, err := time.ParseDuration(l.PushReceiveTimeout); err == nil && d > 0 {
+		receive = d
+	}
+	return idle, receive
 }
 
 func resolveLimits(maxV, perV, queueV int, waitV string, maxDef, perDef, queueDef int, waitDef time.Duration) (max, per, queue int, wait time.Duration) {
@@ -651,6 +677,8 @@ func (c Config) Validate() error {
 	for _, w := range []struct{ name, val string }{
 		{"pack_queue_wait", c.Limits.PackQueueWait},
 		{"push_queue_wait", c.Limits.PushQueueWait},
+		{"push_idle", c.Limits.PushIdle},
+		{"push_receive_timeout", c.Limits.PushReceiveTimeout},
 	} {
 		if w.val == "" {
 			continue
