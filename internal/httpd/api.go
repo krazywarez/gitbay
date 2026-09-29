@@ -77,6 +77,7 @@ func (s *Server) apiCmd(w http.ResponseWriter, r *http.Request) {
 		Expires:  tok.ExpiresAt,
 		Done:     s.until(r),
 		Stopping: s.stopping,
+		Packs:    s.packs,
 	}
 	code := control.Dispatch(ctx, req.Argv)
 

@@ -1,10 +1,13 @@
 package control
 
 import (
+	"errors"
 	"io"
+	"strconv"
 	"strings"
 
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 )
@@ -117,6 +120,22 @@ func runRepoDownload(c *Ctx, args []string) int {
 	// The prefix git puts on every path inside the archive, so unpacking
 	// lands in a named directory rather than the current one.
 	prefix := repo.Name + "-" + ref
+	// git archive draws on the same budget as clones and web archives,
+	// counted against the account the way upload-pack is.
+	principal := "user:" + strconv.FormatInt(c.User.ID, 10)
+	release, err := c.Packs.Acquire(c.Done, principal)
+	if err != nil {
+		transport := "ssh"
+		if c.ViaAPI {
+			transport = "api"
+		}
+		c.Packs.Refused(transport, principal, err)
+		if errors.Is(err, packlimit.ErrBusy) {
+			return c.fail(protocol.ExitFailure, "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
+		}
+		return c.fail(protocol.ExitFailure, "the server is restarting; try again in a minute")
+	}
+	defer release()
 	if err := gitutil.Archive(dir, ref, prefix, c.Stdout); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}

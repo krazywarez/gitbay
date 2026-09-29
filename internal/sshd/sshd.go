@@ -515,6 +515,7 @@ func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, 
 		Done:     done,
 		Stopping: stopping,
 		Expires:  key.ExpiresAt,
+		Packs:    packs,
 	}
 	return control.Dispatch(ctx, argv)
 }

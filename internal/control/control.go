@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gitbay.org/gitbay/internal/config"
+	"gitbay.org/gitbay/internal/packlimit"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -67,6 +68,9 @@ type Ctx struct {
 	// restarting. It closes Done too; a command that ends on Done checks
 	// it to say why.
 	Stopping <-chan struct{}
+	// Packs is the pack-generation limiter a command that runs git to
+	// produce an archive takes a slot from; nil is no limit.
+	Packs *packlimit.Limiter
 }
 
 // SourceWeb is Ctx.Source for a request from a browser session. Its
