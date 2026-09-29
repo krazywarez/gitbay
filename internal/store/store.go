@@ -174,6 +174,17 @@ func (s *Store) Version() (int, error) {
 	return v, err
 }
 
+// TakeMigrationNote returns and clears what a migration left to be
+// logged with it, "" for nothing.
+func (s *Store) TakeMigrationNote() (string, error) {
+	var note string
+	err := s.DB.QueryRow("DELETE FROM settings WHERE key = 'migration_note' RETURNING value").Scan(&note)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return note, err
+}
+
 // MigrateUp applies all pending migrations.
 func (s *Store) MigrateUp() error { return s.migrateTo(-1) }
 

@@ -180,13 +180,49 @@ func (s *Store) SetForkOf(repoID, parentID int64) error {
 	return err
 }
 
+// DeleteRepo removes the repository row, what cascades from it, and
+// the deploy keys scoped to it, which name it by id in their scope
+// rather than by a foreign key (#306).
 func (s *Store) DeleteRepo(repoID int64) error {
-	res, err := s.DB.Exec("DELETE FROM repos WHERE id = ?", repoID)
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query("DELETE FROM ssh_keys WHERE scope LIKE 'deploy:' || ? || ':%' RETURNING id", repoID)
+	if err != nil {
+		return err
+	}
+	var keyIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		keyIDs = append(keyIDs, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	res, err := tx.Exec("DELETE FROM repos WHERE id = ?", repoID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
+	}
+	if len(keyIDs) > 0 {
+		if err := bumpKeyEpoch(tx); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if len(keyIDs) > 0 {
+		s.announce(Revoked{KeyIDs: keyIDs})
 	}
 	return nil
 }

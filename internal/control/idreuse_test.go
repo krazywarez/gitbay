@@ -8,9 +8,9 @@ import (
 	"gitbay.org/gitbay/internal/policy"
 )
 
-// A deploy key names its repository by id in its scope, and deleting
-// the repository leaves the key. The next repository does not take the
-// id, so the key opens nothing (#306).
+// A deploy key names its repository by id in its scope. Deleting the
+// repository removes the key, and the next repository does not take the
+// id, so the key opens nothing either way (#306).
 func TestDeployKeyOfDeletedRepository(t *testing.T) {
 	st, _, uid := newQueueTestRepo(t)
 	goneID, err := st.CreateRepo("user", uid, "gone", "private")
@@ -33,8 +33,8 @@ func TestDeployKeyOfDeletedRepository(t *testing.T) {
 	}
 }
 
-// A grant names its account by id and outlives the account. The next
-// account does not take the id, so it does not inherit the grant (#306).
+// A grant names its account by id. Deleting the account removes the
+// grant, and the next account does not take the id (#306).
 func TestGrantOfDeletedAccount(t *testing.T) {
 	st, repo, _ := newQueueTestRepo(t)
 	carol, err := st.CreateUser("carol", false)

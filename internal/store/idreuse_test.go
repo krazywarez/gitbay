@@ -81,16 +81,14 @@ func seedForIDs(t *testing.T, s *Store) (goneRepo, goneUser int64) {
 	goneRepo = mustExec(t, s, "INSERT INTO repos (owner_kind, owner_id, name, visibility) VALUES ('user', ?, 'gone', 'private')", alice)
 	mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, 'SHA256:d', 'ssh-ed25519', x'00', ?)",
 		alice, "deploy:"+itoa(goneRepo)+":rw")
-	if err := s.DeleteRepo(goneRepo); err != nil {
-		t.Fatal(err)
-	}
+	// Raw deletes: DeleteRepo and DeleteUser now take the deploy key and
+	// the grant with them, and these orphans stand for ones left earlier.
+	mustExec(t, s, "DELETE FROM repos WHERE id = ?", goneRepo)
 	goneUser = mustExec(t, s, "INSERT INTO users (username) VALUES ('carol')")
 	if err := s.GrantAccess(repo, goneUser, "write"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DeleteUser(goneUser); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, s, "DELETE FROM users WHERE id = ?", goneUser)
 	return goneRepo, goneUser
 }
 
@@ -318,5 +316,169 @@ func TestInFlightMarksAfterCascade(t *testing.T) {
 	}
 	if sent != nil {
 		t.Fatal("the removed device's push was marked on the next device's")
+	}
+}
+
+// Deleting a repository takes the deploy keys scoped to it, and only
+// those; deleting an account or an org takes its grants (#306).
+func TestDeletesTakeGrantsAndDeployKeys(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	var revoked []Revoked
+	s.OnRevoke(func(r Revoked) { revoked = append(revoked, r) })
+	alice := mustExec(t, s, "INSERT INTO users (username) VALUES ('alice')")
+	var repos []int64
+	for i := range 12 {
+		repos = append(repos, mustExec(t, s,
+			"INSERT INTO repos (owner_kind, owner_id, name, visibility) VALUES ('user', ?, ?, 'public')", alice, "r"+itoa(int64(i))))
+	}
+	// repos[0] is 2 and repos[10] is 12: a prefix of one id must not
+	// match the other.
+	gone, other := repos[0], repos[len(repos)-2]
+	if !strings.HasPrefix(itoa(other), itoa(gone)) {
+		t.Fatalf("ids %d and %d do not share a prefix", gone, other)
+	}
+	goneKey := mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, 'SHA256:g', 'a', x'00', ?)",
+		alice, "deploy:"+itoa(gone)+":rw")
+	mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, 'SHA256:o', 'a', x'00', ?)",
+		alice, "deploy:"+itoa(other)+":ro")
+	if err := s.DeleteRepo(gone); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	s.DB.QueryRow("SELECT COUNT(*) FROM ssh_keys WHERE fingerprint = 'SHA256:g'").Scan(&n)
+	if n != 0 {
+		t.Fatal("the deleted repository's deploy key survived")
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM ssh_keys WHERE fingerprint = 'SHA256:o'").Scan(&n)
+	if n != 1 {
+		t.Fatal("another repository's deploy key went with it")
+	}
+	if len(revoked) != 1 || len(revoked[0].KeyIDs) != 1 || revoked[0].KeyIDs[0] != goneKey {
+		t.Fatalf("revocations announced: %+v", revoked)
+	}
+	if err := s.DeleteRepo(gone); err != ErrNotFound {
+		t.Fatalf("deleting it again: %v", err)
+	}
+
+	bob := mustExec(t, s, "INSERT INTO users (username) VALUES ('bob')")
+	org := mustExec(t, s, "INSERT INTO orgs (name) VALUES ('acme')")
+	if err := s.GrantAccess(other, bob, "write"); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, s, "INSERT INTO repo_access (repo_id, subject_kind, subject_id, role) VALUES (?, 'org', ?, 'read')", other, org)
+	// An org with the same id as bob's keeps its grant when bob goes.
+	mustExec(t, s, "INSERT INTO repo_access (repo_id, subject_kind, subject_id, role) VALUES (?, 'org', ?, 'read')", repos[1], bob)
+	mustExec(t, s, `INSERT INTO profile_about_backfill (owner_kind, owner_id, about, about_format)
+		VALUES ('user', ?, 'a', 'md'), ('org', ?, 'b', 'md'), ('org', ?, 'c', 'md')`, bob, org, bob)
+	if err := s.DeleteUser(bob); err != nil {
+		t.Fatal(err)
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM repo_access WHERE subject_kind = 'user' AND subject_id = ?", bob).Scan(&n)
+	if n != 0 {
+		t.Fatal("the deleted account's grant survived")
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM profile_about_backfill WHERE owner_kind = 'user' AND owner_id = ?", bob).Scan(&n)
+	if n != 0 {
+		t.Fatal("the deleted account's about text survived")
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM repo_access WHERE subject_kind = 'org' AND subject_id = ?", bob).Scan(&n)
+	if n != 1 {
+		t.Fatal("an org grant went with the account of the same id")
+	}
+	if err := s.DeleteOrg(org); err != nil {
+		t.Fatal(err)
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM repo_access WHERE subject_kind = 'org' AND subject_id = ?", org).Scan(&n)
+	if n != 0 {
+		t.Fatal("the deleted org's grant survived")
+	}
+	s.DB.QueryRow("SELECT COUNT(*) FROM profile_about_backfill WHERE owner_kind = 'org'").Scan(&n)
+	if n != 1 {
+		t.Fatalf("org about texts after deleting acme: %d, want only the one with bob's id", n)
+	}
+}
+
+// The cleanup migration removes grants and deploy keys left by earlier
+// deletes, keeps live ones, and leaves a note with the counts.
+func TestOrphanCleanupMigration(t *testing.T) {
+	ms, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := 0
+	for _, m := range ms {
+		if m.name == "orphan_grants_deploy_keys" {
+			v = m.version
+		}
+	}
+	if v == 0 {
+		t.Fatal("no orphan_grants_deploy_keys migration")
+	}
+	s := open(t)
+	if err := s.MigrateTo(v - 1); err != nil {
+		t.Fatal(err)
+	}
+	alice := mustExec(t, s, "INSERT INTO users (username) VALUES ('alice')")
+	repo := mustExec(t, s, "INSERT INTO repos (owner_kind, owner_id, name, visibility) VALUES ('user', ?, 'r', 'public')", alice)
+	mustExec(t, s, "INSERT INTO repo_access (repo_id, subject_kind, subject_id, role) VALUES (?, 'user', ?, 'read')", repo, alice)
+	mustExec(t, s, "INSERT INTO repo_access (repo_id, subject_kind, subject_id, role) VALUES (?, 'user', 999, 'write')", repo)
+	mustExec(t, s, "INSERT INTO repo_access (repo_id, subject_kind, subject_id, role) VALUES (?, 'org', 998, 'read')", repo)
+	mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, 'SHA256:live', 'a', x'00', ?)",
+		alice, "deploy:"+itoa(repo)+":rw")
+	mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob, scope) VALUES (?, 'SHA256:dead', 'a', x'00', 'deploy:997:ro')", alice)
+	mustExec(t, s, "INSERT INTO ssh_keys (user_id, fingerprint, algo, blob) VALUES (?, 'SHA256:user', 'a', x'00')", alice)
+	mustExec(t, s, `INSERT INTO profile_about_backfill (owner_kind, owner_id, about, about_format)
+		VALUES ('user', ?, 'live', 'md'), ('user', 996, 'dead', 'md'), ('org', 995, 'dead', 'md')`, alice)
+	var epoch int
+	s.DB.QueryRow("SELECT value FROM settings WHERE key = 'key_epoch'").Scan(&epoch)
+	if err := s.MigrateTo(v); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(t, s, "repo_access"); got != 1 {
+		t.Fatalf("repo_access: %d rows, want the live grant", got)
+	}
+	var about string
+	if err := s.DB.QueryRow("SELECT group_concat(about) FROM profile_about_backfill").Scan(&about); err != nil || about != "live" {
+		t.Fatalf("about texts after cleanup: %q, %v", about, err)
+	}
+	var fps []string
+	rows, err := s.DB.Query("SELECT fingerprint FROM ssh_keys ORDER BY fingerprint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var fp string
+		rows.Scan(&fp)
+		fps = append(fps, fp)
+	}
+	rows.Close()
+	if strings.Join(fps, " ") != "SHA256:live SHA256:user" {
+		t.Fatalf("keys after cleanup: %v", fps)
+	}
+	var after int
+	s.DB.QueryRow("SELECT value FROM settings WHERE key = 'key_epoch'").Scan(&after)
+	if after != epoch+1 {
+		t.Fatalf("key_epoch %d, want %d", after, epoch+1)
+	}
+	note, err := s.TakeMigrationNote()
+	if err != nil || note != "removed grants of deleted accounts or organizations: 2; deploy keys of deleted repositories: 1; profile about texts of deleted accounts or organizations: 2" {
+		t.Fatalf("note %q, %v", note, err)
+	}
+	if note, _ := s.TakeMigrationNote(); note != "" {
+		t.Fatalf("note not cleared: %q", note)
+	}
+
+	// Nothing to remove, no note.
+	if err := s.MigrateTo(v - 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MigrateTo(v); err != nil {
+		t.Fatal(err)
+	}
+	if note, _ := s.TakeMigrationNote(); note != "" {
+		t.Fatalf("note with nothing removed: %q", note)
 	}
 }

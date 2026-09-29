@@ -99,12 +99,28 @@ func (s *Store) DeleteUser(id int64) error {
 		return fmt.Errorf("account still anchors: %s — transfer or delete those first, or disable the account instead",
 			strings.Join(blockers, ", "))
 	}
-	res, err := s.DB.Exec("DELETE FROM users WHERE id = ?", id)
+	// Grants and a parked about text name the account by id with no
+	// foreign key, so they go in the same transaction (#306).
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM repo_access WHERE subject_kind = 'user' AND subject_id = ?", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM profile_about_backfill WHERE owner_kind = 'user' AND owner_id = ?", id); err != nil {
+		return err
+	}
+	res, err := tx.Exec("DELETE FROM users WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	s.announce(Revoked{UserID: id})
 	return nil

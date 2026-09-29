@@ -195,8 +195,23 @@ func (s *Store) DeleteOrg(orgID int64) error {
 	if n > 0 {
 		return fmt.Errorf("the organization still owns %d repositories; delete or transfer them first", n)
 	}
-	_, err := s.DB.Exec("DELETE FROM orgs WHERE id = ?", orgID)
-	return err
+	// Grants and a parked about text name the org by id with no foreign
+	// key (#306).
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM repo_access WHERE subject_kind = 'org' AND subject_id = ?", orgID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM profile_about_backfill WHERE owner_kind = 'org' AND owner_id = ?", orgID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM orgs WHERE id = ?", orgID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // RenameOrg changes an org's name, holding the shared owner-namespace

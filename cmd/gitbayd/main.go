@@ -77,7 +77,16 @@ func openStore(cfg config.Config) (*store.Store, error) {
 		return nil, err
 	}
 	if after != before {
-		slog.Info("schema migrated", "from", before, "to", after)
+		note, err := s.TakeMigrationNote()
+		if err != nil {
+			s.Close()
+			return nil, err
+		}
+		args := []any{"from", before, "to", after}
+		if note != "" {
+			args = append(args, "note", note)
+		}
+		slog.Info("schema migrated", args...)
 	}
 	return s, nil
 }

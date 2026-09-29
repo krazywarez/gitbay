@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"log/slog"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"gitbay.org/gitbay/internal/store"
 )
 
 // A restart that moves the schema says so. Migrations used to run in silence,
@@ -50,5 +53,37 @@ func TestOpenStoreLogsSchemaMigration(t *testing.T) {
 	s.Close()
 	if strings.Contains(buf.String(), "schema migrated") {
 		t.Errorf("logged a migration on an up-to-date database:\n%s", buf.String())
+	}
+}
+
+// A note a migration leaves goes in the log line and is then dropped.
+func TestOpenStoreLogsMigrationNote(t *testing.T) {
+	cfg := testConfig(t)
+	st, err := store.Open(filepath.Join(cfg.Server.Root, "gitbay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MigrateTo(1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB.Exec("INSERT INTO settings (key, value) VALUES ('migration_note', 'removed 2 things')"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+	s, err := openStore(cfg)
+	if err != nil {
+		t.Fatalf("openStore: %v", err)
+	}
+	defer s.Close()
+	if !strings.Contains(buf.String(), `note="removed 2 things"`) {
+		t.Fatalf("note not logged:\n%s", buf.String())
+	}
+	if note, err := s.TakeMigrationNote(); err != nil || note != "" {
+		t.Fatalf("note left behind: %q, %v", note, err)
 	}
 }
