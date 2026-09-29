@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"net/mail"
 	"net/textproto"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/emersion/go-msgauth/dkim"
 
 	"gitbay.org/gitbay/internal/mailreply"
 )
@@ -33,3 +36,31 @@ func FuzzReply(f *testing.F) {
 }
 
 var fuzzNow = time.Date(2026, 9, 29, 0, 0, 0, 0, time.UTC)
+
+// FuzzDKIM runs the DKIM check, the dkim package's signature and key
+// record parsing included, on arbitrary messages: no input panics.
+func FuzzDKIM(f *testing.F) {
+	msg := "From: bob@example.test\r\nTo: x@y\r\nSubject: s\r\n\r\nhi\r\n"
+	for _, canon := range []dkim.Canonicalization{dkim.CanonicalizationSimple, dkim.CanonicalizationRelaxed} {
+		var b bytes.Buffer
+		o := dkim.SignOptions{Domain: "example.test", Selector: "rsa", Signer: rsaKey,
+			HeaderCanonicalization: canon, BodyCanonicalization: canon}
+		if err := dkim.Sign(&b, strings.NewReader(msg), &o); err != nil {
+			f.Fatal(err)
+		}
+		f.Add(b.Bytes())
+	}
+	f.Add([]byte("DKIM-Signature: v=1; a=ed25519-sha256; d=example.test; s=temp; h=from; bh=; b=\r\nFrom: a@example.test\r\n\r\n"))
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		msg, err := mail.ReadMessage(bytes.NewReader(raw))
+		if err != nil {
+			return
+		}
+		from, err := msg.Header.AddressList("From")
+		if err != nil || len(from) != 1 {
+			return
+		}
+		p := &Processor{LookupTXT: (&fakeDNS{}).lookup}
+		p.dkimVerified(raw, msg.Header, from[0].Address)
+	})
+}

@@ -48,7 +48,11 @@ type Processor struct {
 	St  *store.Store
 	Cfg config.Config
 	Now func() time.Time
+	// LookupTXT resolves DKIM selector keys; nil is the system
+	// resolver.
+	LookupTXT LookupTXT
 
+	keys  keyCache
 	tries map[uint32]int
 	// A window of refusal rows, bounded because anyone can send mail
 	// to the mailbox.
@@ -197,10 +201,11 @@ func (p *Processor) Handle(raw []byte) Result {
 	if !ok {
 		return p.refuse(u.ID, msgID, "From is not a verified address of the account")
 	}
-	if id := p.Cfg.Mail.Inbound.TrustedAuthservID; id != "" {
-		if reason := authenticated(msg.Header, id, from[0].Address); reason != "" {
-			return p.refuse(u.ID, msgID, reason)
+	if res := p.authenticate(raw, msg.Header, from[0].Address); res != nil {
+		if res.Retry {
+			return *res
 		}
+		return p.refuse(u.ID, msgID, res.Reason)
 	}
 	if on, err := p.St.ReplyEnabled(u.ID); err != nil {
 		return Result{Retry: true, Reason: err.Error()}
@@ -269,6 +274,37 @@ func (p *Processor) Handle(raw []byte) Result {
 	// Dispatch has audited a denied or not-found refusal already; this
 	// row says it came by mail and why.
 	return p.refuse(u.ID, msgID, "comment refused: "+reason)
+}
+
+// authenticate checks that the mail host or the sender's domain vouches
+// for From: an Authentication-Results pass from trusted_authserv_id, or
+// a DKIM signature that verifies here with require_dkim. When both are
+// set either is enough. It returns nil when From is authenticated or
+// neither is set, and the unaudited refusal or retry otherwise.
+func (p *Processor) authenticate(raw []byte, h mail.Header, from string) *Result {
+	in := p.Cfg.Mail.Inbound
+	var reasons []string
+	if id := in.TrustedAuthservID; id != "" {
+		reason := authenticated(h, id, from)
+		if reason == "" {
+			return nil
+		}
+		reasons = append(reasons, reason)
+	}
+	if in.RequireDKIM {
+		reason, retry := p.dkimVerified(raw, h, from)
+		if reason == "" {
+			return nil
+		}
+		if retry {
+			return &Result{Retry: true, Reason: reason}
+		}
+		reasons = append(reasons, reason)
+	}
+	if len(reasons) == 0 {
+		return nil
+	}
+	return &Result{Reason: strings.Join(reasons, "; ")}
 }
 
 // createdAfter refuses when the row was created after the token was

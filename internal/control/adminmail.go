@@ -17,7 +17,7 @@ func init() {
 		ReadOnly: true, Run: runAdminMailInboundCheck})
 }
 
-const unauthenticatedWarning = "trusted_authserv_id is unset: a reply's From is not checked against the mail host's DMARC and DKIM results"
+const unauthenticatedWarning = "require_dkim and trusted_authserv_id are unset: a reply's From is not authenticated"
 
 // runAdminMailInboundCheck logs in to the [mail.inbound] mailbox and
 // opens it with EXAMINE, which changes no flag, so a check never marks a
@@ -36,7 +36,11 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 		Mailbox  string `json:"mailbox,omitempty"`
 		Messages int    `json:"messages"`
 		Unseen   int    `json:"unseen"`
-		Warning  string `json:"warning,omitempty"`
+		// RequireDKIM and TrustedAuthservID are how a reply's From
+		// is authenticated.
+		RequireDKIM       bool   `json:"require_dkim"`
+		TrustedAuthservID string `json:"trusted_authserv_id,omitempty"`
+		Warning           string `json:"warning,omitempty"`
 	}
 	if !in.Enabled {
 		return c.emit(out{}, func(w io.Writer) {
@@ -52,8 +56,9 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%s: %v", in.Addr(), err)
 	}
-	d := out{Enabled: true, Server: in.Addr(), Mailbox: in.MailboxName(), Messages: n, Unseen: len(unseen)}
-	if in.TrustedAuthservID == "" {
+	d := out{Enabled: true, Server: in.Addr(), Mailbox: in.MailboxName(), Messages: n, Unseen: len(unseen),
+		RequireDKIM: in.RequireDKIM, TrustedAuthservID: in.TrustedAuthservID}
+	if !in.Authenticated() {
 		d.Warning = unauthenticatedWarning
 		fmt.Fprintln(c.Stderr, "warning: "+d.Warning)
 	}
@@ -63,6 +68,8 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 			"mailbox", d.Mailbox,
 			"messages", fmt.Sprintf("%d", d.Messages),
 			"unseen", fmt.Sprintf("%d", d.Unseen),
+			"require_dkim", fmt.Sprintf("%t", d.RequireDKIM),
+			"trusted_authserv_id", d.TrustedAuthservID,
 		)
 	})
 }

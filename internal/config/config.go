@@ -302,6 +302,16 @@ type MailInbound struct {
 	// pass, or an aligned DKIM pass, in the topmost such header. Only
 	// safe when the mail host removes incoming headers claiming its id.
 	TrustedAuthservID string `toml:"trusted_authserv_id"`
+	// RequireDKIM makes a reply need a DKIM signature, verified by
+	// gitbayd, that covers From and whose d= is in relaxed alignment
+	// with the From domain. With TrustedAuthservID also set, either
+	// passing is enough.
+	RequireDKIM bool `toml:"require_dkim"`
+}
+
+// Authenticated reports whether a reply's From is checked at all.
+func (m MailInbound) Authenticated() bool {
+	return m.TrustedAuthservID != "" || m.RequireDKIM
 }
 
 // DefaultInboundPoll is the poll interval when poll_interval is unset.

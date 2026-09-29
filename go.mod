@@ -7,6 +7,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/alecthomas/chroma/v2 v2.27.0
+	github.com/emersion/go-msgauth v0.7.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/niklasfasching/go-org v1.9.1
 	github.com/spf13/cobra v1.10.2

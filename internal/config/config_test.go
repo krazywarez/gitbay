@@ -423,6 +423,13 @@ func TestMailInbound(t *testing.T) {
 	if in.Addr() != "imap.example:993" || in.MailboxName() != "INBOX" || in.Poll() != DefaultInboundPoll {
 		t.Fatalf("defaults: %q %q %v", in.Addr(), in.MailboxName(), in.Poll())
 	}
+	if in.RequireDKIM || in.Authenticated() {
+		t.Fatalf("require_dkim defaults on or From counts as authenticated: %+v", in)
+	}
+	cfg, err = Load(writeConfig(t, minimal+smtp+inbound+"require_dkim = true\n"))
+	if err != nil || !cfg.Mail.Inbound.RequireDKIM || !cfg.Mail.Inbound.Authenticated() {
+		t.Fatalf("require_dkim: %+v, %v", cfg.Mail.Inbound, err)
+	}
 	in.TLS = "starttls"
 	if in.Addr() != "imap.example:143" {
 		t.Fatalf("starttls default port: %q", in.Addr())
