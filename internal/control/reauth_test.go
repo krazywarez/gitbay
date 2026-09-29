@@ -109,6 +109,7 @@ func TestNeedsRecentSignInSet(t *testing.T) {
 	want := []string{
 		"admin email verify",
 		"admin invite",
+		"admin repo visibility",
 		"admin user create",
 		"admin user enable",
 		"admin user promote",

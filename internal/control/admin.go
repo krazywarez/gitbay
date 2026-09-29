@@ -80,10 +80,11 @@ func init() {
 		Examples: []string{"admin repo unarchive alice/old-project"},
 		Run:      runAdminRepoUnarchive})
 	register(Command{Path: []string{"admin", "repo", "visibility"},
-		Summary:  "set any repository's visibility (instance admins; audited)",
-		Usage:    "admin repo visibility <owner/name> public|private",
-		Examples: []string{"admin repo visibility alice/secret private"},
-		Run:      runAdminRepoVisibility})
+		NeedsRecentSignIn: true,
+		Summary:           "set any repository's visibility (instance admins; audited)",
+		Usage:             "admin repo visibility <owner/name> public|private",
+		Examples:          []string{"admin repo visibility alice/secret private"},
+		Run:               runAdminRepoVisibility})
 	register(Command{Path: []string{"admin", "repo", "delete"},
 		Summary: "delete any repository (instance admins; audited)",
 		Usage:   "admin repo delete <owner/name> --yes",

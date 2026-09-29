@@ -25,7 +25,8 @@ anything beyond "replace the binary and restart" is needed.
 - A browser session creates credentials and grants access — keys, PGP
   keys, tokens, verified addresses, org and repository roles, transfers,
   repository visibility, webhooks, secrets, mirrors, and the admin
-  promote/enable actions — only within 15 minutes of signing in. An
+  promote/enable and repository-visibility actions — only within 15
+  minutes of signing in. An
   older session gets the form back with a "Sign in again" link, and the
   login returns to it. SSH and API tokens are unaffected (#297).
 - The builds page's status badge section gives an org-mode snippet
