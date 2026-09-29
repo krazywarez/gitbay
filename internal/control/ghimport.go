@@ -136,11 +136,12 @@ func (g *ghClient) get(path string, out any) error {
 
 // pinnedClient reaches api's host only at its checked addresses, never
 // through a proxy from the environment, and follows no redirect, as
-// webhook delivery and repo import do.
+// webhook delivery and repo import do. Each import builds its own
+// client, so connections are not kept for reuse.
 func pinnedClient(api gitpin.Remote) *http.Client {
 	return &http.Client{
 		Timeout:   30 * time.Second,
-		Transport: &http.Transport{Proxy: nil, DialContext: api.DialContext, TLSHandshakeTimeout: 10 * time.Second},
+		Transport: &http.Transport{Proxy: nil, DialContext: api.DialContext, TLSHandshakeTimeout: 10 * time.Second, DisableKeepAlives: true},
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refusing redirect to %s://%s; a renamed repository is imported under its new name", req.URL.Scheme, req.URL.Host)
 		},
