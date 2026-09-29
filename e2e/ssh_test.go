@@ -29,12 +29,16 @@ type instance struct {
 	stderr   *tailBuffer // the end of the first serve's stderr
 }
 
-// nextPort hands out candidate ports. Seeded randomly so two test processes
-// on one machine — `go test ./...` runs packages concurrently — start in
-// different places.
+// nextPort hands out candidate ports below 32768, where Linux and macOS
+// start the ports they give outgoing connections: a git or SMTP client in
+// another test cannot take one between the bind test and gitbayd's bind.
+// Seeded randomly so two test processes on one machine — `go test ./...`
+// runs packages concurrently — start in different places.
+const lastPort = 32000
+
 var nextPort = func() *atomic.Int32 {
 	var n atomic.Int32
-	n.Store(int32(20000 + rand.IntN(20000)))
+	n.Store(int32(10000 + rand.IntN(10000)))
 	return &n
 }()
 
@@ -58,7 +62,7 @@ func freePorts(t *testing.T, n int) []int {
 	ports := make([]int, 0, n)
 	for len(ports) < n {
 		p := int(nextPort.Add(1))
-		if p > 60000 {
+		if p > lastPort {
 			t.Fatal("ran out of ports")
 		}
 		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
