@@ -182,7 +182,7 @@ func TestSuggestionRefusals(t *testing.T) {
 		c := &Ctx{User: f.alice, Scope: "full", Store: f.st, Stdout: &out, Stderr: &errOut,
 			Stdin: strings.NewReader(body)}
 		c.Cfg.Server.Root = f.root
-	c.Cfg.Limits.WriteRate = -1
+		c.Cfg.Limits.WriteRate = -1
 		return Dispatch(c, append([]string{"mr", "diff-comment", f.repo.Path(), "1", "--file", "-"}, extra...)), errOut.String()
 	}
 	block := "```suggestion\nx\n```\n"
@@ -463,5 +463,36 @@ func TestApplySuggestionFork(t *testing.T) {
 	}
 	if !said {
 		t.Fatalf("timeline does not say why the merge was dequeued: %+v", cs)
+	}
+}
+
+// Reading suggestions costs git processes per file and commit, not per
+// thread: six suggestions on one file read it as one does.
+func TestSuggestionsProcessCountPerFile(t *testing.T) {
+	f := newSuggestFixture(t, nil)
+	spawned := func() int {
+		t.Helper()
+		comments, err := f.st.ListDiffComments(f.mr().ID, f.alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := newAnchoredFiles(f.dir)
+		defer files.close()
+		got := suggestionsWith(files, func() bool { return false }, f.mr(), comments)
+		for _, s := range got {
+			if s.Outdated {
+				t.Fatalf("suggestion outdated: %+v", s)
+			}
+		}
+		return files.spawned
+	}
+	f.suggest(f.alice, "lib.txt", 1, 1, "ONE")
+	one := spawned()
+	for i := 2; i <= 5; i++ {
+		f.suggest(f.alice, "lib.txt", i, i, "X")
+	}
+	f.suggest(f.alice, "lib.txt", 1, 2, "Y")
+	if six := spawned(); six != one || one > 2 {
+		t.Fatalf("git processes: %d for one suggestion, %d for six on the same file", one, six)
 	}
 }

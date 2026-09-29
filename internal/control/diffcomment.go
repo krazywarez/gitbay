@@ -218,6 +218,7 @@ func runMRThreads(c *Ctx, args []string) int {
 		Suggestion *SuggestionOut `json:"suggestion,omitempty"`
 		Comments   []commentOut   `json:"comments"`
 	}
+	suggestions := Suggestions(c.Store, c.Cfg.Server.Root, repo, mr, comments)
 	byRoot := map[int64]*threadOut{}
 	var order []int64
 	for _, cm := range comments {
@@ -225,7 +226,7 @@ func runMRThreads(c *Ctx, args []string) int {
 			byRoot[cm.ID] = &threadOut{
 				ID: cm.ID, Path: cm.Path, Side: cm.Side, StartLine: cm.StartLine, Line: cm.Line,
 				Stale: cm.HeadSHA != mr.HeadSHA, Resolved: cm.ResolvedBy,
-				Suggestion: ThreadSuggestion(c.Store, c.Cfg.Server.Root, repo, mr, cm),
+				Suggestion: suggestions[cm.ID],
 				Comments:   []commentOut{{cm.ID, cm.Author, cm.Body, cm.CreatedAt}},
 			}
 			order = append(order, cm.ID)

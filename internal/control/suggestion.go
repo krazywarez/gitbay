@@ -52,23 +52,78 @@ const (
 	reasonNoBase  = "the commit it was made against is no longer available"
 )
 
-// readAnchored reads the regular file path at commit, with its mode.
-func readAnchored(dir, commit, path string) ([]byte, string, error) {
-	e, ok := gitutil.StatPath(dir, commit, path)
-	if !ok {
-		return nil, "", fmt.Errorf("%s", reasonGone)
+// anchoredFiles reads the files suggestions anchor in, for one page or
+// listing: one ls-tree per (commit, path), and every blob through one
+// cat-file --batch process started on first use, so a merge request with
+// many suggestions on a file costs no more processes than one with a
+// single suggestion.
+type anchoredFiles struct {
+	dir     string
+	entries map[[2]string]anchoredEntry
+	blobs   map[string][]byte
+	batch   *gitutil.BlobBatch
+	spawned int // git processes started, for the test that bounds it
+}
+
+type anchoredEntry struct {
+	e  gitutil.TreeEntry
+	ok bool
+}
+
+func newAnchoredFiles(dir string) *anchoredFiles {
+	return &anchoredFiles{dir: dir, entries: map[[2]string]anchoredEntry{}, blobs: map[string][]byte{}}
+}
+
+func (f *anchoredFiles) close() {
+	if f.batch != nil {
+		f.batch.Close()
+	}
+}
+
+// read returns the regular file path at commit, with its mode and blob id.
+func (f *anchoredFiles) read(commit, path string) ([]byte, string, string, error) {
+	key := [2]string{commit, path}
+	ent, seen := f.entries[key]
+	if !seen {
+		f.spawned++
+		ent.e, ent.ok = gitutil.StatPath(f.dir, commit, path)
+		f.entries[key] = ent
+	}
+	e := ent.e
+	if !ent.ok {
+		return nil, "", "", fmt.Errorf("%s", reasonGone)
 	}
 	if e.Type != "blob" || (e.Mode != "100644" && e.Mode != "100755") {
-		return nil, "", fmt.Errorf("%s is not a regular file", path)
+		return nil, "", "", fmt.Errorf("%s is not a regular file", path)
 	}
 	if e.Size > maxSuggestionBytes {
-		return nil, "", fmt.Errorf("%s is larger than %d bytes", path, maxSuggestionBytes)
+		return nil, "", "", fmt.Errorf("%s is larger than %d bytes", path, maxSuggestionBytes)
 	}
-	content, err := gitutil.ReadBlob(dir, commit, path, maxSuggestionBytes)
+	if content, ok := f.blobs[e.SHA]; ok {
+		return content, e.Mode, e.SHA, nil
+	}
+	if f.batch == nil {
+		b, err := gitutil.NewBlobBatch(f.dir)
+		if err != nil {
+			return nil, "", "", err
+		}
+		f.spawned++
+		f.batch = b
+	}
+	content, err := f.batch.Read(e.SHA, maxSuggestionBytes)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
-	return content, e.Mode, nil
+	f.blobs[e.SHA] = content
+	return content, e.Mode, e.SHA, nil
+}
+
+// readAnchored reads the regular file path at commit, with its mode.
+func readAnchored(dir, commit, path string) ([]byte, string, error) {
+	f := newAnchoredFiles(dir)
+	defer f.close()
+	content, mode, _, err := f.read(commit, path)
+	return content, mode, err
 }
 
 // suggestionRange is a thread's first and last line.
@@ -76,45 +131,58 @@ func suggestionRange(cm store.DiffComment) (int, int) {
 	return int(firstNonZero(cm.StartLine, cm.Line)), int(cm.Line)
 }
 
-// ThreadSuggestion is the suggestion a thread root carries, checked
-// against the merge request's head, or nil when it carries none. The
+// Suggestions are the suggestions the thread roots among comments carry,
+// by thread id, each checked against the merge request's head. The
 // original lines are read from the commit the comment was made on, in
 // the target repository, which holds every head the merge request has
 // had until gc prunes an abandoned one.
-func ThreadSuggestion(st *store.Store, root string, repo store.Repo, mr store.MR, cm store.DiffComment) *SuggestionOut {
-	if cm.ReplyTo != 0 || cm.Side != "new" {
-		return nil
+func Suggestions(st *store.Store, root string, repo store.Repo, mr store.MR, comments []store.DiffComment) map[int64]*SuggestionOut {
+	f := newAnchoredFiles(RepoDir(root, repo.OwnerName, repo.Name))
+	defer f.close()
+	return suggestionsWith(f, func() bool { return signedOnly(st, repo, mr) }, mr, comments)
+}
+
+// suggestionsWith is Suggestions reading through f. signed is asked
+// once, and only when there is a suggestion.
+func suggestionsWith(f *anchoredFiles, signed func() bool, mr store.MR, comments []store.DiffComment) map[int64]*SuggestionOut {
+	out := map[int64]*SuggestionOut{}
+	apply := ""
+	for _, cm := range comments {
+		if cm.ReplyTo != 0 || cm.Side != "new" {
+			continue
+		}
+		lines, found, err := suggest.Parse(cm.Body)
+		if err != nil || !found {
+			continue
+		}
+		if apply == "" {
+			apply = "server"
+			if signed() {
+				apply = "local"
+			}
+		}
+		start, end := suggestionRange(cm)
+		s := &SuggestionOut{Path: cm.Path, StartLine: int64(start), EndLine: int64(end), Commit: cm.HeadSHA,
+			Replacement: suggest.Text(lines), Apply: apply}
+		out[cm.ID] = s
+		base, _, blob, err := f.read(cm.HeadSHA, cm.Path)
+		s.Blob = blob
+		orig, ok := suggest.Range(base, start, end)
+		if err != nil || !ok {
+			s.Outdated, s.Reason = true, reasonNoBase
+			continue
+		}
+		s.Original = string(orig)
+		s.Reason = anchorReason(f, mr.HeadSHA, s)
+		s.Outdated = s.Reason != ""
 	}
-	lines, found, err := suggest.Parse(cm.Body)
-	if err != nil || !found {
-		return nil
-	}
-	start, end := suggestionRange(cm)
-	s := &SuggestionOut{Path: cm.Path, StartLine: int64(start), EndLine: int64(end), Commit: cm.HeadSHA,
-		Replacement: suggest.Text(lines), Apply: "server"}
-	if signedOnly(st, repo, mr) {
-		s.Apply = "local"
-	}
-	dir := RepoDir(root, repo.OwnerName, repo.Name)
-	if e, ok := gitutil.StatPath(dir, cm.HeadSHA, cm.Path); ok {
-		s.Blob = e.SHA
-	}
-	base, _, err := readAnchored(dir, cm.HeadSHA, cm.Path)
-	orig, ok := suggest.Range(base, start, end)
-	if err != nil || !ok {
-		s.Outdated, s.Reason = true, reasonNoBase
-		return s
-	}
-	s.Original = string(orig)
-	s.Reason = anchorReason(dir, mr.HeadSHA, s)
-	s.Outdated = s.Reason != ""
-	return s
+	return out
 }
 
 // anchorReason says why s cannot be applied to the file at head, or ""
 // when the lines it replaces are still what it was made against.
-func anchorReason(dir, head string, s *SuggestionOut) string {
-	content, _, err := readAnchored(dir, head, s.Path)
+func anchorReason(f *anchoredFiles, head string, s *SuggestionOut) string {
+	content, _, _, err := f.read(head, s.Path)
 	if err != nil {
 		return err.Error()
 	}
@@ -182,7 +250,7 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 	if mr.State != "open" {
 		return c.fail(protocol.ExitUsage, "%s!%d is %s", repo.Path(), mr.Number, mr.State)
 	}
-	s := ThreadSuggestion(c.Store, c.Cfg.Server.Root, repo, mr, cm)
+	s := Suggestions(c.Store, c.Cfg.Server.Root, repo, mr, []store.DiffComment{cm})[cm.ID]
 	if s == nil {
 		return c.fail(protocol.ExitUsage, "thread %d carries no suggestion", threadID)
 	}
@@ -232,10 +300,12 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 	if s.Reason == reasonNoBase {
 		return c.fail(protocol.ExitUsage, "suggestion in thread %d cannot be applied: %s", threadID, s.Reason)
 	}
-	if reason := anchorReason(srcDir, tip, s); reason != "" {
+	files := newAnchoredFiles(srcDir)
+	defer files.close()
+	if reason := anchorReason(files, tip, s); reason != "" {
 		return c.fail(protocol.ExitUsage, "suggestion in thread %d is outdated: %s", threadID, reason)
 	}
-	content, mode, err := readAnchored(srcDir, tip, s.Path)
+	content, mode, _, err := files.read(tip, s.Path)
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}

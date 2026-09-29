@@ -2236,8 +2236,9 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 		}
 	}
 	suggestions := map[int64]*suggestionView{}
+	sgs := control.Suggestions(s.st, s.cfg.Server.Root, p.Repo, m, diffComments)
 	for _, cm := range diffComments {
-		if sg := control.ThreadSuggestion(s.st, s.cfg.Server.Root, p.Repo, m, cm); sg != nil {
+		if sg := sgs[cm.ID]; sg != nil {
 			suggestions[cm.ID] = newSuggestionView(sg, canApply && !cm.Pending,
 				fmt.Sprintf("gitbay mr apply-suggestion %s %d %d", p.Repo.Path(), m.Number, cm.ID))
 		}
