@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 
+	"gitbay.org/gitbay/internal/gitpin"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -53,6 +55,13 @@ func runMirrorAdd(c *Ctx, args []string) int {
 	direction, username, tokenStdin := f.Value("--direction"), f.Value("--username"), f.Has("--token-stdin")
 	if path == "" || urlArg == "" || (direction != "push" && direction != "pull") {
 		return c.usage()
+	}
+	// Sync refuses a numerically written host; say so now, before a
+	// resolver gets to read it.
+	if u, err := url.Parse(urlArg); err == nil {
+		if err := gitpin.CheckHost(u.Hostname()); err != nil {
+			return c.failInput(err)
+		}
 	}
 	// The worker's git process dials this URL from the server: same SSRF
 	// surface as a webhook target, same rules.

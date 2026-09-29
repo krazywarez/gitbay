@@ -19,6 +19,9 @@ anything beyond "replace the binary and restart" is needed.
   global gitconfig are ignored. A source that redirects (a renamed
   repository) fails; import from the URL it redirects to. Needs git
   2.37 or later on the server (#298).
+- =repo mirror add= refuses a host written numerically (=127.1=,
+  =2130706433=, =0x7f.1=) when the mirror is added, rather than at its
+  first sync (#298).
 - A browser session creates credentials and grants access — keys, PGP
   keys, tokens, verified addresses, org and repository roles, transfers,
   webhooks, secrets, mirrors, and the admin promote/enable actions —

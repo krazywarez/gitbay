@@ -46,10 +46,8 @@ func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (R
 	if host == "" {
 		return Remote{}, fmt.Errorf("URL has no host")
 	}
-	if net.ParseIP(host) == nil && numericHost(host) {
-		// 127.1, 2130706433 and 0x7f.1 are loopback to curl's parser
-		// but not to Go's; refuse rather than leave them to a resolver.
-		return Remote{}, fmt.Errorf("host %q is a numeric address in a form other than dotted decimal; write it as a.b.c.d", host)
+	if err := CheckHost(host); err != nil {
+		return Remote{}, err
 	}
 	ips, err := lookup(ctx, host)
 	if err != nil {
@@ -63,6 +61,17 @@ func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (R
 		return Remote{}, err
 	}
 	return Remote{URL: u, IPs: ips}, nil
+}
+
+// CheckHost refuses a host written as a number in a form other than
+// an IP literal: 127.1, 2130706433 and 0x7f.1 are loopback to curl's
+// parser but not to Go's, so they are refused rather than left to a
+// resolver.
+func CheckHost(host string) error {
+	if net.ParseIP(host) == nil && numericHost(host) {
+		return fmt.Errorf("host %q is a numeric address in a form other than dotted decimal; write it as a.b.c.d", host)
+	}
+	return nil
 }
 
 // numericHost reports whether every label of host is a decimal, octal
