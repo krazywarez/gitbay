@@ -278,11 +278,6 @@ func (s *Server) postReceive(req Request) {
 	control.RefsUpdated(s.st, s.cfg, req.RepoID, req.UserID, req.Scope, req.Updates)
 }
 
-// queueTagBuilds runs the jobs whose tag pattern matches a pushed tag.
-func (s *Server) queueTagBuilds(repo store.Repo, userID int64, tag, pushed string) {
-	control.QueueTagBuilds(s.st, s.cfg, repo, userID, tag, pushed)
-}
-
 // Ask sends one request from the hook process to the daemon. stream is
 // called if the daemon asks for the incoming commit objects; it hands each
 // commit to the callback, which writes it on the wire.

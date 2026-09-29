@@ -354,7 +354,7 @@ var pushShapes = []pushShape{
 		f.git(f.src, "tag", "v1")
 		f.sync()
 		f.mark(f.base)
-		f.srv.queueTagBuilds(f.repo, f.uid, "v1", f.base)
+		control.QueueTagBuilds(f.st, f.srv.cfg, f.repo, f.uid, "v1", f.base)
 	}, []string{"—", "—", "—", "—", "queued", "—"}},
 
 	{"schedule tick on the default branch", func(f *shapeFixture) {
