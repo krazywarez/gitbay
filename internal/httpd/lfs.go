@@ -37,8 +37,10 @@ func (s *Server) lfsSecret() ([]byte, error) {
 
 // lfsAuth resolves what the request may do to the repo: "upload",
 // "download", or "" for no access, and the key the grant rests on (0
-// for none). Tokens are repo-scoped; without one, public repos allow
-// anonymous download only.
+// for none). A token is bound to the SSH key that obtained it and
+// works only while that key is registered, unexpired and on an enabled
+// account (#285). Without one, public repos allow anonymous download
+// only.
 func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 	auth := r.Header.Get("Authorization")
 	if tok, ok := strings.CutPrefix(auth, "Bearer "); ok {
@@ -48,6 +50,17 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 		}
 		g, ok := lfs.Verify(secret, tok, time.Now())
 		if !ok || g.RepoID != repo.ID {
+			return "", 0
+		}
+		if g.KeyID == 0 {
+			// Minted by an anonymous batch: worth what anonymous is.
+			if g.Op == "download" && repo.Visibility == "public" {
+				return "download", 0
+			}
+			return "", 0
+		}
+		live, err := s.st.LiveSSHKeys([]int64{g.KeyID})
+		if err != nil || !live[g.KeyID] {
 			return "", 0
 		}
 		return g.Op, g.KeyID
