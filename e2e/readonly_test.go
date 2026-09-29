@@ -80,6 +80,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	must("", "org", "create", "theorg")
 	must("", "org", "team", "create", "theorg", "core")
 	must("", "token", "create", "--name", "t")
+	must("", "query", "save", "q", "is:open")
 	must("", "web", "login")
 	pub, _ := os.ReadFile(deployKey + ".pub")
 	must(string(pub), "repo", "deploy-key", "add", "alice/app")
@@ -163,6 +164,9 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"notifications device list":   nil,
 		"repo bookmarks":              nil,
 		"search":                      {"app"},
+		"query list":                  {},
+		"query show":                  {"q"},
+		"query run":                   {"q"},
 		"mr revisions":                {"alice/app", "1"},
 		"mr range-diff":               {"alice/app", "1"},
 		"webhook list":                {"alice/app"},
