@@ -3,6 +3,8 @@ package mailin
 import (
 	"errors"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -272,6 +274,7 @@ func (m *fakeMailbox) Unseen() ([]uint32, error) {
 			out = append(out, uid)
 		}
 	}
+	slices.Sort(out)
 	return out, nil
 }
 
@@ -403,7 +406,7 @@ func TestDrainFetchErrors(t *testing.T) {
 	f := setup(t)
 	mb := &fakeMailbox{seen: map[uint32]bool{},
 		msgs: map[uint32][]byte{1: []byte("x"), 2: []byte(f.message(t, "bob@example.test", "hi"))},
-		errs: map[uint32]error{1: errors.New("NO [UNAVAILABLE] try later")}}
+		errs: map[uint32]error{1: &imapc.RefusedError{Text: "NO [UNAVAILABLE] try later"}}}
 	for i := 1; i < maxTries; i++ {
 		if err := f.p.Drain(mb); err != nil {
 			t.Fatal(err)
@@ -445,9 +448,12 @@ func TestAuthenticationResults(t *testing.T) {
 		{"dmarc pass",
 			"Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=example.test; dmarc=pass (p=REJECT) header.from=example.test\r\n",
 			"bob@example.test", ""},
-		{"aligned dkim pass, gmail header.i",
-			"Authentication-Results: mx.example.net;\r\n dkim=pass header.i=@mail.example.test header.s=s1 header.b=abc\r\n",
+		{"aligned dkim pass",
+			"Authentication-Results: mx.example.net;\r\n dkim=pass header.d=mail.example.test header.s=s1 header.b=abc\r\n",
 			"bob@example.test", ""},
+		{"dkim header.i without header.d",
+			"Authentication-Results: mx.example.net; dkim=pass header.i=@example.test\r\n",
+			"bob@example.test", "sender not authenticated"},
 		{"dmarc fail",
 			"Authentication-Results: mx.example.net; dkim=fail header.d=example.test; dmarc=fail header.from=example.test\r\n",
 			"bob@example.test", "sender not authenticated"},
@@ -482,5 +488,25 @@ func TestAuthenticationResults(t *testing.T) {
 				t.Fatal("refusal not audited")
 			}
 		})
+	}
+}
+
+// A timeout mid-poll ends the poll and counts no try, neither for the
+// message being fetched nor for the ones after it.
+func TestDrainTimeoutCountsNoTries(t *testing.T) {
+	f := setup(t)
+	mb := &fakeMailbox{seen: map[uint32]bool{}, msgs: map[uint32][]byte{
+		1: []byte(f.message(t, "bob@example.test", "first")),
+		2: []byte("x"),
+		3: []byte(f.message(t, "bob@example.test", "third")),
+	}, errs: map[uint32]error{2: fmt.Errorf("read: %w", os.ErrDeadlineExceeded)}}
+	if err := f.p.Drain(mb); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("Drain = %v", err)
+	}
+	if !mb.seen[1] || mb.seen[2] || mb.seen[3] {
+		t.Fatalf("seen = %v", mb.seen)
+	}
+	if f.p.tries[2] != 0 || f.p.tries[3] != 0 {
+		t.Fatalf("tries = %v", f.p.tries)
 	}
 }

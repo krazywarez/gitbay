@@ -35,6 +35,13 @@ const (
 // poll.
 const MaxUnseen = 10000
 
+// RefusedError is the server answering a command NO or BAD, or
+// answering a FETCH with no message: a refusal of that command, with the
+// session still usable.
+type RefusedError struct{ Text string }
+
+func (e *RefusedError) Error() string { return e.Text }
+
 var (
 	ErrTooLarge = errors.New("message larger than the fetch limit")
 	ErrLimit    = errors.New("IMAP server exceeded a response limit; connection closed")
@@ -220,7 +227,7 @@ func (c *Client) Fetch(uid uint32) ([]byte, error) {
 			return []byte{}, nil
 		}
 	}
-	return nil, fmt.Errorf("UID FETCH %d: no message body in the response", uid)
+	return nil, &RefusedError{fmt.Sprintf("UID FETCH %d: no message body in the response", uid)}
 }
 
 // MarkSeen sets \Seen.
@@ -264,7 +271,7 @@ func (c *Client) cmd(command string) ([]response, error) {
 			if strings.EqualFold(status, "OK") {
 				return untagged, nil
 			}
-			return nil, fmt.Errorf("%s", clip(rest))
+			return nil, &RefusedError{clip(rest)}
 		}
 		if strings.HasPrefix(line, "* BYE") && command != "LOGOUT" {
 			return nil, fmt.Errorf("server closed the session: %s", clip(line))

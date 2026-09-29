@@ -331,3 +331,23 @@ func TestEmptyBody(t *testing.T) {
 		}
 	}
 }
+
+// A NO to one FETCH is a RefusedError; the session goes on.
+func TestFetchRefused(t *testing.T) {
+	f := &fakeServer{raw: func(conn net.Conn, tag, cmd string) bool {
+		if !strings.HasPrefix(cmd, "UID FETCH 1 ") {
+			return false
+		}
+		fmt.Fprintf(conn, "%s NO [UNAVAILABLE] try later\r\n", tag)
+		return true
+	}}
+	c := session(t, f)
+	f.msgs[1], f.msgs[2] = "a", "b"
+	var re *RefusedError
+	if _, err := c.Fetch(1); !errors.As(err, &re) {
+		t.Fatalf("Fetch = %v, want a RefusedError", err)
+	}
+	if b, err := c.Fetch(2); err != nil || string(b) != "b" {
+		t.Fatalf("next Fetch = %q, %v", b, err)
+	}
+}

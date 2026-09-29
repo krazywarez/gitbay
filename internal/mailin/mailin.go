@@ -98,12 +98,19 @@ func (p *Processor) Drain(mb Mailbox) error {
 			res = refused("message larger than %d bytes", imapc.MaxMessage)
 			p.audit(0, "", res.Reason)
 		case errors.Is(err, imapc.ErrLimit):
-			// The connection is closed; the message counts a try and
-			// the poll ends.
+			// The server sent more than the limits allow for this
+			// message: it counts a try, and the closed connection ends
+			// the poll.
 			p.tries[uid]++
 			return err
-		case err != nil:
+		case errors.As(err, new(*imapc.RefusedError)):
+			// The server refused this message; the session goes on.
 			res = Result{Retry: true, Reason: "fetch: " + err.Error()}
+		case err != nil:
+			// A connection failure or a timeout says nothing about this
+			// message or the ones after it: the poll ends, no try is
+			// counted.
+			return err
 		default:
 			res = p.Handle(raw)
 		}
