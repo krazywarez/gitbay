@@ -146,6 +146,9 @@ func newRoot() *cobra.Command {
 			group("mr", "merge requests in any repository (audited)",
 				pass("prune", passOpts{server: []string{"admin", "mr", "prune"}}),
 			),
+			group("symbols", "symbol indexes",
+				pass("reindex", passOpts{server: []string{"admin", "symbols", "reindex"}}),
+			),
 		),
 		manCmd(root),
 	)
@@ -553,6 +556,7 @@ func repoCmd() *cobra.Command {
 		pass("fork", passOpts{server: []string{"repo", "fork"}, needsRepo: true}),
 		pass("search", passOpts{server: []string{"repo", "search"}}),
 		pass("grep", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
+		pass("symbols", passOpts{server: []string{"repo", "symbols"}, needsRepo: true}),
 		pass("diff", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
 		pass("tree", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
 		pass("cat", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),

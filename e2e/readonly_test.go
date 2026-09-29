@@ -130,6 +130,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"repo cat":                    {"alice/app", "f.go"},
 		"repo blame":                  {"alice/app", "f.go"},
 		"repo grep":                   {"alice/app", "hello"},
+		"repo symbols":                {"alice/app", "app"},
 		"repo diff":                   {"alice/app", "main", "feat"},
 		"repo commit":                 {"alice/app", sha},
 		"repo download":               {"alice/app"},
@@ -185,6 +186,13 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 	// binaryOutput's bytes are not text: a stray 0x1b is coincidence, not
 	// an SGR sequence escaping into plain output.
 	binaryOutput := map[string]bool{"repo download": true}
+
+	// The push to main asked for a symbol index; the worker writing it
+	// mid-loop would be blamed on whichever read ran then.
+	waitFor(t, "symbol index", func() bool {
+		_, _, code := inst.ssh(t, aliceKey, "", "repo", "symbols", "alice/app", "app")
+		return code == 0
+	})
 
 	dbPath := filepath.Join(inst.root, "gitbay.db")
 	before := dbFingerprint(t, dbPath)
