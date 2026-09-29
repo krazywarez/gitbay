@@ -4,7 +4,19 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.40.0 — 2026-09-29
+
+DKIM verification for reply mail, and ids that are not reused after a
+delete (#306, #307).
+
+*Upgrade note.* Migration 0074 rebuilds the users, orgs, repos,
+ssh_keys, api_tokens, webhook_deliveries and push_queue tables in one
+transaction; take a backup first (=gitbayd admin backup=). Migration
+0075 removes grants, deploy keys and profile about rows that name a
+deleted account, organization or repository, and the daemon logs the
+counts with the "schema migrated" line. To authenticate reply mail
+without the mail host's Authentication-Results, set
+=[mail.inbound] require_dkim = true=.
 
 - =[mail.inbound] require_dkim= makes gitbayd verify a reply's DKIM
   signature itself: one of the first five signatures must verify
