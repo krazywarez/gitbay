@@ -176,3 +176,16 @@ func TestImportIssuesRefusesAPrivateAPIBase(t *testing.T) {
 		t.Fatalf("looked up %v", *asked)
 	}
 }
+
+// --api-base takes a plain http or https URL: no credentials, query,
+// fragment or other scheme, and nothing of a refused one is echoed.
+func TestImportIssuesRefusesAnAPIBaseShape(t *testing.T) {
+	for _, base := range []string{"https://abc@api.test", "https://api.test/?abc", "https://api.test/#abc", "ftp://api.test/abc"} {
+		c, errOut, _, _ := importCtx(t, true)
+		asked := stubLookup(t, "127.0.0.1")
+		code := Dispatch(c, []string{"repo", "import-issues", "alice/app", "--from", "o/r", "--api-base", base})
+		if code != protocol.ExitUsage || len(*asked) != 0 || strings.Contains(errOut.String(), "abc") {
+			t.Fatalf("%s: exit %d, looked up %v: %s", base, code, *asked, errOut.String())
+		}
+	}
+}

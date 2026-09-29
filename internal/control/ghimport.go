@@ -173,6 +173,10 @@ func runImportIssues(c *Ctx, args []string) int {
 	given := apiBase != ""
 	if !given {
 		apiBase = "https://api.github.com"
+	} else if strings.Contains(apiBase, "@") || strings.ContainsAny(apiBase, "?#") {
+		// Same rule as repo import: the URL is echoed and becomes the
+		// site prefix, so credentials and queries stay out of it.
+		return c.fail(protocol.ExitUsage, "--api-base: use the plain API URL, without credentials, a query or a fragment; a token goes on stdin with --token-stdin")
 	}
 	// A writer-supplied API base is the same SSRF surface as a webhook
 	// target. Resolve and check it once here; the client connects only
