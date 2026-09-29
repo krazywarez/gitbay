@@ -1,0 +1,127 @@
+// Package gitpin runs git against a user-supplied http or https remote
+// only at addresses resolved and checked immediately before: mirror
+// sync (#279) and repo import (#298).
+package gitpin
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/url"
+	"os/exec"
+	"strconv"
+	"strings"
+
+	"gitbay.org/gitbay/internal/toolpath"
+	"gitbay.org/gitbay/internal/webhook"
+)
+
+// Lookup resolves a host to its addresses.
+type Lookup func(ctx context.Context, host string) ([]net.IP, error)
+
+// LookupIP is the system resolver.
+func LookupIP(ctx context.Context, host string) ([]net.IP, error) {
+	return net.DefaultResolver.LookupIP(ctx, "ip", host)
+}
+
+// Remote is a URL whose host resolved to IPs, every one of which passed
+// the address check.
+type Remote struct {
+	URL *url.URL
+	IPs []net.IP
+}
+
+// Resolve parses raw, requires http or https, resolves the host with
+// lookup, and refuses it when it resolves to nothing or, unless
+// allowLocal, to any private or local address.
+func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (Remote, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return Remote{}, err
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return Remote{}, fmt.Errorf("URL scheme %q is not http or https", u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return Remote{}, fmt.Errorf("URL has no host")
+	}
+	ips, err := lookup(ctx, host)
+	if err != nil {
+		return Remote{}, fmt.Errorf("resolving %s: %w", host, err)
+	}
+	if len(ips) == 0 {
+		// An empty resolve list would leave curl to resolve the host itself.
+		return Remote{}, fmt.Errorf("%s resolves to no address", host)
+	}
+	if err := webhook.CheckAddrs(host, ips, allowLocal); err != nil {
+		return Remote{}, err
+	}
+	return Remote{URL: u, IPs: ips}, nil
+}
+
+// Args are git's leading -c options for r: curl's resolve list pins
+// the host to the checked addresses, and with redirects off a server
+// cannot send git on to a host nobody checked. An address literal
+// needs no pin.
+func (r Remote) Args() []string {
+	args := []string{"-c", "http.followRedirects=false"}
+	host := r.URL.Hostname()
+	if net.ParseIP(host) != nil {
+		return args
+	}
+	port := r.URL.Port()
+	if port == "" {
+		port = "443"
+		if r.URL.Scheme == "http" {
+			port = "80"
+		}
+	}
+	addrs := make([]string, len(r.IPs))
+	for i, ip := range r.IPs {
+		if ip.To4() == nil {
+			addrs[i] = "[" + ip.String() + "]"
+		} else {
+			addrs[i] = ip.String()
+		}
+	}
+	return append(args, "-c", "http.curloptResolve="+host+":"+port+":"+strings.Join(addrs, ","))
+}
+
+// Env is git's whole environment for a pinned remote. No system or
+// global gitconfig: a proxy, URL rewrite or redirect setting there
+// would take git around the pin.
+func Env(home string) []string {
+	return []string{"GIT_TERMINAL_PROMPT=0", "HOME=" + home,
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
+}
+
+// VersionOK accepts the output of `git version` for git 2.37 or later,
+// the first release with http.curloptResolve. An older git ignores the
+// setting and would resolve the host itself.
+func VersionOK(out string) error {
+	fields := strings.Fields(out)
+	if len(fields) >= 3 && fields[0] == "git" && fields[1] == "version" {
+		parts := strings.Split(fields[2], ".")
+		if len(parts) >= 2 {
+			major, err1 := strconv.Atoi(parts[0])
+			minor, err2 := strconv.Atoi(parts[1])
+			if err1 == nil && err2 == nil {
+				if major > 2 || major == 2 && minor >= 37 {
+					return nil
+				}
+				return fmt.Errorf("git %s is older than 2.37 and cannot pin remote addresses", fields[2])
+			}
+		}
+	}
+	return fmt.Errorf("cannot read git version from %q", strings.TrimSpace(out))
+}
+
+// CheckGit runs the server's git and refuses one that cannot pin.
+func CheckGit(ctx context.Context) error {
+	out, err := exec.CommandContext(ctx, toolpath.Look("git"), "version").Output()
+	if err != nil {
+		return fmt.Errorf("running git version: %v", err)
+	}
+	return VersionOK(string(out))
+}
