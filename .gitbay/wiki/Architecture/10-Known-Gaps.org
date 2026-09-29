@@ -13,7 +13,7 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | #259  | Recovery         | No restore has been exercised; the drill is written (Admin wiki) and not yet run | high |
 | #260  | CI network       | Builds share the runner's source address; no egress policy            | medium   |
 | #261  | Various          | Migration foreign-key check after commit; three web writes bypass dispatch; documentation drift | medium |
-| #301  | SSRF             | =repo import-issues --api-base= fetches without an address check or pin | medium   |
+| #301  | SSRF             | =repo import-issues --api-base= checks the address once; fetches unpinned | medium   |
 
 * Not filed
 
