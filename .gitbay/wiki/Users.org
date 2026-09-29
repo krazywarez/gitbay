@@ -701,6 +701,12 @@ creation, expiry and last use, and =gitbay web sessions revoke <id>=
 or =--all= ends them from the terminal, which is where a lost laptop is
 handled.
 
+Actions that create a credential or grant access (adding a key, token
+or email, org and repository roles, transfers) ask you to sign in again
+when your web sign-in is older than 15 minutes. The form shows a "Sign
+in again" link and the login returns to the page. Idle renewal does not
+extend this window.
+
 =web theme set light= or =dark= fixes the web UI's colour scheme for
 your account; =system=, the default, follows the browser's own
 preference. =web theme show= prints it. The account page has the same

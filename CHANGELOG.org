@@ -27,6 +27,12 @@ too; rewrite it before upgrading.
   access — keys, PGP keys, tokens, org membership, and the admin
   promote/enable actions — and the form it tried shows a sign-in link
   that returns there (#297).
+- A browser session creates credentials and grants access — keys, PGP
+  keys, tokens, verified addresses, org and repository roles, transfers,
+  webhooks, secrets, mirrors, and the admin promote/enable actions —
+  only within 15 minutes of signing in. An older session gets the form
+  back with a "Sign in again" link, and the login returns to it. SSH and
+  API tokens are unaffected (#297).
 - The builds page's status badge section gives an org-mode snippet
   beside the Markdown one, for a README.org (#299).
 - API tokens on the settings page: create with a scope and optional

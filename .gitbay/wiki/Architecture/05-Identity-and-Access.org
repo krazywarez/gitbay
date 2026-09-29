@@ -18,7 +18,7 @@
 | SSH user key       | user's public key                               | fingerprint and public blob      | =full=, =git=, or =runner=                 | optional =--ttl=, refused at auth | =keys remove= (own keys); closes its connections |
 | Deploy key         | public key                                      | same table, scope =deploy:<repo>:ro/rw= | one repository, read or read-write  | optional =--ttl=, refused at auth | =repo deploy-key remove= (repo admin); closes its connections |
 | API token          | =gb_= + 32 random bytes hex                     | SHA-256 hash                     | =read= (default) or =full=; with an expiry, no credential-minting command | optional =--ttl=              | =token revoke [--created]=          |
-| Web session        | 32 random bytes hex, cookie =gitbay_session=    | SHA-256 hash                     | full account                               | 12 h idle, 7 days absolute    | logout, =web sessions revoke=       |
+| Web session        | 32 random bytes hex, cookie =gitbay_session=    | SHA-256 hash                     | full account; credential-minting and access-granting commands only within 15 minutes of sign-in | 12 h idle, 7 days absolute    | logout, =web sessions revoke=       |
 | Login link         | 32 random bytes hex in a URL                    | SHA-256 hash, single use         | creates a web session                      | 15 min (mail), 5 min (SSH)    | consumed on use                     |
 | Email verification | 32 random bytes hex                             | SHA-256 hash, single use         | verifies one address for one account       | 24 h                          | consumed on use                     |
 | Invite             | random code                                     | SHA-256 hash, single use         | one registration for one email             | as issued                     | consumed on use                     |
@@ -118,6 +118,17 @@ button and the displayed status (=internal/control/mr.go=):
 - Destructive web actions (key, email and PGP removal, release, snippet,
   team and label deletion, user disable and demote) require the target's
   name typed into the form (=internal/httpd/confirm.go=).
+- Commands that create a credential (SSH, deploy and runner keys, API
+  tokens, email verification, login links, PGP keys, device tokens) or
+  grant access (repository and organization roles, teams, transfers,
+  admin promote and enable, webhooks, secrets, mirrors) are refused
+  from a browser session that signed in more than 15 minutes ago
+  (=control.ReauthWindow=, =Command.NeedsRecentSignIn=). The sign-in
+  time is =web_sessions.created_at=, which idle renewal does not move;
+  a request with no sign-in time is refused. SSH, API tokens and host
+  commands are unaffected. The refusal is audited; the form shows it
+  with a sign-in link, and the login returns to the page through the
+  server-set =gitbay_next= cookie (=internal/httpd/flash.go=).
 
 * Rate limits
 

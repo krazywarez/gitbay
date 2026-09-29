@@ -61,8 +61,9 @@ matrix and the open gaps are in the [[file:Architecture/00-Overview.org][Archite
   rights narrowed by its credential's scope, decided in one place, so a
   bearer token is worth exactly its scope and no more, and a token or
   SSH key with an expiry cannot create a credential that outlives it.
-  Browser sessions are not covered yet (#297). Git transport never runs
-  over the API.
+  A browser session can create one, or grant access, only within 15
+  minutes of signing in (=control.ReauthWindow=, #297). Git transport
+  never runs over the API.
 - *Anonymous surfaces* — HTTPS clone of public repos, =git://= where
   enabled, the read-only web UI — carry no credentials and expose only
   public data. HTTP push is refused via a pkt-line =ERR=, never a 401.
