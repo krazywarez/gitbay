@@ -38,6 +38,13 @@ type MR struct {
 	// ReviewRequests is who has been asked, directly, for a review — the
 	// mr review request counterpart of Issue.Assignees.
 	ReviewRequests []string
+	// The queued merge (mr merge --when-ready); QueuedAt is "" when there
+	// is none. QueueReason is why the last attempt did not merge.
+	QueuedByID    int64
+	QueuedBy      string
+	QueueStrategy string
+	QueueReason   string
+	QueuedAt      string
 }
 
 type MRReview struct {
@@ -96,7 +103,9 @@ const mrSelect = `
 	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state, m.draft,
 	       COALESCE(ms.title, ''), m.head_sha,
 	       m.merged_base, m.merged_at, COALESCE(mu.username, ''),
-	       m.closed_at, COALESCE(cu.username, ''), COALESCE(m.superseded_by, 0), m.created_at, m.updated_at
+	       m.closed_at, COALESCE(cu.username, ''), COALESCE(m.superseded_by, 0), m.created_at, m.updated_at,
+	       COALESCE(q.user_id, 0), COALESCE(qu.username, ''), COALESCE(q.strategy, ''),
+	       COALESCE(q.reason, ''), COALESCE(q.queued_at, '')
 	FROM merge_requests m
 	JOIN users u ON u.id = m.author_id
 	LEFT JOIN users mu ON mu.id = m.merged_by
@@ -104,13 +113,16 @@ const mrSelect = `
 	LEFT JOIN repos sr ON sr.id = m.source_repo_id
 	LEFT JOIN users su ON sr.owner_kind = 'user' AND su.id = sr.owner_id
 	LEFT JOIN orgs so  ON sr.owner_kind = 'org'  AND so.id = sr.owner_id
-	LEFT JOIN milestones ms ON ms.id = m.milestone_id`
+	LEFT JOIN milestones ms ON ms.id = m.milestone_id
+	LEFT JOIN mr_merge_queue q ON q.mr_id = m.id
+	LEFT JOIN users qu ON qu.id = q.user_id`
 
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
 		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Draft, &m.Milestone, &m.HeadSHA, &m.MergedBase,
-		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.SupersededBy, &m.CreatedAt, &m.UpdatedAt)
+		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.SupersededBy, &m.CreatedAt, &m.UpdatedAt,
+		&m.QueuedByID, &m.QueuedBy, &m.QueueStrategy, &m.QueueReason, &m.QueuedAt)
 	return m, err
 }
 

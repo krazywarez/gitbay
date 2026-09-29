@@ -10,6 +10,7 @@ type DashboardItem struct {
 	Author    string
 	State     string
 	UpdatedAt string
+	Queued    bool // a merge request with a queued merge
 }
 
 // reachableCond filters to repositories the user owns, is granted on, or
@@ -39,7 +40,7 @@ func (s *Store) dashboardQuery(q string, userID int64) ([]DashboardItem, error) 
 	var out []DashboardItem
 	for rows.Next() {
 		var d DashboardItem
-		if err := rows.Scan(&d.RepoPath, &d.Number, &d.Title, &d.Author, &d.State, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.RepoPath, &d.Number, &d.Title, &d.Author, &d.State, &d.UpdatedAt, &d.Queued); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -51,7 +52,8 @@ func (s *Store) dashboardQuery(q string, userID int64) ([]DashboardItem, error) 
 // each still walks the 0035 index that supplies its ORDER BY.
 const dashboardMRsQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
-	       x.number, x.title, au.username, x.state, x.updated_at
+	       x.number, x.title, au.username, x.state, x.updated_at,
+	       EXISTS (SELECT 1 FROM mr_merge_queue q WHERE q.mr_id = x.id)
 	FROM merge_requests x
 	JOIN repos r ON r.id = x.repo_id
 	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
@@ -69,7 +71,7 @@ func (s *Store) DashboardMRs(userID int64) ([]DashboardItem, error) {
 // DashboardIssues is the issue counterpart of DashboardMRs.
 const dashboardIssuesQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
-	       x.number, x.title, au.username, x.state, x.updated_at
+	       x.number, x.title, au.username, x.state, x.updated_at, 0
 	FROM issues x
 	JOIN repos r ON r.id = x.repo_id
 	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
@@ -136,7 +138,8 @@ func (s *Store) PinnedRepos(userID int64) ([]Repo, error) {
 // current head.
 const reviewQueueQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
-	       x.number, x.title, au.username, x.state, x.updated_at
+	       x.number, x.title, au.username, x.state, x.updated_at,
+	       EXISTS (SELECT 1 FROM mr_merge_queue q WHERE q.mr_id = x.id)
 	FROM merge_requests x
 	JOIN repos r ON r.id = x.repo_id
 	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
@@ -159,7 +162,8 @@ const reviewQueueQuery = `
 // merge_requests table is the whole instance.
 const requestedReviewsQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
-	       x.number, x.title, au.username, x.state, x.updated_at
+	       x.number, x.title, au.username, x.state, x.updated_at,
+	       EXISTS (SELECT 1 FROM mr_merge_queue q WHERE q.mr_id = x.id)
 	FROM mr_review_requests rr
 	JOIN merge_requests x ON x.id = rr.mr_id
 	JOIN repos r ON r.id = x.repo_id
@@ -233,7 +237,7 @@ func (s *Store) OpenCounts(repoID int64) (issues, mrs int) {
 // is the whole instance.
 const assignedIssuesQuery = `
 	SELECT COALESCE(u.username, o.name) || '/' || r.name,
-	       x.number, x.title, au.username, x.state, x.updated_at
+	       x.number, x.title, au.username, x.state, x.updated_at, 0
 	FROM issue_assignees ia
 	JOIN issues x ON x.id = ia.issue_id
 	JOIN repos r ON r.id = x.repo_id
