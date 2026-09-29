@@ -70,6 +70,13 @@ const queryDefaultLimit = 50
 // dashboard carries.
 const dashboardQueryItems = 5
 
+// Every pinned query is run on each dashboard read, so an account keeps
+// a bounded number of each.
+const (
+	maxSavedQueries  = 50
+	maxPinnedQueries = 10
+)
+
 var queryNamePat = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 // SavedQueryOut is one saved query. Count is filled by query show.
@@ -289,6 +296,17 @@ func runQuerySave(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitUsage, "%v", err)
 	}
+	if _, err := c.Store.SavedQueryByName(c.User.ID, name); errors.Is(err, store.ErrNotFound) {
+		saved, _, err := c.Store.CountSavedQueries(c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if saved >= maxSavedQueries {
+			return c.fail(protocol.ExitUsage, "saved query limit reached (%d); remove one first", maxSavedQueries)
+		}
+	} else if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	err = c.Store.SaveQuery(c.User.ID, name, q.String(), fl.Has("--force"))
 	if errors.Is(err, store.ErrExists) {
 		return c.fail(protocol.ExitFailure, "you already have a query named %s; pass --force to replace it", name)
@@ -390,15 +408,30 @@ func runQueryPin(c *Ctx, args []string, pinned bool) int {
 	if len(args) != 1 {
 		return c.usage()
 	}
-	err := c.Store.PinSavedQuery(c.User.ID, args[0], pinned)
+	sq, err := c.Store.SavedQueryByName(c.User.ID, args[0])
 	if errors.Is(err, store.ErrNotFound) {
 		return c.fail(protocol.ExitNotFound, "no saved query %q; query list shows yours", args[0])
 	}
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	sq, err := c.Store.SavedQueryByName(c.User.ID, args[0])
+	if pinned && !sq.Pinned {
+		_, n, err := c.Store.CountSavedQueries(c.User.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if n >= maxPinnedQueries {
+			return c.fail(protocol.ExitUsage, "pinned query limit reached (%d); unpin one first", maxPinnedQueries)
+		}
+	}
+	err = c.Store.PinSavedQuery(c.User.ID, args[0], pinned)
+	if errors.Is(err, store.ErrNotFound) {
+		return c.fail(protocol.ExitNotFound, "no saved query %q; query list shows yours", args[0])
+	}
 	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if sq, err = c.Store.SavedQueryByName(c.User.ID, args[0]); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(savedQueryOut(sq), func(w io.Writer) {

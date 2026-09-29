@@ -68,6 +68,14 @@ func (s *Store) SavedQueries(userID int64, pinnedOnly bool) ([]SavedQuery, error
 	return out, rows.Err()
 }
 
+// CountSavedQueries is how many queries the user has saved, and how many
+// of them are pinned.
+func (s *Store) CountSavedQueries(userID int64) (saved, pinned int, err error) {
+	err = s.DB.QueryRow("SELECT COUNT(*), COALESCE(SUM(pinned), 0) FROM saved_queries WHERE user_id = ?", userID).
+		Scan(&saved, &pinned)
+	return
+}
+
 func (s *Store) RemoveSavedQuery(userID int64, name string) error {
 	res, err := s.DB.Exec("DELETE FROM saved_queries WHERE user_id = ? AND name = ?", userID, name)
 	if err != nil {
@@ -113,8 +121,8 @@ type ItemFilter struct {
 }
 
 // ItemCursor is the sort key of the last row of a page: rows are newest
-// first by creation, issues before merge requests at the same instant,
-// then by id.
+// first by creation, merge requests before issues at the same instant,
+// then by id, highest first.
 type ItemCursor struct {
 	CreatedAt string
 	Kind      int // 0 issue, 1 merge request
@@ -154,18 +162,12 @@ func (n *numbered) add(v any) string {
 	return fmt.Sprintf("?%d", len(n.args))
 }
 
-// itemBranch is one table's half of the query: every row of it on a
-// repository the user may read (visibleCond, public or reached) that f
-// admits. userID is ?1 in a.
-func itemBranch(kind string, f ItemFilter, a *numbered, after *ItemCursor) string {
-	table, kord, labels, draft := "issues", "0", "issue_labels il", "0"
-	onItem := "il.issue_id = x.id"
-	if kind == "mr" {
-		table, kord, labels, draft = "merge_requests", "1", "mr_labels il", "x.draft"
-		onItem = "il.mr_id = x.id"
-	}
-	var where []string
-	where = append(where, visibleCond)
+// itemRepos is the subquery naming the repositories a query reads: those
+// the user may read (visibleCond, public or reached) within f's scopes.
+// Deciding readability per repository rather than per row lets each
+// table be read through its repo_id index. userID is ?1 in a.
+func itemRepos(f ItemFilter, a *numbered) string {
+	where := []string{visibleCond}
 	if len(f.Scopes) > 0 {
 		var scopes []string
 		for _, sc := range f.Scopes {
@@ -177,6 +179,22 @@ func itemBranch(kind string, f ItemFilter, a *numbered, after *ItemCursor) strin
 		}
 		where = append(where, "("+strings.Join(scopes, " OR ")+")")
 	}
+	return `SELECT r.id FROM repos r
+	LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
+	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
+	WHERE ` + strings.Join(where, " AND ")
+}
+
+// itemBranch is one table's half of the query: every row of it in one of
+// the repositories repos names that f admits.
+func itemBranch(kind string, f ItemFilter, a *numbered, repos string, after *ItemCursor) string {
+	table, kord, labels, draft := "issues", "0", "issue_labels il", "0"
+	onItem := "il.issue_id = x.id"
+	if kind == "mr" {
+		table, kord, labels, draft = "merge_requests", "1", "mr_labels il", "x.draft"
+		onItem = "il.mr_id = x.id"
+	}
+	where := []string{"x.repo_id IN (" + repos + ")"}
 	switch {
 	case f.State == "":
 	case f.State == "open" && kind == "mr":
@@ -229,12 +247,13 @@ func itemBranch(kind string, f ItemFilter, a *numbered, after *ItemCursor) strin
 func itemUnion(userID int64, f ItemFilter, after *ItemCursor) (string, []any) {
 	a := &numbered{}
 	a.add(userID)
+	repos := itemRepos(f, a)
 	var parts []string
 	if f.Issues {
-		parts = append(parts, itemBranch("issue", f, a, after))
+		parts = append(parts, itemBranch("issue", f, a, repos, after))
 	}
 	if f.MRs {
-		parts = append(parts, itemBranch("mr", f, a, after))
+		parts = append(parts, itemBranch("mr", f, a, repos, after))
 	}
 	return strings.Join(parts, "\nUNION ALL\n"), a.args
 }

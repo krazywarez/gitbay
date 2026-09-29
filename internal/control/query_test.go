@@ -3,6 +3,7 @@ package control
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -41,7 +42,7 @@ func newQueryEnv(t *testing.T) queryEnv {
 // the envelope's data and stderr.
 func (e queryEnv) run(user string, argv ...string) (int, json.RawMessage, string) {
 	var out, errOut bytes.Buffer
-	c := &Ctx{User: e.users[user], Scope: "full", Store: e.st, Cfg: config.Config{},
+	c := &Ctx{User: e.users[user], Scope: "full", Store: e.st, Cfg: config.Config{Limits: config.Limits{WriteRate: -1}},
 		Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut}
 	code := Dispatch(c, append(argv, "--json"))
 	var env struct {
@@ -218,5 +219,40 @@ func TestQueryCommands(t *testing.T) {
 	// bob's query of the same name is his own.
 	if code, _, _ := e.run("bob", "query", "show", "all"); code != 0 {
 		t.Errorf("bob lost his query when alice removed hers")
+	}
+}
+
+// An account keeps at most maxSavedQueries, maxPinnedQueries of them
+// pinned; replacing or re-pinning one it has is not a new one.
+func TestQueryCaps(t *testing.T) {
+	e := newQueryEnv(t)
+	for i := 0; i < maxSavedQueries; i++ {
+		if code, _, msg := e.run("alice", "query", "save", fmt.Sprintf("q%d", i), "is:open"); code != 0 {
+			t.Fatalf("save %d: exit %d %s", i, code, msg)
+		}
+	}
+	if code, _, msg := e.run("alice", "query", "save", "one-more", "is:open"); code != protocol.ExitUsage || !strings.Contains(msg, "limit") {
+		t.Fatalf("save past the cap: exit %d %s", code, msg)
+	}
+	if code, _, msg := e.run("alice", "query", "save", "q0", "is:closed", "--force"); code != 0 {
+		t.Fatalf("replace at the cap: exit %d %s", code, msg)
+	}
+	if code, _, _ := e.run("bob", "query", "save", "mine", "is:open"); code != 0 {
+		t.Fatal("the cap is per account")
+	}
+	for i := 0; i < maxPinnedQueries; i++ {
+		if code, _, msg := e.run("alice", "query", "pin", fmt.Sprintf("q%d", i)); code != 0 {
+			t.Fatalf("pin %d: exit %d %s", i, code, msg)
+		}
+	}
+	if code, _, msg := e.run("alice", "query", "pin", "q0"); code != 0 {
+		t.Fatalf("re-pin at the cap: exit %d %s", code, msg)
+	}
+	if code, _, msg := e.run("alice", "query", "pin", fmt.Sprintf("q%d", maxPinnedQueries)); code != protocol.ExitUsage || !strings.Contains(msg, "limit") {
+		t.Fatalf("pin past the cap: exit %d %s", code, msg)
+	}
+	e.run("alice", "query", "unpin", "q0")
+	if code, _, msg := e.run("alice", "query", "pin", fmt.Sprintf("q%d", maxPinnedQueries)); code != 0 {
+		t.Fatalf("pin after an unpin: exit %d %s", code, msg)
 	}
 }

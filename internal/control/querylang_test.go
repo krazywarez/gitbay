@@ -59,6 +59,8 @@ func TestParseItemQueryRefuses(t *testing.T) {
 		{"is:mr assignee:cmc", "assignee:cmc"},
 		{"assignee:cmc is:mr", "is:mr"},
 		{"assignee:cmc assignee:bob", "assignee:bob"},
+		{"is:merged assignee:cmc", "assignee:cmc"},
+		{"assignee:@me is:merged", "is:merged"},
 		{"author:Not_A_User", "author:Not_A_User"},
 		{"repo:krz", "repo:krz"},
 		{"repo:*/gitbay", "repo:*/gitbay"},

@@ -200,11 +200,16 @@ func (q *ItemQuery) term(tok string, quoted bool) error {
 		if q.Kind == "mr" {
 			return bad("merge requests have no assignees")
 		}
-		return user(&q.Assignee, "assignee")
+		if err := user(&q.Assignee, "assignee"); err != nil {
+			return err
+		}
 	case "author":
 		return user(&q.Author, "author")
 	default:
 		return bad("unknown qualifier; the qualifiers are repo:, owner:, is:, label:, no:, milestone:, assignee: and author:")
+	}
+	if issues, mrs := q.Selects(); !issues && !mrs {
+		return bad("is:merged and assignee: never both match: only merge requests merge, and they have no assignees")
 	}
 	return nil
 }

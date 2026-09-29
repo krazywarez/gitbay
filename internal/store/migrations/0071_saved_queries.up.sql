@@ -11,3 +11,7 @@ CREATE TABLE saved_queries (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     UNIQUE (user_id, name)
 );
+
+-- A query reads each table by the repositories it may see, newest first.
+CREATE INDEX issues_repo_created ON issues(repo_id, created_at);
+CREATE INDEX merge_requests_repo_created ON merge_requests(repo_id, created_at);
