@@ -1,6 +1,7 @@
 // Package gitpin runs git against a user-supplied http or https remote
 // only at addresses resolved and checked immediately before: mirror
-// sync (#279) and repo import (#298).
+// sync (#279), repo import (#298) and repo import-issues (#301), whose
+// API client dials the same way.
 package gitpin
 
 import (
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitbay.org/gitbay/internal/toolpath"
 	"gitbay.org/gitbay/internal/webhook"
@@ -61,6 +63,25 @@ func Resolve(ctx context.Context, lookup Lookup, raw string, allowLocal bool) (R
 		return Remote{}, err
 	}
 	return Remote{URL: u, IPs: ips}, nil
+}
+
+// DialContext connects to r's checked addresses, trying each in turn,
+// whatever host addr names; only its port is used. An HTTP client
+// built on it must not follow a redirect to another host.
+func (r Remote) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	d := net.Dialer{Timeout: 10 * time.Second}
+	for _, ip := range r.IPs {
+		var conn net.Conn
+		conn, err = d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+	}
+	return nil, err
 }
 
 // CheckHost refuses a host written as a number in a form other than

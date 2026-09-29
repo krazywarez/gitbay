@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"net"
+	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/protocol"
 )
 
 // pullUpstream serves a bare repository whose refs/pull/1/head is one
@@ -101,5 +103,76 @@ func TestFetchPullHeadsRefusesALocalAddress(t *testing.T) {
 	}
 	if refExists(dir, "refs/gh-pull/1") {
 		t.Fatal("refs/gh-pull/1 was fetched")
+	}
+}
+
+// apiServer serves an empty issue list for o/r, plus whatever extra
+// registers, and returns the server's port.
+func apiServer(t *testing.T, extra func(mux *http.ServeMux)) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("[]"))
+	})
+	if extra != nil {
+		extra(mux)
+	}
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	return u.Port()
+}
+
+// api.test does not resolve; the import reaches the API only because the
+// client dialed the address import-issues looked up and checked (#301).
+func TestImportIssuesConnectsToTheCheckedAddress(t *testing.T) {
+	port := apiServer(t, nil)
+	c, errOut, _, _ := importCtx(t, true)
+	asked := stubLookup(t, "127.0.0.1")
+	code := Dispatch(c, []string{"repo", "import-issues", "alice/app", "--from", "o/r", "--api-base", "http://api.test:" + port})
+	if code != protocol.ExitOK {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if len(*asked) == 0 || (*asked)[0] != "api.test" {
+		t.Fatalf("looked up %v", *asked)
+	}
+}
+
+// A redirect is refused and its target never asked, although the dialer
+// would land it on the checked address.
+func TestImportIssuesRefusesARedirect(t *testing.T) {
+	var port string
+	reached := false
+	port = apiServer(t, func(mux *http.ServeMux) {
+		mux.HandleFunc("/repos/o/x/issues", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "http://other.test:"+port+"/repos/o/x/moved", http.StatusMovedPermanently)
+		})
+		mux.HandleFunc("/repos/o/x/moved", func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.Write([]byte("[]"))
+		})
+	})
+	c, errOut, _, _ := importCtx(t, true)
+	stubLookup(t, "127.0.0.1")
+	code := Dispatch(c, []string{"repo", "import-issues", "alice/app", "--from", "o/x", "--api-base", "http://api.test:" + port})
+	if code != protocol.ExitFailure || !strings.Contains(errOut.String(), "refusing redirect to http://other.test") {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if reached {
+		t.Fatal("followed a redirect to another host")
+	}
+}
+
+// An API base that resolves to private space is refused on a default
+// instance before anything connects.
+func TestImportIssuesRefusesAPrivateAPIBase(t *testing.T) {
+	c, errOut, _, _ := importCtx(t, false)
+	asked := stubLookup(t, "10.0.0.1")
+	code := Dispatch(c, []string{"repo", "import-issues", "alice/app", "--from", "o/r", "--api-base", "https://api.test"})
+	if code != protocol.ExitUsage || !strings.Contains(errOut.String(), "private or local address") {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if !slices.Equal(*asked, []string{"api.test"}) {
+		t.Fatalf("looked up %v", *asked)
 	}
 }

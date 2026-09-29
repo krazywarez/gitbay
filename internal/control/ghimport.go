@@ -19,7 +19,6 @@ import (
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
-	"gitbay.org/gitbay/internal/webhook"
 )
 
 func init() {
@@ -135,6 +134,19 @@ func (g *ghClient) get(path string, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
+// pinnedClient reaches api's host only at its checked addresses, never
+// through a proxy from the environment, and follows no redirect, as
+// webhook delivery and repo import do.
+func pinnedClient(api gitpin.Remote) *http.Client {
+	return &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &http.Transport{Proxy: nil, DialContext: api.DialContext, TLSHandshakeTimeout: 10 * time.Second},
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return fmt.Errorf("refusing redirect to %s://%s; a renamed repository is imported under its new name", req.URL.Scheme, req.URL.Host)
+		},
+	}
+}
+
 func ghDate(iso string) string {
 	if t, err := time.Parse(time.RFC3339, iso); err == nil {
 		return t.UTC().Format("2006-01-02")
@@ -158,12 +170,21 @@ func runImportIssues(c *Ctx, args []string) int {
 	if path == "" || from == "" {
 		return c.usage()
 	}
-	if apiBase == "" {
+	given := apiBase != ""
+	if !given {
 		apiBase = "https://api.github.com"
-	} else if err := webhook.ValidateURL(apiBase, c.Cfg.Webhooks.AllowLocal); err != nil {
-		// A writer-supplied API base is the same SSRF surface as a
-		// webhook target; same rules apply.
-		return c.fail(protocol.ExitUsage, "--api-base: %v", err)
+	}
+	// A writer-supplied API base is the same SSRF surface as a webhook
+	// target. Resolve and check it once here; the client connects only
+	// to those addresses (#301).
+	rctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	api, err := gitpin.Resolve(rctx, importLookup, apiBase, c.Cfg.Webhooks.AllowLocal)
+	cancel()
+	if err != nil {
+		if given {
+			return c.fail(protocol.ExitUsage, "--api-base: %v", err)
+		}
+		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	site := siteFromAPI(apiBase)
 	host := strings.TrimPrefix(strings.TrimPrefix(site, "https://"), "http://")
@@ -191,7 +212,7 @@ func runImportIssues(c *Ctx, args []string) int {
 		}
 		token = strings.TrimSpace(line)
 	}
-	g := &ghClient{base: apiBase, token: token, http: &http.Client{Timeout: 30 * time.Second}}
+	g := &ghClient{base: apiBase, token: token, http: pinnedClient(api)}
 	g.detect()
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 
