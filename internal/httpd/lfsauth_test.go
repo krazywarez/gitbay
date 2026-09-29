@@ -54,14 +54,14 @@ func TestLFSTokenNeedsALiveKey(t *testing.T) {
 	}
 
 	live := addKey("SHA256:live", nil)
-	tok := lfs.Sign(secret, repo.ID, live, "upload", time.Now())
+	tok := lfs.Sign(secret, repo.ID, live, "SHA256:live", "upload", time.Now())
 	if op, key := s.lfsAuth(lfsRequest(tok), repo); op != "upload" || key != live {
 		t.Fatalf("live key: %q, %d", op, key)
 	}
 
 	past := time.Now().Add(-time.Minute)
 	expired := addKey("SHA256:expired", &past)
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, expired, "upload", time.Now())), repo); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, expired, "SHA256:expired", "upload", time.Now())), repo); op != "" {
 		t.Errorf("expired key: %q", op)
 	}
 
@@ -73,7 +73,7 @@ func TestLFSTokenNeedsALiveKey(t *testing.T) {
 	}
 
 	other := addKey("SHA256:other", nil)
-	otherTok := lfs.Sign(secret, repo.ID, other, "download", time.Now())
+	otherTok := lfs.Sign(secret, repo.ID, other, "SHA256:other", "download", time.Now())
 	if op, _ := s.lfsAuth(lfsRequest(otherTok), repo); op != "download" {
 		t.Fatalf("second key before disable: %q", op)
 	}
@@ -97,13 +97,13 @@ func TestLFSAnonymousTokenOnlyDownloadsPublic(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, pub.ID, 0, "download", now)), pub); op != "download" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, pub.ID, 0, "", "download", now)), pub); op != "download" {
 		t.Errorf("public download: %q", op)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, pub.ID, 0, "upload", now)), pub); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, pub.ID, 0, "", "upload", now)), pub); op != "" {
 		t.Errorf("anonymous upload: %q", op)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, priv.ID, 0, "download", now)), priv); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, priv.ID, 0, "", "download", now)), priv); op != "" {
 		t.Errorf("private download: %q", op)
 	}
 }
@@ -140,7 +140,7 @@ func TestLFSTokenNeedsCurrentAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	bobKey := lfsTestKey(t, st, bob, "SHA256:bob", "full")
-	up := lfs.Sign(secret, repo.ID, bobKey, "upload", now)
+	up := lfs.Sign(secret, repo.ID, bobKey, "SHA256:bob", "upload", now)
 	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "upload" {
 		t.Fatalf("collaborator upload: %q", op)
 	}
@@ -153,7 +153,7 @@ func TestLFSTokenNeedsCurrentAccess(t *testing.T) {
 	if err := st.RevokeAccess(repo.ID, bob); err != nil {
 		t.Fatal(err)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, bobKey, "download", now)), repo); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, bobKey, "SHA256:bob", "download", now)), repo); op != "" {
 		t.Errorf("download after access was revoked: %q", op)
 	}
 
@@ -163,7 +163,7 @@ func TestLFSTokenNeedsCurrentAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	carolKey := lfsTestKey(t, st, carol, "SHA256:carol", "full")
-	down := lfs.Sign(secret, pub.ID, carolKey, "download", now)
+	down := lfs.Sign(secret, pub.ID, carolKey, "SHA256:carol", "download", now)
 	if op, _ := s.lfsAuth(lfsRequest(down), pub); op != "download" {
 		t.Fatalf("public download: %q", op)
 	}
@@ -194,12 +194,12 @@ func TestLFSDeployKeyToken(t *testing.T) {
 	ro := fmt.Sprintf("deploy:%d:ro", repo.ID)
 
 	live := lfsTestKey(t, st, u.ID, "SHA256:deploy-live", rw)
-	if op, key := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "upload", now)), repo); op != "upload" || key != live {
+	if op, key := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "SHA256:deploy-live", "upload", now)), repo); op != "upload" || key != live {
 		t.Fatalf("live deploy key: %q, %d", op, key)
 	}
 
 	removed := lfsTestKey(t, st, u.ID, "SHA256:deploy-removed", rw)
-	tok := lfs.Sign(secret, repo.ID, removed, "download", now)
+	tok := lfs.Sign(secret, repo.ID, removed, "SHA256:deploy-removed", "download", now)
 	if err := st.RemoveDeployKey(repo.ID, "SHA256:deploy-removed"); err != nil {
 		t.Fatal(err)
 	}
@@ -208,17 +208,17 @@ func TestLFSDeployKeyToken(t *testing.T) {
 	}
 
 	readOnly := lfsTestKey(t, st, u.ID, "SHA256:deploy-ro", ro)
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "download", now)), repo); op != "download" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "SHA256:deploy-ro", "download", now)), repo); op != "download" {
 		t.Errorf("read-only deploy key download: %q", op)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "upload", now)), repo); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, readOnly, "SHA256:deploy-ro", "upload", now)), repo); op != "" {
 		t.Errorf("read-only deploy key upload: %q", op)
 	}
 
 	if err := st.SetUserDisabled(u.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "download", now)), repo); op != "" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, live, "SHA256:deploy-live", "download", now)), repo); op != "" {
 		t.Errorf("deploy key of a disabled account: %q", op)
 	}
 }
@@ -234,7 +234,7 @@ func TestLFSUploadTokenRefusedOnceArchived(t *testing.T) {
 	}
 	key := lfsTestKey(t, st, u.ID, "SHA256:owner", "full")
 	now := time.Now()
-	up := lfs.Sign(secret, repo.ID, key, "upload", now)
+	up := lfs.Sign(secret, repo.ID, key, "SHA256:owner", "upload", now)
 	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "upload" {
 		t.Fatalf("upload before archiving: %q", op)
 	}
@@ -248,7 +248,35 @@ func TestLFSUploadTokenRefusedOnceArchived(t *testing.T) {
 	if op, _ := s.lfsAuth(lfsRequest(up), repo); op != "" {
 		t.Errorf("upload after archiving: %q", op)
 	}
-	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, key, "download", now)), repo); op != "download" {
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, key, "SHA256:owner", "download", now)), repo); op != "download" {
 		t.Errorf("download after archiving: %q", op)
+	}
+}
+
+// SQLite gives a new key the id of the highest deleted one. A token
+// minted for the deleted key is refused when presented against the new
+// key; the new key's own token works (#303).
+func TestLFSTokenRefusedOnReusedKeyID(t *testing.T) {
+	s, st, u := newTokenTestServer(t)
+	repo := lfsTestRepo(t, st, u.ID, "app", "private")
+	secret, err := s.lfsSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	oldID := lfsTestKey(t, st, u.ID, "SHA256:old", "full")
+	old := lfs.Sign(secret, repo.ID, oldID, "SHA256:old", "upload", now)
+	if err := st.RemoveSSHKey(u.ID, "SHA256:old"); err != nil {
+		t.Fatal(err)
+	}
+	newID := lfsTestKey(t, st, u.ID, "SHA256:new", "full")
+	if newID != oldID {
+		t.Fatalf("new key got id %d, want the reused %d", newID, oldID)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(old), repo); op != "" {
+		t.Errorf("old key's token on the reused id: %q", op)
+	}
+	if op, _ := s.lfsAuth(lfsRequest(lfs.Sign(secret, repo.ID, newID, "SHA256:new", "upload", now)), repo); op != "upload" {
+		t.Errorf("new key's own token: %q", op)
 	}
 }

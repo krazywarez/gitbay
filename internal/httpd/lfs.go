@@ -41,7 +41,8 @@ func (s *Server) lfsSecret() ([]byte, error) {
 // for none). A token is bound to the SSH key that obtained it and
 // works only while that key is registered, unexpired and on an enabled
 // account, and while the key still has the access its operation needs
-// on the repo (#285). Without one, public repos allow anonymous
+// on the repo (#285). A key that took over a deleted key's id does not
+// match the token's fingerprint pin (#303). Without one, public repos allow anonymous
 // download only.
 func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 	auth := r.Header.Get("Authorization")
@@ -62,7 +63,7 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 			return "", 0
 		}
 		live, err := s.st.LiveSSHKeys([]int64{g.KeyID})
-		if err != nil || !live[g.KeyID] || !s.lfsKeyAllows(g.KeyID, repo, g.Op == "upload") {
+		if err != nil || !live[g.KeyID] || !s.lfsKeyAllows(g.KeyID, g.KeyPin, repo, g.Op == "upload") {
 			return "", 0
 		}
 		return g.Op, g.KeyID
@@ -75,13 +76,14 @@ func (s *Server) lfsAuth(r *http.Request, repo store.Repo) (string, int64) {
 
 // lfsKeyAllows repeats git-lfs-authenticate's access check for the key
 // now: a deploy key by its binding, any other key by its account's
-// access narrowed by the key's scope. An archived repo takes no uploads.
-func (s *Server) lfsKeyAllows(keyID int64, repo store.Repo, write bool) bool {
+// access narrowed by the key's scope. The key must be the one the token
+// was minted for, by fingerprint pin. An archived repo takes no uploads.
+func (s *Server) lfsKeyAllows(keyID int64, pin string, repo store.Repo, write bool) bool {
 	if write && repo.Settings.Archived {
 		return false
 	}
 	key, err := s.st.SSHKeyByID(keyID)
-	if err != nil {
+	if err != nil || lfs.KeyPin(key.Fingerprint) != pin {
 		return false
 	}
 	if policy.IsDeployScope(key.Scope) {
@@ -171,7 +173,16 @@ func (s *Server) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		lfsError(w, http.StatusInternalServerError, "lfs secret unavailable")
 		return
 	}
-	transferToken := lfs.Sign(secret, repo.ID, keyID, req.Operation, time.Now())
+	fingerprint := ""
+	if keyID != 0 {
+		key, err := s.st.SSHKeyByID(keyID)
+		if err != nil {
+			lfsError(w, http.StatusNotFound, "repository not found")
+			return
+		}
+		fingerprint = key.Fingerprint
+	}
+	transferToken := lfs.Sign(secret, repo.ID, keyID, fingerprint, req.Operation, time.Now())
 	base := fmt.Sprintf("%s/%s/%s.git/info/lfs/objects",
 		strings.TrimSuffix(s.cfg.Server.SiteURL, "/"), repo.OwnerName, repo.Name)
 	authHeader := map[string]string{"Authorization": "Bearer " + transferToken}

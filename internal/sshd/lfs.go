@@ -69,7 +69,7 @@ func runLFSAuthenticate(cfg config.Config, st *store.Store, user store.User, key
 		fmt.Fprintln(stderr, "internal error")
 		return protocol.ExitFailure
 	}
-	token := lfs.Sign([]byte(secret), repo.ID, key.ID, op, time.Now())
+	token := lfs.Sign([]byte(secret), repo.ID, key.ID, key.Fingerprint, op, time.Now())
 	json.NewEncoder(stdout).Encode(map[string]any{
 		"href": fmt.Sprintf("%s/%s/%s.git/info/lfs",
 			cfg.Server.SiteURL, repo.OwnerName, repo.Name),

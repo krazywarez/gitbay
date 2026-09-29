@@ -300,6 +300,12 @@ missing, =gitbayd admin backup --verify <archive>= names it, and
   of a public repository made private, loses the token's use with the
   access, and an upload token stops working once its repository is
   archived (#285).
+- LFS transfer tokens carry a hash of their key's fingerprint beside
+  its id, and a token whose key id now belongs to another key is
+  refused, since SQLite gives a new key the id of the last deleted one.
+  The token format changed: tokens minted before the upgrade are
+  refused, and a transfer running across the restart needs running
+  again (#303).
 
 * v1.36.0 — 2026-09-23
 

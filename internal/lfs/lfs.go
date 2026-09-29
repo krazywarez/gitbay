@@ -129,24 +129,39 @@ const TokenTTL = time.Hour
 
 // Sign mints a token for op ("download" or "upload") on repoID, bound
 // to keyID: the SSH key, user or deploy, that asked for it, or 0 for an
-// anonymous download of a public repository.
-func Sign(secret []byte, repoID, keyID int64, op string, now time.Time) string {
-	payload := fmt.Sprintf("%d:%d:%s:%d", repoID, keyID, op, now.Add(TokenTTL).Unix())
+// anonymous download of a public repository. fingerprint is that key's
+// fingerprint, "" for key 0. SQLite reuses the id of a deleted key, so
+// the token carries a hash of the fingerprint as well and a new key
+// given the old id does not inherit the old key's tokens (#303).
+func Sign(secret []byte, repoID, keyID int64, fingerprint, op string, now time.Time) string {
+	payload := fmt.Sprintf("%d:%d:%s:%s:%d", repoID, keyID, KeyPin(fingerprint), op, now.Add(TokenTTL).Unix())
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." +
 		base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
+// KeyPin is the fingerprint's form in a token: the first 16 hex
+// characters of its SHA-256, or "" for no key.
+func KeyPin(fingerprint string) string {
+	if fingerprint == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(fingerprint))
+	return hex.EncodeToString(sum[:8])
+}
+
 // Grant is what a verified token authorizes.
 type Grant struct {
 	RepoID int64
-	KeyID  int64 // 0: an anonymous download of a public repository
+	KeyID  int64  // 0: an anonymous download of a public repository
+	KeyPin string // KeyPin of the key's fingerprint; "" when KeyID is 0
 	Op     string
 }
 
 // Verify checks a token's MAC, shape and expiry. A token from before
-// tokens named their key does not verify.
+// tokens named their key, or before they carried its fingerprint, does
+// not verify.
 func Verify(secret []byte, token string, now time.Time) (Grant, bool) {
 	payloadB64, macB64, found := strings.Cut(token, ".")
 	if !found {
@@ -166,19 +181,22 @@ func Verify(secret []byte, token string, now time.Time) (Grant, bool) {
 		return Grant{}, false
 	}
 	parts := strings.Split(string(payload), ":")
-	if len(parts) != 4 {
+	if len(parts) != 5 {
 		return Grant{}, false
 	}
 	repoID, err1 := strconv.ParseInt(parts[0], 10, 64)
 	keyID, err2 := strconv.ParseInt(parts[1], 10, 64)
-	exp, err3 := strconv.ParseInt(parts[3], 10, 64)
+	exp, err3 := strconv.ParseInt(parts[4], 10, 64)
 	if err1 != nil || err2 != nil || err3 != nil || keyID < 0 || now.Unix() > exp {
 		return Grant{}, false
 	}
-	if parts[2] != "download" && parts[2] != "upload" {
+	if (keyID == 0) != (parts[2] == "") {
 		return Grant{}, false
 	}
-	return Grant{RepoID: repoID, KeyID: keyID, Op: parts[2]}, true
+	if parts[3] != "download" && parts[3] != "upload" {
+		return Grant{}, false
+	}
+	return Grant{RepoID: repoID, KeyID: keyID, KeyPin: parts[2], Op: parts[3]}, true
 }
 
 // NewSecret returns 32 random bytes, hex-encoded for the settings table.
