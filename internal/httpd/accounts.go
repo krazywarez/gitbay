@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"path"
 	"slices"
 	"strconv"
@@ -203,16 +204,22 @@ func (s *Server) adminOrgs(u store.User) []string {
 	return out
 }
 
-func (s *Server) renderNewRepo(w http.ResponseWriter, u store.User, errMsg string) {
+func (s *Server) renderNewRepo(w http.ResponseWriter, u store.User, errMsg string, submitted url.Values) {
+	// A refused import keeps what was typed, except the token.
+	subm := map[string]string{
+		"owner": submitted.Get("owner"), "name": submitted.Get("name"),
+		"from": submitted.Get("from"), "visibility": submitted.Get("visibility"),
+	}
 	s.render(w, "new.html", struct {
 		basePage
-		Orgs  []string
-		Error string
-	}{s.baseFor(u), s.adminOrgs(u), errMsg})
+		Orgs      []string
+		Error     string
+		Submitted map[string]string
+	}{s.baseFor(u), s.adminOrgs(u), errMsg, subm})
 }
 
 func (s *Server) newRepoForm(w http.ResponseWriter, r *http.Request, u store.User) {
-	s.renderNewRepo(w, u, "")
+	s.renderNewRepo(w, u, "", nil)
 }
 
 // newSubmit creates a repository or an organization: /new carries both
@@ -222,7 +229,7 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 	if r.FormValue("field") == "org-create" {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if _, msg, ok := s.runControl(u, []string{"org", "create", name}); !ok {
-			s.renderNewRepo(w, u, msg)
+			s.renderNewRepo(w, u, msg, nil)
 			return
 		}
 		http.Redirect(w, r, "/"+name, http.StatusSeeOther)
@@ -245,7 +252,7 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 			stdin = tok + "\n"
 		}
 		if msg, ok := s.runControlStdin(u, argv, stdin); !ok {
-			s.renderNewRepo(w, u, msg)
+			s.renderNewRepo(w, u, msg, r.Form)
 			return
 		}
 		http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)
@@ -256,7 +263,7 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 		argv = append(argv, "--private")
 	}
 	if _, msg, ok := s.runControl(u, argv); !ok {
-		s.renderNewRepo(w, u, msg)
+		s.renderNewRepo(w, u, msg, nil)
 		return
 	}
 	http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)

@@ -205,7 +205,7 @@ func TestSettingsTransfer(t *testing.T) {
 		t.Fatalf("refusal: %d %s", rr.Code, rr.Body.String())
 	}
 	rr = e.post(e.alice, url.Values{"field": {"transfer"}, "new-owner": {"krz"}, "confirm": {"alice/app"}})
-	if rr.Code != http.StatusSeeOther || rr.Header().Get("Location") != "/krz/app" {
+	if rr.Code != http.StatusSeeOther || rr.Header().Get("Location") != "/krz/app/settings" {
 		t.Fatalf("%d %q", rr.Code, rr.Header().Get("Location"))
 	}
 	if _, err := e.st.RepoByPath("krz/app"); err != nil {
@@ -264,5 +264,35 @@ func TestNewImportRefusalShown(t *testing.T) {
 	}
 	if !strings.Contains(body, `name="field" value="import"`) {
 		t.Fatal("import form missing")
+	}
+}
+
+// A session older than the reauth window cannot delete or rename: the
+// form comes back with the refusal and nothing changes.
+func TestSettingsDeleteRenameNeedRecentSignIn(t *testing.T) {
+	e := newSettingsEnv(t)
+	stale := e.alice
+	stale.SignedInAt = time.Now().Add(-control.ReauthWindow - time.Minute)
+	rr := e.post(stale, url.Values{"field": {"delete"}, "confirm": {"alice/app"}})
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Sign in again") {
+		t.Fatalf("delete: %d", rr.Code)
+	}
+	if _, err := e.st.RepoByPath("alice/app"); err != nil {
+		t.Fatal("a stale session deleted the repository")
+	}
+	rr = e.post(stale, url.Values{"field": {"rename"}, "name": {"tool"}})
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Sign in again") {
+		t.Fatalf("rename: %d", rr.Code)
+	}
+	if _, err := e.st.RepoByPath("alice/app"); err != nil {
+		t.Fatal("a stale session renamed the repository")
+	}
+}
+
+func TestSettingsDeleteTransferFlash(t *testing.T) {
+	e := newSettingsEnv(t)
+	rr := e.post(e.alice, url.Values{"field": {"delete"}, "confirm": {"alice/app"}})
+	if c := strings.Join(rr.Header().Values("Set-Cookie"), ";"); !strings.Contains(c, "Deleted") {
+		t.Fatalf("no flash: %s", c)
 	}
 }

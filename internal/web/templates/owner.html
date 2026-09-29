@@ -9,6 +9,7 @@
 {{if .Members}}<p class="meta">members {{range .Members}}<a class="memberchip" href="/{{.Name}}">{{.Name}} <span class="role">{{.Role}}</span></a> {{end}}</p>{{end}}
 {{if and (eq .Kind "org") .Repos}}<p class="meta"><a href="/{{.Owner}}/-/labels">labels</a> · <a href="/{{.Owner}}/-/milestones">milestones</a></p>{{end}}
 </section>
+{{if and .Notice (ne .Tab "snippets") (ne .Tab "people")}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
 {{/* The profile is sections rather than one stack: a long About used to
      push the repositories off the bottom of the page (#242). About is
      the bare /{owner}; the rest hang off /-/. A tab nobody may open is

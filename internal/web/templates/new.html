@@ -26,17 +26,17 @@
 <form method="post" action="/new" autocomplete="off">
 <input type="hidden" name="field" value="import">
 <p><label>Owner <select name="owner">
-  <option value="{{.Viewer}}">{{.Viewer}}</option>
-  {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
+  {{$o := index .Submitted "owner"}}<option value="{{.Viewer}}">{{.Viewer}}</option>
+  {{range .Orgs}}<option value="{{.}}"{{if eq . $o}} selected{{end}}>{{.}}</option>{{end}}
 </select></label>
-<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" autocomplete="off" spellcheck="false"></label></p>
-<p><label>From <input type="text" name="from" required placeholder="https://github.com/owner/repo.git" spellcheck="false" size="48"></label></p>
+<label>/ Name <input name="name" value="{{index .Submitted "name"}}" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" autocomplete="off" spellcheck="false"></label></p>
+<p><label>From <input type="text" name="from" value="{{index .Submitted "from"}}" required placeholder="https://github.com/owner/repo.git" spellcheck="false" size="48"></label></p>
 <p><label>Access token <input type="password" name="token" autocomplete="new-password"></label> <span class="hint">Optional.</span></p>
 <fieldset class="segmented">
   <legend>Visibility</legend>
   <div class="options">
-    <label><input type="radio" name="visibility" value="public" checked><span>Public</span></label>
-    <label><input type="radio" name="visibility" value="private"><span>Private</span></label>
+    <label><input type="radio" name="visibility" value="public"{{if ne (index .Submitted "visibility") "private"}} checked{{end}}><span>Public</span></label>
+    <label><input type="radio" name="visibility" value="private"{{if eq (index .Submitted "visibility") "private"}} checked{{end}}><span>Private</span></label>
   </div>
 </fieldset>
 <p><button type="submit">Import repository</button></p>

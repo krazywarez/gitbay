@@ -288,7 +288,8 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			s.settingsFormWith(w, r, u, msg, r.Form)
 			return
 		}
-		http.Redirect(w, r, "/"+v("new-owner")+"/"+r.PathValue("repo"), http.StatusSeeOther)
+		s.setFlash(w, "Saved the owner: transferred to "+v("new-owner")+".")
+		http.Redirect(w, r, "/"+v("new-owner")+"/"+r.PathValue("repo")+"/settings", http.StatusSeeOther)
 		return
 	case "delete":
 		if ok, msg := confirmed(r, repo); !ok {
@@ -299,6 +300,7 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			s.settingsFormWith(w, r, u, msg, r.Form)
 			return
 		}
+		s.setFlash(w, "Deleted "+repo+".")
 		http.Redirect(w, r, "/"+r.PathValue("owner"), http.StatusSeeOther)
 		return
 	default:

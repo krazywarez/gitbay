@@ -56,13 +56,15 @@ func init() {
 		Examples:          []string{"repo transfer krz/gitbay krazywarez"},
 		Run:               runRepoTransfer})
 	register(Command{Path: []string{"repo", "rename"},
-		Summary:  "rename a repository",
-		Usage:    "repo rename <owner/name> <new-name> (clone URLs change)",
-		Examples: []string{"repo rename krz/gitbay forge"},
-		Run:      runRepoRename})
+		NeedsRecentSignIn: true,
+		Summary:           "rename a repository",
+		Usage:             "repo rename <owner/name> <new-name> (clone URLs change)",
+		Examples:          []string{"repo rename krz/gitbay forge"},
+		Run:               runRepoRename})
 	register(Command{Path: []string{"repo", "delete"},
-		Summary: "delete a repository",
-		Usage:   "repo delete <owner/name> --yes",
+		NeedsRecentSignIn: true,
+		Summary:           "delete a repository",
+		Usage:             "repo delete <owner/name> --yes",
 		Flags: []Flag{
 			{"--yes", "", "confirm the permanent delete", ""},
 		},
