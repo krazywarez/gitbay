@@ -211,6 +211,21 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 		parent = ""
 	}
 
+	sha, err := CommitWithFile(dir, parent, path, "100644", content, name, email, message)
+	if err != nil {
+		return "", err
+	}
+	if err := UpdateRefCAS(dir, branchRef, sha, parent); err != nil {
+		return "", fmt.Errorf("branch moved during edit; reload and retry: %w", err)
+	}
+	return sha, nil
+}
+
+// CommitWithFile writes a commit on parent ("" for a root commit) whose
+// tree is parent's with content at path, as a file of mode (100644 or
+// 100755), authored and committed as name <email>. No ref moves: the
+// caller updates one, and enforces policy, since no hook runs.
+func CommitWithFile(dir, parent, path, mode string, content []byte, name, email, message string) (string, error) {
 	// Hash the new blob.
 	hb := exec.Command(toolpath.Look("git"), "-C", dir, "hash-object", "-w", "--stdin")
 	hb.Stdin = strings.NewReader(string(content))
@@ -239,7 +254,7 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	if out, err := rt.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("read-tree: %v\n%s", err, out)
 	}
-	ui := exec.Command(toolpath.Look("git"), "-C", dir, "update-index", "--add", "--cacheinfo", "100644,"+blob+","+path)
+	ui := exec.Command(toolpath.Look("git"), "-C", dir, "update-index", "--add", "--cacheinfo", mode+","+blob+","+path)
 	ui.Env = env
 	if out, err := ui.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("update-index: %v\n%s", err, out)
@@ -256,14 +271,7 @@ func CommitFileChange(dir, branch, path string, content []byte, name, email, mes
 	if parent != "" {
 		parents = []string{parent}
 	}
-	sha, err := CommitTree(dir, tree, parents, name, email, message)
-	if err != nil {
-		return "", err
-	}
-	if err := UpdateRefCAS(dir, branchRef, sha, parent); err != nil {
-		return "", fmt.Errorf("branch moved during edit; reload and retry: %w", err)
-	}
-	return sha, nil
+	return CommitTree(dir, tree, parents, name, email, message)
 }
 
 // isEmptyRepo reports whether dir has no refs at all — a repository
