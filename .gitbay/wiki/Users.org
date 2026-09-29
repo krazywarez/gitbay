@@ -455,6 +455,41 @@ Lists narrow the same way on every surface: =issue list --label bug
 merge request lists take the same names as query parameters, and each
 active filter shows with a link that drops it.
 
+A query spans repositories, and a saved one keeps it under a name:
+
+#+begin_src sh
+gitbay query save mine is:open assignee:@me
+gitbay query save triage 'repo:krz/*' is:issue is:open no:label
+gitbay query save v2 owner:krz label:bug 'label:needs review' milestone:v2
+gitbay query list / show mine / remove mine
+gitbay query run mine [--limit 20] [--cursor <c>]   # issues and MRs
+gitbay issue list --query mine                     # only the issues
+gitbay mr list --q 'owner:krz is:open author:@me'  # a query written out
+gitbay query pin mine                              # on the dashboard; unpin
+#+end_src
+
+The terms: =repo:owner/name=, =repo:owner/glob*= (=*= in the name
+only), =repo:*=, =owner:name=; =is:open=, =is:closed=, =is:merged=,
+=is:issue=, =is:mr=; =label:x= (repeat it: every label must be there),
+=no:label=; =milestone:x=, =no:milestone=; =assignee:user=,
+=author:user=, either as =@me= for whoever runs the query. Anything
+without a colon is text matched against title and body, as =search=
+does. Every term narrows, except that several =repo:= and =owner:=
+terms widen the scope to any of them; with none the query covers every
+repository you can read, and only those — someone else's private
+repository is neither a row nor part of a count. Merge requests have no
+assignees, so =assignee:= means issues. A term that does not parse
+exits 2 and names itself. =@me= is resolved when the query runs, and
+the saved text is the query in a canonical order.
+
+Rows come newest first, each naming its repository, paged as ={items,
+next}= with fifty to a page unless =--limit= says otherwise.
+An account keeps at most 50 saved queries, 10 of them pinned; past
+either, =query save= or =query pin= exits 2 until one is removed or
+unpinned. =dashboard --json= carries each pinned query's count and first five
+rows under =queries=; the web dashboard shows them, and
+=/you/-/queries= lists your saved queries with a page per query.
+
 Labels take a colour: =gitbay label set bug --color cf222e=; =label
 list= shows each with its colour and how many issues and merge requests
 carry it, and =label remove= takes one off all of them. =issue label

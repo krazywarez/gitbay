@@ -309,6 +309,9 @@ now render the way the reference does. go-org is not yet on the corpus.
 |----------------------------------+-----+-----+-----|
 | search repositories              | yes | yes | yes |
 | search issues and merge requests | yes | yes | yes |
+| saved query save, remove, pin    | yes | no  | no  |
+| saved query list and results     | yes | yes | no  |
+| pinned queries on the dashboard  | yes | yes | no  |
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
 | profile sections as tabs         | n/a | yes | n/a |
@@ -326,6 +329,21 @@ one repository. What someone types is quoted term by term, so an FTS5
 operator — =c++=, =AND=, a lone quote — is a word to match and never a
 syntax error. =repo grep= remains the per-repository file-contents
 search.
+
+A saved query is a named query over issues and merge requests across
+every repository the caller can read (#292): =query save <name>
+<query>= (=--force= replaces), =query list=, =query show= with its
+count, =query run= for the rows, =query remove=, =query pin= and
+=unpin=. =issue list --query <name>= and =mr list --query <name>= run
+one narrowed to their kind, and =--q '<query>'= takes one written out.
+Results are newest first, always paged with ={items, next}= and fifty
+rows by default, each naming its repository. Readability is the
+search rule, decided in the SQL, so a private repository someone else
+owns is neither a row nor part of a count. =dashboard= carries each
+pinned query's count and first five rows under =queries=; the web
+shows them on the dashboard and serves =/<owner>/-/queries= and
+=/<owner>/-/queries/<name>=, which are a 404 under anyone else's name.
+Saving, removing and pinning have no web form yet.
 
 The about text is =profile/README.{md,org,markdown}= on the default
 branch of =<owner>/.gitbay=, resolved in that order, so the extension

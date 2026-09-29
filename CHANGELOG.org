@@ -39,6 +39,14 @@ anything beyond "replace the binary and restart" is needed.
 - Reactions on issues, merge requests and their comments: =issue react=
   and =mr react= with a fixed set of eight, counts and your own in
   =show=, comment ids in =show=, and buttons on the web pages (#291).
+- Saved queries: =query save|list|show|run|remove|pin|unpin= keep a
+  named query over issues and merge requests across every repository
+  the caller can read (=repo:=, =owner:=, =is:=, =label:=, =no:=,
+  =milestone:=, =assignee:=, =author:=, free text). =issue list --query=
+  and =mr list --query= run one, =--q= takes one written out, both paged
+  with ={items, next}=. =dashboard= gains =queries= for pinned ones; the
+  web shows them on the dashboard and at =/<you>/-/queries=. An account
+  keeps at most 50 saved queries, 10 pinned (#292).
 
 * v1.38.0 — 2026-09-29
 
