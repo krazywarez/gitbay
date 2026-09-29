@@ -209,6 +209,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	reviews, _ := s.st.ReviewQueue(viewer.ID)
 	assigned, _ := s.st.AssignedIssues(viewer.ID)
 	events, _ := s.st.RecentEvents(viewer.ID, 20, 0)
+	queries, _ := control.PinnedQueries(s.st, viewer)
 	s.render(w, "dashboard.html", struct {
 		basePage
 		Tab      string
@@ -217,8 +218,9 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
+		Queries  []control.DashboardQuery
 		Feed     []control.FeedLine
-	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, control.FeedLines(events)})
+	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, queries, control.FeedLines(events)})
 }
 
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {

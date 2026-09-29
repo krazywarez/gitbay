@@ -24,12 +24,13 @@ func TestDashboardTilesAndPins(t *testing.T) {
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
+		Queries  []control.DashboardQuery
 		Feed     []control.FeedLine
 	}{base, "dashboard", []pinnedRow{
 		{Owner: "krz", Name: "gitbay", Issues: 3, MRs: 0, Build: "success"},
 		{Owner: "krz", Name: "old", Build: "cancelled"},
 	}, nil, nil, nil,
-		[]store.DashboardItem{{RepoPath: "krz/gitbay", Number: 1, Title: "one", Author: "alice", State: "open"}}, nil})
+		[]store.DashboardItem{{RepoPath: "krz/gitbay", Number: 1, Title: "one", Author: "alice", State: "open"}}, nil, nil})
 	if err != nil {
 		t.Fatal(err)
 	}

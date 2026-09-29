@@ -184,6 +184,8 @@ func (s *Server) Routes() []Route {
 			Route{Method: "POST", Pattern: "/{owner}/-/milestones", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.orgMilestoneSubmit))},
 			Route{Method: "GET", Pattern: "/bookmarks", Handler: s.requireUser(s.bookmarksPage)},
+			Route{Method: "GET", Pattern: "/{owner}/-/queries", Handler: s.requireUser(s.queriesPage)},
+			Route{Method: "GET", Pattern: "/{owner}/-/queries/{name}", Handler: s.requireUser(s.queriesPage)},
 			Route{Method: "GET", Pattern: "/{owner}/-/snippets/new", Handler: s.requireUser(s.snippetNewForm)},
 			Route{Method: "POST", Pattern: "/{owner}/-/snippets/new", Mutating: true,
 				Handler: s.checkOrigin(s.requireUser(s.snippetNewSubmit))},

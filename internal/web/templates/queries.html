@@ -1,0 +1,35 @@
+{{define "width"}}wide{{end}}
+{{define "title"}}{{if .Query.Name}}{{.Query.Name}} · {{end}}queries · {{.Site}}{{end}}
+{{define "content"}}
+{{if .Query.Name}}
+<div class="listhead">
+  <h1>{{.Query.Name}} <span class="count">{{.Count}}</span></h1>
+  <span class="spacer"></span>
+  <p class="meta"><a href="/{{.Viewer}}/-/queries">saved queries</a></p>
+</div>
+<p class="meta"><code>{{.Query.Query}}</code> · the same read as <code>gitbay query run {{.Query.Name}}</code></p>
+<ul class="issuelist rows">
+{{range .Items}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{.Repo}}/{{if eq .Kind "mr"}}mrs{{else}}issues{{end}}/{{.Number}}">{{.Title}}</a></p>
+    <p class="meta"><span class="repo">{{.Ref}}</span> · <a href="/{{.Author}}">{{.Author}}</a>{{if .Milestone}} · in {{.Milestone}}{{end}} · {{when .CreatedAt}}</p>
+  </div>
+  <span class="chip {{if eq .State "open"}}chip-open{{else if eq .State "merged"}}chip-done{{else}}chip-closed{{end}}">{{if .Draft}}draft{{else}}{{.State}}{{end}}</span>
+</li>
+{{else}}<li class="empty">nothing matches</li>{{end}}
+</ul>
+{{if .Next}}<p class="pager"><a href="{{.Next}}">older →</a></p>{{end}}
+{{else}}
+<h1>Saved queries</h1>
+<p class="meta">Saved with <code>gitbay query save &lt;name&gt; &lt;query&gt;</code>; <code>gitbay query pin &lt;name&gt;</code> puts one on the dashboard.</p>
+<ul class="issuelist rows">
+{{range .Saved}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{$.Viewer}}/-/queries/{{.Name}}">{{.Name}}</a>{{if .Pinned}} <span class="chip">pinned</span>{{end}}</p>
+    <p class="meta"><code>{{.Query}}</code></p>
+  </div>
+</li>
+{{else}}<li class="empty">no saved queries</li>{{end}}
+</ul>
+{{end}}
+{{end}}

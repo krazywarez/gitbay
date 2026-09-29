@@ -59,8 +59,9 @@ func TestStylesheetURLCarriesTheBuildHash(t *testing.T) {
 		Assigned []store.DashboardItem
 		MRs      []store.DashboardItem
 		Issues   []store.DashboardItem
+		Queries  []control.DashboardQuery
 		Feed     []control.FeedLine
-	}{base, "dashboard", nil, nil, nil, nil, nil, nil})
+	}{base, "dashboard", nil, nil, nil, nil, nil, nil, nil})
 	if err != nil {
 		t.Fatal(err)
 	}

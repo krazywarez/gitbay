@@ -42,6 +42,22 @@
 {{if .MRs}}{{template "queue" dict "ID" "mrs" "Title" "Open merge requests" "Items" .MRs "Kind" "mrs" "Empty" "No open merge requests" "Hint" "Your MRs across all repos."}}{{end}}
 {{if .Issues}}{{template "queue" dict "ID" "issues" "Title" "Open issues" "Items" .Issues "Kind" "issues" "Empty" "No open issues" "Hint" "Your issues across all repos."}}{{end}}
 {{if not (or .Reviews .Assigned .MRs .Issues)}}<p class="none">Nothing open.</p>{{end}}
+{{range .Queries}}
+<h2 id="query-{{.Name}}"><a href="/{{$.Viewer}}/-/queries/{{.Name}}">{{.Name}}</a> <span class="count">{{.Count}}</span></h2>
+<p class="hint"><code>{{.Query}}</code></p>
+{{if .Error}}<p class="none">{{.Error}}</p>{{else}}
+<ul class="issuelist rows">
+{{range .Items}}<li>
+  <div class="issuemain">
+    <p class="title"><a href="/{{.Repo}}/{{if eq .Kind "mr"}}mrs{{else}}issues{{end}}/{{.Number}}">{{.Title}}</a></p>
+    <p class="meta"><span class="repo">{{.Ref}}</span> · <a href="/{{.Author}}">{{.Author}}</a> · {{when .UpdatedAt}}</p>
+  </div>
+</li>
+{{else}}<li class="empty">Nothing matches</li>{{end}}
+</ul>
+{{if gt .Count (len .Items)}}<p class="pager"><a href="/{{$.Viewer}}/-/queries/{{.Name}}">all {{.Count}} →</a></p>{{end}}
+{{end}}
+{{end}}
 </section>
 
 <aside class="feedcol" aria-label="Recent activity">
