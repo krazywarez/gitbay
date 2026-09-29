@@ -246,7 +246,7 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 	if bytes.Equal(updated, content) {
 		return c.fail(protocol.ExitUsage, "the suggestion in thread %d changes nothing", threadID)
 	}
-	message := SuggestionMessage(repo.Path(), mr.Number, threadID, cm.Author)
+	message := suggest.Message(repo.Path(), mr.Number, threadID, cm.Author)
 	sha, err := gitutil.CommitWithFile(srcDir, tip, s.Path, mode, updated, c.User.Username, email, message)
 	if err != nil {
 		return c.failErr(err)
@@ -266,11 +266,4 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 	return c.emit(map[string]any{"thread": threadID, "sha": sha, "source": source, "resolved": true}, func(w io.Writer) {
 		fmt.Fprintf(w, "applied thread %d to %s at %.10s; thread resolved\n", threadID, source, sha)
 	})
-}
-
-// SuggestionMessage is the commit message of an applied suggestion,
-// naming the merge request and the thread. The CLI's local apply writes
-// the same one.
-func SuggestionMessage(repoPath string, mr, thread int64, author string) string {
-	return fmt.Sprintf("Apply suggestion from %s\n\nThread %d on %s!%d.\n", author, thread, repoPath, mr)
 }

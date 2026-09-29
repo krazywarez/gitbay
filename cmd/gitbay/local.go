@@ -6,12 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"gitbay.org/gitbay/internal/cliconfig"
 	"gitbay.org/gitbay/internal/protocol"
+	"gitbay.org/gitbay/internal/suggest"
 	"gitbay.org/gitbay/internal/toolpath"
 )
 
@@ -412,4 +415,232 @@ func worktreeDirty() (bool, error) {
 		return false, fmt.Errorf("git status: %w", err)
 	}
 	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// mrApplySuggestionCmd is `gitbay mr apply-suggestion`: the server's
+// command where the server can commit the suggestion, and a local commit
+// where it cannot.
+func mrApplySuggestionCmd() *cobra.Command {
+	server := []string{"mr", "apply-suggestion"}
+	return &cobra.Command{
+		Use:   "apply-suggestion",
+		Short: summaries["mr apply-suggestion"],
+		Annotations: map[string]string{
+			serverPath: "mr apply-suggestion",
+			stdinMode:  "none",
+		},
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, a := range args {
+				if a == "--help" || a == "-h" {
+					os.Exit(runServerHelp(passOpts{server: server}, cliPathOf(cmd)))
+				}
+			}
+			os.Exit(cmdMRApplySuggestion(args))
+			return nil
+		},
+	}
+}
+
+// suggestionJSON is the suggestion `mr threads --json` carries.
+type suggestionJSON struct {
+	Path        string `json:"path"`
+	StartLine   int    `json:"start_line"`
+	EndLine     int    `json:"end_line"`
+	Original    string `json:"original"`
+	Replacement string `json:"replacement"`
+	Outdated    bool   `json:"outdated"`
+	Reason      string `json:"reason"`
+	Apply       string `json:"apply"`
+}
+
+// cmdMRApplySuggestion implements `gitbay mr apply-suggestion [<owner/name>]
+// <n> <thread>`. The thread's suggestion says where it applies. Where the
+// server can commit it, the server's command does. On a repository
+// requiring signed commits the server has no key to sign with, so the
+// commit is made here, signed by whatever the user's git config signs
+// with (#288): the source branch is fetched into this clone's objects,
+// the anchored lines are checked against what the suggestion was made
+// against, the commit is built with plumbing (the working tree and
+// branches are not touched) and signed with commit-tree -S, and pushed
+// as a fast-forward, which fails if the branch moved meanwhile. Then the
+// thread is resolved.
+func cmdMRApplySuggestion(args []string) int {
+	t, err := resolveTarget()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitFailure
+	}
+	if args, err = withRepo(t, args); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitUsage
+	}
+	if len(args) != 3 {
+		fmt.Fprintln(os.Stderr, "usage: gitbay mr apply-suggestion [<owner/name>] <n> <thread-id>")
+		return protocol.ExitUsage
+	}
+	repo, n, thread := args[0], args[1], args[2]
+	out, code := captureSSH(t, []string{"mr", "threads", repo, n, "--json"})
+	if code != 0 {
+		return code
+	}
+	var threads struct {
+		Data []struct {
+			ID       int64 `json:"id"`
+			Comments []struct {
+				Author string `json:"author"`
+			} `json:"comments"`
+			Suggestion *suggestionJSON `json:"suggestion"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &threads); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay: reading threads:", err)
+		return protocol.ExitProtocol
+	}
+	var author string
+	var s *suggestionJSON
+	found := false
+	for _, th := range threads.Data {
+		if strconv.FormatInt(th.ID, 10) == thread {
+			found, s = true, th.Suggestion
+			if len(th.Comments) > 0 {
+				author = th.Comments[0].Author
+			}
+		}
+	}
+	switch {
+	case !found:
+		fmt.Fprintf(os.Stderr, "gitbay: no thread %s on %s!%s\n", thread, repo, n)
+		return protocol.ExitNotFound
+	case s == nil:
+		fmt.Fprintf(os.Stderr, "gitbay: thread %s carries no suggestion\n", thread)
+		return protocol.ExitUsage
+	case s.Apply != "local":
+		return runSSH(t, []string{"mr", "apply-suggestion", repo, n, thread}, strings.NewReader(""))
+	case s.Outdated:
+		fmt.Fprintf(os.Stderr, "gitbay: suggestion in thread %s is outdated: %s\n", thread, s.Reason)
+		return protocol.ExitUsage
+	}
+	if _, code := gitOutput("", "rev-parse", "--git-dir"); code != 0 {
+		fmt.Fprintln(os.Stderr, "gitbay: run this in a git clone; the commit is made and signed here")
+		return protocol.ExitUsage
+	}
+
+	out, code = captureSSH(t, []string{"mr", "show", repo, n, "--json"})
+	if code != 0 {
+		return code
+	}
+	var mr struct {
+		Data struct {
+			Source string `json:"source"`
+			State  string `json:"state"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &mr); err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay: reading merge request:", err)
+		return protocol.ExitProtocol
+	}
+	if mr.Data.State != "open" {
+		fmt.Fprintf(os.Stderr, "gitbay: !%s is %s\n", n, mr.Data.State)
+		return protocol.ExitUsage
+	}
+	srcRepo, branch := repo, mr.Data.Source
+	if r, b, ok := strings.Cut(mr.Data.Source, ":"); ok {
+		srcRepo, branch = r, b
+	}
+	url := t.inst.CloneURL(srcRepo)
+	if len(t.inst.SSHOptions) > 0 {
+		os.Setenv("GIT_SSH_COMMAND", "ssh "+strings.Join(quoteAll(t.inst.SSHOptions), " "))
+	}
+	if code := runGitLocal("fetch", "--quiet", url, "refs/heads/"+branch); code != 0 {
+		return code
+	}
+	tip, code := gitOutput("", "rev-parse", "FETCH_HEAD^{commit}")
+	if code != 0 {
+		return code
+	}
+	entry, code := gitOutput("", "ls-tree", tip, "--", s.Path)
+	mode, _, _ := strings.Cut(entry, " ")
+	if code != 0 || (mode != "100644" && mode != "100755") {
+		fmt.Fprintf(os.Stderr, "gitbay: %s is not a regular file at the head of %s; it was renamed or deleted\n", s.Path, mr.Data.Source)
+		return protocol.ExitUsage
+	}
+	content, code := gitRaw("", "", "cat-file", "blob", tip+":"+s.Path)
+	if code != 0 {
+		return code
+	}
+	if now, ok := suggest.Range([]byte(content), s.StartLine, s.EndLine); !ok || string(now) != s.Original {
+		fmt.Fprintf(os.Stderr, "gitbay: suggestion in thread %s is outdated: the lines it replaces have changed\n", thread)
+		return protocol.ExitUsage
+	}
+	updated, err := suggest.Apply([]byte(content), s.StartLine, s.EndLine, suggest.FromText(s.Replacement))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitUsage
+	}
+	blob, code := gitOutput(string(updated), "hash-object", "-w", "--stdin")
+	if code != 0 {
+		return code
+	}
+	idx, err := os.CreateTemp("", "gitbay-index-*")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return protocol.ExitFailure
+	}
+	idx.Close()
+	defer os.Remove(idx.Name())
+	indexEnv := "GIT_INDEX_FILE=" + idx.Name()
+	if _, code := gitRaw(indexEnv, "", "read-tree", tip); code != 0 {
+		return code
+	}
+	if _, code := gitRaw(indexEnv, "", "update-index", "--add", "--cacheinfo", mode+","+blob+","+s.Path); code != 0 {
+		return code
+	}
+	tree, code := gitRaw(indexEnv, "", "write-tree")
+	if code != 0 {
+		return code
+	}
+	tree = strings.TrimSpace(tree)
+	nr, _ := strconv.ParseInt(n, 10, 64)
+	tn, _ := strconv.ParseInt(thread, 10, 64)
+	sha, code := gitOutput(suggest.Message(repo, nr, tn, author), "commit-tree", "-S", tree, "-p", tip, "-F", "-")
+	if code != 0 {
+		fmt.Fprintln(os.Stderr, "gitbay: signing the commit failed; the repository requires signed commits, so set user.signingkey (and gpg.format) in git config")
+		return code
+	}
+	if code := runGitLocal("push", "--quiet", url, sha+":refs/heads/"+branch); code != 0 {
+		return code
+	}
+	if _, code := captureSSH(t, []string{"mr", "resolve", repo, n, thread}); code != 0 {
+		return code
+	}
+	fmt.Printf("applied thread %s to %s at %.10s; thread resolved\n", thread, mr.Data.Source, sha)
+	return 0
+}
+
+// gitOutput runs git with stdin and returns its stdout without the
+// trailing newline; git's stderr goes to the terminal.
+func gitOutput(stdin string, args ...string) (string, int) {
+	out, code := gitRaw("", stdin, args...)
+	return strings.TrimRight(out, "\n"), code
+}
+
+// gitRaw runs git with one extra environment variable (none when env is
+// "") and returns its stdout as written.
+func gitRaw(env, stdin string, args ...string) (string, int) {
+	cmd := exec.Command(toolpath.Look("git"), args...)
+	if env != "" {
+		cmd.Env = append(os.Environ(), env)
+	}
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return "", ee.ExitCode()
+		}
+		fmt.Fprintln(os.Stderr, "gitbay:", err)
+		return "", protocol.ExitFailure
+	}
+	return string(out), 0
 }

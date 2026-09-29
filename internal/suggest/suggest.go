@@ -167,3 +167,10 @@ func Apply(content []byte, start, end int, repl []string) ([]byte, error) {
 	}
 	return b.Bytes(), nil
 }
+
+// Message is the commit message of an applied suggestion, naming the
+// merge request and the thread. The server and the CLI's local apply
+// both write it.
+func Message(repoPath string, mr, thread int64, author string) string {
+	return fmt.Sprintf("Apply suggestion from %s\n\nThread %d on %s!%d.\n", author, thread, repoPath, mr)
+}

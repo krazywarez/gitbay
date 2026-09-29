@@ -16,6 +16,7 @@ type cli struct {
 	configDir string
 	inst      *instance
 	key       string
+	env       []string // appended last, so it overrides the defaults
 }
 
 func (c *cli) run(t *testing.T, dir, stdin string, args ...string) (string, string, int) {
@@ -29,6 +30,7 @@ func (c *cli) run(t *testing.T, dir, stdin string, args ...string) (string, stri
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test",
 		"EDITOR=", // no editor in tests: bodies come from flags
 	)
+	cmd.Env = append(cmd.Env, c.env...)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
