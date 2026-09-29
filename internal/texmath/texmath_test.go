@@ -1,6 +1,9 @@
 package texmath
 
 import (
+	"encoding/xml"
+	"errors"
+	"io"
 	"regexp"
 	"strings"
 	"testing"
@@ -78,6 +81,8 @@ func TestConvertRefuses(t *testing.T) {
 		`\style{color:red}{x}`, `\color{red}{x}`, `\class{a}{x}`, `\htmlId{a}{x}`,
 		`\def\a{x}\a`, `\newcommand{\a}{x}`, `\require{html}`, `\unicode{x}`,
 		`\includegraphics{x}`, `\input{/etc/passwd}`,
+		`\sqrt\displaystyle`, `\frac\displaystyle y`, `\hat\displaystyle`,
+		`\overbrace\displaystyle`, `\binom\displaystyle1`, `\mathbf\limits`, `x^\nolimits`,
 	} {
 		if out, err := Convert(tex, false); err == nil {
 			t.Errorf("Convert(%q) = %s, want an error", tex, out)
@@ -166,4 +171,54 @@ func TestConvertEmitsOnlyListed(t *testing.T) {
 			}
 		}
 	}
+}
+
+// FuzzConvert: no panic, output bounded by the input, and output that is
+// well-formed XML using only the listed elements and attribute values.
+func FuzzConvert(f *testing.F) {
+	for _, seed := range []string{
+		`x^2`, `\frac{a}{b}`, `\sqrt[3]{x}`, `\left(\frac12\right)`, `\sum_{i=1}^n i`,
+		`\begin{pmatrix}a&b\\c&d\end{pmatrix}`, `\text{a<b}`, `\mathbb{R}`, `\hat{x}~'`,
+		`\sqrt\displaystyle`, `\operatorname*{argmax}_x`, `{{{x}}}`, `a\,b\quad c`,
+	} {
+		f.Add(seed, false)
+	}
+	allowed := map[string]bool{}
+	for _, e := range Elements {
+		allowed[e] = true
+	}
+	length := regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?em$`)
+	f.Fuzz(func(t *testing.T, tex string, display bool) {
+		out, err := Convert(tex, display)
+		if err != nil {
+			return
+		}
+		if len(out) > 64*len(tex)+256 {
+			t.Fatalf("%d bytes out for %d in", len(out), len(tex))
+		}
+		d := xml.NewDecoder(strings.NewReader(out))
+		for {
+			tok, err := d.Token()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				t.Fatalf("not XML: %v\n%s", err, out)
+			}
+			start, ok := tok.(xml.StartElement)
+			if !ok {
+				continue
+			}
+			if !allowed[start.Name.Local] || start.Name.Space != "" {
+				t.Fatalf("element %v in %s", start.Name, out)
+			}
+			for _, a := range start.Attr {
+				want, ok := Attrs[start.Name.Local][a.Name.Local]
+				if !ok || a.Name.Space != "" || (want == "<length>" && !length.MatchString(a.Value)) ||
+					(want != "<length>" && want != a.Value) {
+					t.Fatalf("attribute %v=%q on %s in %s", a.Name, a.Value, start.Name.Local, out)
+				}
+			}
+		}
+	})
 }

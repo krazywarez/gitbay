@@ -65,6 +65,11 @@ func Convert(tex string, display bool) (string, error) {
 	if !utf8.ValidString(tex) {
 		return "", errors.New("texmath: invalid UTF-8")
 	}
+	for _, r := range tex {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7F || r == 0xFFFE || r == 0xFFFF {
+			return "", errors.New("texmath: control character")
+		}
+	}
 	p := &parser{src: tex, display: display}
 	kids, err := p.list(func(t token) bool { return false })
 	if err != nil {
@@ -346,7 +351,12 @@ func (p *parser) arg() (*node, error) {
 		p.next()
 		return leaf("mn", p.styled(t.val)), nil
 	}
-	return p.atom()
+	n, err := p.atom()
+	if err == nil && n == nil {
+		// \displaystyle and the like render nothing, so cannot be an argument.
+		return nil, fmt.Errorf(`texmath: \%s cannot be an argument at %d`, t.val, t.pos)
+	}
+	return n, err
 }
 
 func (p *parser) enter() error {
