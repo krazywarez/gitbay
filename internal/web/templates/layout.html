@@ -211,9 +211,9 @@
   {{else if $split}}<div class="tablewrap"><table class="difftable split"><colgroup><col class="cln"><col><col class="cln"><col></colgroup>
   {{range .Rows}}{{if eq .Kind "hunk"}}<tr class="hunk"><td class="ln"></td><td class="src" colspan="3">{{.Text}}</td></tr>
   {{else if eq .Kind "meta"}}<tr class="dmeta"><td class="ln"></td><td class="src" colspan="3">{{.Text}}</td></tr>
-  {{else}}<tr class="pair">
-    {{with .Old}}{{if eq .Class "del"}}<td class="ln del" id="f{{$fi}}-o{{.OldLine}}">{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src del chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{else}}<td class="ln ctx old">{{.OldLine}}</td><td class="src ctx old chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{end}}{{else}}<td class="ln none"></td><td class="src none"></td>{{end}}
-    {{with .New}}<td class="ln {{.Class}}" id="f{{$fi}}-n{{.NewLine}}">{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src {{.Class}} chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{else}}<td class="ln none"></td><td class="src none"></td>{{end}}
+  {{else}}{{$r := .}}<tr class="pair">
+    {{with .Old}}{{if eq .Class "del"}}<td class="ln del" id="f{{$fi}}-o{{.OldLine}}">{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src del chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}{{with $r.OldNote}}<span class="nonl">{{.}}</span>{{end}}</td>{{else}}<td class="ln ctx old">{{.OldLine}}</td><td class="src ctx old chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}{{with $r.OldNote}}<span class="nonl">{{.}}</span>{{end}}</td>{{end}}{{else}}<td class="ln none" aria-hidden="true"></td><td class="src none" aria-hidden="true"></td>{{end}}
+    {{with .New}}<td class="ln {{.Class}}" id="f{{$fi}}-n{{.NewLine}}">{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src {{.Class}} chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}{{with $r.NewNote}}<span class="nonl">{{.}}</span>{{end}}</td>{{else}}<td class="ln none" aria-hidden="true"></td><td class="src none" aria-hidden="true"></td>{{end}}
   </tr>
   {{with .Compose}}<tr class="threadrow"><td colspan="4"><form id="compose" method="post" action="{{$base}}/diff-comment" class="thread composing">
     <input type="hidden" name="path" value="{{.Path}}">

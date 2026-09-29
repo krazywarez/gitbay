@@ -316,6 +316,8 @@ type splitRow struct {
 	Old     *diffLine
 	New     *diffLine
 	Threads []diffThread
+	OldNote string    // "\ No newline" marker belonging to the old side
+	NewNote string    // and to the new side
 	Compose *diffLine // the line whose new-thread form opens under this row
 }
 
@@ -338,6 +340,14 @@ func splitFiles(files []diffFile) {
 			ln := &lines[i]
 			switch ln.Class {
 			case "hunk", "meta":
+				if ln.Class == "meta" && ln.Path == "" && len(rows) > 0 && strings.HasPrefix(ln.Text, `\`) {
+					// a marker after a context line: neither side ends in a newline
+					if last := &rows[len(rows)-1]; last.Old != nil && last.Old == last.New {
+						last.OldNote, last.NewNote = ln.Text, ln.Text
+						i++
+						continue
+					}
+				}
 				rows = append(rows, splitRow{Kind: ln.Class, Text: ln.Text})
 				i++
 			case "ctx":
@@ -349,18 +359,33 @@ func splitFiles(files []diffFile) {
 				i++
 			default:
 				var dels, adds []*diffLine
+				marker := func() string {
+					if i < len(lines) && lines[i].Class == "meta" && strings.HasPrefix(lines[i].Text, `\`) {
+						i++
+						return lines[i-1].Text
+					}
+					return ""
+				}
+				var oldNote, newNote string
 				for i < len(lines) && lines[i].Class == "del" {
 					dels = append(dels, &lines[i])
 					i++
+				}
+				if len(dels) > 0 {
+					oldNote = marker()
 				}
 				for i < len(lines) && lines[i].Class == "add" {
 					adds = append(adds, &lines[i])
 					i++
 				}
+				if len(adds) > 0 {
+					newNote = marker()
+				}
 				if len(dels)+len(adds) == 0 {
 					i++ // an unknown class: skip rather than loop
 					continue
 				}
+				first := len(rows)
 				for k := 0; k < len(dels) || k < len(adds); k++ {
 					r := splitRow{Kind: "pair"}
 					for _, l := range []*diffLine{pick(dels, k), pick(adds, k)} {
@@ -378,6 +403,12 @@ func splitFiles(files []diffFile) {
 						}
 					}
 					rows = append(rows, r)
+				}
+				if len(dels) > 0 {
+					rows[first+len(dels)-1].OldNote = oldNote
+				}
+				if len(adds) > 0 {
+					rows[first+len(adds)-1].NewNote = newNote
 				}
 			}
 		}

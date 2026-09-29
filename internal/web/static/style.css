@@ -1411,9 +1411,11 @@ table.difftable.split tr.threadrow td { overflow-wrap: anywhere; }
 table.difftable.split td.ln:target,
 table.difftable.split td.ln:target + td { background: color-mix(in srgb, var(--mark) 18%, transparent); }
 table.difftable.split td.ln:target { border-left: 3px solid var(--mark); }
+table.difftable.split .nonl { display: block; color: var(--muted); font-style: italic; }
 p.layoutpick { color: var(--muted); font-size: var(--fs-2); margin: 0 0 var(--sp-3); }
 p.layoutpick strong { color: var(--fg); font-weight: 600; }
 @media (max-width: 64rem) {
+  p.layoutpick { display: none; }
   table.difftable.split, table.difftable.split tbody { display: block; }
   table.difftable.split colgroup { display: none; }
   table.difftable.split tr.pair { display: grid; grid-template-columns: auto 1fr; }

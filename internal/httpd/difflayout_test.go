@@ -160,3 +160,43 @@ func TestDiffLayoutForQueryOverridesAccount(t *testing.T) {
 		t.Error("?layout=split ignored for a signed-out reader")
 	}
 }
+
+func splitPairs(patch string) []splitRow {
+	files := parseDiff(patch)
+	splitFiles(files)
+	var out []splitRow
+	for _, r := range files[0].Rows {
+		out = append(out, r)
+	}
+	return out
+}
+
+const noNL = `\ No newline at end of file`
+
+func TestSplitNoNewlineMarkerPairs(t *testing.T) {
+	head := "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n"
+	cases := map[string]struct {
+		patch, oldNote, newNote string
+	}{
+		"newline added":   {head + "-foo\n" + noNL + "\n+foo\n", noNL, ""},
+		"newline removed": {head + "-foo\n+foo\n" + noNL + "\n", "", noNL},
+		"both lack":       {head + "-foo\n" + noNL + "\n+bar\n" + noNL + "\n", noNL, noNL},
+	}
+	for name, c := range cases {
+		rows := splitPairs(c.patch)
+		if len(rows) != 2 || rows[1].Kind != "pair" || rows[1].Old == nil || rows[1].New == nil {
+			t.Errorf("%s: want a hunk and one paired row, got %+v", name, rows)
+			continue
+		}
+		if rows[1].OldNote != c.oldNote || rows[1].NewNote != c.newNote {
+			t.Errorf("%s: notes %q %q", name, rows[1].OldNote, rows[1].NewNote)
+		}
+	}
+}
+
+func TestSplitEmptyCellsAreHiddenFromAssistiveTech(t *testing.T) {
+	out := renderCommitDiff(t, diffLayout{Split: true, UnifiedURL: "/x", SplitURL: "/y"}, nil)
+	if !strings.Contains(out, `class="ln none" aria-hidden="true"`) || !strings.Contains(out, `class="src none" aria-hidden="true"`) {
+		t.Error("empty cells are not aria-hidden")
+	}
+}
