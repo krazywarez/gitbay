@@ -73,6 +73,10 @@ func (s *Server) compare(w http.ResponseWriter, r *http.Request) {
 		}
 		commits = append(commits, cr)
 	}
+	layout := s.diffLayoutFor(r)
+	if layout.Split {
+		splitFiles(files)
+	}
 	canWrite := s.canWriteRepo(r, p.Repo)
 	canOpenMR := canWrite || len(s.writableForks(s.viewer(r), p.Repo)) > 0
 	s.render(w, "compare.html", struct {
@@ -84,5 +88,6 @@ func (s *Server) compare(w http.ResponseWriter, r *http.Request) {
 		DiffTruncated                           bool
 		Stat                                    diffStat
 		CanOpenMR                               bool
-	}{p, base, head, baseSHA, headSHA, mergeBase, commits, total, files, truncated, statOf(files), canOpenMR})
+		Layout                                  diffLayout
+	}{p, base, head, baseSHA, headSHA, mergeBase, commits, total, files, truncated, statOf(files), canOpenMR, layout})
 }

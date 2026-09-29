@@ -224,6 +224,8 @@ var summaries = map[string]string{
 	"token create":                     "mint an API token (shown once)",
 	"token list":                       "list API tokens",
 	"token revoke":                     "revoke an API token by name",
+	"web diff set":                     "draw web diffs unified or side by side",
+	"web diff show":                    "the diff layout the web UI uses for you",
 	"web login":                        "mint a one-time browser login URL",
 	"web sessions list":                "list your browser sessions",
 	"web sessions revoke":              "end a browser session, or all of them",

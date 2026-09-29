@@ -745,6 +745,10 @@ func webCmd() *cobra.Command {
 			pass("show", passOpts{server: []string{"web", "theme", "show"}}),
 			pass("set", passOpts{server: []string{"web", "theme", "set"}}),
 		),
+		group("diff", "the diff layout the web UI uses for you",
+			pass("show", passOpts{server: []string{"web", "diff", "show"}}),
+			pass("set", passOpts{server: []string{"web", "diff", "set"}}),
+		),
 	)
 }
 

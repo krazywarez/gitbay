@@ -23,6 +23,7 @@ type mrPageData struct {
 	Comments        []renderedComment
 	Reviews         []reviewRow
 	DiffFiles       []diffFile
+	DiffTruncated   bool
 	Stat            diffStat
 	Commits         []struct{}
 	Branches        []gitutil.Ref
@@ -38,6 +39,7 @@ type mrPageData struct {
 	HeadPruned      bool
 	Base            string
 	Draft           *draft
+	Layout          diffLayout
 }
 
 // A pruned head has no diff to show; the page must say the head is gone

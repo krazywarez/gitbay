@@ -180,6 +180,16 @@ form here to add one, since a browser cannot produce an APNs token.</p>
   <button type="submit" class="btn">Save</button>
 </form>
 <p class="meta">The same setting as <code>gitbay web theme set</code>. Following the browser takes its light or dark preference.</p>
+<form method="post" action="/settings" class="setform">
+  <input type="hidden" name="field" value="diff-layout">
+  <label for="layout">Diff layout</label>
+  <select id="layout" name="layout">
+    <option value="unified"{{if ne .DiffSetting "split"}} selected{{end}}>unified</option>
+    <option value="split"{{if eq .DiffSetting "split"}} selected{{end}}>side by side</option>
+  </select>
+  <button type="submit" class="btn">Save</button>
+</form>
+<p class="meta">The same setting as <code>gitbay web diff set</code>. A <code>?layout=split</code> or <code>?layout=unified</code> on a diff page overrides it for that request. Narrow windows always show a unified diff.</p>
 </section>
 
 <section id="export"><h2>Export</h2>

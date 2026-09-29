@@ -96,6 +96,7 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 	watchOn, _ := s.st.WatchEnabled(u.ID)
 	pushOn, _ := s.st.PushEnabled(u.ID)
 	theme, _ := s.st.Theme(u.ID)
+	diffPref, _ := s.st.DiffLayout(u.ID)
 
 	var devices []accountDevice
 	if list, err := s.st.PushDevices(u.ID); err == nil {
@@ -149,12 +150,13 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u store.U
 		PushOn       bool
 		Devices      []accountDevice
 		ThemeSetting string // system, light or dark: the form's selected option
+		DiffSetting  string // unified or split: the form's selected option
 		Tokens       []accountToken
 		TokenShown   string // a token minted by this request, shown once
 		Reauth       bool   // Notice is the stale-session refusal: link to sign in
 	}{s.baseFor(u), "account", keys, pgp, emails, profile, profileLinksText(profile.Links),
 		aboutRepo, aboutEdit, s.cfg.SiteHost(),
-		notice, r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme,
+		notice, r.URL.Query().Get("m"), mailOn, watchOn, pushOn, devices, theme, diffPref,
 		tokens, tokenShown, reauth})
 }
 
@@ -342,6 +344,12 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "colour scheme saved")
+	case "diff-layout":
+		if _, msg, ok := s.runControl(u, []string{"web", "diff", "set", r.FormValue("layout")}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "diff layout saved")
 	case "notify-mail", "notify-watch", "notify-push":
 		pref := strings.TrimPrefix(r.FormValue("field"), "notify-")
 		state := "off"

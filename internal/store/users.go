@@ -267,6 +267,22 @@ func (s *Store) SetTheme(userID int64, theme string) error {
 	return err
 }
 
+// DiffLayout is how the account wants diffs drawn on the web: unified or
+// split (#290).
+func (s *Store) DiffLayout(userID int64) (string, error) {
+	var l string
+	err := s.DB.QueryRow("SELECT diff_layout FROM users WHERE id = ?", userID).Scan(&l)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return l, err
+}
+
+func (s *Store) SetDiffLayout(userID int64, layout string) error {
+	_, err := s.DB.Exec("UPDATE users SET diff_layout = ? WHERE id = ?", layout, userID)
+	return err
+}
+
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
 	var admin, pending, disabled int

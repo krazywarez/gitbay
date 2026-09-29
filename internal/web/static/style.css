@@ -1393,6 +1393,39 @@ table.difftable tr.threadrow td { padding: var(--sp-2) var(--sp-3); background: 
 table.difftable td.ln a.cmt { color: inherit; text-decoration: none; }
 table.difftable td.ln a.cmt:hover,
 table.difftable td.ln a.cmt:focus { color: var(--link); text-decoration: underline; }
+/* split layout: old and new side by side in one table. Where two
+   columns of code do not fit, each row becomes a two-column grid and the
+   old cells stack over the new, which reads as a unified diff. */
+table.difftable.split { table-layout: fixed; }
+table.difftable.split col.cln { width: 3.5rem; }
+table.difftable.split td.ln.ctx, table.difftable.split td.ln.none { border-right: 1px solid var(--line); }
+table.difftable.split td.ln + td.src + td.ln { border-left: 1px solid var(--line); }
+table.difftable.split td.ln { width: auto; }
+table.difftable.split td.del { background: var(--diff-del); }
+table.difftable.split td.add { background: var(--diff-add); }
+table.difftable.split td.none { background: var(--surface); }
+table.difftable.split td.src.add::before { content: "+"; color: var(--ok); }
+table.difftable.split td.src.del::before { content: "\2212"; color: var(--bad); }
+table.difftable.split td.src.ctx::before { content: " "; }
+table.difftable.split tr.threadrow td { overflow-wrap: anywhere; }
+table.difftable.split td.ln:target,
+table.difftable.split td.ln:target + td { background: color-mix(in srgb, var(--mark) 18%, transparent); }
+table.difftable.split td.ln:target { border-left: 3px solid var(--mark); }
+p.layoutpick { color: var(--muted); font-size: var(--fs-2); margin: 0 0 var(--sp-3); }
+p.layoutpick strong { color: var(--fg); font-weight: 600; }
+@media (max-width: 64rem) {
+  table.difftable.split, table.difftable.split tbody { display: block; }
+  table.difftable.split colgroup { display: none; }
+  table.difftable.split tr.pair { display: grid; grid-template-columns: auto 1fr; }
+  table.difftable.split tr.pair td.none, table.difftable.split tr.pair td.ctx.old { display: none; }
+  table.difftable.split td.ln + td.src + td.ln { border-left: 0; }
+  table.difftable.split tr.pair td.ln { min-width: 3rem; }
+  table.difftable.split tr.hunk, table.difftable.split tr.dmeta,
+  table.difftable.split tr.threadrow { display: block; }
+  table.difftable.split tr.hunk td.ln, table.difftable.split tr.dmeta td.ln { display: none; }
+  table.difftable.split tr.hunk td, table.difftable.split tr.dmeta td,
+  table.difftable.split tr.threadrow td { display: block; }
+}
 /* A linked line: f2-n17 on a diff, L17 on a file (see issue 118). */
 .difftable tr:target td, .code .line:has(a:target) { background: color-mix(in srgb, var(--mark) 18%, transparent); }
 .difftable tr:target td.ln, .code .line:has(a:target) .ln { border-left: 3px solid var(--mark); }

@@ -4,6 +4,15 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* Unreleased
+
+- =web diff set unified|split= and a Diff layout control on the account
+  page choose how the merge request, commit and compare pages draw a
+  diff; =?layout=split|unified= overrides it per request. The split
+  layout puts old and new side by side, each column's line numbers
+  comment on their own side, and a narrow window stacks the rows as a
+  unified diff. Migration 0068 adds =users.diff_layout=. (#290)
+
 * v1.38.0 — 2026-09-29
 
 Merge when ready, build egress by trust class, and restore-drill

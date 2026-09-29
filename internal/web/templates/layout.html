@@ -199,7 +199,8 @@
      line-number gutters and review threads inline. Base is the MR's
      endpoint and Viewer the signed-in account; the commit page passes
      neither and gets the same diff without review controls. */}}
-{{define "difffiles"}}{{$base := .Base}}{{$viewer := .Viewer}}
+{{define "difffiles"}}{{$base := .Base}}{{$viewer := .Viewer}}{{$L := .L}}{{$split := false}}{{with $L}}{{$split = .Split}}{{end}}
+{{with $L}}{{if .UnifiedURL}}<p class="layoutpick">Layout: {{if .Split}}<a href="{{.UnifiedURL}}">unified</a> · <strong aria-current="true">split</strong>{{else}}<strong aria-current="true">unified</strong> · <a href="{{.SplitURL}}">split</a>{{end}}</p>{{end}}{{end}}
 {{range $fi, $f := .Files}}<details class="difffold" id="f{{$fi}}"{{if .Open}} open{{end}}>
   <summary>
     <span class="fpath">{{if eq .Status "renamed"}}<span class="was">{{.OldPath}} →</span> {{end}}{{.Path}}</span>
@@ -207,10 +208,29 @@
     <span class="fstat">{{if .Adds}}<span class="add">+{{.Adds}}</span>{{end}}{{if .Dels}} <span class="del">−{{.Dels}}</span>{{end}}</span>
   </summary>
   {{if .Binary}}<p class="none">Binary file not shown.</p>
+  {{else if $split}}<div class="tablewrap"><table class="difftable split"><colgroup><col class="cln"><col><col class="cln"><col></colgroup>
+  {{range .Rows}}{{if eq .Kind "hunk"}}<tr class="hunk"><td class="ln"></td><td class="src" colspan="3">{{.Text}}</td></tr>
+  {{else if eq .Kind "meta"}}<tr class="dmeta"><td class="ln"></td><td class="src" colspan="3">{{.Text}}</td></tr>
+  {{else}}<tr class="pair">
+    {{with .Old}}{{if eq .Class "del"}}<td class="ln del" id="f{{$fi}}-o{{.OldLine}}">{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src del chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{else}}<td class="ln ctx old">{{.OldLine}}</td><td class="src ctx old chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{end}}{{else}}<td class="ln none"></td><td class="src none"></td>{{end}}
+    {{with .New}}<td class="ln {{.Class}}" id="f{{$fi}}-n{{.NewLine}}">{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}</td><td class="src {{.Class}} chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td>{{else}}<td class="ln none"></td><td class="src none"></td>{{end}}
+  </tr>
+  {{with .Compose}}<tr class="threadrow"><td colspan="4"><form id="compose" method="post" action="{{$base}}/diff-comment" class="thread composing">
+    <input type="hidden" name="path" value="{{.Path}}">
+    <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
+    <input type="hidden" name="side" value="{{if eq .Class "del"}}old{{else}}new{{end}}">
+    <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
+    <p><button type="submit" class="btn">Comment</button>
+       <button type="submit" name="pending" value="on" class="btn">Add to review</button>
+       <a href="{{$base}}?view=diff{{if $L.Carry}}&amp;layout={{$L.Carry}}{{end}}">Cancel</a></p>
+  </form></td></tr>
+  {{end}}{{range .Threads}}<tr class="threadrow"><td colspan="4">{{template "thread" dict "T" . "Base" $base "Viewer" $viewer "Class" ""}}</td></tr>
+  {{end}}{{end}}{{end}}
+  </table></div>
   {{else}}<div class="tablewrap"><table class="difftable">
   {{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
   {{else if eq .Class "meta"}}<tr class="dmeta"><td class="ln" colspan="2"></td><td class="src">{{.Text}}</td></tr>
-  {{else}}<tr class="{{.Class}}" id="f{{$fi}}-{{if eq .Class "del"}}o{{.OldLine}}{{else}}n{{.NewLine}}{{end}}"><td class="ln">{{if .OldLine}}{{if eq .Class "del"}}{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer}}{{else}}{{.OldLine}}{{end}}{{end}}</td><td class="ln">{{if .NewLine}}{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
+  {{else}}<tr class="{{.Class}}" id="f{{$fi}}-{{if eq .Class "del"}}o{{.OldLine}}{{else}}n{{.NewLine}}{{end}}"><td class="ln">{{if .OldLine}}{{if eq .Class "del"}}{{template "cmtln" dict "N" .OldLine "Path" .Path "Side" "old" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}{{else}}{{.OldLine}}{{end}}{{end}}</td><td class="ln">{{if .NewLine}}{{template "cmtln" dict "N" .NewLine "Path" .Path "Side" "new" "Base" $base "Viewer" $viewer "Carry" $L.Carry}}{{end}}</td><td class="src chroma">{{if .Code}}{{.Code}}{{else}}{{.Content}}{{end}}</td></tr>
   {{if .Compose}}<tr class="threadrow"><td colspan="3"><form id="compose" method="post" action="{{$base}}/diff-comment" class="thread composing">
     <input type="hidden" name="path" value="{{.Path}}">
     <input type="hidden" name="line" value="{{if eq .Class "del"}}{{.OldLine}}{{else}}{{.NewLine}}{{end}}">
@@ -218,7 +238,7 @@
     <p><textarea name="body" aria-label="Comment on {{.Path}}" rows="3" placeholder="Comment on this line" autofocus></textarea></p>
     <p><button type="submit" class="btn">Comment</button>
        <button type="submit" name="pending" value="on" class="btn">Add to review</button>
-       <a href="{{$base}}?view=diff">Cancel</a></p>
+       <a href="{{$base}}?view=diff{{if $L.Carry}}&amp;layout={{$L.Carry}}{{end}}">Cancel</a></p>
   </form></td></tr>
   {{end}}{{end}}{{range .Threads}}<tr class="threadrow"><td colspan="3">{{template "thread" dict "T" . "Base" $base "Viewer" $viewer "Class" ""}}</td></tr>
   {{end}}{{end}}
@@ -228,7 +248,7 @@
 
 {{/* cmtln turns a line number into the link that opens the comment form
      on that line. No JavaScript: the anchor travels in the query. */}}
-{{define "cmtln"}}{{if and .Viewer .Base}}<a class="cmt" aria-label="Comment on line {{.N}}" title="Comment on this line" href="{{.Base}}?view=diff&amp;cpath={{.Path}}&amp;cline={{.N}}&amp;cside={{.Side}}#compose">{{.N}}</a>{{else}}{{.N}}{{end}}{{end}}
+{{define "cmtln"}}{{if and .Viewer .Base}}<a class="cmt" aria-label="Comment on line {{.N}}" title="Comment on this line" href="{{.Base}}?view=diff&amp;cpath={{.Path}}&amp;cline={{.N}}&amp;cside={{.Side}}{{if .Carry}}&amp;layout={{.Carry}}{{end}}#compose">{{.N}}</a>{{else}}{{.N}}{{end}}{{end}}
 
 {{/* thread renders one review thread with its reply and resolve controls.
      Class carries "stale" for threads whose anchor is gone. */}}

@@ -3,6 +3,8 @@ package httpd
 import (
 	"bytes"
 	"html/template"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,8 +38,9 @@ type diffFile struct {
 	Dels    int
 	Binary  bool
 	Lines   []diffLine
-	Threads int  // threads anchored in this file, so it can stay unfolded
-	Open    bool // rendered unfolded: small files, and anything under review
+	Rows    []splitRow // the split layout's rows; empty in the unified layout
+	Threads int        // threads anchored in this file, so it can stay unfolded
+	Open    bool       // rendered unfolded: small files, and anything under review
 }
 
 type diffStat struct{ Files, Adds, Dels int }
@@ -301,4 +304,122 @@ func statOf(files []diffFile) diffStat {
 		st.Dels += f.Dels
 	}
 	return st
+}
+
+// splitRow is one row of the side-by-side layout: a hunk or meta line
+// spanning both columns, or a pair of lines. In a run of deletions
+// followed by additions the two are zipped, and the shorter side is left
+// empty. Old and New point into the file's Lines.
+type splitRow struct {
+	Kind    string // hunk | meta | pair
+	Text    string
+	Old     *diffLine
+	New     *diffLine
+	Threads []diffThread
+	Compose *diffLine // the line whose new-thread form opens under this row
+}
+
+// diffLayout is the layout a diff page renders in and the links that
+// switch it.
+type diffLayout struct {
+	Split      bool
+	UnifiedURL string
+	SplitURL   string
+	Carry      string // "split" or "unified" when the request chose it, so links keep it
+}
+
+// splitFiles fills each file's Rows. It runs after threads and compose
+// forms are attached to the lines.
+func splitFiles(files []diffFile) {
+	for f := range files {
+		lines := files[f].Lines
+		var rows []splitRow
+		for i := 0; i < len(lines); {
+			ln := &lines[i]
+			switch ln.Class {
+			case "hunk", "meta":
+				rows = append(rows, splitRow{Kind: ln.Class, Text: ln.Text})
+				i++
+			case "ctx":
+				r := splitRow{Kind: "pair", Old: ln, New: ln, Threads: ln.Threads}
+				if ln.Compose {
+					r.Compose = ln
+				}
+				rows = append(rows, r)
+				i++
+			default:
+				var dels, adds []*diffLine
+				for i < len(lines) && lines[i].Class == "del" {
+					dels = append(dels, &lines[i])
+					i++
+				}
+				for i < len(lines) && lines[i].Class == "add" {
+					adds = append(adds, &lines[i])
+					i++
+				}
+				if len(dels)+len(adds) == 0 {
+					i++ // an unknown class: skip rather than loop
+					continue
+				}
+				for k := 0; k < len(dels) || k < len(adds); k++ {
+					r := splitRow{Kind: "pair"}
+					for _, l := range []*diffLine{pick(dels, k), pick(adds, k)} {
+						if l == nil {
+							continue
+						}
+						if l.Class == "del" {
+							r.Old = l
+						} else {
+							r.New = l
+						}
+						r.Threads = append(r.Threads, l.Threads...)
+						if l.Compose {
+							r.Compose = l
+						}
+					}
+					rows = append(rows, r)
+				}
+			}
+		}
+		files[f].Rows = rows
+	}
+}
+
+func pick(s []*diffLine, i int) *diffLine {
+	if i < len(s) {
+		return s[i]
+	}
+	return nil
+}
+
+// diffLayoutFor resolves the layout for a request: ?layout= wins, then the
+// signed-in account's setting, then unified. The two switch links keep
+// every other query parameter.
+func (s *Server) diffLayoutFor(r *http.Request) diffLayout {
+	q := r.URL.Query()
+	l := diffLayout{}
+	switch q.Get("layout") {
+	case "split":
+		l.Split, l.Carry = true, "split"
+	case "unified":
+		l.Carry = "unified"
+	default:
+		if s.cfg.Web.Mode == "accounts" {
+			if u := s.viewer(r); u.ID != 0 {
+				if v, err := s.st.DiffLayout(u.ID); err == nil {
+					l.Split = v == "split"
+				}
+			}
+		}
+	}
+	link := func(v string) string {
+		c := url.Values{}
+		for k, vs := range q {
+			c[k] = vs
+		}
+		c.Set("layout", v)
+		return r.URL.Path + "?" + c.Encode()
+	}
+	l.UnifiedURL, l.SplitURL = link("unified"), link("split")
+	return l
 }

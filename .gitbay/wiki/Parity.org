@@ -367,6 +367,7 @@ client has no use for one (krz/gitbay#57).
 | push device remove          | yes | yes | yes |
 | activity push on, off       | yes | yes | yes |
 | web colour scheme           | yes | yes | n/a |
+| web diff layout             | yes | yes | n/a |
 | API token mint              | yes | yes | no  |
 | API token list, revoke      | yes | yes | no  |
 | API token revoke with what it created | yes | no  | no  |

@@ -1697,6 +1697,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 	}
 	patch, truncated, _ := gitutil.ShowPatch(p.Dir, full, 4<<20)
 	files := parseDiff(patch)
+	layout := s.diffLayoutFor(r)
+	if layout.Split {
+		splitFiles(files)
+	}
 	committerEmail := ""
 	if parsed.CommitterEmail != parsed.AuthorEmail {
 		committerEmail = parsed.CommitterEmail
@@ -1716,9 +1720,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
 		Checks                                                                            []store.CommitStatus
 		DiffFiles                                                                         []diffFile
 		DiffTruncated                                                                     bool
+		Layout                                                                            diffLayout
 	}{p, full, full[:10], commitNames.name(parsed.AuthorEmail, parsed.AuthorName), parsed.AuthorEmail, commitUser, committerEmail,
 		time.Unix(parsed.AuthorUnix, 0).UTC().Format(time.RFC3339), msg,
-		gitutil.Parents(p.Dir, full), v, checks, files, truncated})
+		gitutil.Parents(p.Dir, full), v, checks, files, truncated, layout})
 }
 
 // labelPalette provides default label chip colors: mid-tone hues that stay
@@ -2187,6 +2192,10 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 	if p.Viewer != "" {
 		markCompose(files, r.URL.Query())
 	}
+	layout := s.diffLayoutFor(r)
+	if layout.Split {
+		splitFiles(files)
+	}
 	stat := statOf(files)
 	// The commits this MR carries: base..head, the same range as the diff.
 	type commitRow struct {
@@ -2293,10 +2302,11 @@ func (s *Server) mrPage(w http.ResponseWriter, r *http.Request, previewForm stri
 		Base            string
 		LabelColors     map[string]template.CSS
 		Draft           *draft
+		Layout          diffLayout
 	}{p, m, view, md(m.Body, m.BodyFormat), checks, combined, renderComments(comments, md),
 		reviewRows, files, diffTruncated, stat, commits, commitsTotal, branches, s.canEditItem(r, p.Repo, m.Author),
 		canWrite, unresolved, revisions, s.takeFlash(w, r), detachedThreads, stackedOn, stacked, supersedes, gates,
-		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo), d})
+		sourceGone(p, m), headMerged, headPruned, base, s.labelColors(p.Repo), d, layout})
 }
 
 // sourceGone reports whether an MR's source branch no longer exists: the

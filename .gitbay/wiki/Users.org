@@ -743,6 +743,14 @@ your account; =system=, the default, follows the browser's own
 preference. =web theme show= prints it. The account page has the same
 control under Appearance.
 
+=web diff set split= draws diffs side by side on the merge request,
+commit and compare pages; =unified=, the default, keeps one column.
+=web diff show= prints it, and the account page has the same control
+under Appearance. =?layout=split= or =?layout=unified= on a diff page
+overrides the setting for that request. In a narrow window the split
+layout stacks the old line over the new one, as a unified diff does.
+Each column's line numbers open a comment on their own side.
+
 * Notifications
 
 When the instance has SMTP configured, activity mails you as well as
