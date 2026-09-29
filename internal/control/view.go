@@ -1,9 +1,11 @@
 package control
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
+	"gitbay.org/gitbay/internal/store"
 	"gitbay.org/gitbay/internal/termtext"
 )
 
@@ -183,8 +185,8 @@ func (v *view) event(text, format, ts string) {
 	v.wrote = true
 }
 
-func (v *view) comment(author, ts, body, format string) {
-	when := v.c.Term.safe(v.c.when(ts))
+func (v *view) comment(id int64, author, ts, body, format string) {
+	when := v.c.Term.safe(v.c.when(ts)) + fmt.Sprintf(" (comment %d)", id)
 	author = v.c.Term.safe(author)
 	cols := v.c.Term.Cols
 	if cols > 0 {
@@ -198,4 +200,21 @@ func (v *view) comment(author, ts, body, format string) {
 	v.sep()
 	io.WriteString(v.w, v.c.Term.paint(sgrDim, head)+"\n")
 	v.body(body, format)
+}
+
+// reactions prints one line of counts under an item, the caller's own
+// marked "(you)". Nothing when nobody has reacted.
+func (v *view) reactions(rs []ReactionOut) {
+	if len(rs) == 0 {
+		return
+	}
+	var parts []string
+	for _, r := range rs {
+		p := fmt.Sprintf("%s %d", store.ReactionEmoji(r.Reaction), r.Count)
+		if r.Me {
+			p += " (you)"
+		}
+		parts = append(parts, p)
+	}
+	io.WriteString(v.w, "reactions: "+strings.Join(parts, ", ")+"\n")
 }

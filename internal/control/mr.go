@@ -719,9 +719,13 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 		checks = append(checks, out)
 	}
+	rx, err := c.Store.ReactionCounts("mr", mr.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind})
+		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind, reactionsOut(rx[cm.ID])})
 	}
 	var rs []ReviewOut
 	counts := ReviewersWhoCount(c.Store, repo, reviews)
@@ -751,7 +755,7 @@ func runMRShow(c *Ctx, args []string) int {
 		}
 	}
 	d := MRShow{mrOut: mrToOut(repo, mr, true), Checks: checks, Combined: combined,
-		UnresolvedThreads: unresolved, Commits: commits, Comments: cs, Reviews: rs}
+		UnresolvedThreads: unresolved, Commits: commits, Reactions: reactionsOut(rx[0]), Comments: cs, Reviews: rs}
 	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
 	if mr.State == "open" || mr.State == "source_gone" {
 		if targetSHA, err := gitutil.ResolveRef(dir, "refs/heads/"+mr.TargetRef); err == nil {
@@ -857,6 +861,7 @@ func runMRShow(c *Ctx, args []string) int {
 		v.fields(kv...)
 
 		v.body(d.Body, d.BodyFormat)
+		v.reactions(d.Reactions)
 
 		if len(commits) > 1 {
 			v.section(fmt.Sprintf("commits (%d)", len(commits)))
@@ -907,7 +912,8 @@ func runMRShow(c *Ctx, args []string) int {
 			if cm.Kind == "system" {
 				continue
 			}
-			v.comment(cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
+			v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
+			v.reactions(cm.Reactions)
 		}
 	})
 }

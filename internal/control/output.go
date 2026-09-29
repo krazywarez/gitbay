@@ -21,18 +21,20 @@ type MRCreated struct {
 // IssueShow is issue show's payload: the issue and its comments.
 type IssueShow struct {
 	issueOut
-	Comments []commentOut `json:"comments,omitempty"`
+	Reactions []ReactionOut `json:"reactions,omitempty"`
+	Comments  []commentOut  `json:"comments,omitempty"`
 }
 
 // MRShow is mr show's payload.
 type MRShow struct {
 	mrOut
-	Checks            []CheckOut   `json:"checks,omitempty"`
-	Combined          string       `json:"checks_combined,omitempty"`
-	UnresolvedThreads int          `json:"unresolved_threads,omitempty"`
-	Commits           []CommitOut  `json:"commits,omitempty"`
-	Comments          []commentOut `json:"comments,omitempty"`
-	Reviews           []ReviewOut  `json:"reviews,omitempty"`
+	Checks            []CheckOut    `json:"checks,omitempty"`
+	Combined          string        `json:"checks_combined,omitempty"`
+	UnresolvedThreads int           `json:"unresolved_threads,omitempty"`
+	Commits           []CommitOut   `json:"commits,omitempty"`
+	Reactions         []ReactionOut `json:"reactions,omitempty"`
+	Comments          []commentOut  `json:"comments,omitempty"`
+	Reviews           []ReviewOut   `json:"reviews,omitempty"`
 	// Gates is set while the merge request is open.
 	Gates *GatesOut `json:"gates,omitempty"`
 }

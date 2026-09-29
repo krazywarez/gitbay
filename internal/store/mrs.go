@@ -507,7 +507,7 @@ func (s *Store) AddMRSystemComment(mrID, actorID int64, body string) error {
 
 func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
-		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
+		SELECT c.id, CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
 		       c.body, c.body_format, c.created_at, c.kind
 		FROM mr_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.mr_id = ? ORDER BY c.id`, mrID)
@@ -518,7 +518,7 @@ func (s *Store) ListMRComments(mrID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
+		if err := rows.Scan(&c.ID, &c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

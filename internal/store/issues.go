@@ -23,6 +23,7 @@ type Issue struct {
 }
 
 type IssueComment struct {
+	ID         int64
 	Author     string
 	Body       string
 	BodyFormat string // md | org
@@ -240,7 +241,7 @@ func (s *Store) AddIssueComment(issueID, authorID int64, body, format string) er
 
 func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	rows, err := s.DB.Query(`
-		SELECT CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
+		SELECT c.id, CASE WHEN c.kind = 'system' THEN 'system' ELSE u.username END,
 		       c.body, c.body_format, c.created_at, c.kind
 		FROM issue_comments c JOIN users u ON u.id = c.author_id
 		WHERE c.issue_id = ? ORDER BY c.id`, issueID)
@@ -251,7 +252,7 @@ func (s *Store) ListIssueComments(issueID int64) ([]IssueComment, error) {
 	var out []IssueComment
 	for rows.Next() {
 		var c IssueComment
-		if err := rows.Scan(&c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
+		if err := rows.Scan(&c.ID, &c.Author, &c.Body, &c.BodyFormat, &c.CreatedAt, &c.Kind); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

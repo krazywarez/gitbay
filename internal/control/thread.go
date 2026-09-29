@@ -50,11 +50,13 @@ func authorOrWrite(c *Ctx, repo store.Repo, author, what string) int {
 
 // commentOut is one comment as show emits it, for both nouns.
 type commentOut struct {
-	Author     string `json:"author"`
-	Body       string `json:"body"`
-	BodyFormat string `json:"body_format,omitempty"`
-	CreatedAt  string `json:"created_at"`
-	Kind       string `json:"-"` // "comment" or "system"; not part of the wire shape
+	ID         int64         `json:"id"`
+	Author     string        `json:"author"`
+	Body       string        `json:"body"`
+	BodyFormat string        `json:"body_format,omitempty"`
+	CreatedAt  string        `json:"created_at"`
+	Kind       string        `json:"-"` // "comment" or "system"; not part of the wire shape
+	Reactions  []ReactionOut `json:"reactions,omitempty"`
 }
 
 // thread is what a comment command needs to know about its noun.

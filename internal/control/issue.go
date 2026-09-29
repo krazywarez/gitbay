@@ -339,11 +339,15 @@ func runIssueShow(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	rx, err := c.Store.ReactionCounts("issue", issue.ID, c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind})
+		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind, reactionsOut(rx[cm.ID])})
 	}
-	d := IssueShow{issueOut: issueToOut(issue, true), Comments: cs}
+	d := IssueShow{issueOut: issueToOut(issue, true), Reactions: reactionsOut(rx[0]), Comments: cs}
 	return c.emit(d, func(w io.Writer) {
 		v := c.view(w)
 		v.title(fmt.Sprintf("#%d", d.Number), d.Title, d.State)
@@ -355,6 +359,7 @@ func runIssueShow(c *Ctx, args []string) int {
 			"url", c.siteURL(repo.Path(), "issues", strconv.FormatInt(d.Number, 10)),
 		)
 		v.body(d.Body, d.BodyFormat)
+		v.reactions(d.Reactions)
 		events := false
 		for _, cm := range cs {
 			if cm.Kind != "system" {
@@ -370,7 +375,8 @@ func runIssueShow(c *Ctx, args []string) int {
 			if cm.Kind == "system" {
 				continue
 			}
-			v.comment(cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
+			v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
+			v.reactions(cm.Reactions)
 		}
 	})
 }
