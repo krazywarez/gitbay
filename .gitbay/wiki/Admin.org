@@ -171,10 +171,16 @@ trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Result
   one readable by group or others, stops the daemon at start.
 - =reply_address= is what each Reply-To is built from:
   =reply@gitbay.example= becomes =reply+<token>@gitbay.example=. The
-  mailbox must receive that: give it a plus-addressing (subaddress)
-  mailbox, as most hosted mail does by default, or a catch-all for the
-  domain. Point the domain's MX at the mail host as for any other
-  mailbox; nothing about it involves gitbayd.
+  mailbox must receive that. Hosts that deliver subaddresses to the
+  mailbox need nothing more; others need a wildcard rule. Migadu, for
+  one, sent =threads+x@gitbay.org= nowhere until a rewrite from
+  =threads+*= to =threads@gitbay.org= was added. A domain catch-all only
+  works if it points at this mailbox, which then also holds everything
+  else sent to the domain. Send a test to =<reply_address>+test= and
+  expect a =refused mail reply= audit row with "malformed reply token"
+  within a poll interval (=gitbay audit --action 'refused mail'=). Point
+  the domain's MX at the mail host as for any other mailbox; nothing
+  about it involves gitbayd.
 - Use a mailbox that holds nothing else. gitbayd reads every unseen
   message in it and marks each one =\Seen= when it is handled, posted
   or refused. A message that fails for a reason that may pass (the
@@ -201,7 +207,12 @@ trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Result
   as RFC 8601 asks; Gmail, Fastmail and Migadu do. Check yours before
   relying on it. Unset, the daemon logs a warning at start and =admin
   mail inbound check= repeats it: without it, =From= is whatever the
-  sender wrote.
+  sender wrote. Mail between two addresses at the same host may carry
+  no =Authentication-Results= at all: at Migadu, mail from another
+  Migadu-hosted domain is delivered through its outbound path and gets
+  none, so setting the id refuses every reply from such users.
+  gitbay.org runs without it for that reason until gitbayd verifies
+  DKIM itself (#307).
 - =gitbay admin mail inbound check= logs in, opens the mailbox
   read-only (EXAMINE) and reports the message and unseen counts, so a
   check never marks a reply seen before the poller reads it. With
