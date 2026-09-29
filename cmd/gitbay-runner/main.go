@@ -127,19 +127,12 @@ func main() {
 		memory:    *memory,
 		cpus:      *cpus,
 	}
+	var cgErr error
 	if r.isolation == isolationPodman {
 		// Before podman runs anything: its pause process lands in the
 		// cgroup of the first invocation, and that must be the runner's
 		// leaf, not a build's.
-		cg, err := prepareBuildCgroups()
-		switch why := buildCgroupsRequired(r.memory, r.cpus, *untrusted, r.loopbackRemote()); {
-		case err == nil:
-			r.cgroups = cg
-		case why != "":
-			log.Fatalf("%s: build cgroups unavailable: %v", why, err)
-		default:
-			log.Printf("build cgroups unavailable (%v); builds run unconfined in the service cgroup", err)
-		}
+		r.cgroups, cgErr = prepareBuildCgroups()
 	}
 	if err := r.checkIsolation(); err != nil {
 		// Refusing to start is the point. A runner that quietly fell back
@@ -148,6 +141,14 @@ func main() {
 		// runner: the operator sees a failed unit either way, but only
 		// one of them is honest about why (#144).
 		log.Fatalf("isolation: %v", err)
+	}
+	if cgErr != nil {
+		// After checkIsolation, so a missing image or podman is reported
+		// as that rather than as the cgroups it would also lack.
+		if why := buildCgroupsRequired(r.memory, r.cpus, *untrusted, r.loopbackRemote()); why != "" {
+			log.Fatalf("%s: build cgroups unavailable: %v", why, cgErr)
+		}
+		log.Printf("build cgroups unavailable (%v); builds run unconfined in the service cgroup", cgErr)
 	}
 	if *sshOpts != "" {
 		r.sshOpts = strings.Fields(*sshOpts)
