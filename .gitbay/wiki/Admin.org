@@ -660,28 +660,80 @@ gitbayd admin secrets rotate   # new key, reseal, retire the old one (as root)
 
 ** Restore drill
 
-A restore onto a clean host, run quarterly and after any change to the
-backup code (=cmd/gitbayd/backup.go=, the offsite job), and recorded
-below. The disaster it rehearses is losing bay1, so the local archives
-are gone with it and the sources are the main offsite restic
-repository (repositories, LFS, the staged database, =config.toml=),
-the off-host copy of =secret.key= and =apns.p8= (a keys repository once
-runbook D creates it; until then the operator's hand-made copy), and
-the operator's password manager (=offsite.env=, the keys repository's
-password and token once it exists, =backup-identity.txt=). The steps are in the data-at-rest
-plan's operator runbook
-(=docs/plans/2026-09-27-data-at-rest-and-backup.md=).
+A restore onto a clean host, run quarterly (January, April, July,
+October) and after any change to the backup code
+(=cmd/gitbayd/backup.go=, =cmd/gitbayd/restoredrill.go=, the offsite
+job), and recorded below. The disaster it rehearses is losing bay1, so
+the local archives are gone with it and the sources are the main
+offsite restic repository (repositories, LFS, the staged database,
+=config.toml=), the off-host copy of =secret.key= and =apns.p8= (a keys
+repository once runbook D creates it; until then the operator's
+hand-made copy), and the operator's password manager (=offsite.env=,
+the keys repository's password and token once it exists,
+=backup-identity.txt=). The full steps are runbook C of the
+data-at-rest plan (=docs/plans/2026-09-27-data-at-rest-and-backup.md=).
+
+=gitbayd admin restore-drill= does the archive half. It extracts a
+full archive into an empty or absent directory, runs every =--verify=
+check on the extracted copy, and prints what was restored, the newest
+issue, issue comment, merge request comment and push in the restored
+database, and the elapsed time. Exit is non-zero if any check fails.
+
+#+begin_src sh
+gitbayd admin restore-drill /var/backups/gitbay/gitbay-20260927-090000.tar.gz --into /srv/drill
+gitbayd admin restore-drill <archive>.tar.gz.age --identity backup-identity.txt --into /srv/drill
+#+end_src
+
+What to restore, and from where:
+
+| Item                          | Source                                                      | Path on the drill host                         |
+|-------------------------------+-------------------------------------------------------------+------------------------------------------------|
+| Database                      | staged copy in =/var/lib/gitbay-stage= (restic), or an archive | =<root>/gitbay.db=                          |
+| Repositories                  | =/var/lib/gitbay/repos= (restic), or an archive              | =<root>/repos=                                 |
+| LFS objects                   | =/var/lib/gitbay/lfs= (restic), or an archive                | =<root>/lfs= (or =[lfs] root=)                 |
+| Release assets                | inside each repository (=gitbay-releases/=)                  | with the repositories                          |
+| Host keys                     | =/var/lib/gitbay/ssh= (restic), or an archive                | =<root>/ssh= (or =[ssh] host_keys=)            |
+| =config.toml=                 | =/var/lib/gitbay-stage/config.toml= (restic)                 | =/etc/gitbay/config.toml=                      |
+| =secret.key=, =apns.p8=       | the off-host copy; no archive or main snapshot carries them | =/etc/gitbay/=, mode 0600, owned by =gitbay=   |
+
+From the offsite path (restic is not run by any gitbay command):
+
+#+begin_src sh
+restic restore latest --target / --include /var/lib/gitbay --include /var/lib/gitbay-stage
+cp /var/lib/gitbay-stage/gitbay.db /var/lib/gitbay/gitbay.db
+gitbayd --config /etc/gitbay/config.toml admin backup --out /tmp/drill.tar.gz
+gitbayd admin restore-drill /tmp/drill.tar.gz --into /tmp/drill-root
+#+end_src
+
+The second archive is how the restic tree gets the same checks and
+timestamps; =/tmp/drill-root= is discarded afterwards.
+
+What to check, each a column below:
+
+- DB integrity, connectivity, release assets, LFS: =restore-drill=
+  prints =integrity ok=, =connectivity ok on N repositories=, =release
+  assets ok: N=, =LFS objects ok: N=. Compare N with =gitbayd admin
+  stats --json= on the source at the snapshot time.
+- Secrets: =gitbayd --config /etc/gitbay/config.toml admin secrets
+  check= opens every value.
+- Host key: =ssh-keyscan -p 22 <drill-host>= matches the source's
+  fingerprint.
+- Config: =gitbayd --config /etc/gitbay/config.toml check-config=.
+- Service: =ssh -p 22 git@<drill-host> whoami= and a =git clone= over
+  SSH succeed.
 
 Time to service runs from the clean host's first root login to the
 first successful =git clone= over SSH from it. The recovery point is
-the time of the newest restic snapshot restored.
+the time of the newest restic snapshot restored; record beside it the
+newest issue, comment and push =restore-drill= printed, which show how
+much activity the restore carries.
 
 No drill has been run yet; the procedure above is written but
 unexercised, and #259 stays open until the first row below is
 recorded.
 
-| Date | Host | Snapshot restored (UTC) | Time to service | DB integrity | Connectivity | LFS | Release assets | Host key | Secrets | Notes |
-|------+------+-------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|
+| Date | Host | Snapshot restored (UTC) | Newest issue / comment / push | Time to service | DB integrity | Connectivity | LFS | Release assets | Host key | Secrets | Notes |
+|------+------+-------------------------+-------------------------------+-----------------+--------------+--------------+-----+----------------+----------+---------+-------|
 
 * Upgrades
 

@@ -62,8 +62,12 @@ the product activity feed, not an audit trail.
 - Excluded: WAL files, the hook socket, askpass scripts, generated
   hooks.
 - =gitbayd admin backup --verify= checks SQLite integrity, that every
-  repository the database names is present, and =git fsck
-  --connectivity-only= on each (=backup.go=).
+  repository the database names is present, =git fsck
+  --connectivity-only= on each, release assets against their recorded
+  sha256, and LFS objects against their names (=backup.go=).
+  =gitbayd admin restore-drill= runs the same checks on a full
+  extraction and reports elapsed time and the newest recovered
+  activity (=restoredrill.go=).
 - Repository deletes, renames and transfers refuse while a full backup
   runs (=internal/backuplock=), so the snapshot and the walk agree.
 - The host's restic credentials are append-only; the key that can
