@@ -4,6 +4,28 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* Unreleased
+
+- Pushes have a concurrency limit of their own, separate from the pack
+  budget: =[limits] push_concurrency= (2), =push_per_principal= (1),
+  =push_queue= (16) and =push_queue_wait= ("60s"), read like the
+  =pack_*= settings. One principal may have up to half of =push_queue=
+  waiting, so parallel pushes from one account queue. A deploy key
+  counts apart from the account that registered it. The slot is held until receive-pack and its
+  post-receive hook have finished; a busy push exits 1 with "the server
+  is busy: it is at its limit of concurrent pushes…", and the daemon
+  logs a =push limit= warning at most once a minute. (#308)
+- A push holding a slot is killed when its pre-receive has not started
+  =[limits] push_receive_timeout= ("15m") after it took the slot, or,
+  once its pack has begun or pre-receive has started, when nothing has
+  moved either way for =push_idle= ("60s").
+  receive-pack runs with =receive.keepAlive= set from =push_idle=, so
+  long hooks do not trip it. (#308)
+- =repo download= over SSH and the API takes a slot from the pack
+  limit, released once =git archive= exits; busy is exit 1 with the
+  clone message, and 503 with =Retry-After: 60= on both API
+  endpoints. (#308)
+
 * v1.40.0 — 2026-09-29
 
 DKIM verification for reply mail, and ids that are not reused after a

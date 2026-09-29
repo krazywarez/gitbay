@@ -47,7 +47,11 @@ The practical ceiling on this hardware is concurrent pack generation:
 full clones of large repositories are CPU-bound in git itself (the 17s
 clone ran git at ~156% CPU). =limits.pack_concurrency= bounds how many
 run at once across SSH, HTTP and git://, with a queue behind it (see
-[[Admin]], =[limits]=).
+[[Admin]], =[limits]=). Pushes are the other git-bound load: receive-pack
+indexes the pack it is sent, about a core for a large one, and then runs
+its hooks. =limits.push_concurrency= (2) bounds those on a separate
+budget, one per account or deploy key by default, so a clone storm and
+a push storm each leave the other its slots.
 
 * Concurrent clones
 

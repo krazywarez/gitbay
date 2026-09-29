@@ -367,9 +367,10 @@ is recorded here rather than in a closed issue:
 - *Timing and traffic analysis.* Token comparison is a hash index lookup
   by design, but nothing has been measured.
 - *Denial of service by resource exhaustion* beyond rate. Concurrent
-  clones, fetches and web archives are bounded by the pack limit
-  (#262); pushes are not, beyond =max_pack_bytes= on each one. Nor are
-  pathological diffs, deep histories, or zip bombs in LFS.
+  clones, fetches, web archives and =repo download= are bounded by the
+  pack limit (#262, #308), and pushes by a separate push limit (#308)
+  on top of =max_pack_bytes= on each one. Pathological diffs, deep
+  histories and zip bombs in LFS are not.
 
 A sweep is a point in time. This section says what a reader should not
 assume has been checked.

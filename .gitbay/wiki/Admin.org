@@ -357,8 +357,8 @@ push=.
   repositories may take; a push may be no larger than what is left.
 - =pack_concurrency= (3), =pack_per_principal= (2), =pack_queue= (32),
   =pack_queue_wait= (="60s"=) — git pack generation (clones, fetches,
-  =git archive --remote=, web archive downloads) over SSH, smart HTTP
-  and git:// shares one
+  =git archive --remote=, web archive downloads, =repo download= over
+  SSH and the API) over SSH, smart HTTP and git:// shares one
   budget: this many at once, this many per account (per client
   address when anonymous: an IPv4 address, or an IPv6 /64), and this
   many waiting for at most the wait. Anonymous clients together hold
@@ -375,11 +375,48 @@ push=.
   for two minutes: a client reading below about 550 B/s, or an HTTP
   request body that takes over two minutes with nothing written back,
   is cut. Ref listings (info/refs, protocol v2
-  =ls-refs=), pushes and =repo download= are outside the budget. For the
+  =ls-refs=) and pushes are outside the budget. A busy =repo download=
+  exits 1 with the same message; over the API it is a 503 with
+  =Retry-After: 60=. For the
   three counts 0 means the default and a negative value turns that
   bound off. The defaults suit a four-core host; see [[Performance]].
   With =ssh.mode = "system"= each SSH session is its own process and
   SSH clones are not counted.
+- =push_concurrency= (2), =push_per_principal= (1), =push_queue= (16),
+  =push_queue_wait= (="60s"=) — =git receive-pack= over SSH, on a
+  budget of its own so clones cannot starve pushes or the reverse:
+  this many at once, this many per account or deploy key, and this
+  many waiting for at most the wait. One principal may have up to half
+  of =push_queue= (at least one) waiting, so parallel pushes from one
+  account queue rather than being refused, but cannot fill the queue.
+  A deploy key is its own principal, apart from the account that
+  registered it, so an account with deploy keys can hold
+  =push_per_principal= slots per key;
+  the global cap still holds. A bot account such as a runner's counts
+  like any other account. The slot is taken after the access checks and held
+  until receive-pack exits, which is after =post-receive= (merge
+  detection, CI queueing, webhooks) has run. Past that the client gets
+  "the server is busy: it is at its limit of concurrent pushes…" and
+  exit 1, and the daemon logs a =push limit= warning at most once a
+  minute. A client that disconnects while queued leaves the queue; one
+  that disconnects mid-push ends receive-pack and frees its slot, and
+  a revoked key kills it. 0 and negative values read as for =pack_*=.
+  HTTP and git:// carry no pushes. With =ssh.mode = "system"= pushes
+  are not counted and the two timeouts below do not apply.
+- =push_idle= (="60s"=), =push_receive_timeout= (="15m"=) — a push
+  holding a slot is killed, its process group with it, when its
+  pre-receive has not started =push_receive_timeout= after it took the
+  slot, or when no byte has been read from the client and none written
+  to it for =push_idle=. The idle rule starts when the pack signature
+  arrives from the client or pre-receive starts, whichever is first
+  (a delete-only push sends no pack): before that the client may be
+  silent while its =pack-objects= counts and compresses, and only
+  =push_receive_timeout= applies. receive-pack runs with
+  =receive.keepAlive= set to a quarter of =push_idle= (1 to 5 seconds),
+  so the keepalives it sends to side-band clients while it indexes and
+  runs hooks keep a working push alive. Once pre-receive has started
+  only =push_idle= applies: post-receive is never cut short by the
+  clock. A push killed before pre-receive answers updates no refs.
 - =max_pack_bytes= (2 GiB) — the largest pack one push may send,
   enforced as =receive.maxInputSize= and lowered to what an owner's
   storage quota has left.
