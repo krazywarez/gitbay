@@ -498,3 +498,46 @@ func TestAccountTokenCreateAuditOmitsToken(t *testing.T) {
 		t.Fatal("no cmd token create audit row")
 	}
 }
+
+// Marking notices read goes through notifications read, so it carries the
+// audit trail and write budget of the CLI command (#261).
+func TestNotificationsReadDispatches(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, err := st.CreateUser("alice", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := store.User{ID: uid, Username: "alice"}
+	repoID, err := st.CreateRepo("user", uid, "app", "public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := st.AddNotice(uid, repoID, "issue", "bob", "s", "alice/app/issues/1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := New(config.Default(), st, nil)
+
+	notices, _ := st.Inbox(uid, true, 10, 0)
+	req := httptest.NewRequest("POST", "/notifications/read", strings.NewReader("id="+strconv.FormatInt(notices[0].ID, 10)))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	s.notificationsRead(httptest.NewRecorder(), req, u)
+	if n := st.UnreadNotices(uid); n != 1 {
+		t.Fatalf("unread after one id = %d, want 1", n)
+	}
+	assertAudited(t, st, "cmd notifications read")
+
+	req = httptest.NewRequest("POST", "/notifications/read", nil)
+	s.notificationsRead(httptest.NewRecorder(), req, u)
+	if n := st.UnreadNotices(uid); n != 0 {
+		t.Fatalf("unread after all = %d, want 0", n)
+	}
+}

@@ -6,6 +6,8 @@ anything beyond "replace the binary and restart" is needed.
 
 * Unreleased
 
+- Marking notifications read from the web dispatches =notifications
+  read=, so it counts against the write budget and is audited (#261).
 - =gitbayd admin backup --verify= also checks every release asset the
   database names against its recorded size and sha256, and every
   archived LFS object against its name (#259).

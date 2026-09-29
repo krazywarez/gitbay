@@ -38,20 +38,18 @@ func (s *Server) notifications(w http.ResponseWriter, r *http.Request, u store.U
 }
 
 // notificationsRead marks one notice read, or the whole inbox when no id
-// is given, then returns to the list.
+// is given, through notifications read, then returns to the list (#261).
 func (s *Server) notificationsRead(w http.ResponseWriter, r *http.Request, u store.User) {
-	var ids []int64
+	argv := []string{"notifications", "read", "--all"}
 	if v := r.FormValue("id"); v != "" {
-		n, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
+		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
 			http.Error(w, "bad id", http.StatusBadRequest)
 			return
 		}
-		ids = append(ids, n)
+		argv = []string{"notifications", "read", v}
 	}
-	if _, err := s.st.MarkNoticesRead(u.ID, ids); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	if _, msg, ok := s.runControl(u, argv); !ok {
+		s.setFlash(w, msg)
 	}
 	http.Redirect(w, r, "/notifications", http.StatusSeeOther)
 }
