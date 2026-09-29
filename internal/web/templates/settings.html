@@ -12,6 +12,7 @@
   <ul>
     <li><a href="#identity">Identity</a></li>
     <li><a href="#access">Access</a></li>
+    <li><a href="#webhooks">Webhooks</a></li>
     <li><a href="#gates">Merge gates</a></li>
     <li><a href="#branches">Protected branches</a></li>
     <li><a href="#tags">Protected tags</a></li>
@@ -66,6 +67,68 @@
   <div class="check"><input type="checkbox" id="git-daemon" name="git-daemon" value="on"{{if .Repo.Settings.GitDaemon}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
+<h3>Who can reach this repository</h3>
+{{if .Access}}<div class="tablewrap"><table class="keys">
+<thead><tr class="cols"><th scope="col">user</th><th scope="col">role</th><th scope="col">via</th><th scope="col"><span class="vh">actions</span></th></tr></thead>
+<tbody>{{range .Access}}<tr>
+  <td class="mono"><a href="/{{.User}}">{{.User}}</a></td>
+  <td>{{.Role}}</td>
+  <td>{{.Source}}</td>
+  <td class="act">{{if eq .Source "direct"}}<form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="access-revoke">
+    <input type="hidden" name="user" value="{{.User}}">
+    <button type="submit" class="danger">Revoke</button>
+  </form>{{end}}</td>
+</tr>{{end}}</tbody></table></div>
+{{else}}<p class="meta">Nobody else can reach it.</p>{{end}}
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="access-grant">
+  <div><label for="grant-user">Grant access</label><p class="hint">An account name and a role. A grant adds to what an organization or team already gives.</p></div>
+  <div><input type="text" id="grant-user" name="user" value="{{index .Submitted "user"}}" autocomplete="off" spellcheck="false" placeholder="username">
+  <select name="role" aria-label="Role">{{$role := index .Submitted "role"}}<option value="read"{{if eq $role "read"}} selected{{end}}>read</option><option value="write"{{if eq $role "write"}} selected{{end}}>write</option><option value="admin"{{if eq $role "admin"}} selected{{end}}>admin</option></select></div>
+  <div><button type="submit" class="btn">Grant</button></div>
+</form>
+</section>
+
+<section id="webhooks"><h2>Webhooks</h2>
+{{if .Hooks}}
+<ul class="protlist">
+{{range .Hooks}}<li><span class="mono">#{{.ID}}</span> <code>{{.URL}}</code> <span class="meta">{{.Events}}{{if .Secret}}, signed{{end}}</span>
+  <form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="webhook-remove">
+    <input type="hidden" name="id" value="{{.ID}}">
+    <button type="submit" class="danger">Remove</button>
+  </form></li>
+{{end}}
+</ul>
+{{else}}<p class="meta">No webhooks.</p>{{end}}
+<form method="post" action="{{$base}}" class="setform stack" autocomplete="off">
+  <input type="hidden" name="field" value="webhook-add">
+  <label for="hook-url">Add a webhook</label>
+  <input type="text" id="hook-url" name="url" value="{{index .Submitted "url"}}" placeholder="https://ci.example.org/hook" spellcheck="false">
+  <label for="hook-events">Events</label>
+  <p class="hint">Comma separated, or <code>*</code> for all.</p>
+  <input type="text" id="hook-events" name="events" value="{{or (index .Submitted "events") "*"}}" spellcheck="false">
+  <label for="hook-secret">Secret</label>
+  <p class="hint">Optional. Signs each delivery; it is not shown again.</p>
+  <input type="password" id="hook-secret" name="secret" value="" autocomplete="new-password">
+  <button type="submit" class="btn">Add</button>
+</form>
+<h3>Recent deliveries</h3>
+{{if .Deliveries}}<div class="tablewrap"><table class="keys">
+<thead><tr class="cols"><th scope="col">id</th><th scope="col">event</th><th scope="col">url</th><th scope="col">state</th><th scope="col"><span class="vh">actions</span></th></tr></thead>
+<tbody>{{range .Deliveries}}<tr>
+  <td class="mono">{{.ID}}</td>
+  <td>{{.Event}}</td>
+  <td class="mono">{{.URL}}</td>
+  <td>{{.Status}} ({{.Attempts}} attempts){{if .LastError}}<br><span class="meta">{{.LastError}}</span>{{end}}</td>
+  <td class="act"><form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="webhook-redeliver">
+    <input type="hidden" name="delivery" value="{{.ID}}">
+    <button type="submit" class="btn">Redeliver</button>
+  </form></td>
+</tr>{{end}}</tbody></table></div>
+{{else}}<p class="meta">Nothing delivered yet.</p>{{end}}
 </section>
 
 <section id="gates"><h2>Merge gates</h2>
@@ -204,8 +267,26 @@
   <div class="check"><input type="checkbox" id="archive" name="archive" value="on"{{if .Repo.Settings.Archived}} checked{{end}}></div>
   <div><button type="submit" {{if .Repo.Settings.Archived}}class="btn"{{else}}class="danger"{{end}}>Save</button></div>
 </form>
-<p class="meta">Deleting or transferring a repository is a CLI operation:
-<code>gitbay repo delete {{.Repo.OwnerName}}/{{.Repo.Name}} --yes</code></p>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="rename">
+  <div><label for="rename">Name</label><p class="hint">Clone URLs change. The old path stops resolving.</p></div>
+  <div><input type="text" id="rename" name="name" value="{{or (index .Submitted "name") .Repo.Name}}" autocomplete="off" spellcheck="false"></div>
+  <div><button type="submit" class="btn">Rename</button></div>
+</form>
+{{$path := printf "%s/%s" .Repo.OwnerName .Repo.Name}}
+<form method="post" action="{{$base}}" class="setform stack">
+  <input type="hidden" name="field" value="transfer">
+  <label for="new-owner">Transfer</label>
+  <p class="hint">Move it to your own account or an organization you administer. Clone URLs change.</p>
+  <input type="text" id="new-owner" name="new-owner" value="{{index .Submitted "new-owner"}}" placeholder="new owner" autocomplete="off" spellcheck="false">
+  <p>{{template "confirmfield" $path}} <button type="submit" class="danger">Transfer</button></p>
+</form>
+<form method="post" action="{{$base}}" class="setform stack">
+  <input type="hidden" name="field" value="delete">
+  <span class="fieldname">Delete</span>
+  <p class="hint">Removes the repository, its issues and merge requests. Cannot be undone.</p>
+  <p>{{template "confirmfield" $path}} <button type="submit" class="danger">Delete repository</button></p>
+</form>
 </section>
 </div>
 </div>

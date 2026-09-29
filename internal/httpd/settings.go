@@ -13,9 +13,8 @@ import (
 )
 
 // Repository settings for repo admins. Every control dispatches the
-// command the CLI runs; the page only groups them. Destructive lifecycle
-// — delete and transfer — stays on the CLI, where a typed confirmation
-// is the norm.
+// command the CLI runs; the page only groups them. Delete and transfer
+// ask for the repository's path to be typed first.
 
 type settingsPage struct {
 	repoPage
@@ -24,10 +23,36 @@ type settingsPage struct {
 	DepsEnabled bool
 	Deps        control.DepsOut
 	Runners     []store.RepoRunner
+	Access      []accessRow
+	Hooks       []hookRow
+	Deliveries  []deliveryRow
 	Notice      string
 	Saved       bool
 	Reauth      bool // Notice is the stale-session refusal: link to sign in
 	Submitted   map[string]string
+}
+
+type accessRow struct {
+	User   string `json:"user"`
+	Role   string `json:"role"`
+	Source string `json:"source"`
+}
+
+type hookRow struct {
+	ID     int64  `json:"id"`
+	URL    string `json:"url"`
+	Events string `json:"events"`
+	Secret bool   `json:"has_secret"`
+}
+
+type deliveryRow struct {
+	ID         int64  `json:"id"`
+	URL        string `json:"url"`
+	Event      string `json:"event"`
+	Status     string `json:"status"`
+	Attempts   int    `json:"attempts"`
+	LastStatus int    `json:"last_status"`
+	LastError  string `json:"last_error"`
 }
 
 func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -56,6 +81,12 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 	s.runControlInto(u, []string{"repo", "deps", "status", repo.Path()}, &deps)
 	var runners []store.RepoRunner
 	s.runControlInto(u, []string{"repo", "runner", "list", repo.Path()}, &runners)
+	var access []accessRow
+	s.runControlInto(u, []string{"repo", "access", "list", repo.Path()}, &access)
+	var hooks []hookRow
+	s.runControlInto(u, []string{"webhook", "list", repo.Path()}, &hooks)
+	var deliveries []deliveryRow
+	s.runControlInto(u, []string{"webhook", "deliveries", repo.Path(), "--limit", "20"}, &deliveries)
 	var subm map[string]string
 	if submitted != nil {
 		subm = map[string]string{
@@ -63,12 +94,19 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 			"website":     submitted.Get("website"),
 			"topics":      submitted.Get("topics"),
 			"key":         submitted.Get("key"),
+			"user":        submitted.Get("user"),
+			"role":        submitted.Get("role"),
+			"url":         submitted.Get("url"),
+			"events":      submitted.Get("events"),
+			"name":        submitted.Get("name"),
+			"new-owner":   submitted.Get("new-owner"),
 		}
 	}
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: deps.Enabled, Deps: deps,
-		Runners:   runners,
+		Runners: runners,
+		Access:  access, Hooks: hooks, Deliveries: deliveries,
 		Notice:    notice,
 		Saved:     strings.HasPrefix(notice, "Saved "),
 		Reauth:    s.reauthNotice(w, notice, r.URL.Path),
@@ -201,6 +239,68 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		return
 	case "runner-remove":
 		argv = []string{"repo", "runner", "remove", repo, v("fingerprint")}
+	case "access-grant":
+		argv = []string{"repo", "access", "grant", repo, v("user"), v("role")}
+	case "access-revoke":
+		argv = []string{"repo", "access", "revoke", repo, v("user")}
+	case "webhook-add":
+		// The secret goes to the command on stdin and nowhere else: not
+		// argv, not the re-rendered form, not the notice.
+		argv = []string{"webhook", "add", repo, v("url")}
+		if ev := strings.ReplaceAll(v("events"), " ", ""); ev != "" {
+			argv = append(argv, "--events", ev)
+		}
+		var stdin string
+		if secret := strings.TrimRight(r.FormValue("secret"), "\r\n"); secret != "" {
+			argv = append(argv, "--secret", "-")
+			stdin = secret + "\n"
+		}
+		msg, ok := s.runControlStdin(u, argv, stdin)
+		if !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		s.settingsRedirect(w, r, "Saved the webhook.")
+		return
+	case "webhook-remove":
+		argv = []string{"webhook", "remove", repo, v("id")}
+	case "webhook-redeliver":
+		if _, msg, ok := s.runControl(u, []string{"webhook", "redeliver", repo, v("delivery")}); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		s.settingsRedirect(w, r, "Queued the delivery again.")
+		return
+	case "rename":
+		if _, msg, ok := s.runControl(u, []string{"repo", "rename", repo, v("name")}); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		s.setFlash(w, "Saved the name.")
+		http.Redirect(w, r, "/"+r.PathValue("owner")+"/"+v("name")+"/settings", http.StatusSeeOther)
+		return
+	case "transfer":
+		if ok, msg := confirmed(r, repo); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"repo", "transfer", repo, v("new-owner")}); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		http.Redirect(w, r, "/"+v("new-owner")+"/"+r.PathValue("repo"), http.StatusSeeOther)
+		return
+	case "delete":
+		if ok, msg := confirmed(r, repo); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"repo", "delete", repo, "--yes"}); !ok {
+			s.settingsFormWith(w, r, u, msg, r.Form)
+			return
+		}
+		http.Redirect(w, r, "/"+r.PathValue("owner"), http.StatusSeeOther)
+		return
 	default:
 		s.settingsRedirect(w, r, "unknown setting")
 		return
@@ -255,6 +355,10 @@ func fieldLabel(field string) string {
 		return "topics"
 	case "runner-add", "runner-remove":
 		return "runner"
+	case "access-grant", "access-revoke":
+		return "access"
+	case "webhook-remove":
+		return "webhook"
 	default:
 		return field
 	}

@@ -787,7 +787,7 @@ form.setform {
 }
 form.setform label { margin-top: 6px; }
 form.setform .hint { margin: 2px 0 0; }
-form.setform input[type="text"], form.setform select { width: 100%; }
+form.setform input[type="text"], form.setform input[type="password"], form.setform select { width: 100%; }
 /* a control narrower than its column is pushed to the column's end,
    which is where a full-width input's own right edge lands */
 form.setform .check { justify-content: flex-end; }
@@ -796,7 +796,7 @@ form.setform .num input[type="number"] { width: auto; }
 /* the third column takes the leftover width; the button keeps its own */
 form.setform > button, form.setform > .btngroup { justify-self: start; }
 form.setform.stack { grid-template-columns: 1fr; }
-form.setform.stack textarea, form.setform.stack select { width: 100%; max-width: 48rem; }
+form.setform.stack textarea, form.setform.stack select, form.setform.stack input[type="text"], form.setform.stack input[type="password"] { width: 100%; max-width: 48rem; }
 ul.protlist { list-style: none; margin: var(--sp-2) 0; padding: 0; }
 ul.protlist li {
   display: flex;

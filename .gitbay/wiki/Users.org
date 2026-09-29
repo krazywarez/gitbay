@@ -219,6 +219,10 @@ and =fork_of= when it is a
 fork whose parent you can read, so a client draws a toggle rather than
 two blind buttons. Absent means none.
 
+On the web, the repository's settings page carries access, webhooks,
+rename, transfer and delete, and =/new= imports from a remote. Delete and
+transfer ask for the repository's path to be typed.
+
 Pushing is SSH-only. Public repositories are anonymously readable over
 HTTPS (and =git://= where enabled); private repositories exist only over
 SSH and answer "not found" to everyone without access.

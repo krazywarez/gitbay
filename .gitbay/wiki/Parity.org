@@ -203,11 +203,11 @@ rather than the one the web page shows.
 | protected tags              | yes | yes | yes |
 | require codeowners          | yes | yes | yes |
 | require contexts            | yes | yes | no  |
-| access grants               | yes | no  | yes |
-| effective access            | yes | no  | yes |
-| webhooks                    | yes | no  | yes |
+| access grants               | yes | yes | yes |
+| effective access            | yes | yes | yes |
+| webhooks                    | yes | yes | yes |
 | runners attach, list, detach | yes | yes | n/a |
-| import from a remote        | yes | no  | yes |
+| import from a remote        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |
 | archive (read-only flag)    | yes | yes | yes |
@@ -231,8 +231,8 @@ rather than the one the web page shows.
 | job image (ci.yml)          | yes | n/a | n/a |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
-| delete, transfer            | yes | no  | no  |
-| rename                      | yes | no  | yes |
+| delete, transfer            | yes | yes | no  |
+| rename                      | yes | yes | yes |
 | release delete              | yes | yes | yes |
 | release asset add           | yes | no  | n/a |
 | release asset remove        | yes | no  | yes |
@@ -490,11 +490,10 @@ so =gitbay mr apply-suggestion= makes and signs it in a clone with the
 user's own git signing configuration and pushes it. The web shows that
 command in place of the button.
 
-Deleting or transferring a repository stays CLI-only on purpose, as
-does deleting an organization and pruning merge request heads (=admin
-mr prune=): each removes or moves what clone URLs point at, and wants a
-typed command rather than a button. Renaming is the exception: the iOS
-client offers it, and the web has no page yet.
+Deleting an organization and pruning merge request heads (=admin mr
+prune=) stay CLI-only for now. Deleting or transferring a repository is a
+settings section on the web and asks for the repository's path to be
+typed first.
 
 =n/a= means a surface cannot usefully carry the capability at all —
 see the archive note above.

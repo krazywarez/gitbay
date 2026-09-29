@@ -21,6 +21,27 @@
 <p><button type="submit">Create repository</button></p>
 </form>
 
+<h2 id="import">Import</h2>
+<p class="meta">Copies a repository from another host, over http or https. A private source needs an access token; it is sent to the remote for this one fetch and not stored.</p>
+<form method="post" action="/new" autocomplete="off">
+<input type="hidden" name="field" value="import">
+<p><label>Owner <select name="owner">
+  <option value="{{.Viewer}}">{{.Viewer}}</option>
+  {{range .Orgs}}<option value="{{.}}">{{.}}</option>{{end}}
+</select></label>
+<label>/ Name <input name="name" required maxlength="63" pattern="[a-z0-9][a-z0-9._\-]{0,62}" autocomplete="off" spellcheck="false"></label></p>
+<p><label>From <input type="text" name="from" required placeholder="https://github.com/owner/repo.git" spellcheck="false" size="48"></label></p>
+<p><label>Access token <input type="password" name="token" autocomplete="new-password"></label> <span class="hint">Optional.</span></p>
+<fieldset class="segmented">
+  <legend>Visibility</legend>
+  <div class="options">
+    <label><input type="radio" name="visibility" value="public" checked><span>Public</span></label>
+    <label><input type="radio" name="visibility" value="private"><span>Private</span></label>
+  </div>
+</fieldset>
+<p><button type="submit">Import repository</button></p>
+</form>
+
 <h2 id="org">Organization</h2>
 <p class="meta">An organization owns repositories, labels and milestones, and
 grants access through teams. You are its first admin.</p>

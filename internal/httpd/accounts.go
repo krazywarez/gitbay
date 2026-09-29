@@ -233,6 +233,24 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request, u store.User)
 		owner = u.Username
 	}
 	name := r.FormValue("name")
+	if r.FormValue("field") == "import" {
+		// The token, if any, reaches the command on stdin only.
+		argv := []string{"repo", "import", owner + "/" + name, "--from", strings.TrimSpace(r.FormValue("from"))}
+		if r.FormValue("visibility") == "private" {
+			argv = append(argv, "--private")
+		}
+		var stdin string
+		if tok := strings.TrimSpace(r.FormValue("token")); tok != "" {
+			argv = append(argv, "--token-stdin")
+			stdin = tok + "\n"
+		}
+		if msg, ok := s.runControlStdin(u, argv, stdin); !ok {
+			s.renderNewRepo(w, u, msg)
+			return
+		}
+		http.Redirect(w, r, "/"+owner+"/"+name, http.StatusSeeOther)
+		return
+	}
 	argv := []string{"repo", "create", owner + "/" + name}
 	if r.FormValue("visibility") == "private" {
 		argv = append(argv, "--private")
