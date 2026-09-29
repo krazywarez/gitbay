@@ -63,6 +63,33 @@ func TestPackLimits(t *testing.T) {
 	}
 }
 
+// push_* resolve like pack_*, from their own defaults.
+func TestPushLimits(t *testing.T) {
+	max, per, queue, wait := Limits{}.PushLimits()
+	if max != DefaultPushConcurrency || per != DefaultPushPerPrincipal || queue != DefaultPushQueue || wait != DefaultPushQueueWait {
+		t.Fatalf("defaults: %d %d %d %s", max, per, queue, wait)
+	}
+	if max != 2 || per != 1 || queue != 16 || wait != time.Minute {
+		t.Fatalf("defaults moved: %d %d %d %s", max, per, queue, wait)
+	}
+	max, per, queue, wait = Limits{PushConcurrency: -1, PushPerPrincipal: -1, PushQueue: -1, PushQueueWait: "5s"}.PushLimits()
+	if max != 0 || per != 0 || queue != math.MaxInt || wait != 5*time.Second {
+		t.Fatalf("off: %d %d %d %s", max, per, queue, wait)
+	}
+	cfg, err := Load(writeConfig(t, minimal+"\n[limits]\npush_concurrency = 4\npush_per_principal = 2\npush_queue = 8\npush_queue_wait = \"30s\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	max, per, queue, wait = cfg.Limits.PushLimits()
+	if max != 4 || per != 2 || queue != 8 || wait != 30*time.Second {
+		t.Fatalf("loaded: %d %d %d %s", max, per, queue, wait)
+	}
+	// The pack budget is not read from the push settings.
+	if pm, _, _, _ := cfg.Limits.PackLimits(); pm != DefaultPackConcurrency {
+		t.Fatalf("pack_concurrency %d, want the default", pm)
+	}
+}
+
 func TestContradictions(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -73,6 +100,11 @@ func TestContradictions(t *testing.T) {
 			"bad pack_queue_wait",
 			minimal + "\n[limits]\npack_queue_wait = \"soon\"\n",
 			"limits.pack_queue_wait",
+		},
+		{
+			"bad push_queue_wait",
+			minimal + "\n[limits]\npush_queue_wait = \"-5s\"\n",
+			"limits.push_queue_wait",
 		},
 		{
 			"registration open without smtp",

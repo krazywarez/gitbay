@@ -1,8 +1,9 @@
-// Package packlimit bounds concurrent git pack generation. upload-pack
-// and upload-archive over SSH, smart HTTP and git:// draw on one
-// budget: a global cap, a cap per principal (an account, or a client
-// address on the anonymous transports), and a bounded queue whose
-// waiters give up after a fixed wait or when the client goes away.
+// Package packlimit bounds concurrent git processes. upload-pack and
+// upload-archive over SSH, smart HTTP and git:// draw on one budget,
+// receive-pack on a second: each a global cap, a cap per principal (an
+// account, a deploy key, or a client address on the anonymous
+// transports), and a bounded queue whose waiters give up after a fixed
+// wait or when the client goes away.
 // Waiters are not served in order; a new arrival can take a freed slot
 // ahead of them, and the wait bounds how long any one of them waits.
 package packlimit
@@ -24,6 +25,7 @@ var (
 type Limiter struct {
 	max, per, queue int
 	wait            time.Duration
+	name            string // what is limited, for the refusal log
 
 	// Principals starting with class may hold at most classCap slots
 	// between them; classCap 0 is no class cap.
@@ -45,7 +47,7 @@ func New(max, per, queue int, wait time.Duration) *Limiter {
 	if max <= 0 {
 		return nil
 	}
-	return &Limiter{max: max, per: per, queue: queue, wait: wait,
+	return &Limiter{max: max, per: per, queue: queue, wait: wait, name: "pack",
 		held: map[string]int{}, waiting: map[string]int{}, changed: make(chan struct{}),
 		warned: map[string]time.Time{}}
 }
@@ -71,8 +73,17 @@ func (l *Limiter) Refused(transport, principal string, err error) {
 	if errors.Is(err, ErrGone) {
 		reason = "gone"
 	}
-	slog.Warn("pack limit: request turned away (logged at most once a minute per transport)",
+	slog.Warn(l.name+" limit: request turned away (logged at most once a minute per transport)",
 		"transport", transport, "class", class, "reason", reason)
+}
+
+// Name sets what the refusal log calls this limit ("pack" unless set).
+// Call it before the limiter is in use.
+func (l *Limiter) Name(name string) {
+	if l == nil {
+		return
+	}
+	l.name = name
 }
 
 // CapClass caps the slots that principals starting with prefix may hold

@@ -313,3 +313,27 @@ func TestRefusedLogsOncePerTransport(t *testing.T) {
 	var none *Limiter
 	none.Refused("git", "ip:x", ErrBusy)
 }
+
+// Two limiters log apart: a named one says what it limits, and its
+// once-a-minute window does not silence the other's.
+func TestRefusedNamesTheLimit(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	packs := New(1, 0, 0, time.Second)
+	pushes := New(1, 0, 0, time.Second)
+	pushes.Name("push")
+	packs.Refused("ssh", "user:4", ErrBusy)
+	pushes.Refused("ssh", "key:9", ErrBusy)
+	out := buf.String()
+	if !strings.Contains(out, `"pack limit: request turned away`) || !strings.Contains(out, `"push limit: request turned away`) {
+		t.Fatalf("want one line per limit:\n%s", out)
+	}
+	if !strings.Contains(out, "class=key") || strings.Contains(out, "key:9") {
+		t.Fatalf("deploy key principal logged or class missing:\n%s", out)
+	}
+	var none *Limiter
+	none.Name("push")
+}

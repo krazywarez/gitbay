@@ -35,6 +35,16 @@ const (
 	DefaultPackQueueWait    = time.Minute
 )
 
+// Push defaults: receive-pack indexes what it is sent, a core each for a
+// large push, and has its own budget so clones and pushes cannot starve
+// each other.
+const (
+	DefaultPushConcurrency  = 2
+	DefaultPushPerPrincipal = 1
+	DefaultPushQueue        = 16
+	DefaultPushQueueWait    = time.Minute
+)
+
 type Config struct {
 	Server       Server       `toml:"server"`
 	SSH          SSH          `toml:"ssh"`
@@ -235,12 +245,32 @@ type Limits struct {
 	PackPerPrincipal int    `toml:"pack_per_principal"`
 	PackQueue        int    `toml:"pack_queue"`
 	PackQueueWait    string `toml:"pack_queue_wait"`
+	// PushConcurrency caps receive-pack running at once over SSH, with
+	// its hooks; PushPerPrincipal caps it per account or deploy key.
+	// PushQueue and PushQueueWait bound the wait for a slot. The counts
+	// read like the pack_* ones: 0 takes the default, negative is off.
+	PushConcurrency  int    `toml:"push_concurrency"`
+	PushPerPrincipal int    `toml:"push_per_principal"`
+	PushQueue        int    `toml:"push_queue"`
+	PushQueueWait    string `toml:"push_queue_wait"`
 }
 
 // PackLimits resolves the pack_* settings for packlimit.New. A zero
 // max or per is no bound; an unbounded queue is math.MaxInt, since
 // packlimit reads a zero queue as no queue at all.
 func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
+	return resolveLimits(l.PackConcurrency, l.PackPerPrincipal, l.PackQueue, l.PackQueueWait,
+		DefaultPackConcurrency, DefaultPackPerPrincipal, DefaultPackQueue, DefaultPackQueueWait)
+}
+
+// PushLimits resolves the push_* settings the way PackLimits does the
+// pack_* ones.
+func (l Limits) PushLimits() (max, per, queue int, wait time.Duration) {
+	return resolveLimits(l.PushConcurrency, l.PushPerPrincipal, l.PushQueue, l.PushQueueWait,
+		DefaultPushConcurrency, DefaultPushPerPrincipal, DefaultPushQueue, DefaultPushQueueWait)
+}
+
+func resolveLimits(maxV, perV, queueV int, waitV string, maxDef, perDef, queueDef int, waitDef time.Duration) (max, per, queue int, wait time.Duration) {
 	pick := func(v, def int) int {
 		switch {
 		case v == 0:
@@ -250,16 +280,15 @@ func (l Limits) PackLimits() (max, per, queue int, wait time.Duration) {
 		}
 		return v
 	}
-	queue = pick(l.PackQueue, DefaultPackQueue)
-	if l.PackQueue < 0 {
+	queue = pick(queueV, queueDef)
+	if queueV < 0 {
 		queue = math.MaxInt
 	}
-	wait = DefaultPackQueueWait
-	if d, err := time.ParseDuration(l.PackQueueWait); err == nil && d > 0 {
+	wait = waitDef
+	if d, err := time.ParseDuration(waitV); err == nil && d > 0 {
 		wait = d
 	}
-	return pick(l.PackConcurrency, DefaultPackConcurrency),
-		pick(l.PackPerPrincipal, DefaultPackPerPrincipal), queue, wait
+	return pick(maxV, maxDef), pick(perV, perDef), queue, wait
 }
 
 type Mail struct {
@@ -619,9 +648,15 @@ func (c Config) Validate() error {
 	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 {
 		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user and max_snippets_per_user must not be negative"))
 	}
-	if w := c.Limits.PackQueueWait; w != "" {
-		if d, err := time.ParseDuration(w); err != nil || d <= 0 {
-			errs = append(errs, fmt.Errorf("limits.pack_queue_wait %q must be a positive duration such as 60s", w))
+	for _, w := range []struct{ name, val string }{
+		{"pack_queue_wait", c.Limits.PackQueueWait},
+		{"push_queue_wait", c.Limits.PushQueueWait},
+	} {
+		if w.val == "" {
+			continue
+		}
+		if d, err := time.ParseDuration(w.val); err != nil || d <= 0 {
+			errs = append(errs, fmt.Errorf("limits.%s %q must be a positive duration such as 60s", w.name, w.val))
 		}
 	}
 	if c.Push.Enabled {
