@@ -101,6 +101,29 @@ until the limiter locks its address, and the script checks that the
 runner still reported the build and kept polling, and that the build's
 log shows what the table allowed and refused.
 
+** Measured on bay1
+
+2026-09-29, runner and daemon at 8b73af2, kernel 6.12.107, nftables
+1.1.3, podman 5.4.2, the runner scoped to =cmc/runner-scratch=. pasta
+ran in the build's cgroup both times
+(=builds/trusted/build-2144=, =builds/untrusted/build-2146=). Both runs
+passed.
+
+| Probe                | trusted          | untrusted        |
+|----------------------+------------------+------------------|
+| DNS                  | ok               | ok               |
+| 169.254.1.2:22/80/443 | open            | refused          |
+| 169.254.1.2:2222     | refused          | refused          |
+| 10.0.0.1:80, 192.168.0.1:80 | refused   | refused          |
+| proxy.golang.org:443 | open             | open             |
+| github.com:22        | open             | refused          |
+| 12 logins            | 12 denied (sshd) | 12 refused (table) |
+
+The trusted build's logins arrived from the host's public address,
+46.232.248.67: ten =auth.expired= and one =auth.throttled= for it, none
+for =127.0.0.1=. The untrusted build's logins never reached sshd. The
+runner kept polling through both builds.
+
 * The table
 
 One =ci.yml= with five jobs, each isolating one rule:

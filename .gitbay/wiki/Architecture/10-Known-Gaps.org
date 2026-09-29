@@ -11,7 +11,6 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 | Issue | Area             | Gap                                                                   | Severity |
 |-------+------------------+-----------------------------------------------------------------------+----------|
 | #259  | Recovery         | No restore has been exercised; the procedure and tooling (=admin restore-drill=, =backup --verify=) are in place, the clean-host drill is pending | high |
-| #260  | CI network       | Separation and egress tables written; not yet measured from a build on bay1 (=deploy/runner-auth-flood-test.sh=) | medium |
 | #261  | Various          | Migration foreign-key check after commit; three web writes bypass dispatch; documentation drift | medium |
 
 * Not filed
@@ -30,5 +29,4 @@ what the 2026-09-27 review found; remove a row when its issue closes.
 |-----------------------------------------------------------+------------------------------------------|
 | What is the measured recovery time?                       | unmeasured (#259)                        |
 | How many concurrent clones does the host sustain?         | unmeasured (#262)                        |
-| What can a build reach on the host's network?             | policy on the CI page; reachability untested until the flood test runs (#260) |
 | Have the collaboration features been used by independent users? | no; one human user, tests only     |
