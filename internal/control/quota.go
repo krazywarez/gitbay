@@ -81,6 +81,25 @@ func checkRepoQuota(c *Ctx) int {
 	return -1
 }
 
+// checkStorageQuota refuses a server-side write into repo once its
+// owner's storage quota is used up, the check sshd makes before a push.
+// Repositories an org owns have no quota.
+func checkStorageQuota(c *Ctx, repo store.Repo) int {
+	if repo.OwnerKind != "user" {
+		return -1
+	}
+	limit := ByteLimit(c.Store, limitsOf(c), repo.OwnerID)
+	if limit <= 0 {
+		return -1
+	}
+	if used := OwnedBytes(c.Store, c.Cfg.Server.Root, repo.OwnerID); used >= limit {
+		return c.fail(protocol.ExitDenied,
+			"%s's storage quota is used up (%d of %d bytes); delete something, or ask an admin to raise the limit",
+			repo.OwnerName, used, limit)
+	}
+	return -1
+}
+
 func init() {
 	register(Command{Path: []string{"admin", "user", "limits"},
 		Summary: "show or set an account's repository and storage caps (instance admins)",

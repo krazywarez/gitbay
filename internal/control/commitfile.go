@@ -72,6 +72,9 @@ func runCommitFile(c *Ctx, args []string) int {
 			"%s requires signed commits; this writes an unsigned one — push a signed commit instead",
 			repo.Path())
 	}
+	if code := checkStorageQuota(c, repo); code >= 0 {
+		return code
+	}
 	// A commit carries an identity, and an unverified address is not one.
 	email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
 	if err != nil {

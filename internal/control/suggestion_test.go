@@ -496,3 +496,35 @@ func TestSuggestionsProcessCountPerFile(t *testing.T) {
 		t.Fatalf("git processes: %d for one suggestion, %d for six on the same file", one, six)
 	}
 }
+
+// A server-side write stops at the owner's storage quota as a push does:
+// both apply-suggestion and repo commit-file.
+func TestServerWritesHonourStorageQuota(t *testing.T) {
+	f := newSuggestFixture(t, nil)
+	f.verified(f.alice)
+	id := f.suggest(f.alice, "lib.txt", 1, 1, "ONE")
+	full := func(c *Ctx) {
+		c.Cfg.Limits.WriteRate = -1
+		c.Cfg.Limits.MaxBytesPerUser = 1
+	}
+	before := strings.TrimSpace(f.git(f.dir, "rev-parse", "refs/heads/feature"))
+	code, _, errOut := f.runWith(f.alice, full, "mr", "apply-suggestion", f.repo.Path(), "1", id)
+	if code != protocol.ExitDenied || !strings.Contains(errOut, "storage quota is used up") {
+		t.Errorf("apply-suggestion over quota: exit %d %q", code, errOut)
+	}
+	code, _, errOut = f.runWith(f.alice, func(c *Ctx) { full(c); c.Stdin = strings.NewReader("x\n") },
+		"repo", "commit-file", f.repo.Path(), "new.txt", "--ref", "feature", "--file", "-")
+	if code != protocol.ExitDenied || !strings.Contains(errOut, "storage quota is used up") {
+		t.Errorf("commit-file over quota: exit %d %q", code, errOut)
+	}
+	if after := strings.TrimSpace(f.git(f.dir, "rev-parse", "refs/heads/feature")); after != before {
+		t.Fatal("a refused write moved the branch")
+	}
+	// Under the quota both go through.
+	f.mustWrite(f.alice, "mr", "apply-suggestion", f.repo.Path(), "1", id)
+	code, _, errOut = f.runWith(f.alice, func(c *Ctx) { unlimited(c); c.Stdin = strings.NewReader("x\n") },
+		"repo", "commit-file", f.repo.Path(), "new.txt", "--ref", "feature", "--file", "-")
+	if code != protocol.ExitOK {
+		t.Errorf("commit-file under quota: exit %d %q", code, errOut)
+	}
+}

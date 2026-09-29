@@ -283,6 +283,9 @@ func runMRApplySuggestion(c *Ctx, args []string) int {
 			"%s requires signed commits and the server cannot sign one; apply it from a clone, which commits with your own key: gitbay mr apply-suggestion %s %d %d",
 			source, repo.Path(), mr.Number, threadID)
 	}
+	if code := checkStorageQuota(c, src); code >= 0 {
+		return code
+	}
 	email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
 	if err != nil {
 		return c.failErr(err)
