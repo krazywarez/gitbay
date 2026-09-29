@@ -78,6 +78,10 @@ anonymous client has a fuzz target and must never panic:
 - =internal/gitd= — the =git://= pkt-line reader.
 - =internal/sig= — the commit parser, the SSHSIG armor decoder and blob
   parser, and the OpenPGP armored-key reader.
+- =internal/mailin= — an inbound reply's headers, reply token, MIME
+  body and quote stripping, where anyone who can send mail to the
+  reply mailbox chooses the bytes.
+- =internal/imapc= — the IMAP response reader, literals included.
 
 Run =deploy/audit.sh= to exercise them plus =go vet= and =govulncheck=.
 
@@ -89,6 +93,65 @@ and verification is a database index lookup on that hash — the secret
 itself is never compared in Go, so there is no timing oracle to exploit.
 Webhook payloads are signed outbound with HMAC-SHA256; the forge verifies
 no inbound HMAC.
+
+* Reply by mail
+
+When =[mail.inbound]= is on (#295), anyone can send mail to the reply
+mailbox, and a posted reply is a comment written as an account. Two
+things are required together, because neither is enough alone:
+
+- *The reply token.* Each Reply-To is =reply+<token>@<domain>=; the
+  token names the recipient, the repository, the issue or merge
+  request, and an expiry thirty days out, under an HMAC-SHA256
+  truncated to 96 bits. Its key is derived from the secret key file
+  (=seal.Keyring.Derive=), which lives outside =server.root= and out of
+  backups; no row is stored per message. Verification is
+  =hmac.Equal=, against every key in the file so a rotation does not
+  break mail already sent, and only the canonical encoding is
+  accepted. A token is per recipient: it is not a credential for
+  anyone else's account or any other thread.
+- *The sender address.* =From= must be one of the token's account's
+  verified addresses. A leaked token (a forwarded notification, a
+  mailing-list archive, a shared inbox) is not enough to post without
+  also sending as that person. =From= is only what the sender wrote
+  unless the mail host vouches for it. With =[mail.inbound]
+  trusted_authserv_id= set, gitbay reads the topmost
+  =Authentication-Results= header carrying that id and requires DMARC
+  pass for the From domain or a DKIM pass whose =header.d= has the same
+  organizational domain (public suffix list); a forged header lower
+  down, claiming the same id, is ignored. Quoted strings and comments
+  are tokenized as RFC 8601 defines them, so sender-controlled text the
+  mail host echoes into its header (a quoted MAIL FROM local part, a
+  reason) cannot read as a result; =FuzzAuthResults= checks that. That rests on
+  the mail host removing incoming headers that claim its id (RFC 8601
+  §5); Gmail, Fastmail and Migadu do. Unset, the daemon warns at start,
+  and a leaked token plus a forged From posts. The Admin page calls it
+  required for any exposed instance.
+- *Reused ids.* Account and repository ids are reused after a hard
+  delete. A reply is refused when the account or repository was
+  created after its token was minted, so a token cannot post into a
+  later repository, or as a later account, that took the id.
+
+Access is judged when the reply is read, not when the mail was sent:
+the reply is posted by dispatching =issue comment= or =mr comment= as
+the account, so a revoked grant, a private repository, an archived
+repository, a disabled or pending account, or reply by mail turned
+off all refuse it. A =Message-ID= that already posted to a thread as an
+account is not posted there again. Automatic replies (=Auto-Submitted=, =Precedence: bulk=) are
+refused so an out-of-office responder cannot post.
+
+Refusals send nothing back: no bounce, no error mail, so the mailbox
+cannot be used to make the instance mail a forged sender
+(backscatter). Each refusal is an audit row, =refused mail reply=, with
+the reason and the =Message-ID= and none of the message's content,
+bounded at sixty rows a minute. The IMAP connection is TLS or STARTTLS
+with certificate verification; there is no plaintext setting. The
+mailbox password is read from a 0600 file and never logged. The client
+bounds what the server can make it hold: 10 MiB a message (refused by
+size before fetching), about 11 MiB and a thousand responses a
+command, after which the connection is closed; literals other than
+the message body are read and discarded. The Reply-To address is
+blanked from the mail queue once the mail is sent or dead-lettered.
 
 * Network-facing request forgery
 

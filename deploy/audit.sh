@@ -16,5 +16,8 @@ go test -run xxx -fuzz FuzzParseCommit -fuzztime 10s ./internal/sig/
 go test -run xxx -fuzz FuzzDecodeArmorAndParseSSHSig -fuzztime 10s ./internal/sig/
 go test -run xxx -fuzz FuzzParsePGPKey -fuzztime 10s ./internal/sig/
 go test -run xxx -fuzz FuzzTokenizeNoPanic -fuzztime 10s ./internal/protocol/
+go test -run xxx -fuzz FuzzReply -fuzztime 10s ./internal/mailin/
+go test -run xxx -fuzz FuzzAuthResults -fuzztime 10s ./internal/mailin/
+go test -run xxx -fuzz FuzzReadResponse -fuzztime 10s ./internal/imapc/
 
 echo "== all clear =="

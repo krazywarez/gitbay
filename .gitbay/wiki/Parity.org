@@ -395,6 +395,7 @@ client has no use for one (krz/gitbay#57).
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
 | activity mail on, off       | yes | yes | yes |
+| reply by mail on, off       | yes | yes | no  |
 | watch writable repos        | yes | yes | yes |
 | push device add             | yes | yes | yes |
 | push device list            | yes | yes | yes |
@@ -429,6 +430,15 @@ surface like every other command, but no web page offers a form for
 it, because only the iOS app can produce an APNs device token — a
 browser has no way to ask Apple for one. =device list= and =device
 remove= have no such limit and are yes on the web like the rest.
+
+Replying to issue and merge request mail posts a comment (#295) when
+the instance reads a reply mailbox (=[mail.inbound]=) and the account
+ran =notifications settings reply on=. The account page shows the
+switch only on such an instance. The reply is itself a fourth surface
+for =issue comment= and =mr comment= and nothing else: it is dispatched
+as that command, so it cannot do what the command would refuse.
+=admin mail inbound check= has no page, like the rest of instance
+administration.
 
 A login link is requested from the login page by username or verified
 address, and arrives by mail: it works once and expires in fifteen
@@ -474,6 +484,7 @@ when there is none.
 | rebuild a symbol index          | yes | no  | no  |
 | audit log                       | yes | no  | no  |
 | instance statistics             | yes | no  | no  |
+| inbound mail check              | yes | no  | no  |
 
 =/admin/users= carries the account list with the command's state
 filter and cursor, and promote, demote, disable and enable per row;

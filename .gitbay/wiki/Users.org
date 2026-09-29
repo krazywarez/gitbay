@@ -934,6 +934,22 @@ someone else.
 You are never mailed about your own actions, and only verified primary
 addresses receive anything. Delivery retries on relay failure.
 
+=notifications settings reply on= lets you answer that mail: issue and
+merge request mail then carries a =Reply-To= address, and replying to
+it posts your reply as a comment on the thread, as you. Off by
+default; the account page has the switch when the instance reads
+replies, and turning it on is refused where it does not
+(=[mail.inbound]= off). A reply is posted only when it comes from one
+of your verified addresses, you can still comment on the thread, and
+the mail it answers is less than thirty days old. Quoted text (lines
+starting with =>=, the "On … wrote:" line and what follows it, the
+header block Outlook quotes) and everything after a =-- = signature
+line are removed, and the rest is stored as markdown. HTML-only mail is
+not accepted; send plain text or the usual plain-and-HTML pair. A
+refused reply gets no answer: nothing is mailed back. Each reply
+address names you, so do not forward notification mail you would not
+want answered from your own address.
+
 Push is the same activity again, delivered to a phone: the iOS app
 registers a device, and =notifications settings push off= silences it
 the way =mail off= silences mail, without deregistering anything.

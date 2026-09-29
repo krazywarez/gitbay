@@ -35,6 +35,7 @@ the hidden =hook= used by git (=cmd/gitbayd/main.go=,
 | =internal/gitpin=    | Resolves and checks a user-supplied http(s) remote and pins git to the checked addresses; mirror sync and =repo import=. |
 | =internal/notify=, =internal/mail= | Mail queue drain and SMTP.                                      |
 | =internal/push=      | APNs queue drain and provider-token signing.                                    |
+| =internal/mailin=, =internal/imapc=, =internal/mailreply= | Reply by mail: the IMAP client, the reply token, and the processor that posts a reply through =issue comment= / =mr comment=. |
 | =internal/deps=      | Dependency manifest parsing and registry checks (opt-in per repository).        |
 | =internal/config=    | Configuration load and validation.                                             |
 | =internal/web=       | Embedded templates, stylesheet and fonts.                                      |
@@ -77,6 +78,7 @@ Started by =gitbayd serve= (=cmd/gitbayd/main.go=):
 | Webhook delivery      | always                      | 2 s poll                        | =webhook_deliveries=  |
 | Mail                  | =mail.smtp_host= set        | 2 s poll                        | =notifications=       |
 | APNs push             | =push.enabled=              | 2 s poll                        | =push_queue=          |
+| Mail replies          | =mail.inbound.enabled=      | =mail.inbound.poll_interval= (1 min) | IMAP mailbox, =mail_replies= |
 | Mirrors               | always                      | 10 s tick, per-mirror interval  | =mirrors=             |
 | CI scheduler          | always                      | 1 min tick; reaps stale builds  | =build_schedules=, =builds= |
 | Dependency checks     | always (repos opt in)       | =deps.check_interval_hours=     | =dep_checks=          |

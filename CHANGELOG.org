@@ -16,6 +16,25 @@ anything beyond "replace the binary and restart" is needed.
   field passed on stdin and never shown again), rename, transfer and
   delete with typed confirmation. =/new= gains an import form for
   =repo import= (#296).
+- Reply to notification mail to comment. With =[mail.inbound]=
+  configured (an IMAP mailbox over TLS or STARTTLS, polled; password
+  from =password_file=) and =notifications settings reply on= (per
+  account, off by default; also on the account page), issue and merge
+  request mail carries =Reply-To: reply+<token>@<domain>=. The token
+  names the recipient, repository and thread, expires after thirty
+  days, and is an HMAC under a key derived from the secret key file. A
+  reply is posted as =issue comment= or =mr comment= by that account
+  when it comes from one of the account's verified addresses and the
+  account may still comment; quoted text and signatures are removed,
+  HTML-only mail and automatic replies are refused, and a
+  =Message-ID= posts once. Refusals mail nothing back and are audited
+  as =refused mail reply= with the reason. =admin mail inbound check=
+  tests the mailbox read-only. =trusted_authserv_id= makes a reply
+  also need the mail host's DMARC pass or aligned DKIM pass in its
+  topmost =Authentication-Results= header; unset, the daemon warns.
+  A reply is refused when its account or repository was created after
+  the token (a reused id). A migration adds =users.notify_reply=,
+  =notifications.reply_to= and =mail_replies=. (#295)
 - =web diff set unified|split= and a Diff layout control on the account
   page choose how the merge request, commit and compare pages draw a
   diff; =?layout=split|unified= overrides it per request. The split

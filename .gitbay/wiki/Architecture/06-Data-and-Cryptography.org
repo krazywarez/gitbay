@@ -16,7 +16,7 @@ content (as confidential as the repository), *O* operational.
 | CI              | =builds= (includes logs), =build_schedules=, =runner_repos=, =runner_seen=                  | R     | build logs can echo anything a step prints      |
 | CI secrets      | =build_secrets=                                                                             | C     | sealed (AES-256-GCM)                            |
 | Integrations    | =webhooks= (secret), =webhook_deliveries=, =mirrors= (username, token)                      | C     | webhook secret and mirror token sealed          |
-| Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=            | P     | device tokens sealed; looked up by SHA-256      |
+| Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=, =mail_replies= (Message-IDs of posted replies) | P     | device tokens sealed; looked up by SHA-256      |
 | Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
 | Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows, a hash chain (=prev_hash=, =hash=) |
 | Dependencies    | =dep_checks=, =dep_reports=                                                                 | O     |                                                 |
@@ -31,6 +31,7 @@ Outside the database:
 | TLS keys (ACME)            | =<root>/acme=                     | C     |
 | SMTP password              | =/etc/gitbay/config.toml=         | C     |
 | APNs signing key (.p8)     | path in =push.key_file=           | C     |
+| IMAP password              | path in =mail.inbound.password_file= | C  |
 | Secret key file            | =server.secret_key_file= (=/etc/gitbay/secret.key=) | C |
 | Backups                    | =/var/backups/gitbay=, offsite    | all of the above |
 
@@ -64,6 +65,7 @@ token without the key file, which neither carries. Rotation:
 | Runner ↔ server          | SSH                                                           |
 | SMTP                     | STARTTLS required unless the relay is local (=mail.require_tls=), or implicit TLS (=mail.tls=) |
 | APNs                     | TLS, HTTP/2                                                  |
+| IMAP                     | implicit TLS or STARTTLS, TLS 1.2 minimum, certificate verified (=internal/imapc=) |
 | Webhooks                 | TLS when the URL is https; HMAC-SHA256 body signature in =X-Gitbay-Signature-256= (=internal/webhook/webhook.go=) |
 | Mirrors                  | per URL; token passed through =GIT_ASKPASS=, never argv (=internal/mirror/mirror.go=) |
 

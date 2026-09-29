@@ -51,6 +51,7 @@ a database check.
 | =<root>/hooks=                    | generated hook scripts                     | 0755                      |
 | =/etc/gitbay/config.toml=         | configuration, including SMTP password     | 0640 (cloud-init)         |
 | =/etc/gitbay/secret.key=          | keys sealing secret columns                | 0600, owner =gitbay= (=deploy/install.sh=) |
+| =mail.inbound.password_file=      | IMAP mailbox password                      | 0600 required; the daemon refuses to start otherwise |
 | =/var/backups/gitbay=             | backup archives                            | 0750 (cloud-init)         |
 
 * Outbound connections from gitbayd
@@ -60,6 +61,7 @@ a database check.
 | ACME directory         | certificate issue and renewal | yes                                          | host policy limits names to the site and claimed pages domains (=main.go=) |
 | SMTP relay             | queued mail                   | STARTTLS required for a non-local relay, or implicit TLS | =mail.require_tls=; Go's =PlainAuth= will not send credentials over plaintext to a non-local host (=internal/mail/mail.go=) |
 | APNs                   | queued push                   | yes, HTTP/2                                  | provider token signed with the operator's .p8 key              |
+| IMAP server            | =mail.inbound.poll_interval=  | implicit TLS or STARTTLS, certificate verified; no plaintext setting | operator-configured host only (=internal/imapc=) |
 | Webhook URLs           | recorded events               | yes when https; certificate verified         | private, shared, loopback, link-local and multicast targets refused at save and again at connect time; no redirects (=internal/webhook/webhook.go=) |
 | Mirror URLs            | mirror schedule               | per URL                                      | address check at save and before each sync; git pinned to the checked addresses, no redirects (=internal/mirror/mirror.go=) |
 | Package registries     | dependency checks             | yes                                          | fixed hosts; only the package name varies (=internal/deps/registry.go=) |

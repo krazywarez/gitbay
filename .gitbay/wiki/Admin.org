@@ -147,6 +147,94 @@ build page's live log arrives only when the build ends;
   =localhost= and loopback addresses; set =false= to allow plaintext
   to a remote relay.
 
+** [mail.inbound]
+Reply by mail: a reply to issue or merge request mail posts a comment
+(#295). gitbayd polls a mailbox over IMAP; no port is opened for it.
+Off unless =enabled=, and it requires =[mail] smtp_host=, since the
+replies answer mail gitbayd sends.
+
+#+begin_src toml
+[mail.inbound]
+enabled       = true
+imap_host     = "imap.example.org"       # host:port; 993, or 143 with tls = "starttls"
+tls           = "implicit"               # or "starttls"; there is no plaintext setting
+user          = "reply@gitbay.example"
+password_file = "/etc/gitbay/imap.pass"  # one line, mode 0600, owned by gitbayd's user
+mailbox       = "INBOX"                  # default
+poll_interval = "1m"                     # default; at least 10s
+reply_address = "reply@gitbay.example"
+trusted_authserv_id = "mx.example.org"   # the mail host's Authentication-Results id
+#+end_src
+
+- The password is read from =password_file= at every connection and
+  never appears in the config, argv or the log. An unreadable file, or
+  one readable by group or others, stops the daemon at start.
+- =reply_address= is what each Reply-To is built from:
+  =reply@gitbay.example= becomes =reply+<token>@gitbay.example=. The
+  mailbox must receive that: give it a plus-addressing (subaddress)
+  mailbox, as most hosted mail does by default, or a catch-all for the
+  domain. Point the domain's MX at the mail host as for any other
+  mailbox; nothing about it involves gitbayd.
+- Use a mailbox that holds nothing else. gitbayd reads every unseen
+  message in it and marks each one =\Seen= when it is handled, posted
+  or refused. A message that fails for a reason that may pass (the
+  database busy, the server refusing that one fetch) stays unseen and is
+  tried again on the next poll, up to five times, then is marked seen
+  and audited. A dropped connection or a timeout ends the poll and
+  counts against no message. A
+  message over 10 MiB is refused by its size without being fetched. A
+  server that sends more than about 11 MiB, or more than a thousand
+  untagged responses, for one command has its connection closed; one
+  poll handles at most ten thousand messages.
+- =trusted_authserv_id= is required on any instance reachable from the
+  internet. It names the authserv-id the mail host writes at the start
+  of its =Authentication-Results= header (Gmail's is =mx.google.com=).
+  With it set, a reply is posted only when the topmost header with that
+  id shows =dmarc=pass= with =header.from= equal to the From domain, or
+  =dkim=pass= with a =header.d= in relaxed alignment with it (the same
+  organizational domain by the public suffix list; a public suffix such
+  as =github.io= aligns with nothing). The header is parsed per RFC
+  8601, so text inside a quoted string or a comment (a quoted MAIL FROM
+  local part, a reason) is never read as a result. Lower headers
+  claiming the same id are the sender's and are not read. This is only safe when the mail host
+  removes incoming =Authentication-Results= headers that claim its id,
+  as RFC 8601 asks; Gmail, Fastmail and Migadu do. Check yours before
+  relying on it. Unset, the daemon logs a warning at start and =admin
+  mail inbound check= repeats it: without it, =From= is whatever the
+  sender wrote.
+- =gitbay admin mail inbound check= logs in, opens the mailbox
+  read-only (EXAMINE) and reports the message and unseen counts, so a
+  check never marks a reply seen before the poller reads it. With
+  inbound off it says so and exits 0. Poll failures are logged as
+  =mail reply: poll failed= with the server and the IMAP error.
+
+A reply is posted when all of these hold, checked when it is read:
+
+1. It is not an automatic reply (=Auto-Submitted=, =Precedence: bulk=
+   and the like).
+2. A recipient header carries a reply address whose token verifies
+   and has not expired (thirty days from the mail it came on).
+3. The token's account exists, is active and not disabled, still has
+   reply by mail on, and was created before the token was: an id freed
+   by a delete and reused is not the account the token named. The same
+   holds for the repository.
+4. =From= is one of that account's verified addresses, and, with
+   =trusted_authserv_id= set, the mail host authenticated it.
+5. The message has a =text/plain= part (HTML-only mail is refused, not
+   converted), and what is left after quoted text and the signature
+   are removed is not empty and fits a comment (64 KiB).
+6. No earlier copy of the message (same =Message-ID=, account and
+   thread) posted.
+7. =issue comment= or =mr comment=, dispatched as the account, accepts
+   it: the account can still read the repository, the thread exists,
+   the repository is not archived, the write budget is not spent.
+
+The comment's audit row is =cmd issue comment= (or =mr comment=) with
+=source: mail=. A refusal writes a =refused mail reply= row with the
+reason and the =Message-ID=, never the message's content, at most sixty
+a minute, and sends nothing back. See Threat-Model for why the token
+and the sender address are both required.
+
 ** [push]
 Push notifications to Apple devices, delivered by gitbayd talking to
 APNs directly over HTTP/2, authenticated by an ES256 JWT signed with an

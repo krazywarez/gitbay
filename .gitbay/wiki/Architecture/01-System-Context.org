@@ -35,6 +35,7 @@ do not reimplement logic (=internal/httpd/control.go=,
 | ACME CA (Let's Encrypt)   | out       | TLS certificates                          | =cmd/gitbayd/main.go=       |
 | SMTP relay                | out       | verification, login links, notifications  | =internal/mail/mail.go=            |
 | Apple Push Notification   | out       | iOS notifications                         | =internal/push/apns.go=            |
+| IMAP mailbox              | out       | replies to notification mail (opt-in)     | =internal/mailin=, =internal/imapc= |
 | Webhook endpoints         | out       | event delivery, user-configured           | =internal/webhook/webhook.go=      |
 | Mirror remotes            | out / in  | push and pull mirrors, user-configured    | =internal/mirror/mirror.go=        |
 | Package registries        | out       | dependency update checks (opt-in per repo)| =internal/deps/registry.go=  |

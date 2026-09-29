@@ -22,6 +22,7 @@
 | Login link         | 32 random bytes hex in a URL                    | SHA-256 hash, single use         | creates a web session                      | 15 min (mail), 5 min (SSH)    | consumed on use                     |
 | Email verification | 32 random bytes hex                             | SHA-256 hash, single use         | verifies one address for one account       | 24 h                          | consumed on use                     |
 | Invite             | random code                                     | SHA-256 hash, single use         | one registration for one email             | as issued                     | consumed on use                     |
+| Mail reply token   | HMAC-SHA256 (96 bits) over account, repository, thread, expiry, in the Reply-To local part | not stored (stateless); a =Message-ID= that posted is kept | one comment thread, as one account, only from that account's verified =From= | 30 days | with the account's access, checked when the reply is read; =notifications settings reply off= |
 | LFS transfer token | HMAC-SHA256 over repo, SSH key, operation, expiry | not stored (stateless)       | one repository, upload or download         | 1 h                           | with its key: refused once the key is removed or expires, its account is disabled, or it loses the access the operation needs |
 
 Generation and hashing: =internal/store/sessions.go= (=NewToken=,
