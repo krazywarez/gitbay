@@ -24,6 +24,7 @@ var (
 
 type Limiter struct {
 	max, per, queue int
+	perQueue        int // waiting, per principal; per unless set
 	wait            time.Duration
 	name            string // what is limited, for the refusal log
 
@@ -47,7 +48,7 @@ func New(max, per, queue int, wait time.Duration) *Limiter {
 	if max <= 0 {
 		return nil
 	}
-	return &Limiter{max: max, per: per, queue: queue, wait: wait, name: "pack",
+	return &Limiter{max: max, per: per, perQueue: per, queue: queue, wait: wait, name: "pack",
 		held: map[string]int{}, waiting: map[string]int{}, changed: make(chan struct{}),
 		warned: map[string]time.Time{}}
 }
@@ -84,6 +85,16 @@ func (l *Limiter) Name(name string) {
 		return
 	}
 	l.name = name
+}
+
+// CapQueue lets one principal have up to n requests waiting, where by
+// default it may have as many as it may run. It applies only while a
+// per-principal cap is set. Call it before the limiter is in use.
+func (l *Limiter) CapQueue(n int) {
+	if l == nil {
+		return
+	}
+	l.perQueue = n
 }
 
 // CapClass caps the slots that principals starting with prefix may hold
@@ -127,7 +138,7 @@ func (l *Limiter) Acquire(done <-chan struct{}, principal string) (release func(
 		l.mu.Unlock()
 		return l.releaser(principal), nil
 	}
-	if l.queued >= l.queue || (l.per > 0 && l.waiting[principal] >= l.per) {
+	if l.queued >= l.queue || (l.per > 0 && l.waiting[principal] >= l.perQueue) {
 		l.mu.Unlock()
 		return nil, ErrBusy
 	}

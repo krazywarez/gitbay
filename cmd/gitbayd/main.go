@@ -262,12 +262,20 @@ func serveCmd() *cobra.Command {
 			if packMax > 1 {
 				packs.CapClass("ip:", packMax-1)
 			}
+			// receive-pack has a budget of its own. Parallel pushes
+			// from one account (scripts, bots, several terminals)
+			// queue, up to half the queue, rather than being refused
+			// once one is waiting.
+			pushMax, pushPer, pushQueue, pushWait := cfg.Limits.PushLimits()
+			pushes := packlimit.New(pushMax, pushPer, pushQueue, pushWait)
+			pushes.Name("push")
+			pushes.CapQueue(pushPerQueue(pushQueue))
 
 			errCh := make(chan error, 3)
 			var sshSrv *sshd.Server
 			var sshLn, gitLn net.Listener
 			if cfg.SSH.Mode == "embedded" {
-				srv, err := sshd.New(cfg, st, packs)
+				srv, err := sshd.New(cfg, st, packs, pushes)
 				if err != nil {
 					return err
 				}
@@ -644,4 +652,10 @@ func reapPending(ctx context.Context, st *store.Store, maxAge time.Duration) {
 		case <-t.C:
 		}
 	}
+}
+
+// pushPerQueue is how many pushes one principal may have waiting: half
+// the queue, at least one.
+func pushPerQueue(queue int) int {
+	return max(1, queue/2)
 }

@@ -337,3 +337,31 @@ func TestRefusedNamesTheLimit(t *testing.T) {
 	var none *Limiter
 	none.Name("push")
 }
+
+// With a waiting cap above per, one principal runs per and queues up to
+// perQueue, and is refused past that.
+func TestPerPrincipalQueueCap(t *testing.T) {
+	l := New(4, 1, 16, 5*time.Second)
+	l.CapQueue(4)
+	r, err := l.Acquire(nil, "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 4; i++ {
+		go func() {
+			if r, err := l.Acquire(nil, "a"); err == nil {
+				r()
+			}
+		}()
+		waitQueued(t, l, i)
+	}
+	if _, err := l.Acquire(nil, "a"); !errors.Is(err, ErrBusy) {
+		t.Fatalf("sixth for a: %v", err)
+	}
+	rb, err := l.Acquire(nil, "b")
+	if err != nil {
+		t.Fatalf("b blocked by a's queue: %v", err)
+	}
+	rb()
+	r()
+}

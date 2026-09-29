@@ -39,6 +39,7 @@ type Server struct {
 	cfg         config.Config
 	st          *store.Store
 	packs       *packlimit.Limiter
+	pushes      *packlimit.Limiter
 	sshCfg      *ssh.ServerConfig
 	authLimiter *rateLimiter
 	sessions    sync.WaitGroup // accepted connections still being served
@@ -70,8 +71,8 @@ func (c *conn) cut() {
 	c.net.Close()
 }
 
-func New(cfg config.Config, st *store.Store, packs *packlimit.Limiter) (*Server, error) {
-	s := &Server{cfg: cfg, st: st, packs: packs, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}, stopping: make(chan struct{})}
+func New(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter) (*Server, error) {
+	s := &Server{cfg: cfg, st: st, packs: packs, pushes: pushes, authLimiter: newRateLimiter(cfg.Limits.SSHAuthRate, time.Minute), conns: map[*conn]struct{}{}, stopping: make(chan struct{})}
 
 	sc := &ssh.ServerConfig{
 		PublicKeyCallback: s.authenticate,
@@ -425,7 +426,7 @@ func (s *Server) runExec(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, term co
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, s.packs, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
+	return Exec(s.cfg, s.st, s.packs, s.pushes, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -461,7 +462,9 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
 // forced command (gitbayd shell). Closing revoked kills a git transport.
-func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user store.User, key store.SSHKey, term control.Term, cmdline string,
+// packs bounds clones and fetches, and repo download; pushes bounds
+// receive-pack. A nil limiter is no limit.
+func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, user store.User, key store.SSHKey, term control.Term, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
 	if user.Disabled {
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
@@ -479,7 +482,7 @@ func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user sto
 			if user.Pending {
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 			} else {
-				code = runGit(cfg, st, packs, user, key.Scope, argv, stdin, stdout, stderr, done, stopping, revoked)
+				code = runGit(cfg, st, packs, pushes, user, key, argv, stdin, stdout, stderr, done, stopping, revoked)
 			}
 			// A refused push is a refused write, audited like one. runGit
 			// refuses only with the path as the one argument, so argv[1:]
@@ -517,9 +520,9 @@ func Exec(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user sto
 }
 
 // runGit streams a git transport service after access checks.
-func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user store.User, scope string, argv []string,
+func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, user store.User, key store.SSHKey, argv []string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
-	service := argv[0]
+	service, scope := argv[0], key.Scope
 	if len(argv) != 2 {
 		fmt.Fprintf(stderr, "usage: %s <path>\n", service)
 		return protocol.ExitUsage
@@ -594,6 +597,24 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 		}
 	}
 	if write {
+		// Pushes have their own budget, so a clone storm cannot starve
+		// them or the reverse. The slot covers receive-pack and both
+		// hooks: git waits for post-receive (RefsUpdated) before it
+		// exits, and that work is the push's cost. A deploy key is its
+		// own principal, not the account that registered it.
+		principal := "user:" + strconv.FormatInt(user.ID, 10)
+		if policy.IsDeployScope(scope) {
+			principal = "key:" + strconv.FormatInt(key.ID, 10)
+		}
+		release, code := takeSlot(pushes, principal, done, stderr,
+			"the server is busy: it is at its limit of concurrent pushes; try again in a minute")
+		if code != protocol.ExitOK {
+			return code
+		}
+		// Deferred before Transport runs, so it fires after receive-pack
+		// has exited, on every path: the client hanging up ends its
+		// stdin and receive-pack with it, and a revoked key kills it.
+		defer release()
 		// hookd answers only a hook that names this receive-pack.
 		token, err := st.CreatePushToken(repo.ID, user.ID, scope)
 		if err != nil {
@@ -606,21 +627,10 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 	cancel := revoked
 	if !write {
 		// Pack generation shares one budget with smart HTTP and git://.
-		// receive-pack stays outside it: its post-receive runs after the
-		// client has its report, and must not be queued or killed.
-		principal := "user:" + strconv.FormatInt(user.ID, 10)
-		release, err := packs.Acquire(done, principal)
-		if err != nil {
-			packs.Refused("ssh", principal, err)
-		}
-		if errors.Is(err, packlimit.ErrBusy) {
-			fmt.Fprintln(stderr, "the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
-			return protocol.ExitFailure
-		}
-		if err != nil {
-			// ErrGone: the client left, or the server is restarting.
-			fmt.Fprintln(stderr, "the server is restarting; try again in a minute")
-			return protocol.ExitFailure
+		release, code := takeSlot(packs, "user:"+strconv.FormatInt(user.ID, 10), done, stderr,
+			"the server is busy: it is at its limit of concurrent clones and fetches; try again in a minute")
+		if code != protocol.ExitOK {
+			return code
 		}
 		// Deferred before Transport runs, so it fires after git has
 		// exited and been waited for.
@@ -672,4 +682,22 @@ func runGit(cfg config.Config, st *store.Store, packs *packlimit.Limiter, user s
 		return protocol.ExitFailure
 	}
 	return protocol.ExitOK
+}
+
+// takeSlot takes a slot from l for principal, waiting until done closes
+// at most. On a refusal it prints busy, or that the server is going
+// away, and returns a nonzero exit.
+func takeSlot(l *packlimit.Limiter, principal string, done <-chan struct{}, stderr io.Writer, busy string) (release func(), code int) {
+	release, err := l.Acquire(done, principal)
+	if err == nil {
+		return release, protocol.ExitOK
+	}
+	l.Refused("ssh", principal, err)
+	if errors.Is(err, packlimit.ErrBusy) {
+		fmt.Fprintln(stderr, busy)
+	} else {
+		// ErrGone: the client left, or the server is restarting.
+		fmt.Fprintln(stderr, "the server is restarting; try again in a minute")
+	}
+	return nil, protocol.ExitFailure
 }

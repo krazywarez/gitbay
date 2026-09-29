@@ -64,7 +64,7 @@ func newTestServer(t *testing.T) testServer {
 
 	cfg := config.Default()
 	cfg.Server.Root = root
-	srv, err := New(cfg, st, nil)
+	srv, err := New(cfg, st, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestUnregisteredKeyMessageNamesFingerprintAndHost(t *testing.T) {
 	// The settings link keeps the site URL's scheme and port.
 	cfg.Server.SiteURL = "http://forge.test:8080/"
 	cfg.Registration.Mode = "open"
-	srv, err := New(cfg, st, nil)
+	srv, err := New(cfg, st, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
