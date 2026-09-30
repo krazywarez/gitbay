@@ -114,6 +114,12 @@ build page's live log arrives only when the build ends;
   gitbay itself.
 - =privacy_notice= — operator text shown on =/privacy= under the fixed
   statement.
+- =apple_app_ids= (empty) — iOS app IDs (=TEAMID.bundle.id=) allowed to
+  open this instance's links, served at
+  =/.well-known/apple-app-site-association=. Empty leaves the path a
+  404. The gitbay iOS app is =ZCNAX3VL9D.org.gitbay.gitbay=; its
+  entitlement names gitbay.org only, so listing it elsewhere does
+  nothing.
 
 ** [registration]
 - =mode= — =closed= (default) | =invite= | =open=. invite/open require
