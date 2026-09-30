@@ -130,6 +130,10 @@ type Web struct {
 	// PrivacyNotice is operator-provided text shown on /privacy under the
 	// fixed project-level statement. Plain text; blank paragraphs split.
 	PrivacyNotice string `toml:"privacy_notice"`
+	// AppleAppIDs are the iOS apps (TEAMID.bundle.id) that may open this
+	// instance's links, served in /.well-known/apple-app-site-association.
+	// Empty leaves the route unregistered.
+	AppleAppIDs []string `toml:"apple_app_ids"`
 }
 
 type Registration struct {

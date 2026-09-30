@@ -57,6 +57,9 @@ func (s *Server) Routes() []Route {
 	for _, f := range images {
 		routes = append(routes, Route{Method: "GET", Pattern: "/static/img/" + f.Name(), Handler: s.image})
 	}
+	if len(s.cfg.Web.AppleAppIDs) > 0 {
+		routes = append(routes, Route{Method: "GET", Pattern: "/.well-known/apple-app-site-association", Handler: s.appleAppSiteAssociation})
+	}
 	routes = append(routes,
 		Route{Method: "GET", Pattern: "/favicon.svg", Handler: s.favicon},
 		Route{Method: "GET", Pattern: "/{owner}", Handler: s.ownerProfile},
