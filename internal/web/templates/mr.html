@@ -115,6 +115,11 @@
       <button type="submit">Merge</button>
       <button type="submit" name="when_ready" value="on" class="btn">Merge when ready</button>
     </form>
+  </div>
+  {{end}}
+  {{if and .CanEdit (or (eq .MR.State "open") (eq .MR.State "source_gone"))}}
+  <div class="grp">
+    <h2>State</h2>
     <form method="post" action="{{$base}}/close" class="actions">
       <label class="vh" for="by">Closed in favour of</label>
       <input type="text" id="by" name="by" size="4" autocomplete="off" placeholder="!N">

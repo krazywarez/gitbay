@@ -43,7 +43,7 @@
 
 {{$base := printf "/%s/%s/issues/%d" .Repo.OwnerName .Repo.Name .Issue.Number}}
 <aside class="aside">
-  {{if .CanWrite}}
+  {{if .CanEdit}}
   <div class="grp">
     <h2>State</h2>
     <form method="post" action="{{$base}}/state" class="actions">

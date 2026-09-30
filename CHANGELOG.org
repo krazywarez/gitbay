@@ -12,6 +12,10 @@ anything beyond "replace the binary and restart" is needed.
   repository pages the gitbay iOS app has screens for; settings, forms,
   downloads, raw files, feeds and the API stay in the browser. Empty,
   the default, leaves the path a 404. (#310)
+- The web shows an issue's Close/Reopen and a merge request's Close and
+  draft controls to its author as well as to writers, matching the
+  commands: an author without write access could do it over SSH but had
+  no button. (#311)
 
 * v1.40.1 — 2026-09-29
 
