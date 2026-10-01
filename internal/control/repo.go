@@ -1311,7 +1311,7 @@ func runRepoDiff(c *Ctx, args []string) int {
 	if c.JSON {
 		return c.emit(map[string]any{"base": base, "head": head, "merge_base": mergeBase, "patch": patch, "truncated": truncated}, nil)
 	}
-	fmt.Fprint(c.Stdout, patch)
+	fmt.Fprint(c.Stdout, c.Term.diff(patch))
 	if truncated {
 		fmt.Fprintln(c.Stderr, "diff truncated at 4 MiB")
 	}

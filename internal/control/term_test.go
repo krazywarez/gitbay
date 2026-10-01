@@ -1,6 +1,7 @@
 package control
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -135,5 +136,66 @@ func TestFailureAtTerminal(t *testing.T) {
 	}
 	if got := (Term{Cols: 80}).failure("usage: gitbay mr merge <n>"); got != "usage: gitbay mr merge <n>" {
 		t.Errorf("bare usage = %q", got)
+	}
+}
+
+func TestDiffPaint(t *testing.T) {
+	patch := " go.mod | 2 +-\n 1 file changed\n\ndiff --git a/go.mod b/go.mod\nindex a..b 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,2 +1,2 @@ require (\n same\n-old\n+new\n"
+	if got := (Term{}).diff(patch); got != patch {
+		t.Errorf("plain changed:\n%s", got)
+	}
+	if got := (Term{Cols: 80}).diff(patch); got != patch {
+		t.Errorf("no colour changed:\n%s", got)
+	}
+	got := Term{Cols: 80, Color: true}.diff(patch)
+	for _, want := range []string{
+		" go.mod | 2 " + sgrGreen + "+" + sgrReset + sgrRed + "-" + sgrReset,
+		sgrBold + "diff --git a/go.mod b/go.mod" + sgrReset,
+		sgrBold + "--- a/go.mod" + sgrReset,
+		sgrBold + "+++ b/go.mod" + sgrReset,
+		sgrCyan + "@@ -1,2 +1,2 @@" + sgrReset + " require (",
+		"\n same\n",
+		sgrRed + "-old" + sgrReset,
+		sgrGreen + "+new" + sgrReset,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in\n%q", want, got)
+		}
+	}
+	if stripSGR(got) != patch {
+		t.Errorf("colour changed the text:\n%s", stripSGR(got))
+	}
+}
+
+func TestDiffPaintRangeDiff(t *testing.T) {
+	rd := "1:  abc1234 ! 1:  def5678 subject\n    @@ f.go\n    -old\n    +new\n"
+	got := Term{Cols: 80, Color: true}.diff(rd)
+	for _, want := range []string{
+		sgrBold + "1:  abc1234 ! 1:  def5678 subject" + sgrReset,
+		"    " + sgrRed + "-old" + sgrReset,
+		"    " + sgrGreen + "+new" + sgrReset,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in\n%q", want, got)
+		}
+	}
+}
+
+func TestDiffIsSafe(t *testing.T) {
+	got := Term{Cols: 80}.diff("+\x1b]52;c;aGk=\x07\n")
+	if strings.ContainsRune(got, 0x1b) {
+		t.Errorf("escape reached the terminal: %q", got)
+	}
+}
+
+func TestBuildLog(t *testing.T) {
+	log := "$ git clone x\n\x1b[32mok\x1b[0m\n$ make test\nFAIL\n"
+	got := Term{Cols: 80, Color: true}.buildLog(log, "make test")
+	want := sgrBold + "$ git clone x" + sgrReset + "\nok\n" + sgrBold + sgrRed + "$ make test" + sgrReset + "\nFAIL\n"
+	if got != want {
+		t.Errorf("buildLog:\n%q\nwant\n%q", got, want)
+	}
+	if got := (Term{Cols: 80}).buildLog("a\x1b]52;c;aGk=\x07b\n", ""); strings.ContainsRune(got, 0x1b) {
+		t.Errorf("escape reached the terminal: %q", got)
 	}
 }

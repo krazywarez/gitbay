@@ -970,7 +970,7 @@ func runMRDiff(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	fmt.Fprint(c.Stdout, patch)
+	fmt.Fprint(c.Stdout, c.Term.diff(patch))
 	if truncated {
 		fmt.Fprintln(c.Stderr, "diff truncated at 4 MiB; fetch the branch for the rest")
 	}
@@ -2121,7 +2121,7 @@ func runMRRangeDiff(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure,
 			"%v (the objects for an older revision may have been garbage-collected)", err)
 	}
-	fmt.Fprint(c.Stdout, patch)
+	fmt.Fprint(c.Stdout, c.Term.diff(patch))
 	if truncated {
 		fmt.Fprintln(c.Stderr, "range-diff truncated at 4 MiB")
 	}

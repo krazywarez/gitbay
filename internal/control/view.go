@@ -172,6 +172,23 @@ func (v *view) body(src, format string) {
 	}
 }
 
+// text writes src as it is, indented: a commit message, which has no
+// markup to render.
+func (v *view) text(src string) {
+	src = strings.TrimRight(v.c.Term.safe(src), "\n")
+	if strings.TrimSpace(src) == "" {
+		return
+	}
+	v.sep()
+	for _, line := range strings.Split(src, "\n") {
+		if line == "" {
+			io.WriteString(v.w, "\n")
+			continue
+		}
+		io.WriteString(v.w, "  "+line+"\n")
+	}
+}
+
 // event is one line for a system comment: its text without link
 // targets, the time at the right edge at a terminal.
 func (v *view) event(text, format, ts string) {

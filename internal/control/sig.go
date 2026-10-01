@@ -324,12 +324,42 @@ func runRepoCommit(c *Ctx, args []string) int {
 	for _, st := range statuses {
 		d.Checks = append(d.Checks, checkOut{st.Context, st.State, st.TargetURL})
 	}
+	// Message carries the subject paragraph too; the views print it once.
+	body := ""
+	if _, rest, ok := strings.Cut(d.Message, "\n\n"); ok {
+		body = strings.TrimRight(rest, "\n")
+	}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintf(w, "commit %s\nAuthor: %s <%s>\nDate:   %s\n\n    %s\n",
-			d.SHA, d.AuthorName, d.AuthorEmail, d.Date, d.Subject)
-		if d.Message != "" {
-			fmt.Fprintf(w, "\n%s\n", d.Message)
+		if c.Term.Cols == 0 {
+			fmt.Fprintf(w, "commit %s\nAuthor: %s <%s>\nDate:   %s\n\n    %s\n",
+				d.SHA, d.AuthorName, d.AuthorEmail, d.Date, d.Subject)
+			if body != "" {
+				fmt.Fprintf(w, "\n%s\n", body)
+			}
+			fmt.Fprintf(w, "\n%s", d.Diff)
+			return
 		}
-		fmt.Fprintf(w, "\n%s", d.Diff)
+		v := c.view(w)
+		v.title(d.SHA[:10], d.Subject, d.Signature.State)
+		signer := d.Signature.Signer
+		if signer != "" && d.Signature.Fingerprint != "" {
+			signer += ", key " + d.Signature.Fingerprint
+		}
+		v.fields(
+			"author", fmt.Sprintf("%s <%s>, %s", d.AuthorName, d.AuthorEmail, c.when(d.Date)),
+			"committer", d.CommitterEmail,
+			"signer", signer,
+			"url", c.siteURL(repo.OwnerName, repo.Name, "commit", d.SHA[:12]),
+		)
+		v.text(body)
+		if len(d.Checks) > 0 {
+			v.section("checks")
+			tb := c.table(w, "CHECK", "STATE")
+			for _, ch := range d.Checks {
+				tb.row(cText(ch.Context), cState(ch.State))
+			}
+			tb.flush()
+		}
+		fmt.Fprintf(w, "\n%s", c.Term.diff(d.Diff))
 	})
 }

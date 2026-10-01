@@ -27,6 +27,12 @@ anything beyond "replace the binary and restart" is needed.
   except that =profile show='s section labels are plural (=links:=,
   =orgs:=, =members:=, =repos:=) and an unknown flag's message names the
   nearest flag. The server ignores =--term= options it does not know.
+- Diffs at a terminal are coloured (=repo commit=, =repo diff=, =mr diff=,
+  =mr range-diff=) and made safe like other user text. =repo commit= is a
+  view with the signature state, signer, checks and a link; piped, it no
+  longer prints the subject twice. =build log= at a terminal drops the
+  tools' own colour codes, makes the rest safe, and marks step lines,
+  the failed step in red. (#313)
 
 * v1.40.1 — 2026-09-29
 

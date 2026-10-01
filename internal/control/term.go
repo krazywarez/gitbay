@@ -2,6 +2,7 @@ package control
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -189,6 +190,109 @@ func wrapUsage(u string, width int, indent string) string {
 		used += n
 	}
 	return b.String()
+}
+
+// diff is a unified diff, a git stat block, or range-diff output as a
+// terminal shows it: made safe, and with colour file headers bold, hunk
+// headers cyan, added lines green and removed lines red. Plain output
+// and a terminal without colour get it unpainted.
+func (t Term) diff(patch string) string {
+	if t.Cols == 0 {
+		return patch
+	}
+	patch = termSafe(patch)
+	if !t.Color {
+		return patch
+	}
+	lines := strings.Split(patch, "\n")
+	inDiff := false
+	for i, l := range lines {
+		switch {
+		case strings.HasPrefix(l, "diff --git "):
+			inDiff = true
+			lines[i] = t.paint(sgrBold, l)
+		case !inDiff:
+			lines[i] = t.paintPreamble(l)
+		case strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "+++ "),
+			strings.HasPrefix(l, "index "), strings.HasPrefix(l, "new file mode"),
+			strings.HasPrefix(l, "deleted file mode"), strings.HasPrefix(l, "old mode"),
+			strings.HasPrefix(l, "new mode"), strings.HasPrefix(l, "similarity index"),
+			strings.HasPrefix(l, "rename from"), strings.HasPrefix(l, "rename to"),
+			strings.HasPrefix(l, "Binary files"):
+			lines[i] = t.paint(sgrBold, l)
+		default:
+			lines[i] = t.paintDiffLine(l)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// paintPreamble colours what comes before the first file in a diff:
+// a stat line's +/- bar, or a range-diff line (a commit pair, bold, or
+// an indented line of the diff between the two patches).
+func (t Term) paintPreamble(l string) string {
+	if rest, ok := strings.CutPrefix(l, "    "); ok {
+		return "    " + t.paintDiffLine(rest)
+	}
+	if path, bar, ok := strings.Cut(l, " | "); ok && strings.HasPrefix(l, " ") {
+		n := strings.TrimRight(bar, "+-")
+		plus := strings.Count(bar[len(n):], "+")
+		return path + " | " + n + t.paint(sgrGreen, strings.Repeat("+", plus)) +
+			t.paint(sgrRed, bar[len(n)+plus:])
+	}
+	if rangePair(l) {
+		return t.paint(sgrBold, l)
+	}
+	return l
+}
+
+// paintDiffLine colours one line of a hunk by its first byte.
+func (t Term) paintDiffLine(l string) string {
+	switch {
+	case strings.HasPrefix(l, "@@"):
+		if end := strings.Index(l[2:], "@@"); end >= 0 {
+			return t.paint(sgrCyan, l[:end+4]) + l[end+4:]
+		}
+		return t.paint(sgrCyan, l)
+	case strings.HasPrefix(l, "+"):
+		return t.paint(sgrGreen, l)
+	case strings.HasPrefix(l, "-"):
+		return t.paint(sgrRed, l)
+	}
+	return l
+}
+
+// rangePair reports whether l is a range-diff commit pair line:
+// "1:  abc1234 = 1:  def5678 subject", either side possibly "-:  -------".
+func rangePair(l string) bool {
+	f := strings.Fields(l)
+	return len(f) >= 5 && strings.HasSuffix(f[0], ":") && strings.HasSuffix(f[3], ":") &&
+		strings.ContainsAny(f[2], "=!<>") && len(f[2]) == 1
+}
+
+// toolSGR matches the colour sequences build tools print.
+var toolSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// buildLog is a build log as a terminal shows it: the tools' own colour
+// dropped and the rest made safe, since a repository's build writes
+// it; step lines ("$ make test") bold, the failed step's in red.
+func (t Term) buildLog(log, failed string) string {
+	log = termSafe(toolSGR.ReplaceAllString(log, ""))
+	if !t.Color {
+		return log
+	}
+	lines := strings.Split(log, "\n")
+	for i, l := range lines {
+		step, ok := strings.CutPrefix(l, "$ ")
+		switch {
+		case !ok:
+		case failed != "" && step == failed:
+			lines[i] = t.paint(sgrBold+sgrRed, l)
+		default:
+			lines[i] = t.paint(sgrBold, l)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // cells is the width of s in terminal cells: SGR sequences and

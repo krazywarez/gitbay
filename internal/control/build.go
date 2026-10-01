@@ -299,10 +299,14 @@ func runBuildLog(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	var steps []string
+	json.Unmarshal([]byte(b.Steps), &steps)
+	sections := SplitBuildLog(string(log), steps)
+	failed := ""
+	if at := FailedSection(sections, b.Status, b.FailedStep); at >= 0 {
+		failed = sections[at].Step
+	}
 	if f.Has("--step") {
-		var steps []string
-		json.Unmarshal([]byte(b.Steps), &steps)
-		sections := SplitBuildLog(string(log), steps)
 		at := -1
 		if want := f.Value("--step"); want == "failed" {
 			if at = FailedSection(sections, b.Status, b.FailedStep); at < 0 {
@@ -326,6 +330,9 @@ func runBuildLog(c *Ctx, args []string) int {
 	}
 	if tail > 0 {
 		log = tailLines(log, tail)
+	}
+	if c.Term.Cols > 0 {
+		log = []byte(c.Term.buildLog(string(log), failed))
 	}
 	c.Stdout.Write(log)
 	return protocol.ExitOK
