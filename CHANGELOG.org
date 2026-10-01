@@ -4,7 +4,17 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.41.0 — 2026-10-01
+
+Terminal output that reads at a glance (#312–#315): colour by meaning,
+coloured diffs, lists that show what needs you, and label swatches and
+hyperlinks where the terminal has them. Piped and =--json= output are
+unchanged apart from the items noted below.
+
+*Upgrade note.* The CLI from this release sends =truecolor= and =links=
+in =--term= when the terminal supports them; an instance older than
+v1.41.0 turns those into plain output. Upgrade the instance first, or
+set =GITBAY_TERM=basic= until it is.
 
 - =[web] apple_app_ids= serves =/.well-known/apple-app-site-association=
   as JSON, so links to this instance open in the listed iOS apps
@@ -56,9 +66,6 @@ anything beyond "replace the binary and restart" is needed.
   WezTerm, Ghostty, VS Code, kitty and VTE terminals, or with
   =GITBAY_LINKS=1= (=0= turns it off), for references that open their
   page (OSC 8). Checks read =✓ 3/3=, =✗ 1 failed=, =• 2 pending=.
-  *Upgrade note:* an instance older than this release turns those
-  options into plain output; set =GITBAY_TERM=basic= for the CLI to send
-  only the width and colour until the instance is upgraded.
 
 * v1.40.1 — 2026-09-29
 
