@@ -365,7 +365,7 @@ func runRepoList(c *Ctx, args []string) int {
 		for _, d := range ds {
 			cells := []cell{cRef(d.Path), cState(d.Visibility), cFlex(d.Description)}
 			if d.Archived {
-				cells = append(cells, cText("[archived]"))
+				cells = c.note(cells, 1, "[archived]", "archived")
 			}
 			tb.row(cells...)
 		}

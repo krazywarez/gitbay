@@ -52,8 +52,8 @@ func (v *view) sep() {
 	v.wrote = true
 }
 
-// section prints a sub-table's label: a blank line, then the label bold
-// at a terminal or "label:" in plain. Callers skip the call entirely
+// section prints a sub-table's label: a blank line, then the label
+// capitalised and bold at a terminal, or "label:" in plain. Callers skip the call entirely
 // when the table it introduces has no rows.
 func (v *view) section(label string) {
 	v.sep()
@@ -61,7 +61,7 @@ func (v *view) section(label string) {
 		io.WriteString(v.w, label+":\n")
 		return
 	}
-	io.WriteString(v.w, v.c.Term.paint(sgrBold, label)+"\n")
+	io.WriteString(v.w, v.c.Term.heading(label)+"\n")
 }
 
 // title prints "ref  title  state", wrapping title+state to the
@@ -96,14 +96,14 @@ func (v *view) title(ref, title, state string) {
 		rest += state
 	}
 	if rest == "" {
-		io.WriteString(v.w, ref+"\n")
+		io.WriteString(v.w, t.paint(sgrCyan, ref)+"\n")
 		return
 	}
 	lines := termtext.Wrap(rest, t.Cols-cells(prefix))
 	for i, line := range lines {
 		p := indent
 		if i == 0 {
-			p = prefix
+			p = t.paint(sgrCyan, ref) + "  "
 		}
 		if i < len(lines)-1 || state == "" {
 			io.WriteString(v.w, p+t.paint(sgrBold, line)+"\n")

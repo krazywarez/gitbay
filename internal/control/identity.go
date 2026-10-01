@@ -102,7 +102,7 @@ func runKeysList(c *Ctx, args []string) int {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
 			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label),
-				cText(c.usedText(d.LastUsedAt)), cText(expiresText(d.ExpiresAt, now)))
+				cText(c.usedText(d.LastUsedAt)), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})
@@ -138,13 +138,16 @@ func (c *Ctx) usedText(ts string) string {
 	return relAge(ts, termNow())
 }
 
-// expiresText is a credential's expiry as an EXPIRES cell shows it. It
-// is absolute at a terminal too: relAge reads only the past.
-func expiresText(t *time.Time, now time.Time) string {
+// expiresText is a credential's expiry as an EXPIRES cell shows it:
+// RFC3339 in plain output, relative at a terminal.
+func (c *Ctx) expiresText(t *time.Time, now time.Time) string {
 	if t == nil {
 		return "never"
 	}
 	s := stamp(t.UTC().Format(time.RFC3339Nano))
+	if c.Term.Cols > 0 {
+		s = relAge(s, now)
+	}
 	if !t.After(now) {
 		return "expired " + s
 	}
@@ -204,7 +207,7 @@ func runKeysAdd(c *Ctx, args []string) int {
 			line += " " + d.Label
 		}
 		if d.ExpiresAt != nil {
-			line += ", expires " + expiresText(d.ExpiresAt, time.Now())
+			line += ", expires " + c.expiresText(d.ExpiresAt, time.Now())
 		}
 		fmt.Fprintln(w, line)
 	})

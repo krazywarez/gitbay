@@ -265,7 +265,7 @@ func emitProfile(c *Ctx, d ProfileOut) int {
 			"activity", activity,
 		)
 		if len(d.Links) > 0 {
-			v.section("link")
+			v.section("links")
 			tb := c.table(w, "LINK", "URL")
 			for _, l := range d.Links {
 				tb.row(cText(l.Label), cFlex(l.URL))
@@ -273,7 +273,7 @@ func emitProfile(c *Ctx, d ProfileOut) int {
 			tb.flush()
 		}
 		if len(d.Orgs) > 0 {
-			v.section("org")
+			v.section("orgs")
 			tb := c.table(w, "ORG", "ROLE")
 			for _, m := range d.Orgs {
 				tb.row(cRef(m.Name), cState(m.Role))
@@ -281,7 +281,7 @@ func emitProfile(c *Ctx, d ProfileOut) int {
 			tb.flush()
 		}
 		if len(d.Members) > 0 {
-			v.section("member")
+			v.section("members")
 			tb := c.table(w, "MEMBER", "ROLE")
 			for _, m := range d.Members {
 				tb.row(cRef(m.Name), cState(m.Role))
@@ -289,7 +289,7 @@ func emitProfile(c *Ctx, d ProfileOut) int {
 			tb.flush()
 		}
 		if len(d.Repos) > 0 {
-			v.section("repo")
+			v.section("repos")
 			tb := c.table(w, "REPO", "VISIBILITY", "DESCRIPTION")
 			for _, r := range d.Repos {
 				tb.row(cRef(r.Path), cState(r.Visibility), cFlex(r.Description))

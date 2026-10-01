@@ -31,3 +31,19 @@ func TestParseFlags(t *testing.T) {
 		t.Fatalf("-- handling: %v %+v", err, f)
 	}
 }
+
+func TestNearestFlag(t *testing.T) {
+	known := map[string]byte{"--state": 'v', "--label": 'm', "--limit": 'v', "--json": 'b'}
+	cases := map[string]string{
+		"--stat":    "--state",
+		"--lable":   "--label",
+		"--l":       "",
+		"--jsno":    "--json",
+		"--nothing": "",
+	}
+	for in, want := range cases {
+		if got := nearestFlag(in, known); got != want {
+			t.Errorf("nearestFlag(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

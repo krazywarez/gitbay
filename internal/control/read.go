@@ -317,7 +317,11 @@ func runRepoTree(c *Ctx, args []string) int {
 			if e.Type == "tree" {
 				name += "/"
 			}
-			tb.row(cRef(e.SHA[:min(10, len(e.SHA))]), cText(sizeCol(e)), cFlex(name))
+			size := cText("-")
+			if e.Type != "tree" {
+				size = cSize(e.Size)
+			}
+			tb.row(cRef(e.SHA[:min(10, len(e.SHA))]), size, cFlex(name))
 		}
 		tb.flush()
 	})
@@ -388,13 +392,6 @@ func runRepoReadme(c *Ctx, args []string) int {
 			fmt.Fprintln(w)
 		}
 	})
-}
-
-func sizeCol(e entryOut) string {
-	if e.Type == "tree" {
-		return "-"
-	}
-	return fmt.Sprintf("%d", e.Size)
 }
 
 // readmeRank orders competing README files: richer renderers win.

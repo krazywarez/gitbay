@@ -1002,22 +1002,37 @@ terminal, and follows these rules so every noun reads the same way.
 
 ** At a terminal
 
-The =gitbay= CLI sends a leading =--term=<cols>[,color]= argument on
+The =gitbay= CLI sends a leading =--term=<cols>[,<option>]...= argument on
 the SSH command line when stdout is a terminal (OpenSSH's multiplexed
 sessions, which the CLI uses, do not forward a session's =SetEnv=).
 The argument goes first: the server reads =--term=<v>= only as the
-first argument, and ignores it over HTTP. The server then prints:
+first argument, and ignores it over HTTP. =color= is the one option
+the server acts on; it ignores options it does not know. The server
+then prints:
 
 - lists under a header, padded, fitted to the width (the title or
-  description column is cut with =…= first), states in colour, ages as
-  =2h ago=, and the next page as a command on stderr (piped output
-  keeps a =next\t<cursor>= row instead);
+  description column is cut with =…= first; a title or description
+  column blank on most rows is held to a third of the width), with no
+  trailing whitespace, and the next page as a command on stderr (piped
+  output keeps a =next\t<cursor>= row instead);
+- colour by meaning: green for open, success, approved, verified; magenta
+  for merged; red for failures, =private=, and bad or untrusted
+  signatures; dim for closed, pending, archived, unsigned; yellow only
+  for what waits on you (an unverified address); references (=#12=,
+  =krz/gitbay=, SHAs) in cyan. A marker piped output keeps as its own
+  trailing cell (=[archived]=, =primary=) joins the state at a terminal:
+  =public, archived=;
+- ages as =2h ago= and =in 5h=, sizes as =3.0 MiB=, durations as
+  =53m43s=, where piped output keeps RFC3339, bytes and seconds;
 - =show= views with a title line, aligned fields, the body rendered
   from markdown or org, one line per event, and comments under a rule;
   a sub-table (labels, revisions, and the like) carries a section label
   line in both terminal and piped output; timestamps as
   =2026-09-23 23:26 UTC=. =wiki show= piped prints the page source
   verbatim; the rendered page is terminal-only;
+- errors on stderr after a red =error:=, a mistyped flag with the flag
+  it is closest to (=did you mean --state?=), and a usage line wrapped
+  to the width between its bracketed groups, one alternative per line;
 - help with flag descriptions, defaults, and examples; =gitbay --help=
   groups commands under WORK, REPOSITORIES, YOU and INSTANCE;
   =help --json= adds =flags= and =examples=.

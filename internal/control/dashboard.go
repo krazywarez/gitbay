@@ -177,12 +177,25 @@ func runDashboard(c *Ctx, args []string) int {
 	}
 
 	return c.emit(d, func(w io.Writer) {
-		section := func(title string, header []string, rows [][]cell) {
-			if c.Term.Cols > 0 {
-				fmt.Fprintln(w, c.Term.paint(sgrBold, title))
-			} else {
+		// At a terminal sections are separated by a blank line, and an
+		// empty one is left out.
+		wrote := false
+		heading := func(title string) {
+			if c.Term.Cols == 0 {
 				fmt.Fprintln(w, title)
+				return
 			}
+			if wrote {
+				fmt.Fprintln(w)
+			}
+			wrote = true
+			fmt.Fprintln(w, c.Term.heading(title))
+		}
+		section := func(title string, header []string, rows [][]cell) {
+			if c.Term.Cols > 0 && len(rows) == 0 {
+				return
+			}
+			heading(title)
 			if len(rows) == 0 {
 				fmt.Fprintln(w, "  none")
 				return
@@ -238,7 +251,7 @@ func runDashboard(c *Ctx, args []string) int {
 		for i, p := range d.Pinned {
 			cells := []cell{cRef(p.Path), cState(p.Visibility), cFlex(p.Description)}
 			if p.Archived {
-				cells = append(cells, cText("[archived]"))
+				cells = c.note(cells, 1, "[archived]", "archived")
 			}
 			pinnedRows[i] = cells
 		}
@@ -258,10 +271,11 @@ func runDashboard(c *Ctx, args []string) int {
 		section("builds:", []string{"REPO", "#", "JOB", "STATUS", "SHA", "REF"}, buildRows)
 
 		if d.Server != nil {
-			fmt.Fprintf(w, "server:\n  build %s\n", d.Server.Commit)
+			heading("server:")
+			fmt.Fprintf(w, "  build %s\n", d.Server.Commit)
 		}
 		if q := d.Queues; q != nil {
-			fmt.Fprintln(w, "queues:")
+			heading("queues:")
 
 			fmt.Fprintf(w, "  webhooks\tpending %d\tretrying %d\tfailed %d\n", q.Webhooks.Pending, q.Webhooks.Retrying, q.Webhooks.Failed)
 			twh := c.table(w, "REPO", "URL", "ATTEMPTS", "ERROR")

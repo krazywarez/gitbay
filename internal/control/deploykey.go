@@ -84,7 +84,7 @@ func runDeployKeyAdd(c *Ctx, args []string) int {
 	return c.emit(d, func(w io.Writer) {
 		line := fmt.Sprintf("deploy key %s (%s) bound to %s", fp, mode, repo.Path())
 		if expires != nil {
-			line += ", expires " + expiresText(expires, time.Now())
+			line += ", expires " + c.expiresText(expires, time.Now())
 		}
 		fmt.Fprintln(w, line)
 	})
@@ -123,7 +123,7 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
 			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label),
-				cText(c.usedText(d.LastUsedAt)), cText(expiresText(d.ExpiresAt, now)))
+				cText(c.usedText(d.LastUsedAt)), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})

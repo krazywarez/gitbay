@@ -80,6 +80,9 @@ func parseFlags(args []string, spec flagSpec) (flags, error) {
 				}
 				i++
 			default:
+				if near := nearestFlag(a, kind); near != "" {
+					return f, usage("unknown flag %q; did you mean %s?", a, near)
+				}
 				return f, usage("unknown flag %q", a)
 			}
 			continue
@@ -90,6 +93,48 @@ func parseFlags(args []string, spec flagSpec) (flags, error) {
 		f.Pos = append(f.Pos, a)
 	}
 	return f, nil
+}
+
+// nearestFlag is the known flag closest to an unknown one: the only
+// flag it is a prefix of, or else the only one within two edits.
+func nearestFlag(a string, known map[string]byte) string {
+	var prefixed, close []string
+	for n := range known {
+		if strings.HasPrefix(n, a) {
+			prefixed = append(prefixed, n)
+		}
+		if editDistance(a, n) <= 2 {
+			close = append(close, n)
+		}
+	}
+	switch {
+	case len(prefixed) == 1:
+		return prefixed[0]
+	case len(prefixed) == 0 && len(close) == 1:
+		return close[0]
+	}
+	return ""
+}
+
+// editDistance is the Levenshtein distance between two ASCII strings.
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
 }
 
 // parseArgs is parseFlags for the running command, with the usage line

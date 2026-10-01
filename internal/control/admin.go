@@ -312,7 +312,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 				}
 				cells := []cell{cRef(e.Address), cState(state)}
 				if e.Primary {
-					cells = append(cells, cText("primary"))
+					cells = c.note(cells, 1, "primary", "primary")
 				}
 				te.row(cells...)
 			}
@@ -442,9 +442,9 @@ func runAdminRepoList(c *Ctx, args []string) int {
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "BYTES", "CREATED", "LAST PUSH")
 		for _, d := range ds {
-			cells := []cell{cRef(d.Path), cState(d.Visibility), cNum(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
+			cells := []cell{cRef(d.Path), cState(d.Visibility), cSize(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
 			if d.Archived {
-				cells = append(cells, cText("[archived]"))
+				cells = c.note(cells, 1, "[archived]", "archived")
 			}
 			tb.row(cells...)
 		}
@@ -579,8 +579,8 @@ func runAdminRunners(c *Ctx, args []string) int {
 		v.fields(
 			"pending", fmt.Sprintf("%d", queue.Pending),
 			"claimed 24h", fmt.Sprintf("%d", queue.Claimed24h),
-			"wait avg", fmt.Sprintf("%ds", queue.ClaimWaitAvgS),
-			"wait max", fmt.Sprintf("%ds", queue.ClaimWaitMaxS),
+			"wait avg", c.Term.dur(queue.ClaimWaitAvgS),
+			"wait max", c.Term.dur(queue.ClaimWaitMaxS),
 			"reaped 24h", fmt.Sprintf("%d", queue.Reaped24h),
 		)
 		if len(runners) > 0 {

@@ -15,6 +15,7 @@ const (
 	kindState
 	kindAge
 	kindNum
+	kindSize
 )
 
 // cell is one column of a table row. The kind decides colour, time
@@ -30,6 +31,7 @@ func cText(s string) cell  { return cell{kindText, s} }
 func cFlex(s string) cell  { return cell{kindFlex, s} }
 func cAge(ts string) cell  { return cell{kindAge, ts} }
 func cNum(n int64) cell    { return cell{kindNum, strconv.FormatInt(n, 10)} }
+func cSize(n int64) cell   { return cell{kindSize, strconv.FormatInt(n, 10)} }
 
 // table is a list command's rows. Plain, each row is written as it
 // comes, tab-separated with no header. At a terminal rows are held
@@ -40,6 +42,18 @@ type table struct {
 	w      io.Writer
 	header []string
 	rows   [][]cell
+}
+
+// note adds a marker to a row: its own trailing cell in plain output,
+// as rows have always carried it, and joined to the state cell at
+// cells[at] at a terminal ("private, archived"), so the table has no
+// unnamed column.
+func (c *Ctx) note(cells []cell, at int, plain, word string) []cell {
+	if c.Term.Cols == 0 {
+		return append(cells, cText(plain))
+	}
+	cells[at].s += ", " + word
+	return cells
 }
 
 func (c *Ctx) table(w io.Writer, header ...string) *table {
@@ -62,8 +76,13 @@ func (t *table) row(cs ...cell) {
 	now := termNow()
 	for i := range cs {
 		cs[i].s = termSafe(cs[i].s)
-		if cs[i].kind == kindAge {
+		switch cs[i].kind {
+		case kindAge:
 			cs[i].s = relAge(cs[i].s, now)
+		case kindSize:
+			if n, err := strconv.ParseInt(cs[i].s, 10, 64); err == nil {
+				cs[i].s = humanBytes(n)
+			}
 		}
 	}
 	t.rows = append(t.rows, cs)
@@ -89,6 +108,7 @@ func (t *table) flush() {
 			widths[i] = max(widths[i], cells(r[i].s))
 		}
 	}
+	t.capSparse(widths)
 	t.fit(widths)
 
 	var b strings.Builder
@@ -98,7 +118,7 @@ func (t *table) flush() {
 			line[i] = clip(t.header[i], widths[i])
 		}
 	}
-	b.WriteString(t.term.paint(sgrDim, t.join(line, widths)) + "\n")
+	b.WriteString(t.term.paint(sgrDim, strings.TrimRight(t.join(line, widths), " ")) + "\n")
 	for _, r := range t.rows {
 		for i := 0; i < n; i++ {
 			s := ""
@@ -107,9 +127,29 @@ func (t *table) flush() {
 			}
 			line[i] = s
 		}
-		b.WriteString(t.joinRow(r, line, widths) + "\n")
+		b.WriteString(strings.TrimRight(t.joinRow(r, line, widths), " ") + "\n")
 	}
 	io.WriteString(t.w, b.String())
+}
+
+// capSparse narrows a flexible column that is blank on most rows to a
+// third of the terminal, so a few long values do not push every other
+// row's later columns to the right edge.
+func (t *table) capSparse(widths []int) {
+	for i := range widths {
+		filled, flex := 0, false
+		for _, r := range t.rows {
+			if i < len(r) && r[i].kind == kindFlex {
+				flex = true
+				if r[i].s != "" {
+					filled++
+				}
+			}
+		}
+		if flex && filled*2 < len(t.rows) {
+			widths[i] = min(widths[i], max(8, t.term.Cols/3))
+		}
+	}
 }
 
 // fit shrinks columns until a row fits the terminal: the flexible
@@ -177,8 +217,13 @@ func (t *table) joinRow(r []cell, line []string, widths []int) string {
 		if i < len(line)-1 {
 			padding = strings.Repeat(" ", max(0, widths[i]-cells(s)))
 		}
-		if i < len(r) && r[i].kind == kindState {
-			s = t.term.paint(stateColor(s), s)
+		if i < len(r) {
+			switch r[i].kind {
+			case kindState:
+				s = t.term.paintState(s)
+			case kindRef:
+				s = t.term.paint(sgrCyan, s)
+			}
 		}
 		b.WriteString(s + padding)
 	}

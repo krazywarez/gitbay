@@ -419,6 +419,9 @@ func (c *Ctx) fail(code int, format string, args ...any) int {
 		enc.SetEscapeHTML(false)
 		enc.Encode(protocol.Envelope{ProtocolVersion: protocol.Version, Error: msg})
 	} else {
+		if c.Term.Cols > 0 {
+			msg = c.Term.failure(msg)
+		}
 		fmt.Fprintln(c.Stderr, msg)
 	}
 	return code

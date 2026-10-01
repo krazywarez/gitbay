@@ -124,3 +124,50 @@ func TestTableEmptyPrintsNothing(t *testing.T) {
 		t.Errorf("empty table printed %q", b.String())
 	}
 }
+
+func TestTableNoTrailingSpace(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b, "ADDRESS", "STATE")
+	tb.row(cRef("a@example.com"), cState("verified"), cText("primary"))
+	tb.row(cRef("b@example.com"), cState("verified"))
+	tb.flush()
+	for _, line := range strings.Split(b.String(), "\n") {
+		if strings.HasSuffix(line, " ") {
+			t.Errorf("trailing space: %q", line)
+		}
+	}
+}
+
+// A flexible column blank on most rows is capped at a third of the
+// terminal.
+func TestTableCapsSparseFlex(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 90}}).table(&b, "TAG", "TITLE", "ASSETS")
+	tb.row(cRef("v3"), cFlex(""), cText("2"))
+	tb.row(cRef("v2"), cFlex(""), cText("2"))
+	tb.row(cRef("v1"), cFlex(""), cText("2"))
+	tb.row(cRef("v0"), cFlex(strings.Repeat("x", 60)), cText("2"))
+	tb.flush()
+	lines := strings.Split(b.String(), "\n")
+	if at := strings.Index(lines[0], "ASSETS"); at != len("TAG  ")+30+2 {
+		t.Errorf("ASSETS at %d:\n%s", at, b.String())
+	}
+}
+
+func TestTableSizeCells(t *testing.T) {
+	var plain, term bytes.Buffer
+	for _, c := range []struct {
+		ctx *Ctx
+		w   *bytes.Buffer
+	}{{&Ctx{}, &plain}, {&Ctx{Term: Term{Cols: 80}}, &term}} {
+		tb := c.ctx.table(c.w, "NAME", "SIZE")
+		tb.row(cRef("a"), cSize(2048))
+		tb.flush()
+	}
+	if plain.String() != "a\t2048\n" {
+		t.Errorf("plain = %q", plain.String())
+	}
+	if term.String() != "NAME  SIZE\na     2.0 KiB\n" {
+		t.Errorf("term = %q", term.String())
+	}
+}

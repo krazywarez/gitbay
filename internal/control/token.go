@@ -121,7 +121,7 @@ func runTokenList(c *Ctx, args []string) int {
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "NAME", "SCOPE", "EXPIRES")
 		for _, d := range ds {
-			tb.row(cRef(d.Name), cState(d.Scope), cText(expiresText(d.ExpiresAt, now)))
+			tb.row(cRef(d.Name), cState(d.Scope), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})

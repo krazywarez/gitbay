@@ -19,21 +19,23 @@ type Term struct {
 	Color bool
 }
 
-// ParseTerm reads "<cols>[,color]". Anything else, or a width outside
+// ParseTerm reads "<cols>[,<option>]...". Options it does not know are
+// ignored, so a newer client's capabilities do not turn an older
+// server's output plain. A width that is not a number, or is outside
 // 40 to 1000, is plain output.
 func ParseTerm(v string) Term {
-	cols, opt, hasOpt := strings.Cut(v, ",")
-	n, err := strconv.Atoi(cols)
+	parts := strings.Split(v, ",")
+	n, err := strconv.Atoi(parts[0])
 	if err != nil || n < 40 || n > 1000 {
 		return Term{}
 	}
-	switch {
-	case !hasOpt:
-		return Term{Cols: n}
-	case opt == "color":
-		return Term{Cols: n, Color: true}
+	t := Term{Cols: n}
+	for _, opt := range parts[1:] {
+		if opt == "color" {
+			t.Color = true
+		}
 	}
-	return Term{}
+	return t
 }
 
 const (
@@ -42,7 +44,9 @@ const (
 	sgrDim     = "\x1b[2m"
 	sgrRed     = "\x1b[31m"
 	sgrGreen   = "\x1b[32m"
+	sgrYellow  = "\x1b[33m"
 	sgrMagenta = "\x1b[35m"
+	sgrCyan    = "\x1b[36m"
 )
 
 // termSafe replaces the bytes a terminal would act on — ESC, the C0
@@ -86,19 +90,105 @@ func (t Term) paint(sgr, s string) string {
 }
 
 // stateColor maps a state word to the web's state tokens: --ok green,
-// --done magenta, --bad red, --neutral dim.
+// --done magenta, --bad red, --neutral dim, and yellow for what waits
+// on the viewer (the web's orange).
 func stateColor(s string) string {
 	switch s {
-	case "open", "success", "approved", "active":
+	case "open", "success", "approved", "active", "verified", "ok":
 		return sgrGreen
 	case "merged":
 		return sgrMagenta
-	case "failed", "failure", "error", "changes requested":
+	case "failed", "failure", "error", "changes requested", "private",
+		"bad_signature", "signed_email_mismatch", "signed_key_expired", "signed_key_revoked":
 		return sgrRed
-	case "closed", "draft", "pending", "canceled", "cancelled", "archived", "disabled":
+	case "closed", "draft", "pending", "canceled", "cancelled", "archived", "disabled",
+		"unsigned", "signed_unknown_key":
 		return sgrDim
+	case "unverified":
+		return sgrYellow
 	}
 	return ""
+}
+
+// paintState colours each word of a state cell: "private, archived"
+// is two states, each in its own colour.
+func (t Term) paintState(s string) string {
+	if !t.Color {
+		return s
+	}
+	words := strings.Split(s, ", ")
+	for i, w := range words {
+		words[i] = t.paint(stateColor(w), w)
+	}
+	return strings.Join(words, ", ")
+}
+
+// heading is a section label at a terminal: capitalised, no trailing
+// colon, bold.
+func (t Term) heading(label string) string {
+	label = strings.TrimSuffix(label, ":")
+	if r, size := utf8.DecodeRuneInString(label); size > 0 {
+		label = string(unicode.ToUpper(r)) + label[size:]
+	}
+	return t.paint(sgrBold, label)
+}
+
+// failure is a refusal as a terminal shows it: "error: " in red ahead
+// of the message, and a usage line wrapped to the width between its
+// bracketed groups, continuation lines indented under the command.
+func (t Term) failure(msg string) string {
+	lines := strings.Split(termSafe(msg), "\n")
+	for i, line := range lines {
+		if rest, ok := strings.CutPrefix(line, "usage: "); ok {
+			lines[i] = "usage: " + wrapUsage(rest, t.Cols-len("usage: "), strings.Repeat(" ", len("usage: ")))
+		} else if i == 0 {
+			lines[i] = t.paint(sgrBold+sgrRed, "error:") + " " + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// wrapUsage packs a usage line into lines of at most width cells,
+// breaking only between words outside brackets, so "[--state
+// open|closed|all]" and "[--label <l>]" are never split.
+func wrapUsage(u string, width int, indent string) string {
+	var words []string
+	depth, start := 0, 0
+	for i, r := range u {
+		switch r {
+		case '[', '<':
+			depth++
+		case ']', '>':
+			depth = max(0, depth-1)
+		case ' ':
+			if depth == 0 {
+				if i > start {
+					words = append(words, u[start:i])
+				}
+				start = i + 1
+			}
+		}
+	}
+	if start < len(u) {
+		words = append(words, u[start:])
+	}
+	var b strings.Builder
+	used := 0
+	for _, w := range words {
+		n := cells(w)
+		switch {
+		case used == 0:
+		case w == "|" || used+1+n > width:
+			b.WriteString("\n" + indent)
+			used = 0
+		default:
+			b.WriteByte(' ')
+			used++
+		}
+		b.WriteString(w)
+		used += n
+	}
+	return b.String()
 }
 
 // cells is the width of s in terminal cells: SGR sequences and
@@ -179,24 +269,54 @@ func stamp(s string) string {
 	return t.Format("2006-01-02T15:04:05Z")
 }
 
-// relAge is a stored timestamp as a table shows it at a terminal.
+// relAge is a stored timestamp as a table shows it at a terminal: "2h
+// ago" in the past, "in 2h" in the future, a date beyond eight weeks
+// either way.
 func relAge(s string, now time.Time) string {
 	t, ok := parseStamp(s)
 	if !ok {
 		return s
 	}
-	d := max(now.Sub(t), 0)
+	d := now.Sub(t)
+	future := d < 0
+	if future {
+		d = -d
+	}
+	var n string
 	switch {
 	case d < time.Minute:
 		return "just now"
 	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d/time.Minute))
+		n = fmt.Sprintf("%dm", int(d/time.Minute))
 	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d/time.Hour))
+		n = fmt.Sprintf("%dh", int(d/time.Hour))
 	case d < 14*24*time.Hour:
-		return fmt.Sprintf("%dd ago", int(d/(24*time.Hour)))
+		n = fmt.Sprintf("%dd", int(d/(24*time.Hour)))
 	case d < 56*24*time.Hour:
-		return fmt.Sprintf("%dw ago", int(d/(7*24*time.Hour)))
+		n = fmt.Sprintf("%dw", int(d/(7*24*time.Hour)))
+	default:
+		return t.Format("2006-01-02")
 	}
-	return t.Format("2006-01-02")
+	if future {
+		return "in " + n
+	}
+	return n + " ago"
+}
+
+// size is a byte count: the number in plain output, KiB and up at a
+// terminal.
+func (t Term) size(n int64) string {
+	if t.Cols == 0 {
+		return strconv.FormatInt(n, 10)
+	}
+	return humanBytes(n)
+}
+
+// dur is a number of seconds: "<n>s" in plain output, hours, minutes
+// and seconds at a terminal.
+func (t Term) dur(secs int64) string {
+	if t.Cols == 0 {
+		return fmt.Sprintf("%ds", secs)
+	}
+	return (time.Duration(secs) * time.Second).String()
 }

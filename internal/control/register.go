@@ -82,7 +82,7 @@ func runEmailList(c *Ctx, args []string) int {
 			}
 			cells := []cell{cRef(d.Address), cState(state)}
 			if d.Primary {
-				cells = append(cells, cText("primary"))
+				cells = c.note(cells, 1, "primary", "primary")
 			}
 			tb.row(cells...)
 		}

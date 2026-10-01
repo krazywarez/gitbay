@@ -16,6 +16,17 @@ anything beyond "replace the binary and restart" is needed.
   draft controls to its author as well as to writers, matching the
   commands: an author without write access could do it over SSH but had
   no button. (#311)
+- Terminal output reads at a glance (#312): colour by meaning across
+  every list and view (=private= red, signature states, references in
+  cyan, yellow only for what waits on you), future times as =in 5h=,
+  sizes and durations humanized, no unnamed trailing column or trailing
+  whitespace, a mostly blank title column held to a third of the width,
+  section headings in one style with empty dashboard sections left out,
+  and errors after a red =error:= with =did you mean= for a mistyped
+  flag and the usage wrapped. Piped and =--json= output are unchanged,
+  except that =profile show='s section labels are plural (=links:=,
+  =orgs:=, =members:=, =repos:=) and an unknown flag's message names the
+  nearest flag. The server ignores =--term= options it does not know.
 
 * v1.40.1 — 2026-09-29
 
