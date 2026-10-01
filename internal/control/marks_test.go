@@ -19,9 +19,9 @@ func TestChecksMark(t *testing.T) {
 		text, sgr string
 	}{
 		{nil, "", ""},
-		{st("success", "success", "skipped"), "3/3", sgrGreen},
-		{st("success", "pending"), "1 pending", sgrDim},
-		{st("success", "failure", "error", "pending"), "2 failed", sgrRed},
+		{st("success", "success", "skipped"), "✓ 3/3", sgrGreen},
+		{st("success", "pending"), "• 1 pending", sgrDim},
+		{st("success", "failure", "error", "pending"), "✗ 2 failed", sgrRed},
 	}
 	for _, tc := range cases {
 		if got := checksMark(tc.in); got.s != tc.text || got.sgr != tc.sgr {

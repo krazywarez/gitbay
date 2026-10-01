@@ -26,6 +26,14 @@ func TestTermValue(t *testing.T) {
 		{true, 120, map[string]string{"TERM": "dumb"}, false, "120"},
 		{true, 120, nil, true, "120"},
 		{true, 120, map[string]string{"GITBAY_TERM": "off"}, false, ""},
+		{true, 120, map[string]string{"COLORTERM": "truecolor"}, false, "120,color,truecolor"},
+		{true, 120, map[string]string{"COLORTERM": "24bit", "NO_COLOR": "1"}, false, "120"},
+		{true, 120, map[string]string{"TERM_PROGRAM": "iTerm.app"}, false, "120,color,links"},
+		{true, 120, map[string]string{"TERM_PROGRAM": "iTerm.app", "GITBAY_LINKS": "0"}, false, "120,color"},
+		{true, 120, map[string]string{"TERM_PROGRAM": "Apple_Terminal"}, false, "120,color"},
+		{true, 120, map[string]string{"GITBAY_LINKS": "1"}, false, "120,color,links"},
+		{true, 120, map[string]string{"VTE_VERSION": "7200"}, false, "120,color,links"},
+		{true, 120, map[string]string{"COLORTERM": "truecolor", "GITBAY_LINKS": "1", "GITBAY_TERM": "basic"}, false, "120,color"},
 	}
 	for _, c := range cases {
 		noColor = c.noColor

@@ -154,7 +154,7 @@ func runOrgLabelList(c *Ctx, args []string) int {
 	return c.emit(labels, func(w io.Writer) {
 		tb := c.table(w, "NAME", "COLOR", "ISSUES", "MRS")
 		for _, l := range labels {
-			tb.row(cRef(l.Name), cText(l.Color), cNum(l.Issues), cNum(l.MRs))
+			tb.row(cRef(l.Name), cSwatch(l.Color), cNum(l.Issues), cNum(l.MRs))
 		}
 		tb.flush()
 	})

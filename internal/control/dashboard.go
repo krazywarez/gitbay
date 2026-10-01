@@ -266,7 +266,12 @@ func runDashboard(c *Ctx, args []string) int {
 		itemRows := func(items []DashboardItem, marker string) [][]cell {
 			rows := make([][]cell, len(items))
 			for i, item := range items {
-				rows[i] = []cell{cRef(fmt.Sprintf("%s%s%d", item.Repo, marker, item.Number)), cFlex(item.Title), cText(item.Author)}
+				page := "issues"
+				if marker == "!" {
+					page = "mrs"
+				}
+				ref := cLink(fmt.Sprintf("%s%s%d", item.Repo, marker, item.Number), c.siteURL(item.Repo, page, strconv.FormatInt(item.Number, 10)))
+				rows[i] = []cell{ref, cFlex(item.Title), cText(item.Author)}
 			}
 			return rows
 		}
@@ -296,7 +301,7 @@ func runDashboard(c *Ctx, args []string) int {
 
 		pinnedRows := make([][]cell, len(d.Pinned))
 		for i, p := range d.Pinned {
-			cells := []cell{cRef(p.Path), cState(p.Visibility), cFlex(p.Description)}
+			cells := []cell{cLink(p.Path, c.siteURL(p.Path)), cState(p.Visibility), cFlex(p.Description)}
 			if p.Archived {
 				cells = c.note(cells, 1, "[archived]", "archived")
 			}
@@ -309,7 +314,7 @@ func runDashboard(c *Ctx, args []string) int {
 			// The feed has its own command; the dashboard shows the start.
 			rows := make([][]cell, 0, dashboardActivity)
 			for _, l := range lines[:min(len(lines), dashboardActivity)] {
-				rows = append(rows, l.termCells())
+				rows = append(rows, l.termCells(c))
 			}
 			section("recent activity:", feedHeader, rows)
 			if len(lines) > dashboardActivity {
@@ -325,7 +330,7 @@ func runDashboard(c *Ctx, args []string) int {
 
 		buildRows := make([][]cell, len(d.Builds))
 		for i, b := range d.Builds {
-			buildRows[i] = []cell{cRef(b.Repo), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
+			buildRows[i] = []cell{cLink(b.Repo, c.siteURL(b.Repo, "builds", strconv.FormatInt(b.Number, 10))), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
 		}
 		section("builds:", []string{"REPO", "#", "JOB", "STATUS", "SHA", "REF"}, buildRows)
 
@@ -440,7 +445,7 @@ func runFeed(c *Ctx, args []string) int {
 		if c.Term.Cols > 0 {
 			tb := c.table(w, feedHeader...)
 			for _, l := range lines {
-				tb.row(l.termCells()...)
+				tb.row(l.termCells(c)...)
 			}
 			tb.flush()
 			return

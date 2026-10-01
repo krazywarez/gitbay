@@ -363,7 +363,7 @@ func runRepoList(c *Ctx, args []string) int {
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
-			cells := []cell{cRef(d.Path), cState(d.Visibility), cFlex(d.Description)}
+			cells := []cell{cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cFlex(d.Description)}
 			if d.Archived {
 				cells = c.note(cells, 1, "[archived]", "archived")
 			}
@@ -1089,7 +1089,7 @@ func runRepoSearch(c *Ctx, args []string) int {
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
-			tb.row(cRef(d.Path), cState(d.Visibility), cFlex(d.Description))
+			tb.row(cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cFlex(d.Description))
 		}
 		tb.flush()
 	})

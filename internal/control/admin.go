@@ -442,7 +442,7 @@ func runAdminRepoList(c *Ctx, args []string) int {
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "BYTES", "CREATED", "LAST PUSH")
 		for _, d := range ds {
-			cells := []cell{cRef(d.Path), cState(d.Visibility), cSize(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
+			cells := []cell{cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cSize(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
 			if d.Archived {
 				cells = c.note(cells, 1, "[archived]", "archived")
 			}

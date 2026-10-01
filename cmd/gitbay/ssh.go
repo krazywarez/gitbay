@@ -114,18 +114,52 @@ func sshArgs(inst cliconfig.Instance) []string {
 var noColor bool
 
 // termValue is GITBAY_TERM for this invocation: the terminal's width,
-// and whether colour is wanted. Empty when stdout is not a terminal,
-// so piped output stays the rows stock ssh prints, and when GITBAY_TERM
-// is "off", for an instance older than --term.
+// whether colour is wanted, and what else the terminal can show: 24-bit
+// colour and hyperlinks. Empty when stdout is not a terminal, so piped
+// output stays the rows stock ssh prints, and when GITBAY_TERM is "off",
+// for an instance older than --term. GITBAY_TERM=basic sends the width
+// and colour only, for an instance older than truecolor and links, which
+// turns any other option into plain output.
 func termValue(isTerminal bool, cols int, env func(string) string) string {
 	if !isTerminal || cols < 40 || env("GITBAY_TERM") == "off" {
 		return ""
 	}
 	v := strconv.Itoa(cols)
-	if !noColor && env("NO_COLOR") == "" && env("TERM") != "dumb" {
+	color := !noColor && env("NO_COLOR") == "" && env("TERM") != "dumb"
+	if color {
 		v += ",color"
 	}
+	if env("GITBAY_TERM") == "basic" {
+		return v
+	}
+	if ct := env("COLORTERM"); color && (ct == "truecolor" || ct == "24bit") {
+		v += ",truecolor"
+	}
+	if linksWanted(env) {
+		v += ",links"
+	}
 	return v
+}
+
+// linksWanted reports whether the terminal shows OSC 8 hyperlinks:
+// GITBAY_LINKS=1 or 0 decides, else terminals known to support them.
+// One that does not would print the escape's text, so the default is no.
+func linksWanted(env func(string) string) bool {
+	switch env("GITBAY_LINKS") {
+	case "1":
+		return true
+	case "0":
+		return false
+	}
+	switch env("TERM_PROGRAM") {
+	case "iTerm.app", "WezTerm", "ghostty", "vscode":
+		return true
+	}
+	if env("KITTY_WINDOW_ID") != "" {
+		return true
+	}
+	n, err := strconv.Atoi(env("VTE_VERSION"))
+	return err == nil && n >= 5000
 }
 
 // stripNoColor removes --no-color wherever it appears.

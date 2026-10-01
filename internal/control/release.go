@@ -297,7 +297,7 @@ func runReleaseList(c *Ctx, args []string) int {
 				default:
 					assets = fmt.Sprintf("%d assets", n)
 				}
-				tb.row(cRef(d.Tag), cFlex(title), cText(assets), cAge(d.CreatedAt))
+				tb.row(cLink(d.Tag, c.siteURL(repo.Path(), "releases")), cFlex(title), cText(assets), cAge(d.CreatedAt))
 			}
 			tb.flush()
 			return

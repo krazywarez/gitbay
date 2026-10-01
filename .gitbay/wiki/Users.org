@@ -1055,6 +1055,17 @@ then prints:
 instance older than v1.36.0, which refuses the argument as an unknown
 command.
 
+Two more options say what the terminal can show. =truecolor= (sent when
+=COLORTERM= is =truecolor= or =24bit=) puts a dot in each label's own
+colour beside its hex in =label list=. =links= (sent in iTerm2, WezTerm,
+Ghostty, VS Code, kitty and VTE terminals, or when =GITBAY_LINKS=1=;
+=GITBAY_LINKS=0= stops it) makes references in lists open their page,
+as OSC 8 hyperlinks. A terminal outside that list would print the
+escape's text, so it is not sent there by default. =GITBAY_TERM=basic=
+sends only the width and colour, for an instance older than the release
+that added these options, which turns any option it does not know into
+plain output.
+
 Stock ssh without the CLI's multiplexing gets the plain output unless
 it passes the same leading argument or sets the environment variable
 sshd is told to accept. OpenSSH parses options after the host, so the

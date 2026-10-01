@@ -50,6 +50,15 @@ anything beyond "replace the binary and restart" is needed.
   key and scope; =auth keys list= marks this session's key; issue, merge
   request and release creation print the page's URL. A column empty on
   every row is left out.
+- The CLI tells the server what the terminal can show (#315):
+  =truecolor= when =COLORTERM= is =truecolor= or =24bit=, for a dot in
+  each label's own colour in =label list=, and =links= in iTerm2,
+  WezTerm, Ghostty, VS Code, kitty and VTE terminals, or with
+  =GITBAY_LINKS=1= (=0= turns it off), for references that open their
+  page (OSC 8). Checks read =✓ 3/3=, =✗ 1 failed=, =• 2 pending=.
+  *Upgrade note:* an instance older than this release turns those
+  options into plain output; set =GITBAY_TERM=basic= for the CLI to send
+  only the width and colour until the instance is upgraded.
 
 * v1.40.1 — 2026-09-29
 

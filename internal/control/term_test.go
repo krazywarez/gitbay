@@ -16,8 +16,9 @@ func TestParseTerm(t *testing.T) {
 		"abc":                {},
 		"80,blink":           {Cols: 80},
 		"80,":                {Cols: 80},
-		"80,truecolor,color": {Cols: 80, Color: true},
-		"80,color,links":     {Cols: 80, Color: true},
+		"80,truecolor,color": {Cols: 80, Color: true, TrueColor: true},
+		"80,color,links":     {Cols: 80, Color: true, Links: true},
+		"80,truecolor":       {Cols: 80},
 		"abc,color":          {},
 		"5000":               {},
 	}
@@ -197,5 +198,24 @@ func TestBuildLog(t *testing.T) {
 	}
 	if got := (Term{Cols: 80}).buildLog("a\x1b]52;c;aGk=\x07b\n", ""); strings.ContainsRune(got, 0x1b) {
 		t.Errorf("escape reached the terminal: %q", got)
+	}
+}
+
+func TestLinkAndSwatch(t *testing.T) {
+	on := Term{Cols: 80, Color: true, TrueColor: true, Links: true}
+	if got := on.link("https://x.test/a", "a"); got != "\x1b]8;;https://x.test/a\x1b\\a\x1b]8;;\x1b\\" {
+		t.Errorf("link = %q", got)
+	}
+	if got := on.link("https://x.test/\x1b", "a"); got != "a" {
+		t.Errorf("control byte in url = %q", got)
+	}
+	if got := (Term{Cols: 80, Color: true}).link("https://x.test/a", "a"); got != "a" {
+		t.Errorf("without links = %q", got)
+	}
+	if got := on.swatch("● #cf222e"); got != "\x1b[38;2;207;34;46m●"+sgrReset+" #cf222e" {
+		t.Errorf("swatch = %q", got)
+	}
+	if got := on.swatch("● #nothex"); got != "● #nothex" {
+		t.Errorf("bad hex = %q", got)
 	}
 }

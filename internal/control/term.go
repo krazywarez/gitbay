@@ -18,6 +18,10 @@ import (
 type Term struct {
 	Cols  int
 	Color bool
+	// TrueColor is 24-bit colour, for a label's own colour.
+	TrueColor bool
+	// Links is OSC 8 hyperlinks, for a reference's page.
+	Links bool
 }
 
 // ParseTerm reads "<cols>[,<option>]...". Options it does not know are
@@ -32,10 +36,16 @@ func ParseTerm(v string) Term {
 	}
 	t := Term{Cols: n}
 	for _, opt := range parts[1:] {
-		if opt == "color" {
+		switch opt {
+		case "color":
 			t.Color = true
+		case "truecolor":
+			t.TrueColor = true
+		case "links":
+			t.Links = true
 		}
 	}
+	t.TrueColor = t.TrueColor && t.Color
 	return t
 }
 
@@ -109,6 +119,38 @@ func stateColor(s string) string {
 		return sgrYellow
 	}
 	return ""
+}
+
+// link makes s a hyperlink to url when the terminal shows them (OSC 8).
+// A url with a control byte in it is left out rather than sent.
+func (t Term) link(url, s string) string {
+	if !t.Links || url == "" || s == "" || strings.IndexFunc(url, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return s
+	}
+	return "\x1b]8;;" + url + "\x1b\\" + s + "\x1b]8;;\x1b\\"
+}
+
+// rgb is the SGR sequence for a "#rrggbb" colour as a 24-bit
+// foreground, or "" when hex is not one.
+func rgb(hex string) string {
+	var r, g, b int
+	if len(hex) != 7 || hex[0] != '#' {
+		return ""
+	}
+	if n, err := fmt.Sscanf(hex[1:], "%02x%02x%02x", &r, &g, &b); err != nil || n != 3 {
+		return ""
+	}
+	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", r, g, b)
+}
+
+// swatch paints the dot of a "● #rrggbb" label colour cell in that
+// colour; anything else is returned as it is.
+func (t Term) swatch(s string) string {
+	hex, ok := strings.CutPrefix(s, "● ")
+	if !ok || !t.TrueColor || rgb(hex) == "" {
+		return s
+	}
+	return t.paint(rgb(hex), "●") + " " + hex
 }
 
 // paintState colours each word of a state cell: "private, archived"

@@ -189,3 +189,25 @@ func TestTableDropsEmptyColumns(t *testing.T) {
 		t.Errorf("plain = %q", plain.String())
 	}
 }
+
+// A swatch's dot is counted in the column's width, so the next column
+// stays aligned.
+func TestTableSwatchAligned(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80, Color: true, TrueColor: true}}).table(&b, "NAME", "COLOR", "ISSUES")
+	tb.row(cRef("bug"), cSwatch("#cf222e"), cNum(3))
+	tb.row(cRef("none"), cSwatch(""), cNum(1))
+	tb.flush()
+	lines := strings.Split(stripSGR(b.String()), "\n")
+	col := func(line, sub string) int { return cells(line[:strings.Index(line, sub)]) }
+	if at := col(lines[0], "ISSUES"); at != col(lines[1], "3") || at != col(lines[2], "1") {
+		t.Errorf("ISSUES not aligned:\n%s", stripSGR(b.String()))
+	}
+	var plain bytes.Buffer
+	tb = (&Ctx{}).table(&plain, "NAME", "COLOR")
+	tb.row(cRef("bug"), cSwatch("#cf222e"))
+	tb.flush()
+	if plain.String() != "bug\t#cf222e\n" {
+		t.Errorf("plain = %q", plain.String())
+	}
+}

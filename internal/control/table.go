@@ -17,6 +17,7 @@ const (
 	kindAge
 	kindNum
 	kindSize
+	kindSwatch
 )
 
 // cell is one column of a table row. The kind decides colour, time
@@ -25,6 +26,7 @@ type cell struct {
 	kind cellKind
 	s    string
 	sgr  string // colour for a kindText cell whose meaning is not its word
+	url  string // the page a kindRef cell links to, when the terminal shows links
 }
 
 func cRef(s string) cell   { return cell{kind: kindRef, s: s} }
@@ -34,6 +36,14 @@ func cFlex(s string) cell  { return cell{kind: kindFlex, s: s} }
 func cAge(ts string) cell  { return cell{kind: kindAge, s: ts} }
 func cNum(n int64) cell    { return cell{kind: kindNum, s: strconv.FormatInt(n, 10)} }
 func cSize(n int64) cell   { return cell{kind: kindSize, s: strconv.FormatInt(n, 10)} }
+
+// cLink is a reference that links to its page at a terminal that shows
+// links; url is a path on this instance or an absolute URL.
+func cLink(s, url string) cell { return cell{kind: kindRef, s: s, url: url} }
+
+// cSwatch is a label colour: a coloured dot before the hex at a terminal
+// with 24-bit colour.
+func cSwatch(hex string) cell { return cell{kind: kindSwatch, s: hex} }
 
 // cMark is text coloured for what it says about the row rather than for
 // its word: "2 failed" red, "review requested" yellow.
@@ -88,6 +98,10 @@ func (t *table) row(cs ...cell) {
 		case kindSize:
 			if n, err := strconv.ParseInt(cs[i].s, 10, 64); err == nil {
 				cs[i].s = humanBytes(n)
+			}
+		case kindSwatch:
+			if t.term.TrueColor && rgb(cs[i].s) != "" {
+				cs[i].s = "● " + cs[i].s
 			}
 		}
 	}
@@ -258,7 +272,9 @@ func (t *table) joinRow(r []cell, line []string, widths []int) string {
 			case kindState:
 				s = t.term.paintState(s)
 			case kindRef:
-				s = t.term.paint(sgrCyan, s)
+				s = t.term.link(r[i].url, t.term.paint(sgrCyan, s))
+			case kindSwatch:
+				s = t.term.swatch(s)
 			default:
 				s = t.term.paint(r[i].sgr, s)
 			}

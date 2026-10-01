@@ -47,7 +47,7 @@ func (l FeedLine) Sentence() string {
 // reference can carry their colours.
 var feedHeader = []string{"WHEN", "WHO", "EVENT", "WHERE", "DETAIL"}
 
-func (l FeedLine) termCells() []cell {
+func (l FeedLine) termCells(c *Ctx) []cell {
 	ref := l.Ref
 	if ref != "" && ref[0] != '#' && ref[0] != '!' {
 		ref = " " + ref
@@ -58,7 +58,7 @@ func (l FeedLine) termCells() []cell {
 		verb = strings.TrimSuffix(verb, " "+l.State)
 		detail = cState(l.State)
 	}
-	return []cell{cAge(l.When), cText(l.Actor), cText(verb), cRef(l.Repo + ref), detail}
+	return []cell{cAge(l.When), cText(l.Actor), cText(verb), cLink(l.Repo+ref, c.siteURL(strings.TrimPrefix(l.URL, "/"))), detail}
 }
 
 // FeedLines turns stored events into readable lines. An unknown kind

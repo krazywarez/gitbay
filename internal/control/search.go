@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/protocol"
@@ -118,12 +119,16 @@ func writeSearchTable(c *Ctx, w io.Writer, results []SearchResult) {
 		switch r.Kind {
 		case "repo":
 			if c.Term.Cols > 0 {
-				tb.row(cText("repo"), cRef(r.Repo), cState(""), cFlex(r.Title))
+				tb.row(cText("repo"), cLink(r.Repo, c.siteURL(r.Repo)), cState(""), cFlex(r.Title))
 			} else {
 				tb.row(cText("repo"), cRef(r.Repo), cFlex(r.Title))
 			}
 		default:
-			tb.row(cText(r.Kind), cRef(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number)), cState(r.State), cFlex(r.Title))
+			page := "issues"
+			if r.Kind == "mr" {
+				page = "mrs"
+			}
+			tb.row(cText(r.Kind), cLink(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number), c.siteURL(r.Repo, page, strconv.FormatInt(r.Number, 10))), cState(r.State), cFlex(r.Title))
 		}
 	}
 	tb.flush()

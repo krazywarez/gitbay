@@ -57,7 +57,7 @@ func runLabelList(c *Ctx, args []string) int {
 	return c.emit(labels, func(w io.Writer) {
 		tb := c.table(w, "NAME", "COLOR", "ISSUES", "MRS")
 		for _, l := range labels {
-			cells := []cell{cRef(l.Name), cText(l.Color), cNum(l.Issues), cNum(l.MRs)}
+			cells := []cell{cRef(l.Name), cSwatch(l.Color), cNum(l.Issues), cNum(l.MRs)}
 			if l.Org {
 				cells = append(cells, cText("org"))
 			}

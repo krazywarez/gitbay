@@ -216,7 +216,7 @@ func runBuildList(c *Ctx, args []string) int {
 	return c.emitPage(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "#", "JOB", "STATUS", "SHA", "REF", "TITLE")
 		for _, d := range ds {
-			tb.row(cRef(fmt.Sprintf("%d", d.Number)), cText(d.Job), cState(d.Status), cRef(fmt.Sprintf("%.10s", d.SHA)), cText(d.Ref), cFlex(d.Subject))
+			tb.row(cLink(fmt.Sprintf("%d", d.Number), c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10))), cText(d.Job), cState(d.Status), cRef(fmt.Sprintf("%.10s", d.SHA)), cText(d.Ref), cFlex(d.Subject))
 		}
 		tb.flush()
 	})

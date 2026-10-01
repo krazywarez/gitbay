@@ -363,7 +363,7 @@ func runIssueList(c *Ctx, args []string) int {
 				if k := comments[issues[i].ID]; k > 0 {
 					n = strconv.Itoa(k)
 				}
-				tb.row(cRef(fmt.Sprintf("#%d", d.Number)), cState(d.State), cFlex(d.Title),
+				tb.row(cLink(fmt.Sprintf("#%d", d.Number), c.siteURL(repo.Path(), "issues", strconv.FormatInt(d.Number, 10))), cState(d.State), cFlex(d.Title),
 					cText(labelsMark(labels[issues[i].ID])), assigneesMark(assignees[issues[i].ID], c.User.Username),
 					cText(n), cAge(issues[i].UpdatedAt))
 			}

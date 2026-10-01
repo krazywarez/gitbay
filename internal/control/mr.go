@@ -724,7 +724,7 @@ func mrListTerm(c *Ctx, w io.Writer, repo store.Repo, mrs []store.MR, ds []mrOut
 			ref += fmt.Sprintf(" (on !%d)", d.StackedOn.Number)
 		}
 		m := mrs[i]
-		tb.row(cRef(fmt.Sprintf("!%d", d.Number)), cState(state), cFlex(d.Title), cText(ref),
+		tb.row(cLink(fmt.Sprintf("!%d", d.Number), c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10))), cState(state), cFlex(d.Title), cText(ref),
 			checks[m.ID], review[m.ID], cAge(m.UpdatedAt))
 	}
 	tb.flush()
