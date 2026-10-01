@@ -33,6 +33,23 @@ anything beyond "replace the binary and restart" is needed.
   longer prints the subject twice. =build log= at a terminal drops the
   tools' own colour codes, makes the rest safe, and marks step lines,
   the failed step in red. (#313)
+- At a terminal, lists and views say what to do next (#314). =mr list=
+  adds checks, review state (the merge gates' rule; =review requested=
+  in yellow when it is yours) and age; =issue list= adds labels,
+  assignee (yellow when it is you), comments and age, each from one
+  query per page. =dashboard= opens with what needs you and shows eight
+  lines of activity; =feed= splits who, what and where so outcomes carry
+  their colours. =repo show= adds the clone URL, open counts, the latest
+  release and the default branch's checks; =repo log= shows the author's
+  name, age and signature; =repo refs= lists tags newest version first
+  (piped too) and the default branch first; =repo tree= leads with the
+  name; =release list= drops the tag from titles and adds the date;
+  =build show= lists steps with their outcome, the open merge request
+  and the log command; =milestone list= marks overdue and shows
+  progress; =audit= data reads as key=value; =whoami= shows instance,
+  key and scope; =auth keys list= marks this session's key; issue, merge
+  request and release creation print the page's URL. A column empty on
+  every row is left out.
 
 * v1.40.1 — 2026-09-29
 

@@ -259,6 +259,15 @@ func runBuildShow(c *Ctx, args []string) int {
 		if d.DurationS > 0 {
 			duration = (time.Duration(d.DurationS) * time.Second).String()
 		}
+		// At a terminal: the open merge request the build ran for, and
+		// the command that prints its log.
+		mr, logCmd := "", ""
+		if c.Term.Cols > 0 {
+			if m, ok, err := c.Store.OpenMRBySource(repo.ID, d.Ref); err == nil && ok {
+				mr = fmt.Sprintf("!%d %s", m.Number, m.Title)
+			}
+			logCmd = fmt.Sprintf("gitbay build log %s %d", repo.Path(), d.Number)
+		}
 		v := c.view(w)
 		v.title(fmt.Sprintf("#%d", d.Number), d.Job, d.Status)
 		v.fields(
@@ -269,9 +278,38 @@ func runBuildShow(c *Ctx, args []string) int {
 			"duration", duration,
 			"failed step", failedStep,
 			"failed", failed,
+			"mr", mr,
+			"log", logCmd,
 			"url", c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10)),
 		)
+		if c.Term.Cols > 0 && len(d.Steps) > 0 {
+			v.section("steps")
+			tb := c.table(w, "#", "STEP", "STATE")
+			for i, step := range d.Steps {
+				line, _, _ := strings.Cut(step, "\n")
+				tb.row(cNum(int64(i+1)), cFlex(line), cState(stepState(d.Status, d.FailedStep, i+1)))
+			}
+			tb.flush()
+		}
 	})
+}
+
+// stepState is what a finished build says about one of its steps: those
+// before the failed step passed, the failed one failed, the rest never
+// ran. A build still running, or one that failed outside its steps,
+// says nothing per step.
+func stepState(status string, failedStep, n int) string {
+	switch {
+	case status == "success":
+		return "success"
+	case status != "failure" || failedStep == 0:
+		return ""
+	case n < failedStep:
+		return "success"
+	case n == failedStep:
+		return "failure"
+	}
+	return "skipped"
 }
 
 func runBuildLog(c *Ctx, args []string) int {

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -20,6 +21,37 @@ type Issue struct {
 	UpdatedAt  string
 	Labels     []string
 	Assignees  []string
+}
+
+// IssueCommentCounts counts, per issue, the comments people wrote —
+// system comments do not count — for every issue on a list page in one
+// query.
+func (s *Store) IssueCommentCounts(issueIDs []int64) (map[int64]int, error) {
+	out := map[int64]int{}
+	if len(issueIDs) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(issueIDs))
+	for i, id := range issueIDs {
+		args[i] = id
+	}
+	rows, err := s.DB.Query(`
+		SELECT issue_id, COUNT(*) FROM issue_comments
+		WHERE kind <> 'system' AND issue_id IN (?`+strings.Repeat(",?", len(issueIDs)-1)+`)
+		GROUP BY issue_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
 }
 
 type IssueComment struct {
@@ -78,6 +110,55 @@ func (s *Store) IssueByNumber(repoID, number int64) (Issue, error) {
 		SELECT u.username FROM issue_assignees ia JOIN users u ON u.id = ia.user_id
 		WHERE ia.issue_id = ? ORDER BY u.username`)
 	return i, err
+}
+
+// IssueLabelsFor is the labels and assignees of every issue on a list
+// page, two queries for the page rather than two per issue.
+func (s *Store) IssueLabelsFor(issueIDs []int64) (labels, assignees map[int64][]string, err error) {
+	if labels, err = s.stringsFor(issueIDs, `
+		SELECT il.issue_id, l.name FROM issue_labels il JOIN labels l ON l.id = il.label_id
+		WHERE il.issue_id IN (%s) ORDER BY l.name`); err != nil {
+		return nil, nil, err
+	}
+	assignees, err = s.stringsFor(issueIDs, `
+		SELECT ia.issue_id, u.username FROM issue_assignees ia JOIN users u ON u.id = ia.user_id
+		WHERE ia.issue_id IN (%s) ORDER BY u.username`)
+	return labels, assignees, err
+}
+
+// MRReviewRequestsFor is ReviewRequests for every merge request on a
+// list page in one query.
+func (s *Store) MRReviewRequestsFor(mrIDs []int64) (map[int64][]string, error) {
+	return s.stringsFor(mrIDs, `
+		SELECT rr.mr_id, u.username FROM mr_review_requests rr JOIN users u ON u.id = rr.user_id
+		WHERE rr.mr_id IN (%s) ORDER BY u.username`)
+}
+
+// stringsFor runs a query selecting (id, value) rows, its %s replaced by
+// one placeholder per id, and groups the values by id in row order.
+func (s *Store) stringsFor(ids []int64, query string) (map[int64][]string, error) {
+	out := map[int64][]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	rows, err := s.DB.Query(fmt.Sprintf(query, "?"+strings.Repeat(",?", len(ids)-1)), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var v string
+		if err := rows.Scan(&id, &v); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], v)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) issueStrings(issueID int64, query string) ([]string, error) {

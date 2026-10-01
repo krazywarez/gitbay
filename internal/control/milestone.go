@@ -135,6 +135,29 @@ func emitMilestones(c *Ctx, ms []store.Milestone) int {
 		ds = append(ds, out{m.Title, m.Description, m.DueDate, m.State, m.OrgID != 0, m.OpenItems, m.ClosedItems})
 	}
 	return c.emit(ds, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			tb := c.table(w, "TITLE", "STATE", "DUE", "PROGRESS", "SCOPE")
+			for _, d := range ds {
+				due := cText("")
+				if t, ok := parseStamp(d.Due + " 00:00:00"); ok {
+					due = cText(relAge(d.Due+" 00:00:00", termNow()))
+					if d.State == "open" && t.Before(termNow()) {
+						due = cMark("overdue "+d.Due, sgrRed)
+					}
+				}
+				progress := ""
+				if total := d.Open + d.Closed; total > 0 {
+					progress = fmt.Sprintf("%d/%d closed (%d%%)", d.Closed, total, d.Closed*100/total)
+				}
+				scope := ""
+				if d.Org {
+					scope = "org"
+				}
+				tb.row(cRef(d.Title), cState(d.State), due, cText(progress), cText(scope))
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "TITLE", "STATE", "DUE", "PROGRESS")
 		for _, d := range ds {
 			due := d.Due

@@ -42,6 +42,25 @@ func (l FeedLine) Sentence() string {
 	return s
 }
 
+// feedHeader and termCells are a feed line as a terminal table shows
+// it: who, what, where, and how a build came out, so the outcome and the
+// reference can carry their colours.
+var feedHeader = []string{"WHEN", "WHO", "EVENT", "WHERE", "DETAIL"}
+
+func (l FeedLine) termCells() []cell {
+	ref := l.Ref
+	if ref != "" && ref[0] != '#' && ref[0] != '!' {
+		ref = " " + ref
+	}
+	detail := cText(l.Extra)
+	verb := l.Verb
+	if l.State != "" {
+		verb = strings.TrimSuffix(verb, " "+l.State)
+		detail = cState(l.State)
+	}
+	return []cell{cAge(l.When), cText(l.Actor), cText(verb), cRef(l.Repo + ref), detail}
+}
+
 // FeedLines turns stored events into readable lines. An unknown kind
 // still shows: the feed says what happened even for events added later.
 // Build events on the same commit, adjacent in the input, fold into one

@@ -282,6 +282,9 @@ func runIssueCreate(c *Ctx, args []string) int {
 	}
 	return c.emit(Created{Number: n}, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s#%d\n", repo.Path(), n)
+		if c.Term.Cols > 0 {
+			fmt.Fprintln(w, c.siteURL(repo.Path(), "issues", strconv.FormatInt(n, 10)))
+		}
 	})
 }
 
@@ -336,7 +339,37 @@ func runIssueList(c *Ctx, args []string) int {
 	for _, i := range issues {
 		ds = append(ds, issueToOut(i, false))
 	}
+	var comments map[int64]int
+	var labels, assignees map[int64][]string
+	if c.Term.Cols > 0 && !c.JSON {
+		ids := make([]int64, len(issues))
+		for i, is := range issues {
+			ids[i] = is.ID
+		}
+		if comments, err = c.Store.IssueCommentCounts(ids); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if labels, assignees, err = c.Store.IssueLabelsFor(ids); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			// At a terminal: who it waits on and how much it has moved,
+			// in place of who opened it.
+			tb := c.table(w, "#", "STATE", "TITLE", "LABELS", "ASSIGNEE", "COMMENTS", "UPDATED")
+			for i, d := range ds {
+				n := ""
+				if k := comments[issues[i].ID]; k > 0 {
+					n = strconv.Itoa(k)
+				}
+				tb.row(cRef(fmt.Sprintf("#%d", d.Number)), cState(d.State), cFlex(d.Title),
+					cText(labelsMark(labels[issues[i].ID])), assigneesMark(assignees[issues[i].ID], c.User.Username),
+					cText(n), cAge(issues[i].UpdatedAt))
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "#", "STATE", "TITLE", "AUTHOR")
 		for _, d := range ds {
 			tb.row(cRef(fmt.Sprintf("#%d", d.Number)), cState(d.State), cFlex(d.Title), cText(d.Author))

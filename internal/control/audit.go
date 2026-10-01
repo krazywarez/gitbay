@@ -1,7 +1,9 @@
 package control
 
 import (
+	"encoding/json"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -59,7 +61,11 @@ func runAudit(c *Ctx, args []string) int {
 			if actor == "" {
 				actor = "-"
 			}
-			tb.row(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(e.Data))
+			data := e.Data
+			if c.Term.Cols > 0 {
+				data = keyValues(data)
+			}
+			tb.row(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(data))
 		}
 		tb.flush()
 	})
@@ -83,4 +89,41 @@ func parseSince(v string, now time.Time) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// keyValues is an audit entry's JSON data as a terminal reads it:
+// key=value pairs in key order, strings bare, arrays space-separated.
+// Anything that is not a JSON object is returned as it is.
+func keyValues(data string) string {
+	var m map[string]any
+	if json.Unmarshal([]byte(data), &m) != nil {
+		return data
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + kvValue(m[k])
+	}
+	return strings.Join(parts, " ")
+}
+
+func kvValue(v any) string {
+	switch v := v.(type) {
+	case string:
+		return v
+	case []any:
+		parts := make([]string, len(v))
+		for i, e := range v {
+			parts[i] = kvValue(e)
+		}
+		return "[" + strings.Join(parts, " ") + "]"
+	case nil:
+		return ""
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
 }

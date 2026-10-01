@@ -93,6 +93,50 @@ type DashboardOut struct {
 	Queues *store.Queues `json:"queues,omitempty"`
 }
 
+// dashboardActivity is how many feed lines the dashboard shows at a
+// terminal.
+const dashboardActivity = 8
+
+// needsYou is the dashboard's first line at a terminal: what waits on
+// the viewer, in yellow, or a dim line saying nothing does.
+func (t Term) needsYou(d DashboardOut) string {
+	var parts []string
+	add := func(n int, one, many string) {
+		switch {
+		case n == 1:
+			parts = append(parts, "1 "+one)
+		case n > 1:
+			parts = append(parts, fmt.Sprintf("%d %s", n, many))
+		}
+	}
+	add(len(d.Reviews), "review requested", "reviews requested")
+	add(len(d.Assigned), "assigned issue", "assigned issues")
+	add(failingBuilds(d.Builds), "failing build", "failing builds")
+	add(d.Unread, "unread notification", "unread notifications")
+	if len(parts) == 0 {
+		return t.paint(sgrDim, "Nothing waits on you.")
+	}
+	return t.paint(sgrBold+sgrYellow, "Needs you: "+strings.Join(parts, ", "))
+}
+
+// failingBuilds counts the jobs whose latest build failed: a failure a
+// later build of the same job and ref has already replaced is not one.
+func failingBuilds(builds []DashboardBuild) int {
+	seen := map[string]bool{}
+	n := 0
+	for _, b := range builds {
+		key := b.Repo + "\x00" + b.Job + "\x00" + b.Ref
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if b.Status == "failure" {
+			n++
+		}
+	}
+	return n
+}
+
 func runDashboard(c *Ctx, args []string) int {
 	if len(args) != 0 {
 		return c.usage()
@@ -227,7 +271,10 @@ func runDashboard(c *Ctx, args []string) int {
 			return rows
 		}
 
-		if d.Unread > 0 {
+		if c.Term.Cols > 0 {
+			fmt.Fprintln(w, c.Term.needsYou(d))
+			wrote = true
+		} else if d.Unread > 0 {
 			fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
 		}
 		itemHeader := []string{"REF", "TITLE", "AUTHOR"}
@@ -258,11 +305,23 @@ func runDashboard(c *Ctx, args []string) int {
 		section("pinned:", []string{"PATH", "VISIBILITY", "DESCRIPTION"}, pinnedRows)
 
 		lines := FeedLines(events)
-		activityRows := make([][]cell, len(lines))
-		for i, l := range lines {
-			activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
+		if c.Term.Cols > 0 {
+			// The feed has its own command; the dashboard shows the start.
+			rows := make([][]cell, 0, dashboardActivity)
+			for _, l := range lines[:min(len(lines), dashboardActivity)] {
+				rows = append(rows, l.termCells())
+			}
+			section("recent activity:", feedHeader, rows)
+			if len(lines) > dashboardActivity {
+				fmt.Fprintln(w, c.Term.paint(sgrDim, "more: gitbay feed"))
+			}
+		} else {
+			activityRows := make([][]cell, len(lines))
+			for i, l := range lines {
+				activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
+			}
+			section("recent activity:", []string{"WHEN", "EVENT"}, activityRows)
 		}
-		section("recent activity:", []string{"WHEN", "EVENT"}, activityRows)
 
 		buildRows := make([][]cell, len(d.Builds))
 		for i, b := range d.Builds {
@@ -378,6 +437,14 @@ func runFeed(c *Ctx, args []string) int {
 	ds := feedOutputs(events)
 	lines := FeedLines(events)
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			tb := c.table(w, feedHeader...)
+			for _, l := range lines {
+				tb.row(l.termCells()...)
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "WHEN", "EVENT")
 		for _, l := range lines {
 			tb.row(cAge(l.When), cFlex(l.Sentence()))

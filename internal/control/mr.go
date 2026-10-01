@@ -532,6 +532,9 @@ func runMRCreate(c *Ctx, args []string) int {
 	}
 	return c.emit(out, func(w io.Writer) {
 		fmt.Fprintf(w, "created %s!%d (%s -> %s)\n", repo.Path(), n, source, target)
+		if c.Term.Cols > 0 {
+			fmt.Fprintln(w, c.siteURL(repo.Path(), "mrs", strconv.FormatInt(n, 10)))
+		}
 		if out.StackedOn != nil {
 			fmt.Fprintf(w, "stacked on !%d %s\n", out.StackedOn.Number, out.StackedOn.Title)
 		}
@@ -676,7 +679,17 @@ func runMRList(c *Ctx, args []string) int {
 		o.StackedOn, _ = stackOf(c, repo, m)
 		ds = append(ds, o)
 	}
+	var checks, review map[int64]cell
+	if c.Term.Cols > 0 && !c.JSON {
+		if checks, review, err = mrMarks(c, repo, mrs); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			mrListTerm(c, w, repo, mrs, ds, checks, review)
+			return
+		}
 		tb := c.table(w, "!", "STATE", "TITLE", "REF")
 		for _, d := range ds {
 			state := d.State
@@ -691,6 +704,30 @@ func runMRList(c *Ctx, args []string) int {
 		}
 		tb.flush()
 	})
+}
+
+// mrListTerm is mr list at a terminal: where checks and review stand
+// for each open merge request, and when it last changed. The source
+// branch alone names a merge request into the default branch.
+func mrListTerm(c *Ctx, w io.Writer, repo store.Repo, mrs []store.MR, ds []mrOut, checks, review map[int64]cell) {
+	tb := c.table(w, "!", "STATE", "TITLE", "BRANCH", "CHECKS", "REVIEW", "UPDATED")
+	for i, d := range ds {
+		state := d.State
+		if d.Draft {
+			state = "draft"
+		}
+		ref := d.Source
+		if d.TargetRef != repo.DefaultBranch {
+			ref += " -> " + d.TargetRef
+		}
+		if d.StackedOn != nil {
+			ref += fmt.Sprintf(" (on !%d)", d.StackedOn.Number)
+		}
+		m := mrs[i]
+		tb.row(cRef(fmt.Sprintf("!%d", d.Number)), cState(state), cFlex(d.Title), cText(ref),
+			checks[m.ID], review[m.ID], cAge(m.UpdatedAt))
+	}
+	tb.flush()
 }
 
 // byWhom renders " by <user>", or nothing when the actor is unknown — an

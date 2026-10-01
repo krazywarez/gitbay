@@ -1022,6 +1022,11 @@ then prints:
   =krz/gitbay=, SHAs) in cyan. A marker piped output keeps as its own
   trailing cell (=[archived]=, =primary=) joins the state at a terminal:
   =public, archived=;
+- lists that say what to do next: =mr list= with checks, review state
+  and age, =issue list= with labels, assignee, comments and age, a
+  =dashboard= that opens with what needs you; a column empty on every
+  row is left out. These columns are terminal-only; piped rows keep
+  their own;
 - diffs coloured (file headers bold, hunks cyan, added green, removed
   red), and =build log= with its step lines bold, the failed one red;
   both made safe like any user text, the log's own colour codes dropped;

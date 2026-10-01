@@ -151,6 +151,9 @@ func runReleaseCreate(c *Ctx, args []string) int {
 	c.Store.RecordEvent(repo.ID, c.User.ID, "release.created", fmt.Sprintf(`{"tag":%q}`, tag))
 	return c.emit(map[string]string{"tag": tag, "title": title}, func(w io.Writer) {
 		fmt.Fprintf(w, "created release %s on %s\n", tag, repo.Path())
+		if c.Term.Cols > 0 {
+			fmt.Fprintln(w, c.siteURL(repo.Path(), "releases"))
+		}
 	})
 }
 
@@ -280,6 +283,25 @@ func runReleaseList(c *Ctx, args []string) int {
 		ds = append(ds, releaseToOut(r, false))
 	}
 	return c.emitPage(p, ds, next, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			tb := c.table(w, "TAG", "TITLE", "ASSETS", "RELEASED")
+			for _, d := range ds {
+				// "v1.2.0 — the forge speaks first" reads as its
+				// subtitle beside the tag.
+				title := strings.TrimPrefix(strings.TrimPrefix(d.Title, d.Tag), " — ")
+				assets := ""
+				switch n := len(d.Assets); n {
+				case 0:
+				case 1:
+					assets = "1 asset"
+				default:
+					assets = fmt.Sprintf("%d assets", n)
+				}
+				tb.row(cRef(d.Tag), cFlex(title), cText(assets), cAge(d.CreatedAt))
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "TAG", "TITLE", "ASSETS")
 		for _, d := range ds {
 			title := d.Title
@@ -313,7 +335,11 @@ func runReleaseShow(c *Ctx, args []string) int {
 			v.section("assets")
 			tb := c.table(w, "NAME", "SIZE", "SHA256")
 			for _, a := range d.Assets {
-				tb.row(cRef(a.Name), cSize(a.Size), cFlex(a.SHA256))
+				sum := a.SHA256
+				if c.Term.Cols > 0 {
+					sum = sum[:min(12, len(sum))]
+				}
+				tb.row(cRef(a.Name), cSize(a.Size), cFlex(sum))
 			}
 			tb.flush()
 		}

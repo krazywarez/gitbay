@@ -102,7 +102,7 @@ func stateColor(s string) string {
 	case "failed", "failure", "error", "changes requested", "private",
 		"bad_signature", "signed_email_mismatch", "signed_key_expired", "signed_key_revoked":
 		return sgrRed
-	case "closed", "draft", "pending", "canceled", "cancelled", "archived", "disabled",
+	case "closed", "draft", "pending", "canceled", "cancelled", "archived", "disabled", "skipped",
 		"unsigned", "signed_unknown_key":
 		return sgrDim
 	case "unverified":

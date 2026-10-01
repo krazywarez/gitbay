@@ -226,6 +226,15 @@ func runRepoLog(c *Ctx, args []string) int {
 		ds = append(ds, d)
 	}
 	return c.emit(ds, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			tb := c.table(w, "SHA", "SUBJECT", "AUTHOR", "WHEN", "SIGNATURE")
+			for _, d := range ds {
+				tb.row(cRef(fmt.Sprintf("%.10s", d.SHA)), cFlex(d.Subject), cText(d.AuthorName),
+					cAge(d.Date), cState(d.Signature.State))
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "SHA", "STATE", "SUBJECT", "AUTHOR")
 		for _, d := range ds {
 			tb.row(cRef(fmt.Sprintf("%.10s", d.SHA)), cState(d.Signature.State), cFlex(d.Subject),

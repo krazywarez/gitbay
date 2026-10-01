@@ -2,6 +2,7 @@ package control
 
 import (
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -23,15 +24,20 @@ const (
 type cell struct {
 	kind cellKind
 	s    string
+	sgr  string // colour for a kindText cell whose meaning is not its word
 }
 
-func cRef(s string) cell   { return cell{kindRef, s} }
-func cState(s string) cell { return cell{kindState, s} }
-func cText(s string) cell  { return cell{kindText, s} }
-func cFlex(s string) cell  { return cell{kindFlex, s} }
-func cAge(ts string) cell  { return cell{kindAge, ts} }
-func cNum(n int64) cell    { return cell{kindNum, strconv.FormatInt(n, 10)} }
-func cSize(n int64) cell   { return cell{kindSize, strconv.FormatInt(n, 10)} }
+func cRef(s string) cell   { return cell{kind: kindRef, s: s} }
+func cState(s string) cell { return cell{kind: kindState, s: s} }
+func cText(s string) cell  { return cell{kind: kindText, s: s} }
+func cFlex(s string) cell  { return cell{kind: kindFlex, s: s} }
+func cAge(ts string) cell  { return cell{kind: kindAge, s: ts} }
+func cNum(n int64) cell    { return cell{kind: kindNum, s: strconv.FormatInt(n, 10)} }
+func cSize(n int64) cell   { return cell{kind: kindSize, s: strconv.FormatInt(n, 10)} }
+
+// cMark is text coloured for what it says about the row rather than for
+// its word: "2 failed" red, "review requested" yellow.
+func cMark(s, sgr string) cell { return cell{kind: kindText, s: s, sgr: sgr} }
 
 // table is a list command's rows. Plain, each row is written as it
 // comes, tab-separated with no header. At a terminal rows are held
@@ -92,6 +98,7 @@ func (t *table) flush() {
 	if t.term.Cols == 0 || len(t.rows) == 0 {
 		return
 	}
+	t.dropEmpty()
 	// The column count is never smaller than the longest row: a row with
 	// more cells than the header has still gets every cell rendered, the
 	// header just shows blank above the ones it doesn't name.
@@ -130,6 +137,35 @@ func (t *table) flush() {
 		b.WriteString(strings.TrimRight(t.joinRow(r, line, widths), " ") + "\n")
 	}
 	io.WriteString(t.w, b.String())
+}
+
+// dropEmpty removes a column that is blank on every row, header and
+// all: an issue list where nothing is labelled has no LABELS column.
+func (t *table) dropEmpty() {
+	n := len(t.header)
+	for _, r := range t.rows {
+		n = max(n, len(r))
+	}
+	for i := n - 1; i >= 0; i-- {
+		empty := true
+		for _, r := range t.rows {
+			if i < len(r) && r[i].s != "" {
+				empty = false
+				break
+			}
+		}
+		if !empty {
+			continue
+		}
+		if i < len(t.header) {
+			t.header = slices.Delete(slices.Clone(t.header), i, i+1)
+		}
+		for j, r := range t.rows {
+			if i < len(r) {
+				t.rows[j] = slices.Delete(r, i, i+1)
+			}
+		}
+	}
 }
 
 // capSparse narrows a flexible column that is blank on most rows to a
@@ -223,6 +259,8 @@ func (t *table) joinRow(r []cell, line []string, widths []int) string {
 				s = t.term.paintState(s)
 			case kindRef:
 				s = t.term.paint(sgrCyan, s)
+			default:
+				s = t.term.paint(r[i].sgr, s)
 			}
 		}
 		b.WriteString(s + padding)

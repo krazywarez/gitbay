@@ -72,7 +72,30 @@ func runWhoami(c *Ctx, args []string) int {
 	}
 	d := out{Username: c.User.Username, Admin: c.User.IsAdmin, KeyScope: c.Scope}
 	return c.emit(d, func(w io.Writer) {
-		fmt.Fprintln(w, d.Username)
+		if c.Term.Cols == 0 {
+			fmt.Fprintln(w, d.Username)
+			return
+		}
+		// At a terminal: where, and with what.
+		role := ""
+		if d.Admin {
+			role = "admin"
+		}
+		// The key's label, or the start of its fingerprint: keys list
+		// has the whole of it.
+		via := c.Source
+		if k, err := c.Store.SSHKeyByFingerprint(c.Source); err == nil && k.Label != "" {
+			via = k.Label
+		} else if len(via) > 20 {
+			via = via[:19] + "…"
+		}
+		v := c.view(w)
+		v.title(d.Username, "", role)
+		v.fields(
+			"instance", c.Cfg.Server.SiteURL,
+			"key", via,
+			"scope", d.KeyScope,
+		)
 	})
 }
 
@@ -101,8 +124,12 @@ func runKeysList(c *Ctx, args []string) int {
 	return c.emit(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
+			used := cText(c.usedText(d.LastUsedAt))
+			if c.Term.Cols > 0 && d.Fingerprint == c.Source {
+				used = cMark("this session", sgrGreen)
+			}
 			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label),
-				cText(c.usedText(d.LastUsedAt)), cText(c.expiresText(d.ExpiresAt, now)))
+				used, cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
 	})

@@ -234,3 +234,97 @@ func TestMRCommentCounts(t *testing.T) {
 		t.Fatalf("MRCommentCounts(nil) = %v, %v", empty, err)
 	}
 }
+
+// The list batches return what the per-item calls return, keyed by item.
+func TestListPageBatches(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	mr1, err := s.MRByNumber(repoID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMRReview(mr1.ID, uid, "approve", "abc123"); err != nil {
+		t.Fatal(err)
+	}
+	reviews, err := s.MRReviewsFor([]int64{mr1.ID, mr1.ID + 99})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reviews[mr1.ID]; len(got) != 1 || got[0].Reviewer != "cmc" || got[0].Verdict != "approve" {
+		t.Errorf("reviews = %+v", got)
+	}
+	if len(reviews[mr1.ID+99]) != 0 {
+		t.Errorf("reviews for a missing MR: %+v", reviews[mr1.ID+99])
+	}
+
+	if err := s.SetCommitStatus(repoID, "abc123", "ci/test", "failure", "", "", uid); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetCommitStatus(repoID, "abc123", "ci/build", "success", "", "", uid); err != nil {
+		t.Fatal(err)
+	}
+	statuses, err := s.CommitStatusesFor(repoID, []string{"abc123", "def456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := statuses["abc123"]; len(got) != 2 || got[0].Context != "ci/build" || got[1].State != "failure" {
+		t.Errorf("statuses = %+v", got)
+	}
+	if len(statuses["def456"]) != 0 {
+		t.Errorf("statuses for a commit with none: %+v", statuses["def456"])
+	}
+
+	n, err := s.CreateIssue(repoID, uid, "t", "", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue, err := s.IssueByNumber(repoID, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddIssueComment(issue.ID, uid, "hi", "md"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddIssueSystemComment(issue.ID, uid, "closed"); err != nil {
+		t.Fatal(err)
+	}
+	counts, err := s.IssueCommentCounts([]int64{issue.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[issue.ID] != 1 {
+		t.Errorf("comment count = %d, want 1", counts[issue.ID])
+	}
+}
+
+func TestLabelAndRequestBatches(t *testing.T) {
+	s, repoID, uid := mrFixture(t)
+	mr, err := s.MRByNumber(repoID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetMRReviewRequest(mr.ID, uid, true); err != nil {
+		t.Fatal(err)
+	}
+	reqs, err := s.MRReviewRequestsFor([]int64{mr.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reqs[mr.ID]; len(got) != 1 || got[0] != "cmc" {
+		t.Errorf("review requests = %v", got)
+	}
+	n, err := s.CreateIssue(repoID, uid, "t", "", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue, err := s.IssueByNumber(repoID, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels, assignees, err := s.IssueLabelsFor([]int64{issue.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(labels[issue.ID]) != 0 || len(assignees[issue.ID]) != 0 {
+		t.Errorf("fresh issue: labels %v, assignees %v", labels[issue.ID], assignees[issue.ID])
+	}
+}

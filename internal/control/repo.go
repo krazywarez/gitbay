@@ -445,6 +445,10 @@ func runRepoShow(c *Ctx, args []string) int {
 			d.Mirrors = append(d.Mirrors, mirrorOut{m.Direction, m.URL, m.Dirty, m.LastSync, m.LastError})
 		}
 	}
+	var glance repoGlance
+	if c.Term.Cols > 0 && !c.JSON {
+		glance = repoAtAGlance(c, repo)
+	}
 	return c.emit(d, func(w io.Writer) {
 		bookmarked, archived := "", ""
 		if d.Bookmarked {
@@ -454,19 +458,41 @@ func runRepoShow(c *Ctx, args []string) int {
 			archived = "yes"
 		}
 		v := c.view(w)
-		v.title(d.Path, d.Description, d.Visibility)
-		v.fields(
-			"default branch", d.DefaultBranch,
-			"website", d.Website,
-			"topics", strings.Join(d.Topics, ", "),
-			"protected", strings.Join(d.ProtectedBranches, ", "),
-			"pages domains", strings.Join(d.Domains, ", "),
-			"fork of", d.ForkOf,
-			"watch", d.Watch,
-			"bookmarked", bookmarked,
-			"archived", archived,
-			"url", c.siteURL(d.Path),
-		)
+		if c.Term.Cols > 0 {
+			v.title(d.Path, "", d.Visibility)
+			v.text(d.Description)
+			v.fields(
+				"clone", glance.clone,
+				"issues", glance.issues,
+				"merge requests", glance.mrs,
+				"release", glance.release,
+				"checks", glance.checks,
+				"default branch", d.DefaultBranch,
+				"website", d.Website,
+				"topics", strings.Join(d.Topics, ", "),
+				"protected", strings.Join(d.ProtectedBranches, ", "),
+				"pages domains", strings.Join(d.Domains, ", "),
+				"fork of", d.ForkOf,
+				"watch", d.Watch,
+				"bookmarked", bookmarked,
+				"archived", archived,
+				"url", c.siteURL(d.Path),
+			)
+		} else {
+			v.title(d.Path, d.Description, d.Visibility)
+			v.fields(
+				"default branch", d.DefaultBranch,
+				"website", d.Website,
+				"topics", strings.Join(d.Topics, ", "),
+				"protected", strings.Join(d.ProtectedBranches, ", "),
+				"pages domains", strings.Join(d.Domains, ", "),
+				"fork of", d.ForkOf,
+				"watch", d.Watch,
+				"bookmarked", bookmarked,
+				"archived", archived,
+				"url", c.siteURL(d.Path),
+			)
+		}
 		if len(d.Mirrors) > 0 {
 			v.section("mirror")
 			tb := c.table(w, "DIRECTION", "URL", "LAST SYNC", "STATUS")
@@ -483,6 +509,37 @@ func runRepoShow(c *Ctx, args []string) int {
 			tb.flush()
 		}
 	})
+}
+
+// repoGlance is what repo show adds at a terminal: how to clone it and
+// what is going on in it.
+type repoGlance struct {
+	clone, issues, mrs, release, checks string
+}
+
+// repoAtAGlance reads the glance fields. Each is left blank when it
+// cannot be read: they are a summary, not the command's result.
+func repoAtAGlance(c *Ctx, repo store.Repo) repoGlance {
+	host := c.Cfg.SiteHost()
+	if c.Cfg.SSH.Port != 22 {
+		host += ":" + strconv.Itoa(c.Cfg.SSH.Port)
+	}
+	g := repoGlance{clone: "ssh://git@" + host + "/" + repo.Path() + ".git"}
+	issues, mrs := c.Store.OpenCounts(repo.ID)
+	g.issues = fmt.Sprintf("%d open", issues)
+	g.mrs = fmt.Sprintf("%d open", mrs)
+	if rs, err := c.Store.ListReleasesPage(repo.ID, 1, "", 0); err == nil && len(rs) > 0 {
+		g.release = rs[0].Tag + ", " + relAge(rs[0].CreatedAt, termNow())
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	if tip, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch); err == nil {
+		if sts, err := c.Store.ListCommitStatuses(repo.ID, tip); err == nil {
+			if m := checksMark(sts); m.s != "" {
+				g.checks = m.s + " on " + repo.DefaultBranch
+			}
+		}
+	}
+	return g
 }
 
 func runRepoTransfer(c *Ctx, args []string) int {

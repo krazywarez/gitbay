@@ -604,6 +604,38 @@ func (s *Store) ListMRReviews(mrID int64) ([]MRReview, error) {
 	return out, rows.Err()
 }
 
+// MRReviewsFor is ListMRReviews for every merge request on a list page
+// in one query, keyed by merge request id.
+func (s *Store) MRReviewsFor(mrIDs []int64) (map[int64][]MRReview, error) {
+	out := map[int64][]MRReview{}
+	if len(mrIDs) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(mrIDs))
+	for i, id := range mrIDs {
+		args[i] = id
+	}
+	rows, err := s.DB.Query(`
+		SELECT r.mr_id, u.username, r.verdict, r.head_sha, r.stale, r.created_at
+		FROM mr_reviews r JOIN users u ON u.id = r.reviewer_id
+		WHERE r.mr_id IN (?`+strings.Repeat(",?", len(mrIDs)-1)+`) ORDER BY r.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var r MRReview
+		var stale int
+		if err := rows.Scan(&id, &r.Reviewer, &r.Verdict, &r.HeadSHA, &stale, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.Stale = stale != 0
+		out[id] = append(out[id], r)
+	}
+	return out, rows.Err()
+}
+
 // PrimaryVerifiedEmail returns the user's primary email if verified, else "".
 func (s *Store) PrimaryVerifiedEmail(userID int64) (string, error) {
 	var addr string

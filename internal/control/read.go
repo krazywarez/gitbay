@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -104,12 +105,24 @@ func runRepoRefs(c *Ctx, args []string) int {
 	for _, ref := range tags {
 		d.Tags = append(d.Tags, refOut{Name: ref.Name, SHA: ref.SHA})
 	}
+	// Tags read newest version first; the JSON keeps git's order.
+	sorted := slices.Clone(tags)
+	gitutil.SortVersions(sorted)
 	return c.emit(d, func(w io.Writer) {
 		tb := c.table(w, "KIND", "NAME", "SHA")
-		for _, ref := range d.Branches {
-			tb.row(cText("branch"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
+		if c.Term.Cols > 0 {
+			for _, ref := range d.Branches {
+				if ref.Name == repo.DefaultBranch {
+					tb.row(cText("default"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
+				}
+			}
 		}
-		for _, ref := range d.Tags {
+		for _, ref := range d.Branches {
+			if c.Term.Cols == 0 || ref.Name != repo.DefaultBranch {
+				tb.row(cText("branch"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
+			}
+		}
+		for _, ref := range sorted {
 			tb.row(cText("tag"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
 		}
 		tb.flush()
@@ -311,6 +324,20 @@ func runRepoTree(c *Ctx, args []string) int {
 		d.Entries = append(d.Entries, eo)
 	}
 	return c.emit(d, func(w io.Writer) {
+		if c.Term.Cols > 0 {
+			tb := c.table(w, "NAME", "SIZE", "SHA")
+			for _, e := range d.Entries {
+				name, size := cText(e.Name), cText("")
+				if e.Type == "tree" {
+					name = cMark(e.Name+"/", sgrCyan)
+				} else {
+					size = cSize(e.Size)
+				}
+				tb.row(name, size, cMark(e.SHA[:min(10, len(e.SHA))], sgrDim))
+			}
+			tb.flush()
+			return
+		}
 		tb := c.table(w, "SHA", "SIZE", "NAME")
 		for _, e := range d.Entries {
 			name := e.Name

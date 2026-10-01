@@ -171,3 +171,21 @@ func TestTableSizeCells(t *testing.T) {
 		t.Errorf("term = %q", term.String())
 	}
 }
+
+func TestTableDropsEmptyColumns(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b, "#", "LABELS", "TITLE")
+	tb.row(cRef("#1"), cText(""), cFlex("one"))
+	tb.row(cRef("#2"), cText(""), cFlex("two"))
+	tb.flush()
+	if b.String() != "#   TITLE\n#1  one\n#2  two\n" {
+		t.Errorf("terminal = %q", b.String())
+	}
+	var plain bytes.Buffer
+	tb = (&Ctx{}).table(&plain, "#", "LABELS", "TITLE")
+	tb.row(cRef("#1"), cText(""), cFlex("one"))
+	tb.flush()
+	if plain.String() != "#1\t\tone\n" {
+		t.Errorf("plain = %q", plain.String())
+	}
+}

@@ -53,6 +53,37 @@ func (s *Store) ListCommitStatuses(repoID int64, sha string) ([]CommitStatus, er
 	return out, rows.Err()
 }
 
+// CommitStatusesFor is ListCommitStatuses for every commit on a list
+// page in one query, keyed by commit.
+func (s *Store) CommitStatusesFor(repoID int64, shas []string) (map[string][]CommitStatus, error) {
+	out := map[string][]CommitStatus{}
+	if len(shas) == 0 {
+		return out, nil
+	}
+	args := []any{repoID}
+	for _, sha := range shas {
+		args = append(args, sha)
+	}
+	rows, err := s.DB.Query(`
+		SELECT cs.commit_sha, cs.context, cs.state, cs.description, cs.target_url, COALESCE(u.username, ''), cs.updated_at
+		FROM commit_statuses cs LEFT JOIN users u ON u.id = cs.creator_id
+		WHERE cs.repo_id = ? AND cs.commit_sha IN (?`+strings.Repeat(",?", len(shas)-1)+`)
+		ORDER BY cs.context`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sha string
+		var c CommitStatus
+		if err := rows.Scan(&sha, &c.Context, &c.State, &c.Description, &c.TargetURL, &c.Creator, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out[sha] = append(out[sha], c)
+	}
+	return out, rows.Err()
+}
+
 // RepoHasStatuses reports whether anything has ever reported a status in
 // this repository. It is how require_checks tells a repository whose
 // checks come from outside — `status set`, with no .gitbay/ci.yml — from
