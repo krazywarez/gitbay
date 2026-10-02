@@ -39,6 +39,13 @@ anything beyond "replace the binary and restart" is needed.
   milestone lists (repo and org), =org team list=/=show=. The session's
   own key leads with =●=; =pgp list= shows user IDs rather than their
   JSON; a webhook URL on screen is its scheme and host only.
+- The remaining commands at a terminal are screens (#319): saved
+  queries (and =issue list=/=mr list= with =--query=/=--q=), =search=
+  (a section per kind), =feed=, =mr revisions=, =issue templates=,
+  =build jobs=, =status list=, releases, snippets, wiki, =explore=,
+  =audit=, and the admin commands (=admin stats= lists the 20 largest
+  repositories). Every list and show is now a screen; the piped layout
+  is the only other one.
 
 * v1.41.0 — 2026-10-01
 
