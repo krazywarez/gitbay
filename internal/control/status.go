@@ -154,7 +154,7 @@ func runStatusList(c *Ctx, args []string) int {
 			{"Commit", []cell{cRef(fmt.Sprintf("%.10s", d.SHA))}},
 			{"Combined", combined},
 		}, sections: []section{statuses}, actions: []action{
-			{"Report", []string{"status", "set", repo.Path(), d.SHA, "--context", "<context>", "--state", "success"}},
+			{"Read", []string{"repo", "commit", repo.Path(), fmt.Sprintf("%.10s", d.SHA)}},
 		}}
 	})
 }

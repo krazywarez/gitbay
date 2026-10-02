@@ -383,7 +383,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		}
 		keys := section{title: "Keys", n: len(d.Keys)}
 		for _, k := range d.Keys {
-			keys.rows = append(keys.rows, rowOf(cRef(k.Fingerprint), cState(k.Scope), cMeta(k.Algo, "used "+relAge(k.LastUsedAt, termNow()))))
+			keys.rows = append(keys.rows, rowOf(cFlexRef(k.Fingerprint), cState(k.Scope), cMeta(k.Algo, "used "+relAge(k.LastUsedAt, termNow()))))
 		}
 		emails := section{title: "Emails", n: len(d.Emails)}
 		for _, e := range d.Emails {
@@ -398,7 +398,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		}
 		pgp := section{title: "PGP keys", n: len(d.PGPKeys)}
 		for _, k := range d.PGPKeys {
-			pgp.rows = append(pgp.rows, rowOf(cRef(k.Fingerprint)))
+			pgp.rows = append(pgp.rows, rowOf(cFlexRef(k.Fingerprint)))
 		}
 		orgs := section{title: "Orgs", n: len(d.Orgs)}
 		for _, o := range d.Orgs {
