@@ -27,26 +27,26 @@ func TestTablePlainIsTabs(t *testing.T) {
 func TestTableTerminalFits(t *testing.T) {
 	var b bytes.Buffer
 	fixtureTable(&Ctx{Term: Term{Cols: 40}}, &b)
-	want := "#     STATE   TITLE           AUTHOR\n" +
-		"#252  open    Dependency up…  gitbay-bot\n" +
+	want := "#252  open    Dependency up…  gitbay-bot\n" +
 		"#12   closed  Android app     cmc\n"
 	if b.String() != want {
 		t.Errorf("terminal:\n%s\nwant\n%s", b.String(), want)
 	}
 }
 
-// A column shrunk below its header's width clips the header too.
+// A column shrunk below its header's width clips the header too. The
+// number column is what keeps the header.
 func TestTableClipsHeaderToColumn(t *testing.T) {
 	var b bytes.Buffer
-	tb := (&Ctx{Term: Term{Cols: 16}}).table(&b, "FINGERPRINT", "SCOPE")
-	tb.row(cFlex("SHA256:abcdefghijklmnopqrstuvwxyz"), cState("full"))
+	tb := (&Ctx{Term: Term{Cols: 12}}).table(&b, "FINGERPRINTS", "N")
+	tb.row(cFlex("SHA256:abcdefghijklmnopqrstuvwxyz"), cNum(1))
 	tb.flush()
 	for _, line := range strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n") {
-		if cells(line) > 16 {
-			t.Errorf("line of %d cells at 16 columns: %q", cells(line), line)
+		if cells(line) > 12 {
+			t.Errorf("line of %d cells at 12 columns: %q", cells(line), line)
 		}
 	}
-	if !strings.HasPrefix(b.String(), "FINGERPR…  SCOPE\n") {
+	if !strings.HasPrefix(b.String(), "FINGERPR…  N\n") {
 		t.Errorf("header:\n%s", b.String())
 	}
 }
@@ -58,8 +58,8 @@ func TestTableColourOnlyAddsSGR(t *testing.T) {
 	if !strings.Contains(colour.String(), sgrGreen+"open"+sgrReset) {
 		t.Errorf("open not green: %q", colour.String())
 	}
-	if !strings.HasPrefix(colour.String(), sgrDim) {
-		t.Errorf("header not dim: %q", colour.String())
+	if !strings.HasPrefix(colour.String(), sgrDim+"#252"+sgrReset) {
+		t.Errorf("ref not dim: %q", colour.String())
 	}
 	if stripSGR(colour.String()) != mono.String() {
 		t.Errorf("colour changed the layout:\n%s\nvs\n%s", stripSGR(colour.String()), mono.String())
@@ -81,7 +81,7 @@ func TestTableAgesAndPlainStamps(t *testing.T) {
 	if plain.String() != "#1\t2026-09-23T10:00:00Z\n" {
 		t.Errorf("plain = %q", plain.String())
 	}
-	if term.String() != "#   UPDATED\n#1  2h ago\n" {
+	if term.String() != "#1  2h ago\n" {
 		t.Errorf("term = %q", term.String())
 	}
 }
@@ -102,18 +102,16 @@ func TestTableKeepsCellsBeyondTheHeader(t *testing.T) {
 		t.Fatalf("archived marker dropped:\n%s", out)
 	}
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("want 3 lines, got %d:\n%s", len(lines), out)
+	if len(lines) != 2 {
+		t.Fatalf("want 2 lines, got %d:\n%s", len(lines), out)
 	}
-	header, row1, row2 := lines[0], lines[1], lines[2]
-	descAt := strings.Index(header, "DESCRIPTION")
-	oneAt := strings.Index(row1, "one")
-	twoAt := strings.Index(row2, "two")
-	if descAt < 0 || oneAt < 0 || twoAt < 0 {
+	oneAt := strings.Index(lines[0], "one")
+	twoAt := strings.Index(lines[1], "two")
+	if oneAt < 0 || twoAt < 0 {
 		t.Fatalf("columns not found:\n%s", out)
 	}
-	if descAt != oneAt || descAt != twoAt {
-		t.Errorf("DESCRIPTION column not aligned: header at %d, row1 at %d, row2 at %d\n%s", descAt, oneAt, twoAt, out)
+	if oneAt != twoAt {
+		t.Errorf("description column not aligned: row1 at %d, row2 at %d\n%s", oneAt, twoAt, out)
 	}
 }
 
@@ -149,8 +147,8 @@ func TestTableCapsSparseFlex(t *testing.T) {
 	tb.row(cRef("v0"), cFlex(strings.Repeat("x", 60)), cText("2"))
 	tb.flush()
 	lines := strings.Split(b.String(), "\n")
-	if at := strings.Index(lines[0], "ASSETS"); at != len("TAG  ")+30+2 {
-		t.Errorf("ASSETS at %d:\n%s", at, b.String())
+	if at := strings.LastIndex(lines[0], "2"); at != len("v3  ")+30+2 {
+		t.Errorf("assets at %d:\n%s", at, b.String())
 	}
 }
 
@@ -178,7 +176,7 @@ func TestTableDropsEmptyColumns(t *testing.T) {
 	tb.row(cRef("#1"), cText(""), cFlex("one"))
 	tb.row(cRef("#2"), cText(""), cFlex("two"))
 	tb.flush()
-	if b.String() != "#   TITLE\n#1  one\n#2  two\n" {
+	if b.String() != "#1  one\n#2  two\n" {
 		t.Errorf("terminal = %q", b.String())
 	}
 	var plain bytes.Buffer
@@ -236,5 +234,37 @@ func TestGlyphAndMetaCells(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in %q", want, out)
 		}
+	}
+}
+
+func TestTableDropsHeaderWithoutNumbers(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b, "#", "STATE", "TITLE")
+	tb.row(cRef("#12"), cState("open"), cFlex("Android app"))
+	tb.flush()
+	if got, want := b.String(), "#12  open  Android app\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTableKeepsHeaderForNumbers(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b, "RUNNER", "PENDING")
+	tb.row(cText("bay1"), cNum(3))
+	tb.flush()
+	if !strings.HasPrefix(b.String(), "RUNNER  PENDING\n") {
+		t.Errorf("header missing: %q", b.String())
+	}
+}
+
+func TestTableLines(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80}}).table(&b)
+	tb.row(cRef("!1"), cFlex("one"))
+	tb.row(cRef("!22"), cFlex("two"))
+	got := tb.lines()
+	want := []string{"!1   one", "!22  two"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

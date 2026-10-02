@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// A repo hit has no state, an issue/mr hit does. At a terminal both must
-// still put TITLE under the TITLE header, not have the repo's title slide
-// left under STATE.
+// A repo hit has no state, an issue/mr hit does. At a terminal both
+// titles must start in the same column, not have the repo's title slide
+// left into the state column.
 func TestSearchTableAlignsTitleAtTerminal(t *testing.T) {
 	results := []SearchResult{
 		{Kind: "repo", Repo: "alice/webapp", Title: "a web application"},
@@ -18,21 +18,17 @@ func TestSearchTableAlignsTitleAtTerminal(t *testing.T) {
 	writeSearchTable(&Ctx{Term: Term{Cols: 100}}, &b, results)
 
 	lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("want header + 2 rows, got %d lines:\n%s", len(lines), b.String())
+	if len(lines) != 2 {
+		t.Fatalf("want 2 rows, got %d lines:\n%s", len(lines), b.String())
 	}
-	header, repoRow, issueRow := lines[0], lines[1], lines[2]
-	titleAt := strings.Index(header, "TITLE")
+	repoRow, issueRow := lines[0], lines[1]
 	repoTitleAt := strings.Index(repoRow, "a web application")
 	issueTitleAt := strings.Index(issueRow, "memory leak")
-	if titleAt < 0 || repoTitleAt < 0 || issueTitleAt < 0 {
+	if repoTitleAt < 0 || issueTitleAt < 0 {
 		t.Fatalf("columns not found:\n%s", b.String())
 	}
 	if repoTitleAt != issueTitleAt {
 		t.Errorf("titles not aligned: repo row at %d, issue row at %d\n%s", repoTitleAt, issueTitleAt, b.String())
-	}
-	if repoTitleAt != titleAt {
-		t.Errorf("title not under TITLE header: header at %d, repo row at %d\n%s", titleAt, repoTitleAt, b.String())
 	}
 }
 

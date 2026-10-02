@@ -74,8 +74,8 @@ func cMeta(parts ...string) cell {
 
 // table is a list command's rows. Plain, each row is written as it
 // comes, tab-separated with no header. At a terminal rows are held
-// until flush, then written under a header, padded, and fitted to the
-// width.
+// until flush, then padded and fitted to the width, under a header only
+// when a column holds numbers.
 type table struct {
 	term   Term
 	w      io.Writer
@@ -135,6 +135,32 @@ func (t *table) flush() {
 	if t.term.Cols == 0 || len(t.rows) == 0 {
 		return
 	}
+	var b strings.Builder
+	for _, l := range t.lines() {
+		b.WriteString(l + "\n")
+	}
+	io.WriteString(t.w, b.String())
+}
+
+// numeric reports whether a column holds numbers or sizes, which need a
+// header to say what they count.
+func (t *table) numeric() bool {
+	for _, r := range t.rows {
+		for _, c := range r {
+			if c.kind == kindNum || c.kind == kindSize {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// lines lays the rows out at the terminal width: a dim header first
+// only when a column is a number, then each row padded and painted.
+func (t *table) lines() []string {
+	if !t.numeric() {
+		t.header = nil
+	}
 	t.dropEmpty()
 	// The column count is never smaller than the longest row: a row with
 	// more cells than the header has still gets every cell rendered, the
@@ -155,14 +181,17 @@ func (t *table) flush() {
 	t.capSparse(widths)
 	t.fit(widths)
 
-	var b strings.Builder
+	var out []string
 	line := make([]string, n)
-	for i := range line {
-		if i < len(t.header) {
-			line[i] = clip(t.header[i], widths[i])
+	if len(t.header) > 0 {
+		for i := range line {
+			line[i] = ""
+			if i < len(t.header) {
+				line[i] = clip(t.header[i], widths[i])
+			}
 		}
+		out = append(out, t.term.paint(sgrDim, strings.TrimRight(t.join(line, widths), " ")))
 	}
-	b.WriteString(t.term.paint(sgrDim, strings.TrimRight(t.join(line, widths), " ")) + "\n")
 	for _, r := range t.rows {
 		for i := 0; i < n; i++ {
 			s := ""
@@ -171,9 +200,9 @@ func (t *table) flush() {
 			}
 			line[i] = s
 		}
-		b.WriteString(strings.TrimRight(t.joinRow(r, line, widths), " ") + "\n")
+		out = append(out, strings.TrimRight(t.joinRow(r, line, widths), " "))
 	}
-	io.WriteString(t.w, b.String())
+	return out
 }
 
 // dropEmpty removes a column that is blank on every row, header and
