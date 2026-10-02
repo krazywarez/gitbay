@@ -129,7 +129,7 @@ func runDeployKeyList(c *Ctx, args []string) int {
 	}, func() screen {
 		rows := make([]row, len(ds))
 		for i, d := range ds {
-			rows[i] = rowOf(cRef(d.Fingerprint), cState(d.Mode), cText(d.Label),
+			rows[i] = rowOf(cFlexRef(d.Fingerprint), cState(d.Mode), cText(d.Label),
 				cMeta(d.Algo, "used "+c.usedText(d.LastUsedAt), c.expiresText(d.ExpiresAt, now)))
 		}
 		return listScreen("Deploy keys", rows,

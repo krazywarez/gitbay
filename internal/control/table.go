@@ -57,6 +57,11 @@ func cGlyph(state string) cell {
 	return cell{kind: kindGlyph, s: g, sgr: sgr}
 }
 
+// cFlexRef is an identifier too long to keep whole at every width, a
+// key fingerprint: dim like a reference, but cut to fit like a title.
+// Piped and --json output carry it whole.
+func cFlexRef(s string) cell { return cell{kind: kindFlex, s: s, sgr: sgrDim} }
+
 // cYou is the mark for a row that waits on the viewer.
 func cYou() cell { return cell{kind: kindGlyph, s: "●", sgr: sgrYellow} }
 

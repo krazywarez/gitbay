@@ -25,7 +25,7 @@ func TestTermEnvSelectsTerminalOutput(t *testing.T) {
 		t.Errorf("plain repo list: %q", plain)
 	}
 	term, _, _ := inst.sshTerm(t, key, "80,color", "repo", "list")
-	if !strings.HasPrefix(term, "\x1b[2malice/app\x1b[0m  ") {
+	if !strings.HasPrefix(term, "\x1b[1m\x1b[34mRepositories (1)") {
 		t.Errorf("terminal repo list: %q", term)
 	}
 }
@@ -75,10 +75,10 @@ func TestTermEnvOverMultiplexedSession(t *testing.T) {
 		exec.Command("ssh", "-o", "ControlPath="+sock, "-O", "exit", "git@127.0.0.1").Run()
 	})
 
-	if out := mux("80"); !strings.HasPrefix(out, "alice/app  ") {
+	if out := mux("80"); !strings.HasPrefix(out, "Repositories (1)\nalice/app  public") {
 		t.Fatalf("master session: %q", out)
 	}
-	if out := mux("80,color"); !strings.HasPrefix(out, "\x1b[2malice/app") {
+	if out := mux("80,color"); !strings.HasPrefix(out, "\x1b[1m\x1b[34mRepositories") {
 		t.Errorf("second session kept the master's GITBAY_TERM: %q", out)
 	}
 	if out := mux(""); !strings.HasPrefix(out, "alice/app\t") {

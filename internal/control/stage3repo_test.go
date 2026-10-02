@@ -284,3 +284,27 @@ func TestRepoShowScreens(t *testing.T) {
 		t.Errorf("legend before the header:\n%s", out)
 	}
 }
+
+// At 60 columns no screen line is wider than the terminal, apart from a
+// suggested command: e2e's readonly test holds every read command to it.
+func TestRepoScreensFitSixtyColumns(t *testing.T) {
+	st, repo, owner := repoListsFixture(t)
+	p := repo.Path()
+	for _, argv := range [][]string{
+		{"repo", "deploy-key", "list", p},
+		{"repo", "runner", "list", p},
+		{"repo", "mirror", "list", p},
+	} {
+		out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+		c := &Ctx{User: owner, Scope: "full", Store: st, Stdout: out, Stderr: errOut, Term: Term{Cols: 60}}
+		c.Cfg.Limits.WriteRate = -1
+		if code := Dispatch(c, argv); code != protocol.ExitOK {
+			t.Fatalf("%v: exit %d: %s", argv, code, errOut)
+		}
+		for _, line := range strings.Split(out.String(), "\n") {
+			if cells(line) > 60 && !strings.HasPrefix(line, "gitbay ") {
+				t.Errorf("%v: %d cells: %q", argv, cells(line), line)
+			}
+		}
+	}
+}

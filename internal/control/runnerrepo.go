@@ -139,7 +139,7 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 			if r.LastSeen != "" {
 				seen = "seen " + relAge(r.LastSeen, termNow())
 			}
-			rows[i] = rowOf(cRef(r.Fingerprint), lead, cFlex(r.Username), cMeta(r.Algo, seen, held))
+			rows[i] = rowOf(cFlexRef(r.Fingerprint), lead, cText(r.Username), cMeta(r.Algo, seen, held))
 		}
 		return listScreen("Runners", rows,
 			action{"Runners", []string{"repo", "runner", "remove", repo.Path(), "<fingerprint>"}},

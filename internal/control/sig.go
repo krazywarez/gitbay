@@ -362,7 +362,7 @@ func runRepoCommit(c *Ctx, args []string) int {
 		if d.CommitterEmail != "" && d.CommitterEmail != d.AuthorEmail {
 			s.fields = append(s.fields, field{"Committer", []cell{cText(d.CommitterEmail)}})
 		}
-		s.fields = append(s.fields, field{"Signature", []cell{cGlyph(d.Signature.State), cState(d.Signature.State), cMeta(d.Signature.Signer, d.Signature.Fingerprint)}})
+		s.fields = append(s.fields, field{"Signed", []cell{cGlyph(d.Signature.State), cState(d.Signature.State), cMeta(d.Signature.Signer, d.Signature.Fingerprint)}})
 		if !c.Term.Links {
 			s.fields = append(s.fields, field{"URL", []cell{cText(url)}})
 		}
