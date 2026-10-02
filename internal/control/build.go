@@ -213,13 +213,29 @@ func runBuildList(c *Ctx, args []string) int {
 	for i := range ds {
 		ds[i].Subject = subjects[ds[i].SHA]
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "#", "JOB", "STATUS", "SHA", "REF", "TITLE")
 		for _, d := range ds {
 			tb.row(cLink(fmt.Sprintf("%d", d.Number), c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10))), cText(d.Job), cState(d.Status), cRef(fmt.Sprintf("%.10s", d.SHA)), cText(d.Ref), cFlex(d.Subject))
 		}
 		tb.flush()
-	})
+	}, func() screen { return buildListScreen(c, repo, ds) })
+}
+
+// buildListScreen is build list at a terminal: one section of builds,
+// each led by its outcome's mark, then job, ref, commit subject and age.
+func buildListScreen(c *Ctx, repo store.Repo, ds []BuildOut) screen {
+	sec := section{title: "Builds", n: len(ds)}
+	for _, d := range ds {
+		n := strconv.FormatInt(d.Number, 10)
+		sec.rows = append(sec.rows, rowOf(cLink(n, c.siteURL(repo.Path(), "builds", n)), cGlyph(d.Status),
+			cText(d.Job), cText(d.Ref), cFlex(d.Subject), cAge(d.CreatedAt)))
+	}
+	s := screen{sections: []section{sec}}
+	if len(ds) > 0 {
+		s.actions = []action{{"Read", []string{"build", "show", repo.Path(), strconv.FormatInt(ds[0].Number, 10)}}}
+	}
+	return s
 }
 
 // buildSubjects reads the commit subject of each distinct sha on a page

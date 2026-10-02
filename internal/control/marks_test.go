@@ -59,15 +59,9 @@ func TestReviewMark(t *testing.T) {
 	}
 }
 
-func TestLabelsAndAssignees(t *testing.T) {
+func TestLabelsMark(t *testing.T) {
 	if got := labelsMark([]string{"a", "b", "c", "d"}); got != "a, b, +2" {
 		t.Errorf("labelsMark = %q", got)
-	}
-	if got := assigneesMark([]string{"me"}, "me"); got.sgr != sgrYellow {
-		t.Errorf("viewer's assignment not yellow: %+v", got)
-	}
-	if got := assigneesMark([]string{"bob"}, "me"); got.sgr != "" {
-		t.Errorf("someone else's assignment coloured: %+v", got)
 	}
 }
 

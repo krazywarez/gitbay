@@ -354,29 +354,13 @@ func runIssueList(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			// At a terminal: who it waits on and how much it has moved,
-			// in place of who opened it.
-			tb := c.table(w, "#", "STATE", "TITLE", "LABELS", "ASSIGNEE", "COMMENTS", "UPDATED")
-			for i, d := range ds {
-				n := ""
-				if k := comments[issues[i].ID]; k > 0 {
-					n = strconv.Itoa(k)
-				}
-				tb.row(cLink(fmt.Sprintf("#%d", d.Number), c.siteURL(repo.Path(), "issues", strconv.FormatInt(d.Number, 10))), cState(d.State), cFlex(d.Title),
-					cText(labelsMark(labels[issues[i].ID])), assigneesMark(assignees[issues[i].ID], c.User.Username),
-					cText(n), cAge(issues[i].UpdatedAt))
-			}
-			tb.flush()
-			return
-		}
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "#", "STATE", "TITLE", "AUTHOR")
 		for _, d := range ds {
 			tb.row(cRef(fmt.Sprintf("#%d", d.Number)), cState(d.State), cFlex(d.Title), cText(d.Author))
 		}
 		tb.flush()
-	})
+	}, func() screen { return issueListScreen(c, repo, f.State, issues, ds, comments, labels, assignees) })
 }
 
 func runIssueShow(c *Ctx, args []string) int {
@@ -768,4 +752,40 @@ func issueShowScreen(c *Ctx, repo store.Repo, d IssueShow, canWrite bool) screen
 		s.actions = append(s.actions, action{"State", []string{"issue", verb, path, n}})
 	}
 	return s
+}
+
+// issueListScreen is issue list at a terminal: one section of issues,
+// each led by ● when it is assigned to the viewer, then title, labels,
+// assignees, comments and age.
+func issueListScreen(c *Ctx, repo store.Repo, state string, issues []store.Issue, ds []issueOut, comments map[int64]int, labels, assignees map[int64][]string) screen {
+	title, ok := map[string]string{"open": "Open issues", "closed": "Closed issues"}[state]
+	if !ok {
+		title = "Issues"
+	}
+	sec := section{title: title, n: len(ds)}
+	for i, d := range ds {
+		id := issues[i].ID
+		lead := cGlyph(d.State)
+		if slices.Contains(assignees[id], c.User.Username) {
+			lead = cYou()
+		}
+		n := ""
+		switch k := comments[id]; {
+		case k == 1:
+			n = "1 comment"
+		case k > 1:
+			n = fmt.Sprintf("%d comments", k)
+		}
+		ref := cLink(fmt.Sprintf("#%d", d.Number), c.siteURL(repo.Path(), "issues", strconv.FormatInt(d.Number, 10)))
+		sec.rows = append(sec.rows, rowOf(ref, lead, cFlex(d.Title),
+			cMeta(labelsMark(labels[id]), labelsMark(assignees[id]), n, relAge(issues[i].UpdatedAt, termNow()))))
+	}
+	other := "closed"
+	if state != "open" {
+		other = "open"
+	}
+	return screen{sections: []section{sec}, actions: []action{
+		{"New", []string{"issue", "create", repo.Path()}},
+		{"Filter", []string{"issue", "list", repo.Path(), "--state", other}},
+	}}
 }

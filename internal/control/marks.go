@@ -115,12 +115,3 @@ func labelsMark(labels []string) string {
 	}
 	return fmt.Sprintf("%s, +%d", strings.Join(labels[:2], ", "), len(labels)-2)
 }
-
-// assigneesMark is a row's assignees, yellow when the viewer is one.
-func assigneesMark(assignees []string, viewer string) cell {
-	s := labelsMark(assignees)
-	if slices.Contains(assignees, viewer) {
-		return cMark(s, sgrYellow)
-	}
-	return cText(s)
-}

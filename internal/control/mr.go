@@ -685,11 +685,7 @@ func runMRList(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			mrListTerm(c, w, repo, mrs, ds, checks, review)
-			return
-		}
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "!", "STATE", "TITLE", "REF")
 		for _, d := range ds {
 			state := d.State
@@ -703,31 +699,50 @@ func runMRList(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
-	})
+	}, func() screen { return mrListScreen(c, repo, f.State, mrs, ds, checks, review) })
 }
 
-// mrListTerm is mr list at a terminal: where checks and review stand
-// for each open merge request, and when it last changed. The source
+// mrListScreen is mr list at a terminal: one section of merge requests,
+// each led by ● when its review waits on the viewer, otherwise by its
+// checks' mark, then title, review state, branch and age. The source
 // branch alone names a merge request into the default branch.
-func mrListTerm(c *Ctx, w io.Writer, repo store.Repo, mrs []store.MR, ds []mrOut, checks, review map[int64]cell) {
-	tb := c.table(w, "!", "STATE", "TITLE", "BRANCH", "CHECKS", "REVIEW", "UPDATED")
+func mrListScreen(c *Ctx, repo store.Repo, state string, mrs []store.MR, ds []mrOut, checks, review map[int64]cell) screen {
+	title, ok := map[string]string{"open": "Open merge requests", "closed": "Closed merge requests", "merged": "Merged merge requests"}[state]
+	if !ok {
+		title = "Merge requests"
+	}
+	sec := section{title: title, n: len(ds)}
 	for i, d := range ds {
-		state := d.State
-		if d.Draft {
-			state = "draft"
+		m := mrs[i]
+		lead := cell{kind: kindGlyph}
+		if ch := checks[m.ID]; ch.s != "" {
+			g, _, _ := strings.Cut(ch.s, " ")
+			lead = cell{kind: kindGlyph, s: g, sgr: ch.sgr}
 		}
-		ref := d.Source
+		if review[m.ID].sgr == sgrYellow {
+			lead = cYou()
+		}
+		branch := d.Source
 		if d.TargetRef != repo.DefaultBranch {
-			ref += " -> " + d.TargetRef
+			branch += " → " + d.TargetRef
 		}
 		if d.StackedOn != nil {
-			ref += fmt.Sprintf(" (on !%d)", d.StackedOn.Number)
+			branch += fmt.Sprintf(" (on !%d)", d.StackedOn.Number)
 		}
-		m := mrs[i]
-		tb.row(cLink(fmt.Sprintf("!%d", d.Number), c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10))), cState(state), cFlex(d.Title), cText(ref),
-			checks[m.ID], review[m.ID], cAge(m.UpdatedAt))
+		if d.Draft {
+			branch = "draft · " + branch
+		}
+		ref := cLink(fmt.Sprintf("!%d", d.Number), c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)))
+		sec.rows = append(sec.rows, rowOf(ref, lead, cFlex(d.Title), review[m.ID], cMeta(branch, relAge(m.UpdatedAt, termNow()))))
 	}
-	tb.flush()
+	other := "all"
+	if state == "all" {
+		other = "open"
+	}
+	return screen{sections: []section{sec}, actions: []action{
+		{"New", []string{"mr", "create", repo.Path()}},
+		{"Filter", []string{"mr", "list", repo.Path(), "--state", other}},
+	}}
 }
 
 // byWhom renders " by <user>", or nothing when the actor is unknown — an
