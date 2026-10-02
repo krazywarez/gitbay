@@ -22,6 +22,9 @@ type Term struct {
 	TrueColor bool
 	// Links is OSC 8 hyperlinks, for a reference's page.
 	Links bool
+	// Here is the repository the CLI inferred from the clone it runs in,
+	// so a suggested command can leave it out.
+	Here string
 }
 
 // ParseTerm reads "<cols>[,<option>]...". Options it does not know are
@@ -36,6 +39,10 @@ func ParseTerm(v string) Term {
 	}
 	t := Term{Cols: n}
 	for _, opt := range parts[1:] {
+		if v, ok := strings.CutPrefix(opt, "here="); ok {
+			t.Here = v
+			continue
+		}
 		switch opt {
 		case "color":
 			t.Color = true

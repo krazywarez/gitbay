@@ -1,6 +1,7 @@
 package control
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -112,5 +113,67 @@ func TestRenderFieldWraps(t *testing.T) {
 	}
 	if !strings.HasPrefix(lines[1], strings.Repeat(" ", len("Merge:  !1  "))) {
 		t.Errorf("continuation not under the value: %q", lines[1])
+	}
+}
+
+func TestCmdlineDropsHere(t *testing.T) {
+	c := screenCtx(80, false)
+	c.Term.Here = "krz/gitbay"
+	for _, tc := range []struct {
+		argv []string
+		want string
+	}{
+		{[]string{"mr", "diff", "krz/gitbay", "552"}, "gitbay mr diff 552"},
+		{[]string{"issue", "show", "krz/hutch", "3"}, "gitbay issue show krz/hutch 3"},
+		{[]string{"issue", "list", "--label", "needs review"}, "gitbay issue list --label 'needs review'"},
+	} {
+		if got := c.cmdline(tc.argv); got != tc.want {
+			t.Errorf("cmdline(%q) = %q, want %q", tc.argv, got, tc.want)
+		}
+	}
+}
+
+func legendSample() []action {
+	return []action{
+		{"Unblock", []string{"mr", "rebase", "552"}},
+		{"Review", []string{"mr", "review", "krz/gitbay", "552", "--approve"}},
+		{"Review", []string{"mr", "comment", "krz/gitbay", "552"}},
+		{"Read", []string{"mr", "diff", "krz/gitbay", "552"}},
+	}
+}
+
+func TestLegendColumns(t *testing.T) {
+	c := screenCtx(120, false)
+	c.Term.Here = "krz/gitbay"
+	got := c.renderLegend(legendSample())
+	want := strings.Repeat("─", 120) + "\n" +
+		fmt.Sprintf("%-22s%-32s%s\n", "Unblock", "Review", "Read") +
+		fmt.Sprintf("%-22s%-32s%s\n", "gitbay mr rebase 552", "gitbay mr review 552 --approve", "gitbay mr diff 552") +
+		fmt.Sprintf("%-22s%s\n", "", "gitbay mr comment 552")
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestLegendStacksWhenNarrow(t *testing.T) {
+	c := screenCtx(60, false)
+	c.Term.Here = "krz/gitbay"
+	got := c.renderLegend(legendSample())
+	want := strings.Repeat("─", 60) + "\n" +
+		"Unblock\ngitbay mr rebase 552\n" +
+		"Review\ngitbay mr review 552 --approve\ngitbay mr comment 552\n" +
+		"Read\ngitbay mr diff 552\n"
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestLegendColour(t *testing.T) {
+	got := screenCtx(120, true).renderLegend(legendSample())
+	if !strings.Contains(got, sgrBlue+"gitbay mr rebase 552"+sgrReset) || !strings.Contains(got, sgrBold+"Unblock"+sgrReset) {
+		t.Errorf("legend paint: %q", got)
+	}
+	if stripSGR(got) != screenCtx(120, false).renderLegend(legendSample()) {
+		t.Error("colour legend differs beyond SGR")
 	}
 }

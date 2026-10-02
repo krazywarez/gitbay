@@ -198,6 +198,82 @@ func (c *Ctx) renderSection(s section) string {
 	return b.String()
 }
 
-func (c *Ctx) renderLegend(as []action) string { return "" }
+// cmdline is argv as the viewer would type it: "gitbay", the words
+// shell-quoted, and the repository the CLI inferred left out.
+func (c *Ctx) cmdline(argv []string) string {
+	words := []string{"gitbay"}
+	for _, a := range argv {
+		if c.Term.Here != "" && a == c.Term.Here {
+			continue
+		}
+		words = append(words, shellWord(a))
+	}
+	return strings.Join(words, " ")
+}
 
-func (c *Ctx) cmdline(argv []string) string { return "gitbay " + strings.Join(argv, " ") }
+// renderLegend is a rule, then the action groups in the order they first
+// appear, each a bold name over its commands in blue. Groups sit side by
+// side, three to a band, when the terminal is 80 wide or more and the
+// band fits; otherwise they stack.
+func (c *Ctx) renderLegend(as []action) string {
+	if len(as) == 0 {
+		return ""
+	}
+	t := c.Term
+	type group struct {
+		name string
+		cmds []string
+	}
+	var groups []*group
+	byName := map[string]*group{}
+	for _, a := range as {
+		g := byName[a.group]
+		if g == nil {
+			g = &group{name: a.group}
+			byName[a.group] = g
+			groups = append(groups, g)
+		}
+		g.cmds = append(g.cmds, c.cmdline(a.argv))
+	}
+	var b strings.Builder
+	b.WriteString(t.paint(sgrDim, strings.Repeat("─", t.Cols)) + "\n")
+	for start := 0; start < len(groups); start += 3 {
+		band := groups[start:min(start+3, len(groups))]
+		widths := make([]int, len(band))
+		total, height := 2*(len(band)-1), 0
+		for i, g := range band {
+			widths[i] = cells(g.name)
+			for _, cmd := range g.cmds {
+				widths[i] = max(widths[i], cells(cmd))
+			}
+			total += widths[i]
+			height = max(height, len(g.cmds))
+		}
+		if t.Cols < 80 || total > t.Cols {
+			for _, g := range band {
+				b.WriteString(t.paint(sgrBold, g.name) + "\n")
+				for _, cmd := range g.cmds {
+					b.WriteString(t.paint(sgrBlue, cmd) + "\n")
+				}
+			}
+			continue
+		}
+		for line := -1; line < height; line++ {
+			var l strings.Builder
+			for i, g := range band {
+				s, sgr := "", sgrBlue
+				if line < 0 {
+					s, sgr = g.name, sgrBold
+				} else if line < len(g.cmds) {
+					s = g.cmds[line]
+				}
+				l.WriteString(t.paint(sgr, s))
+				if i < len(band)-1 {
+					l.WriteString(strings.Repeat(" ", widths[i]-cells(s)+2))
+				}
+			}
+			b.WriteString(strings.TrimRight(l.String(), " ") + "\n")
+		}
+	}
+	return b.String()
+}

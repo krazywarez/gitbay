@@ -8,19 +8,21 @@ import (
 
 func TestParseTerm(t *testing.T) {
 	cases := map[string]Term{
-		"120":                {Cols: 120},
-		"120,color":          {Cols: 120, Color: true},
-		"40":                 {Cols: 40},
-		"39":                 {},
-		"":                   {},
-		"abc":                {},
-		"80,blink":           {Cols: 80},
-		"80,":                {Cols: 80},
-		"80,truecolor,color": {Cols: 80, Color: true, TrueColor: true},
-		"80,color,links":     {Cols: 80, Color: true, Links: true},
-		"80,truecolor":       {Cols: 80},
-		"abc,color":          {},
-		"5000":               {},
+		"120":                       {Cols: 120},
+		"120,color":                 {Cols: 120, Color: true},
+		"40":                        {Cols: 40},
+		"39":                        {},
+		"":                          {},
+		"abc":                       {},
+		"80,blink":                  {Cols: 80},
+		"80,":                       {Cols: 80},
+		"80,truecolor,color":        {Cols: 80, Color: true, TrueColor: true},
+		"80,color,links":            {Cols: 80, Color: true, Links: true},
+		"80,truecolor":              {Cols: 80},
+		"abc,color":                 {},
+		"5000":                      {},
+		"120,color,here=krz/gitbay": {Cols: 120, Color: true, Here: "krz/gitbay"},
+		"120,here=":                 {Cols: 120},
 	}
 	for in, want := range cases {
 		if got := ParseTerm(in); got != want {
