@@ -211,3 +211,30 @@ func TestTableSwatchAligned(t *testing.T) {
 		t.Errorf("plain = %q", plain.String())
 	}
 }
+
+func TestRefsDimNotCyan(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80, Color: true}}).table(&b, "#", "TITLE")
+	tb.row(cRef("#12"), cFlex("Android app"))
+	tb.flush()
+	if strings.Contains(b.String(), sgrCyan) {
+		t.Errorf("ref painted cyan: %q", b.String())
+	}
+	if !strings.Contains(b.String(), sgrDim+"#12"+sgrReset) {
+		t.Errorf("ref not dim: %q", b.String())
+	}
+}
+
+func TestGlyphAndMetaCells(t *testing.T) {
+	var b bytes.Buffer
+	tb := (&Ctx{Term: Term{Cols: 80, Color: true}}).table(&b)
+	tb.row(cRef("1779"), cGlyph("failure"), cFlex("test"), cMeta("gitbay", "2h"))
+	tb.row(cRef("1780"), cYou(), cFlex("review"), cMeta("", "3h"))
+	tb.flush()
+	out := b.String()
+	for _, want := range []string{sgrRed + "✗" + sgrReset, sgrYellow + "●" + sgrReset, sgrDim + "gitbay · 2h" + sgrReset, sgrDim + "3h" + sgrReset} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in %q", want, out)
+		}
+	}
+}

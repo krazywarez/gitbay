@@ -219,3 +219,25 @@ func TestLinkAndSwatch(t *testing.T) {
 		t.Errorf("bad hex = %q", got)
 	}
 }
+
+func TestGlyph(t *testing.T) {
+	for _, c := range []struct{ state, g, sgr string }{
+		{"success", "✓", sgrGreen},
+		{"approved", "✓", sgrGreen},
+		{"merged", "✓", ""},
+		{"failure", "✗", sgrRed},
+		{"changes requested", "✗", sgrRed},
+		{"signed_key_revoked", "✗", sgrRed},
+		{"running", "◐", ""},
+		{"pending", "◐", ""},
+		{"closed", "○", ""},
+		{"draft", "○", ""},
+		{"open", "", ""},
+		{"", "", ""},
+	} {
+		g, sgr := glyph(c.state)
+		if g != c.g || sgr != c.sgr {
+			t.Errorf("glyph(%q) = %q %q, want %q %q", c.state, g, sgr, c.g, c.sgr)
+		}
+	}
+}

@@ -96,14 +96,14 @@ func (v *view) title(ref, title, state string) {
 		rest += state
 	}
 	if rest == "" {
-		io.WriteString(v.w, t.paint(sgrCyan, ref)+"\n")
+		io.WriteString(v.w, t.paint(sgrDim, ref)+"\n")
 		return
 	}
 	lines := termtext.Wrap(rest, t.Cols-cells(prefix))
 	for i, line := range lines {
 		p := indent
 		if i == 0 {
-			p = t.paint(sgrCyan, ref) + "  "
+			p = t.paint(sgrDim, ref) + "  "
 		}
 		if i < len(lines)-1 || state == "" {
 			io.WriteString(v.w, p+t.paint(sgrBold, line)+"\n")

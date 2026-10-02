@@ -56,6 +56,7 @@ const (
 	sgrRed     = "\x1b[31m"
 	sgrGreen   = "\x1b[32m"
 	sgrYellow  = "\x1b[33m"
+	sgrBlue    = "\x1b[34m"
 	sgrMagenta = "\x1b[35m"
 	sgrCyan    = "\x1b[36m"
 )
@@ -119,6 +120,26 @@ func stateColor(s string) string {
 		return sgrYellow
 	}
 	return ""
+}
+
+// glyph is the mark a screen puts first in a row or field for a state
+// word, and its colour: ✓ passed, ✗ failed or blocked, ◐ still going,
+// ○ closed or draft. A state with no mark ("open") returns "".
+func glyph(state string) (g, sgr string) {
+	switch state {
+	case "merged":
+		return "✓", ""
+	case "success", "ok", "approved", "verified", "passed":
+		return "✓", sgrGreen
+	case "failure", "failed", "error", "changes requested",
+		"bad_signature", "signed_email_mismatch", "signed_key_expired", "signed_key_revoked":
+		return "✗", sgrRed
+	case "pending", "running", "queued":
+		return "◐", ""
+	case "closed", "draft", "canceled", "cancelled", "skipped":
+		return "○", ""
+	}
+	return "", ""
 }
 
 // link makes s a hyperlink to url when the terminal shows them (OSC 8).

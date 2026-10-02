@@ -18,6 +18,8 @@ const (
 	kindNum
 	kindSize
 	kindSwatch
+	kindGlyph
+	kindMeta
 )
 
 // cell is one column of a table row. The kind decides colour, time
@@ -48,6 +50,27 @@ func cSwatch(hex string) cell { return cell{kind: kindSwatch, s: hex} }
 // cMark is text coloured for what it says about the row rather than for
 // its word: "2 failed" red, "review requested" yellow.
 func cMark(s, sgr string) cell { return cell{kind: kindText, s: s, sgr: sgr} }
+
+// cGlyph is a state's mark, coloured for the state.
+func cGlyph(state string) cell {
+	g, sgr := glyph(state)
+	return cell{kind: kindGlyph, s: g, sgr: sgr}
+}
+
+// cYou is the mark for a row that waits on the viewer.
+func cYou() cell { return cell{kind: kindGlyph, s: "●", sgr: sgrYellow} }
+
+// cMeta is a row's trailing facts, dim and joined by " · ". Empty parts
+// are skipped.
+func cMeta(parts ...string) cell {
+	var keep []string
+	for _, p := range parts {
+		if p != "" {
+			keep = append(keep, p)
+		}
+	}
+	return cell{kind: kindMeta, s: strings.Join(keep, " · ")}
+}
 
 // table is a list command's rows. Plain, each row is written as it
 // comes, tab-separated with no header. At a terminal rows are held
@@ -233,7 +256,7 @@ func (t *table) fit(widths []int) {
 		}
 	}
 	for i := len(kinds) - 1; i >= 0; i-- {
-		if kinds[i] == kindText {
+		if kinds[i] == kindText || kinds[i] == kindMeta {
 			shrink(i)
 		}
 	}
@@ -272,7 +295,11 @@ func (t *table) joinRow(r []cell, line []string, widths []int) string {
 			case kindState:
 				s = t.term.paintState(s)
 			case kindRef:
-				s = t.term.link(r[i].url, t.term.paint(sgrCyan, s))
+				s = t.term.link(r[i].url, t.term.paint(sgrDim, s))
+			case kindGlyph:
+				s = t.term.paint(r[i].sgr, s)
+			case kindMeta:
+				s = t.term.paint(sgrDim, s)
 			case kindSwatch:
 				s = t.term.swatch(s)
 			default:
