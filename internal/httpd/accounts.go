@@ -90,7 +90,7 @@ func (s *Server) renderLogin(w http.ResponseWriter, errMsg string, sent bool, ne
 		EmailLogin bool
 		Sent       bool
 		Next       string
-	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()},
+	}{s.anonBase(),
 		s.cfg.Registration.Mode, errMsg, s.emailLoginEnabled(), sent, next})
 }
 
@@ -399,7 +399,7 @@ func (s *Server) renderSignup(w http.ResponseWriter, errMsg, username string) {
 		Mode     string // open | invite
 		Error    string
 		Username string
-	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
+	}{s.anonBase(), s.cfg.SiteHost(), s.cfg.Registration.Mode, errMsg, username})
 }
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
@@ -421,7 +421,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request) {
 		Username string
 		Message  string
 		Host     string
-	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, username, msg, s.cfg.SiteHost()})
+	}{s.anonBase(), username, msg, s.cfg.SiteHost()})
 }
 
 // issueNewPage is what the new-issue form renders with, whether that is a

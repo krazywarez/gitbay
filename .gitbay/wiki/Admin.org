@@ -115,6 +115,9 @@ build page's live log arrives only when the build ends;
   gitbay itself.
 - =privacy_notice= — operator text shown on =/privacy= under the fixed
   statement.
+- =abuse_url=, =terms_url= (empty) — linked from every page's footer as
+  "Report abuse" and "Terms"; no link when empty. gitbay.org points them
+  at the [[Abuse][Abuse]] and [[Terms][Terms]] wiki pages.
 - =apple_app_ids= (empty) — iOS app IDs (=TEAMID.bundle.id=) allowed to
   open this instance's links, served at
   =/.well-known/apple-app-site-association=. Empty leaves the path a

@@ -26,13 +26,22 @@ type basePage struct {
 	// Theme is stamped on <html> as data-theme: light or dark when the
 	// viewer chose one, empty when the browser's own scheme decides.
 	Theme string
+	// AbuseURL and TermsURL are the operator's footer links, empty when
+	// not configured.
+	AbuseURL string
+	TermsURL string
+}
+
+// anonBase is the layout-wide data with no viewer.
+func (s *Server) anonBase() basePage {
+	return basePage{Site: s.siteName(), Host: s.cfg.SiteHost(), AbuseURL: s.cfg.Web.AbuseURL, TermsURL: s.cfg.Web.TermsURL}
 }
 
 // base builds the layout-wide data for a request that has not already
 // resolved a viewer.
 func (s *Server) base(r *http.Request) basePage {
 	if s.cfg.Web.Mode != "accounts" {
-		return basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}
+		return s.anonBase()
 	}
 	return s.baseFor(s.viewer(r))
 }
@@ -40,7 +49,7 @@ func (s *Server) base(r *http.Request) basePage {
 // baseFor is base for a handler that already holds the viewer, so the
 // session lookup is not repeated.
 func (s *Server) baseFor(viewer store.User) basePage {
-	b := basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}
+	b := s.anonBase()
 	if viewer.ID == 0 {
 		return b
 	}

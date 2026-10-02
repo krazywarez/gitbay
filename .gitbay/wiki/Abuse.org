@@ -1,0 +1,21 @@
+#+title: Reporting abuse
+
+This page is for gitbay.org. Another instance links its own page from
+its footer, or none.
+
+Mail =abuse@gitbay.org= with:
+
+- the URL of the repository, issue, merge request, comment or snippet;
+- what is wrong with it: malware, spam, phishing, a copyright or
+  licence claim, illegal content, harassment, or anything else;
+- if you are the rights holder or the person affected, say so.
+
+You do not need an account. One person runs the instance and reads the
+mail. Depending on the report, the content is removed, the repository
+is archived or made private, or the account is disabled
+(=admin user disable=, which refuses SSH, web and API access without
+deleting anything). The account holder is told what was done and why,
+unless that would help them continue.
+
+A security problem in gitbay itself can go to the same address; do not
+file it as a public issue.

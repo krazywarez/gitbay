@@ -88,7 +88,7 @@
 </main>
 
 <footer>
-  <p>Powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="https://apps.apple.com/us/app/gitbay/id6806399095">iOS app</a> · <a href="/privacy">Privacy</a></p>
+  <p>Powered by <a href="https://gitbay.org/krz/gitbay">gitbay</a>{{with gitbayVersion}} · <code><a href="https://gitbay.org/krz/gitbay/commit/{{gitbayCommit}}">{{.}}</a></code>{{end}} · <a href="https://apps.apple.com/us/app/gitbay/id6806399095">iOS app</a> · <a href="/privacy">Privacy</a>{{with field . "TermsURL"}} · <a href="{{.}}">Terms</a>{{end}}{{with field . "AbuseURL"}} · <a href="{{.}}">Report abuse</a>{{end}}</p>
 </footer>
 </div>
 </div>

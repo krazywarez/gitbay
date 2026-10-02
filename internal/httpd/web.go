@@ -198,7 +198,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		Accounts   bool
 		Signup     bool
 		EmailLogin bool
-	}{basePage{Site: s.siteName(), Host: s.cfg.SiteHost()}, host, s.cfg.Web.Mode == "accounts",
+	}{s.anonBase(), host, s.cfg.Web.Mode == "accounts",
 		s.cfg.Web.Mode == "accounts" && s.cfg.Registration.Mode != "closed",
 		s.emailLoginEnabled()})
 }

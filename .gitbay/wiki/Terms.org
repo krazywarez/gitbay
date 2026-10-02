@@ -1,0 +1,51 @@
+#+title: Terms
+
+These are the terms for gitbay.org, kept informal on purpose. Another
+instance sets its own.
+
+* What this is
+
+One person runs gitbay.org on one server in Nuremberg, Germany. It is
+free, comes with no warranty, and makes no uptime promise. Repositories
+are backed up nightly off the host, but keep your own clone of anything
+that matters.
+
+* What is not allowed
+
+- malware, phishing kits, or anything built to attack other systems
+  (security research and proof-of-concept code with a clear purpose are
+  fine);
+- spam, including accounts or repositories that exist to carry links;
+- content that is illegal in Germany, or that infringes someone's
+  copyright;
+- harassment of other users;
+- using CI, storage or bandwidth as general-purpose hosting: crypto
+  mining, file dumps, or mirrors of large binaries unrelated to a
+  project.
+
+* Limits
+
+Each account may own 250 repositories and 5 GB. An organization has
+the same caps, and an account may create 5 organizations. Ask if you
+need more.
+
+* What the operator may do
+
+Remove content, archive a repository or make it private, or disable an
+account, when it breaks the rules above or puts the instance at risk.
+Reports go to the address on the [[Abuse][abuse page]].
+
+* Leaving
+
+=account export= writes your profile, repositories, issues and merge
+requests as a bundle another gitbay instance can replay
+(=gitbay migrate=), and every repository can be cloned. To have
+the account deleted, mail the abuse address from the account's primary
+email.
+
+If gitbay.org ever shuts down, every account with a verified address
+gets notice and time to export first.
+
+* Privacy
+
+See https://gitbay.org/privacy.
