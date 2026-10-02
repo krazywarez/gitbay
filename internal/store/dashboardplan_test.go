@@ -60,7 +60,7 @@ func TestDashboardQueriesUseIndexes(t *testing.T) {
 		if !strings.Contains(tc.plan, tc.want) {
 			t.Errorf("%s does not use %s:\n%s", tc.name, tc.want, tc.plan)
 		}
-		if tc.ordered && strings.Contains(tc.plan, "USE TEMP B-TREE FOR ORDER BY") {
+		if tc.ordered && strings.Contains(tc.plan, "USE TEMP B-TREE") {
 			t.Errorf("%s sorts instead of walking an index:\n%s", tc.name, tc.plan)
 		}
 	}

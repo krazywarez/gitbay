@@ -60,7 +60,7 @@ const dashboardMRsQuery = `
 	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 	JOIN users au ON au.id = x.author_id
 	WHERE x.state IN ('open', 'source_gone') AND ` + involvedCond + `
-	ORDER BY x.updated_at DESC LIMIT 50`
+	ORDER BY x.updated_at DESC, x.id DESC LIMIT 50`
 
 // DashboardMRs returns open merge requests involving the user: on their
 // repositories (owned, granted, org) or authored by them anywhere.
@@ -80,7 +80,7 @@ const dashboardIssuesQuery = `
 	WHERE x.state = 'open' AND ` + involvedCond + `
 	  AND NOT EXISTS (SELECT 1 FROM issue_assignees ia
 	                  WHERE ia.issue_id = x.id AND ia.user_id = ?1)
-	ORDER BY x.updated_at DESC LIMIT 50`
+	ORDER BY x.updated_at DESC, x.id DESC LIMIT 50`
 
 func (s *Store) DashboardIssues(userID int64) ([]DashboardItem, error) {
 	return s.dashboardQuery(dashboardIssuesQuery, userID)
@@ -152,7 +152,7 @@ const reviewQueueQuery = `
 	                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
 	                    AND rv.head_sha = x.head_sha)
 	  AND ` + involvedCond + `
-	ORDER BY x.updated_at DESC LIMIT 8`
+	ORDER BY x.updated_at DESC, x.id DESC LIMIT 8`
 
 // requestedReviewsQuery is ReviewQueue's other half: MRs where the user was
 // asked directly, regardless of involvement — the same exemption
@@ -177,7 +177,7 @@ const requestedReviewsQuery = `
 	  AND NOT EXISTS (SELECT 1 FROM mr_reviews rv
 	                  WHERE rv.mr_id = x.id AND rv.reviewer_id = ?1
 	                    AND rv.head_sha = x.head_sha)
-	ORDER BY x.updated_at DESC LIMIT 8`
+	ORDER BY x.updated_at DESC, x.id DESC LIMIT 8`
 
 // ReviewQueue returns open merge requests the user is involved in, has not
 // authored, and has not reviewed at the current head — what the rail shows
@@ -245,7 +245,7 @@ const assignedIssuesQuery = `
 	LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 	JOIN users au ON au.id = x.author_id
 	WHERE ia.user_id = ?1 AND x.state = 'open'
-	ORDER BY x.updated_at DESC LIMIT 20`
+	ORDER BY x.updated_at DESC, x.id DESC LIMIT 20`
 
 func (s *Store) AssignedIssues(userID int64) ([]DashboardItem, error) {
 	return s.dashboardQuery(assignedIssuesQuery, userID)
