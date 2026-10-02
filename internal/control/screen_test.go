@@ -206,3 +206,94 @@ func TestEmitViewRoutes(t *testing.T) {
 		t.Errorf("terminal: %q built=%v", out.String(), built)
 	}
 }
+
+// errorer is the part of *testing.T checkActions uses, so its own test
+// can pass a recorder.
+type errorer interface {
+	Helper()
+	Errorf(format string, args ...any)
+}
+
+type recorder struct{ failed bool }
+
+func (r *recorder) Helper()               {}
+func (r *recorder) Errorf(string, ...any) { r.failed = true }
+
+// cliLocal are commands cmd/gitbay runs itself; the registry does not
+// know them, but a legend may suggest them.
+var cliLocal = map[string]bool{"mr rebase": true, "mr checkout": true, "repo clone": true}
+
+// checkActions fails t for any legend or "more" command that the
+// registry would not dispatch, or whose flags it does not declare.
+func checkActions(t errorer, s screen) {
+	t.Helper()
+	var all [][]string
+	for _, a := range s.actions {
+		all = append(all, a.argv)
+	}
+	for _, sec := range s.sections {
+		if len(sec.more) > 0 {
+			all = append(all, sec.more)
+		}
+	}
+	for _, argv := range all {
+		if len(argv) >= 2 && cliLocal[argv[0]+" "+argv[1]] {
+			continue
+		}
+		cmd, rest, ok := Lookup(argv)
+		if !ok {
+			t.Errorf("no command for %q", argv)
+			continue
+		}
+		if err := checkFlags(cmd, rest); err != nil {
+			t.Errorf("%q: %v", argv, err)
+		}
+	}
+}
+
+// checkFlags refuses a flag the command does not declare, and a value
+// flag with nothing after it. Words that are not flags are positionals.
+func checkFlags(cmd Command, rest []string) error {
+	takes := map[string]bool{}
+	for _, f := range cmd.Flags {
+		takes[f.Name] = f.Arg != ""
+	}
+	for i := 0; i < len(rest); i++ {
+		a := rest[i]
+		if !strings.HasPrefix(a, "--") {
+			continue
+		}
+		name, _, inline := strings.Cut(a, "=")
+		value, ok := takes[name]
+		if !ok {
+			return fmt.Errorf("%s does not take %s", joinPath(cmd.Path), name)
+		}
+		if value && !inline {
+			if i+1 >= len(rest) {
+				return fmt.Errorf("%s needs a value", name)
+			}
+			i++
+		}
+	}
+	return nil
+}
+
+func TestCheckActions(t *testing.T) {
+	for _, tc := range []struct {
+		argv []string
+		fail bool
+	}{
+		{[]string{"mr", "dif", "a/b", "1"}, true},
+		{[]string{"mr", "diff", "a/b", "1", "--bogus"}, true},
+		{[]string{"mr", "review", "a/b", "1", "--approve"}, false},
+		{[]string{"mr", "list", "a/b", "--state"}, true},
+		{[]string{"mr", "list", "a/b", "--state", "all"}, false},
+		{[]string{"mr", "rebase", "1"}, false},
+	} {
+		r := &recorder{}
+		checkActions(r, screen{actions: []action{{"G", tc.argv}}})
+		if r.failed != tc.fail {
+			t.Errorf("%q: failed = %v, want %v", tc.argv, r.failed, tc.fail)
+		}
+	}
+}
