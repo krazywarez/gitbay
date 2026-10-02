@@ -194,16 +194,6 @@ func (t Term) paintState(s string) string {
 	return strings.Join(words, ", ")
 }
 
-// heading is a section label at a terminal: capitalised, no trailing
-// colon, bold.
-func (t Term) heading(label string) string {
-	label = strings.TrimSuffix(label, ":")
-	if r, size := utf8.DecodeRuneInString(label); size > 0 {
-		label = string(unicode.ToUpper(r)) + label[size:]
-	}
-	return t.paint(sgrBold, label)
-}
-
 // failure is a refusal as a terminal shows it: "error: " in red ahead
 // of the message, and a usage line wrapped to the width between its
 // bracketed groups, continuation lines indented under the command.

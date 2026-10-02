@@ -117,12 +117,6 @@ func TestPaintStateEachWord(t *testing.T) {
 	}
 }
 
-func TestHeading(t *testing.T) {
-	if got := (Term{Cols: 80}).heading("waiting on your review:"); got != "Waiting on your review" {
-		t.Errorf("heading = %q", got)
-	}
-}
-
 func TestFailureAtTerminal(t *testing.T) {
 	msg := "unknown flag \"--stat\"; did you mean --state?\nusage: gitbay issue list [<owner/name>] [--state open|closed|all] [--label <l>] [--assignee <user>]"
 	got := Term{Cols: 50}.failure(msg)

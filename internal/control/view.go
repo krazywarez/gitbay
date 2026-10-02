@@ -27,8 +27,10 @@ func (c *Ctx) siteURL(parts ...string) string {
 	return strings.TrimRight(c.Cfg.Server.SiteURL, "/") + "/" + strings.Join(parts, "/")
 }
 
-// view lays out a show: a title line, aligned fields, a body, events,
-// comments. Plain output is the same lines without colour or wrapping.
+// view lays out a show piped: a title line, aligned fields, a body,
+// events, comments. A terminal draws a screen instead (screen.go); a
+// caller that still reaches view at a terminal gets the same plain
+// layout, with user text made safe.
 type view struct {
 	c     *Ctx
 	w     io.Writer
@@ -38,7 +40,7 @@ type view struct {
 func (c *Ctx) view(w io.Writer) *view { return &view{c: c, w: w} }
 
 func (v *view) opts() termtext.Options {
-	return termtext.Options{Width: max(0, v.c.Term.Cols-2), Color: v.c.Term.Color, Base: v.c.Cfg.Server.SiteURL}
+	return termtext.Options{Base: v.c.Cfg.Server.SiteURL}
 }
 
 // sep writes a blank line before the next block, unless this view has
@@ -52,82 +54,32 @@ func (v *view) sep() {
 	v.wrote = true
 }
 
-// section prints a sub-table's label: a blank line, then the label
-// capitalised and bold at a terminal, or "label:" in plain. Callers skip the call entirely
-// when the table it introduces has no rows.
+// section prints a sub-table's label: a blank line, then "label:".
+// Callers skip the call entirely when the table it introduces has no
+// rows.
 func (v *view) section(label string) {
 	v.sep()
-	if v.c.Term.Cols == 0 {
-		io.WriteString(v.w, label+":\n")
-		return
-	}
-	io.WriteString(v.w, v.c.Term.heading(label)+"\n")
+	io.WriteString(v.w, label+":\n")
 }
 
-// title prints "ref  title  state", wrapping title+state to the
-// terminal width. Continuation lines indent under the title, and each
-// line is painted after wrapping so no SGR sequence crosses a break.
-// title or state may be "": either is skipped rather than leaving a
-// trailing blank field.
+// title prints "ref  title  state" on one line. title or state may be
+// "": either is skipped rather than leaving a trailing blank field.
 func (v *view) title(ref, title, state string) {
 	v.sep()
 	t := v.c.Term
 	ref, title, state = t.safe(ref), t.safe(title), t.safe(state)
-	if t.Cols == 0 {
-		switch {
-		case title == "" && state == "":
-			io.WriteString(v.w, ref+"\n")
-		case state == "":
-			io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"\n")
-		case title == "":
-			io.WriteString(v.w, ref+"  "+t.paint(stateColor(state), state)+"\n")
-		default:
-			io.WriteString(v.w, ref+"  "+t.paint(sgrBold, title)+"  "+t.paint(stateColor(state), state)+"\n")
-		}
-		return
+	line := ref
+	if title != "" {
+		line += "  " + title
 	}
-	prefix := ref + "  "
-	indent := strings.Repeat(" ", cells(prefix))
-	rest := title
 	if state != "" {
-		if rest != "" {
-			rest += "  "
-		}
-		rest += state
+		line += "  " + state
 	}
-	if rest == "" {
-		io.WriteString(v.w, t.paint(sgrDim, ref)+"\n")
-		return
-	}
-	lines := termtext.Wrap(rest, t.Cols-cells(prefix))
-	for i, line := range lines {
-		p := indent
-		if i == 0 {
-			p = t.paint(sgrDim, ref) + "  "
-		}
-		if i < len(lines)-1 || state == "" {
-			io.WriteString(v.w, p+t.paint(sgrBold, line)+"\n")
-			continue
-		}
-		// Last line carries the state word, the last word overall
-		// (states are single words): keep it coloured, not bold.
-		head, last := line, line
-		if idx := strings.LastIndex(line, " "); idx >= 0 {
-			head, last = line[:idx], line[idx+1:]
-		} else {
-			head = ""
-		}
-		io.WriteString(v.w, p)
-		if head != "" {
-			io.WriteString(v.w, t.paint(sgrBold, head)+" ")
-		}
-		io.WriteString(v.w, t.paint(stateColor(state), last)+"\n")
-	}
+	io.WriteString(v.w, line+"\n")
 }
 
 // fields prints key/value pairs aligned on the widest key, skipping
-// empty values. A value that does not fit wraps, its continuation
-// lines indented to the value column.
+// empty values.
 func (v *view) fields(kv ...string) {
 	wide := 0
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -141,19 +93,7 @@ func (v *view) fields(kv ...string) {
 		if val == "" {
 			continue
 		}
-		prefix := "  " + v.c.Term.paint(sgrDim, pad(key, wide)) + "  "
-		if v.c.Term.Cols == 0 {
-			io.WriteString(v.w, prefix+val+"\n")
-			continue
-		}
-		indent := strings.Repeat(" ", 2+wide+2)
-		for j, line := range termtext.Wrap(val, v.c.Term.Cols-2-wide-2) {
-			p := indent
-			if j == 0 {
-				p = prefix
-			}
-			io.WriteString(v.w, p+line+"\n")
-		}
+		io.WriteString(v.w, "  "+pad(key, wide)+"  "+val+"\n")
 	}
 }
 
@@ -190,32 +130,18 @@ func (v *view) text(src string) {
 }
 
 // event is one line for a system comment: its text without link
-// targets, the time at the right edge at a terminal.
+// targets, then the time.
 func (v *view) event(text, format, ts string) {
 	line := "· " + termtext.Inline(v.c.Term.safe(text), format)
-	when := v.c.Term.safe(v.c.when(ts))
-	if cols := v.c.Term.Cols; cols > 0 {
-		room := cols - 2 - 2 - cells(when)
-		line = pad(clip(line, room), room)
-	}
-	io.WriteString(v.w, "  "+v.c.Term.paint(sgrDim, line+"  "+when)+"\n")
+	io.WriteString(v.w, "  "+line+"  "+v.c.Term.safe(stamp(ts))+"\n")
 	v.wrote = true
 }
 
 func (v *view) comment(id int64, author, ts, body, format string) {
-	when := v.c.Term.safe(v.c.when(ts)) + fmt.Sprintf(" (comment %d)", id)
-	author = v.c.Term.safe(author)
-	cols := v.c.Term.Cols
-	if cols > 0 {
-		suffix := ", " + when + " "
-		author = clip(author, max(0, cols-cells("── "+suffix)-1))
-	}
-	head := "── " + author + ", " + when + " "
-	if cols > 0 {
-		head += strings.Repeat("─", max(1, cols-cells(head)))
-	}
+	when := v.c.Term.safe(stamp(ts)) + fmt.Sprintf(" (comment %d)", id)
+	head := "── " + v.c.Term.safe(author) + ", " + when + " "
 	v.sep()
-	io.WriteString(v.w, v.c.Term.paint(sgrDim, head)+"\n")
+	io.WriteString(v.w, head+"\n")
 	v.body(body, format)
 }
 

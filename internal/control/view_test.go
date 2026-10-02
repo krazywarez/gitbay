@@ -132,3 +132,23 @@ func issueIDFor(t *testing.T, st *store.Store, repoID, n int64) int64 {
 	}
 	return issue.ID
 }
+
+// view is the piped writer: at a terminal it writes what it writes
+// piped, so a caller that never migrated falls back to the plain layout.
+func TestViewIgnoresTerminal(t *testing.T) {
+	render := func(term Term) string {
+		var b bytes.Buffer
+		c := &Ctx{Term: term}
+		v := c.view(&b)
+		v.title("#1", "A title", "open")
+		v.fields("author", "alice", "when", "2026-09-01T10:00:00Z")
+		v.body("Some *body* text that is long enough to wrap at forty columns, if it wraps.", "md")
+		v.section("files")
+		v.event("labelled [bug](/x)", "md", "2026-09-01T10:00:00Z")
+		v.comment(1, "bob", "2026-09-01T10:00:00Z", "A comment.", "md")
+		return b.String()
+	}
+	if got, want := render(Term{Cols: 40, Color: true}), render(Term{}); got != want {
+		t.Errorf("terminal view differs from piped:\n%s\n---\n%s", got, want)
+	}
+}
