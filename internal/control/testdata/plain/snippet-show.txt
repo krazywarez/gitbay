@@ -1,0 +1,8 @@
+<id>  Hello  unlisted
+
+  author   alice
+  updated  <time>
+  url      /alice/-/snippets/<id>
+
+files:
+main.go	13 bytes

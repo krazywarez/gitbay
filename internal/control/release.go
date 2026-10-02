@@ -282,26 +282,7 @@ func runReleaseList(c *Ctx, args []string) int {
 	for _, r := range rels {
 		ds = append(ds, releaseToOut(r, false))
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			tb := c.table(w, "TAG", "TITLE", "ASSETS", "RELEASED")
-			for _, d := range ds {
-				// "v1.2.0 — the forge speaks first" reads as its
-				// subtitle beside the tag.
-				title := strings.TrimPrefix(strings.TrimPrefix(d.Title, d.Tag), " — ")
-				assets := ""
-				switch n := len(d.Assets); n {
-				case 0:
-				case 1:
-					assets = "1 asset"
-				default:
-					assets = fmt.Sprintf("%d assets", n)
-				}
-				tb.row(cLink(d.Tag, c.siteURL(repo.Path(), "releases")), cFlex(title), cText(assets), cAge(d.CreatedAt))
-			}
-			tb.flush()
-			return
-		}
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "TAG", "TITLE", "ASSETS")
 		for _, d := range ds {
 			title := d.Title
@@ -311,16 +292,37 @@ func runReleaseList(c *Ctx, args []string) int {
 			tb.row(cRef(d.Tag), cFlex(title), cText(fmt.Sprintf("%d asset(s)", len(d.Assets))))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			// "v1.2.0 — the forge speaks first" reads as its subtitle
+			// beside the tag.
+			title := strings.TrimPrefix(strings.TrimPrefix(d.Title, d.Tag), " — ")
+			assets := ""
+			switch n := len(d.Assets); n {
+			case 0:
+			case 1:
+				assets = "1 asset"
+			default:
+				assets = fmt.Sprintf("%d assets", n)
+			}
+			rows[i] = rowOf(cLink(d.Tag, c.siteURL(repo.Path(), "releases")), cFlex(title), cMeta(assets, relAge(d.CreatedAt, termNow())))
+		}
+		s := listScreen("Releases", rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{"release", "show", repo.Path(), ds[0].Tag}}}
+		}
+		return s
 	})
 }
 
 func runReleaseShow(c *Ctx, args []string) int {
-	_, rel, code := releaseRef(c, args, policy.CanRead)
+	repo, rel, code := releaseRef(c, args, policy.CanRead)
 	if code >= 0 {
 		return code
 	}
 	d := releaseToOut(rel, true)
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		title := d.Title
 		if title == d.Tag {
 			title = ""
@@ -335,14 +337,24 @@ func runReleaseShow(c *Ctx, args []string) int {
 			v.section("assets")
 			tb := c.table(w, "NAME", "SIZE", "SHA256")
 			for _, a := range d.Assets {
-				sum := a.SHA256
-				if c.Term.Cols > 0 {
-					sum = sum[:min(12, len(sum))]
-				}
-				tb.row(cRef(a.Name), cSize(a.Size), cFlex(sum))
+				tb.row(cRef(a.Name), cSize(a.Size), cFlex(a.SHA256))
 			}
 			tb.flush()
 		}
+	}, func() screen {
+		assets := section{title: "Assets", n: len(d.Assets)}
+		for _, a := range d.Assets {
+			assets.rows = append(assets.rows, rowOf(cRef(a.Name), cSize(a.Size), cMeta(a.SHA256[:min(12, len(a.SHA256))])))
+		}
+		s := screen{body: d.Notes, format: d.NotesFormat, sections: []section{assets}, fields: []field{
+			{"Release", []cell{cLink(d.Tag, c.siteURL(repo.Path(), "releases")), cText(d.Title)}},
+			{"Author", []cell{cText(d.Author), cAge(d.CreatedAt)}},
+		}}
+		if len(d.Assets) > 0 {
+			s.actions = append(s.actions, action{"Get", []string{"release", "asset", "get", repo.Path(), d.Tag, d.Assets[0].Name}})
+		}
+		s.actions = append(s.actions, action{"Edit", []string{"release", "edit", repo.Path(), d.Tag, "--title", "<title>"}})
+		return s
 	})
 }
 

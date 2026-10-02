@@ -30,6 +30,8 @@ func dispatchIn(t *testing.T, st *store.Store, u store.User, root, stdin string,
 	// Fixtures write a lot as user 1; the write limiter is global to
 	// the package, so leave its budget to the tests that exercise it.
 	c.Cfg.Limits.WriteRate = -1
+	c.Cfg.Limits.MaxSnippetBytes = 1 << 20
+	c.Cfg.Limits.MaxBlobBytes = 1 << 20
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}
@@ -52,6 +54,8 @@ func atTerminalIn(t *testing.T, st *store.Store, u store.User, root string, argv
 	// Fixtures write a lot as user 1; the write limiter is global to
 	// the package, so leave its budget to the tests that exercise it.
 	c.Cfg.Limits.WriteRate = -1
+	c.Cfg.Limits.MaxSnippetBytes = 1 << 20
+	c.Cfg.Limits.MaxBlobBytes = 1 << 20
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"gitbay.org/gitbay/internal/policy"
@@ -222,7 +223,7 @@ func runSnippetShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	sn.Files = files
-	return c.emit(snippetOut(c, sn), func(w io.Writer) {
+	return c.emitView(snippetOut(c, sn), func(w io.Writer) {
 		v := c.view(w)
 		v.title(sn.PublicID, sn.Description, sn.Visibility)
 		v.fields(
@@ -238,6 +239,21 @@ func runSnippetShow(c *Ctx, args []string) int {
 			}
 			tb.flush()
 		}
+	}, func() screen {
+		fs := section{title: "Files", n: len(files)}
+		for _, f := range files {
+			fs.rows = append(fs.rows, rowOf(cRef(f.Name), cSize(int64(f.Size))))
+		}
+		s := screen{sections: []section{fs}, fields: []field{
+			{"Snippet", []cell{cLink(sn.PublicID, snippetURL(c, sn)), cText(sn.Description)}},
+			{"Owner", []cell{cText(sn.OwnerName), cState(sn.Visibility)}},
+			{"Updated", []cell{cAge(sn.UpdatedAt)}},
+		}}
+		if len(files) > 0 {
+			s.actions = append(s.actions, action{"Get", []string{"snippet", "file", "get", sn.PublicID, files[0].Name}})
+		}
+		s.actions = append(s.actions, action{"Edit", []string{"snippet", "edit", sn.PublicID, "--description", "<text>"}})
+		return s
 	})
 }
 
@@ -270,7 +286,7 @@ func runSnippetList(c *Ctx, args []string) int {
 	for _, sn := range rows {
 		items = append(items, snippetOut(c, sn))
 	}
-	return c.emitPage(p, items, next, func(w io.Writer) {
+	return c.emitPageView(p, items, next, func(w io.Writer) {
 		tb := c.table(w, "ID", "VISIBILITY", "FILES", "DESCRIPTION")
 		for _, sn := range rows {
 			names := ""
@@ -283,6 +299,20 @@ func runSnippetList(c *Ctx, args []string) int {
 			tb.row(cRef(sn.PublicID), cState(sn.Visibility), cText(names), cFlex(sn.Description))
 		}
 		tb.flush()
+	}, func() screen {
+		rs := make([]row, len(rows))
+		for i, sn := range rows {
+			names := make([]string, len(sn.Files))
+			for j, f := range sn.Files {
+				names[j] = f.Name
+			}
+			rs[i] = rowOf(cRef(sn.PublicID), cState(sn.Visibility), cFlex(sn.Description), cMeta(strings.Join(names, ", "), relAge(sn.UpdatedAt, termNow())))
+		}
+		s := listScreen("Snippets", rs)
+		if len(rows) > 0 {
+			s.actions = []action{{"Read", []string{"snippet", "show", rows[0].PublicID}}}
+		}
+		return s
 	})
 }
 

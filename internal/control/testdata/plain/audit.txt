@@ -1,0 +1,2 @@
+<time>	alice	cmd admin user create	{"argv":["bob"],"source":""}
+<time>	alice	admin user.created	{"user":"bob"}

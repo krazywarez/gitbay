@@ -54,20 +54,26 @@ func runAudit(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(entries, func(w io.Writer) {
+	return c.emitView(entries, func(w io.Writer) {
 		tb := c.table(w, "WHEN", "ACTOR", "ACTION", "DATA")
 		for _, e := range entries {
 			actor := e.Actor
 			if actor == "" {
 				actor = "-"
 			}
-			data := e.Data
-			if c.Term.Cols > 0 {
-				data = keyValues(data)
-			}
-			tb.row(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(data))
+			tb.row(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(e.Data))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(entries))
+		for i, e := range entries {
+			actor := e.Actor
+			if actor == "" {
+				actor = "-"
+			}
+			rows[i] = rowOf(cAge(e.CreatedAt), cText(actor), cText(e.Action), cFlex(keyValues(e.Data)))
+		}
+		return listScreen("Audit", rows, action{"Filter", []string{"audit", "--since", "24h"}})
 	})
 }
 

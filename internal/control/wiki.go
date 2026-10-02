@@ -98,12 +98,26 @@ func runWikiList(c *Ctx, args []string) int {
 	if d.Pages == nil {
 		d.Pages = []string{}
 	}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		tb := c.table(w, "PAGE")
 		for _, p := range d.Pages {
 			tb.row(cRef(p))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(d.Pages))
+		for i, pg := range d.Pages {
+			home := ""
+			if pg == d.Home {
+				home = "home"
+			}
+			rows[i] = rowOf(cLink(pg, c.siteURL(repo.Path(), "wiki", pg)), cMeta(home))
+		}
+		s := listScreen("Wiki", rows)
+		if d.Home != "" {
+			s.actions = []action{{"Read", []string{"wiki", "show", repo.Path(), d.Home}}}
+		}
+		return s
 	})
 }
 
@@ -170,27 +184,20 @@ func runWikiShow(c *Ctx, args []string) int {
 		if ext == ".org" {
 			format = "org"
 		}
-		return c.emit(d, func(w io.Writer) {
+		return c.emitView(d, func(w io.Writer) {
 			// Plain: the page source verbatim, same as any other piped
-			// file read. The title/fields/body layout is terminal-only.
-			if c.Term.Cols == 0 {
-				fmt.Fprint(w, d.Content)
-				return
-			}
-			v := c.view(w)
-			v.title(repo.Path(), page, "")
-			binaryNote := ""
+			// file read.
+			fmt.Fprint(w, d.Content)
+		}, func() screen {
+			s := screen{fields: []field{
+				{"Page", []cell{cLink(page, c.siteURL(repo.Path(), "wiki", page)), cMeta(repo.Path(), d.File)}},
+			}, actions: []action{{"Read", []string{"wiki", "list", repo.Path()}}}}
 			if binary {
-				binaryNote = fmt.Sprintf("%d bytes, binary", d.Size)
+				s.fields = append(s.fields, field{"Binary", []cell{cSize(int64(d.Size))}})
+			} else {
+				s.body, s.format = d.Content, format
 			}
-			v.fields(
-				"file", d.File,
-				"binary", binaryNote,
-				"url", c.siteURL(repo.Path(), "wiki", page),
-			)
-			if !binary {
-				v.body(d.Content, format)
-			}
+			return s
 		})
 	}
 	return c.fail(protocol.ExitNotFound, "no wiki page %q in %s", page, repo.Path())

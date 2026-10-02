@@ -35,10 +35,13 @@ func workFixture(t *testing.T) (*store.Store, store.Repo, store.User, string, st
 	}
 	os.WriteFile(filepath.Join(src, ".gitbay", "ci.yml"), []byte("jobs:\n  test:\n    steps:\n      - go test ./...\n"), 0o644)
 	os.WriteFile(filepath.Join(src, ".gitbay", "issue-template-bug.md"), []byte("## Steps\n"), 0o644)
+	os.MkdirAll(filepath.Join(src, ".gitbay", "wiki"), 0o755)
+	os.WriteFile(filepath.Join(src, ".gitbay", "wiki", "Home.md"), []byte("# Welcome\n\nStart here.\n"), 0o644)
 	git(root, "init", "-q", "-b", "main", "src")
 	git(src, "add", ".")
 	git(src, "commit", "-q", "-m", "first")
 	sha := git(src, "rev-parse", "HEAD")
+	git(src, "tag", "v1.0.0")
 	dir := RepoDir(root, repo.OwnerName, repo.Name)
 	os.MkdirAll(filepath.Dir(dir), 0o755)
 	git(root, "clone", "-q", "--bare", src, dir)
@@ -100,4 +103,66 @@ func TestWorkScreensA(t *testing.T) {
 			checkLegend(t, out)
 		}
 	}
+}
+
+func TestWorkPlainPinnedB(t *testing.T) {
+	st, repo, u, root, _ := workFixture(t)
+	p := repo.Path()
+	dispatchIn(t, st, u, root, "", "release", "create", p, "v1.0.0", "--title", "v1.0.0 — first", "--notes", "First release.")
+	dispatchIn(t, st, u, root, "package main\n", "snippet", "create", "main.go", "--description", "Hello")
+	snippets := dispatchIn(t, st, u, root, "", "snippet", "list")
+	id, _, _ := strings.Cut(snippets, "\t")
+	for name, argv := range map[string][]string{
+		"release-list": {"release", "list", p},
+		"release-show": {"release", "show", p, "v1.0.0"},
+		"snippet-list": {"snippet", "list"},
+		"snippet-show": {"snippet", "show", id},
+		"wiki-list":    {"wiki", "list", p},
+		"wiki-show":    {"wiki", "show", p, "Home"},
+		"explore":      {"explore"},
+	} {
+		got := dispatchIn(t, st, u, root, "", argv...)
+		pinPlain(t, name, strings.ReplaceAll(got, id, "<id>"))
+	}
+}
+
+func TestWorkScreensB(t *testing.T) {
+	st, repo, u, root, _ := workFixture(t)
+	p := repo.Path()
+	dispatchIn(t, st, u, root, "", "release", "create", p, "v1.0.0", "--title", "v1.0.0 — first", "--notes", "First release.")
+	dispatchIn(t, st, u, root, "package main\n", "snippet", "create", "main.go", "--description", "Hello")
+	snippets := dispatchIn(t, st, u, root, "", "snippet", "list")
+	id, _, _ := strings.Cut(snippets, "\t")
+	for _, tc := range []struct {
+		argv []string
+		want []string
+	}{
+		{[]string{"release", "list", p}, []string{"Releases (1)\n", "v1.0.0  first"}},
+		{[]string{"release", "show", p, "v1.0.0"}, []string{"Release:", "v1.0.0  v1.0.0 — first", "First release."}},
+		{[]string{"snippet", "list"}, []string{"Snippets (1)\n", "Hello", "main.go"}},
+		{[]string{"snippet", "show", id}, []string{"Snippet:", "Hello", "Files (1)\nmain.go"}},
+		{[]string{"wiki", "list", p}, []string{"Wiki (1)\nHome", "home"}},
+		{[]string{"wiki", "show", p, "Home"}, []string{"Page:", "Home", "Welcome", "Start here."}},
+		{[]string{"explore"}, []string{"Explore (1)\nalice/app"}},
+	} {
+		out := atTerminalIn(t, st, u, root, tc.argv...)
+		for _, w := range tc.want {
+			if !strings.Contains(out, w) {
+				t.Errorf("%v: missing %q in:\n%s", tc.argv, w, out)
+			}
+		}
+		checkLegend(t, out)
+	}
+}
+
+func TestAuditScreen(t *testing.T) {
+	st, _, uid := newQueueTestRepo(t)
+	admin := store.User{ID: uid, Username: "alice", IsAdmin: true}
+	dispatchAs(t, st, admin, "", "admin", "user", "create", "bob")
+	pinPlain(t, "audit", dispatchAs(t, st, admin, "", "audit"))
+	out := atTerminal(t, st, admin, "audit")
+	if !strings.Contains(out, "Audit (") || !strings.Contains(out, "alice") {
+		t.Errorf("audit:\n%s", out)
+	}
+	checkLegend(t, out)
 }

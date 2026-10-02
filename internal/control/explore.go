@@ -85,12 +85,26 @@ func runExplore(c *Ctx, args []string) int {
 		}
 	}
 	ds, next := trimPage(p, ds, "explore", func(o out) string { return o.Path })
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "DESCRIPTION")
 		for _, d := range ds {
 			tb.row(cRef(d.Path), cFlex(d.Description))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			archived := ""
+			if d.Archived {
+				archived = "archived"
+			}
+			rows[i] = rowOf(cLink(d.Path, c.siteURL(d.Path)), cFlex(d.Description), cMeta(strings.Join(d.Topics, ", "), archived))
+		}
+		s := listScreen("Explore", rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{"repo", "show", ds[0].Path}}}
+		}
+		return s
 	})
 }
 
