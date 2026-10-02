@@ -31,6 +31,14 @@ anything beyond "replace the binary and restart" is needed.
   lists, =repo settings show= (now with approvals, resolved threads,
   code owners and website), =repo deps status=, and =repo commit=, whose
   diff follows the screen.
+- Account, notification, webhook and organisation commands at a
+  terminal are screens (#319): =keys=, =email=, =pgp=, =token= and =web
+  sessions= lists, =whoami=, =profile show=/=set=, =org profile=,
+  =notifications list= and =settings=, =notifications device list=,
+  =webhook list= and =deliveries=, =org list=/=show=, label and
+  milestone lists (repo and org), =org team list=/=show=. The session's
+  own key leads with =●=; =pgp list= shows user IDs rather than their
+  JSON; a webhook URL on screen is its scheme and host only.
 
 * v1.41.0 — 2026-10-01
 
