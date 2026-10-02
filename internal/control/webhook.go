@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -101,6 +102,19 @@ func runWebhookAdd(c *Ctx, args []string) int {
 	})
 }
 
+// shortURL is a webhook URL as a screen shows it: scheme and host only,
+// since the path of a hook URL is often a token.
+func shortURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "…"
+	}
+	if u.Path == "" || u.Path == "/" {
+		return u.Scheme + "://" + u.Host
+	}
+	return u.Scheme + "://" + u.Host + "/…"
+}
+
 func runWebhookList(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.usage()
@@ -124,12 +138,28 @@ func runWebhookList(c *Ctx, args []string) int {
 	for _, h := range hooks {
 		ds = append(ds, out{h.ID, h.URL, h.Events, h.Active, h.Secret != ""})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "ID", "URL", "EVENTS")
 		for _, d := range ds {
 			tb.row(cRef(fmt.Sprintf("%d", d.ID)), cText(d.URL), cText(d.Events))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead := cGlyph("closed")
+			if d.Active {
+				lead = cGlyph("ok")
+			}
+			signed := ""
+			if d.Secret {
+				signed = "signed"
+			}
+			rows[i] = rowOf(cRef(strconv.FormatInt(d.ID, 10)), lead, cFlex(shortURL(d.URL)), cMeta(d.Events, signed))
+		}
+		return listScreen("Webhooks", rows,
+			action{"Hooks", []string{"webhook", "deliveries", repo.Path()}},
+		)
 	})
 }
 
@@ -193,7 +223,7 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 	for _, d := range ds {
 		rows = append(rows, out{d.ID, d.URL, d.EventKind, d.Status, d.Attempts, d.LastStatus, d.LastError})
 	}
-	return c.emit(rows, func(w io.Writer) {
+	return c.emitView(rows, func(w io.Writer) {
 		tb := c.table(w, "ID", "EVENT", "URL", "STATUS")
 		for _, d := range rows {
 			cells := []cell{cRef(fmt.Sprintf("%d", d.ID)), cText(d.Event), cText(d.URL),
@@ -204,6 +234,33 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		rs := make([]row, len(rows))
+		var failed int64
+		for i, d := range rows {
+			state := d.Status
+			if state == "delivered" {
+				state = "ok"
+			}
+			if state == "failed" && failed == 0 {
+				failed = d.ID
+			}
+			attempts := fmt.Sprintf("%d attempts", d.Attempts)
+			if d.Attempts == 1 {
+				attempts = "1 attempt"
+			}
+			status := ""
+			if d.LastStatus != 0 {
+				status = fmt.Sprintf("HTTP %d", d.LastStatus)
+			}
+			rs[i] = rowOf(cRef(strconv.FormatInt(d.ID, 10)), cGlyph(state), cFlex(d.Event), cMeta(shortURL(d.URL), attempts, status), cMark(d.LastError, sgrRed))
+		}
+		s := listScreen("Deliveries", rs)
+		if failed != 0 {
+			s.actions = []action{{"Retry", []string{"webhook", "redeliver", repo.Path(), strconv.FormatInt(failed, 10)}}}
+		}
+		s.actions = append(s.actions, action{"Hooks", []string{"webhook", "list", repo.Path()}})
+		return s
 	})
 }
 

@@ -1,0 +1,4 @@
+  mail   off
+  reply  off
+  watch  off
+  push   on

@@ -268,7 +268,7 @@ func emitNotificationSettings(c *Ctx) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]bool{"mail": mail, "watch": watch, "push": push, "reply": reply}, func(w io.Writer) {
+	return c.emitView(map[string]bool{"mail": mail, "watch": watch, "push": push, "reply": reply}, func(w io.Writer) {
 		onOff := func(on bool) string {
 			if on {
 				return "on"
@@ -282,6 +282,21 @@ func emitNotificationSettings(c *Ctx) int {
 			"watch", onOff(watch),
 			"push", onOff(push),
 		)
+	}, func() screen {
+		var s screen
+		for _, x := range []struct {
+			label, name string
+			on          bool
+		}{{"Mail", "mail", mail}, {"Reply", "reply", reply}, {"Watch", "watch", watch}, {"Push", "push", push}} {
+			state, flip := cText("on"), "off"
+			if !x.on {
+				state, flip = cMeta("off"), "on"
+			}
+			s.fields = append(s.fields, field{x.label, []cell{state}})
+			s.actions = append(s.actions, action{"Settings", []string{"notifications", "settings", x.name, flip}})
+		}
+		s.actions = append(s.actions, action{"Devices", []string{"notifications", "device", "list"}})
+		return s
 	})
 }
 
@@ -392,23 +407,31 @@ func runNotificationsDeviceList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	type row struct {
+	type deviceRow struct {
 		ID    int64  `json:"id"`
 		Label string `json:"label"`
 		Token string `json:"token"` // truncated; a token is not echoed in full
 		Added string `json:"added"`
 	}
-	rows := make([]row, 0, len(devices))
+	rows := make([]deviceRow, 0, len(devices))
 	for _, d := range devices {
-		rows = append(rows, row{ID: d.ID, Label: d.Label,
+		rows = append(rows, deviceRow{ID: d.ID, Label: d.Label,
 			Token: ShortToken(d.Token), Added: d.CreatedAt})
 	}
-	return c.emit(rows, func(w io.Writer) {
+	return c.emitView(rows, func(w io.Writer) {
 		tb := c.table(w, "ID", "LABEL", "TOKEN", "ADDED")
 		for _, r := range rows {
 			tb.row(cRef(fmt.Sprintf("%d", r.ID)), cText(r.Label), cText(r.Token), cAge(r.Added))
 		}
 		tb.flush()
+	}, func() screen {
+		rs := make([]row, len(rows))
+		for i, r := range rows {
+			rs[i] = rowOf(cRef(strconv.FormatInt(r.ID, 10)), cFlex(r.Label), cMeta(r.Token, "added "+relAge(r.Added, termNow())))
+		}
+		return listScreen("Push devices", rs,
+			action{"Devices", []string{"notifications", "device", "remove", "<id>"}},
+		)
 	})
 }
 
@@ -493,7 +516,7 @@ func runNotificationsList(c *Ctx, args []string) int {
 		fmt.Fprintln(c.Stderr, msg)
 		return protocol.ExitOK
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "ID", "WHEN", "REPO", "EVENT", "PATH")
 		for _, d := range ds {
 			mark := "*"
@@ -504,6 +527,26 @@ func runNotificationsList(c *Ctx, args []string) int {
 				cFlex(fmt.Sprintf("%s %s", d.Actor, d.Summary)), cText(d.Path))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		var read []string
+		for i, d := range ds {
+			lead := cGlyph("")
+			if d.ReadAt == "" {
+				lead = cYou()
+			}
+			rows[i] = rowOf(cRef(d.Repo), lead, cFlex(d.Actor+" "+d.Summary), cMeta(d.Kind, relAge(d.CreatedAt, termNow())))
+			if read == nil && (d.Kind == "issue" || d.Kind == "mr") {
+				if j := strings.LastIndex(d.Path, "/"); j >= 0 {
+					read = []string{d.Kind, "show", d.Repo, d.Path[j+1:]}
+				}
+			}
+		}
+		s := listScreen("Notifications", rows, action{"Inbox", []string{"notifications", "read", "--all"}})
+		if read != nil {
+			s.actions = append(s.actions, action{"Read", read})
+		}
+		return s
 	})
 }
 
