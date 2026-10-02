@@ -140,7 +140,13 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	// and the session it would create renders every page the account can
 	// read. Checking here covers every mint path. The message is the one a
 	// bad token gets: a distinct one would confirm the account exists.
-	if u, err := s.st.UserByID(userID); err != nil || u.Disabled {
+	// A login is how the owner of an account scheduled for deletion
+	// cancels it.
+	u, err := s.st.UserByID(userID)
+	if err == nil {
+		control.CancelScheduledDeletion(s.st, &u, "web")
+	}
+	if err != nil || u.Disabled {
 		s.renderLogin(w, badLoginToken, false, "")
 		return
 	}

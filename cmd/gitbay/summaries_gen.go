@@ -3,6 +3,7 @@
 package main
 
 var summaries = map[string]string{
+	"account delete":                   "delete your account: mails a link, then purges seven days after it is opened",
 	"account export":                   "write your account bundle (profile, repos, issues, MRs) as JSON",
 	"account import-bundle":            "replay an account bundle (see gitbay migrate)",
 	"admin email verify":               "mark an address verified by admin assertion",

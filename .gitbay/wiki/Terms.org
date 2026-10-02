@@ -39,9 +39,10 @@ Reports go to the address on the [[Abuse][abuse page]].
 
 =account export= writes your profile, repositories, issues and merge
 requests as a bundle another gitbay instance can replay
-(=gitbay migrate=), and every repository can be cloned. To have
-the account deleted, mail the abuse address from the account's primary
-email.
+(=gitbay migrate=), and every repository can be cloned.
+=gitbay auth delete= (or the bottom of =/settings=) deletes the account
+seven days after its mailed link is opened; see [[Users][the user
+guide]] for what goes and what stays.
 
 If gitbay.org ever shuts down, every account with a verified address
 gets notice and time to export first.

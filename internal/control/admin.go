@@ -251,6 +251,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		ByteLimit   int64      `json:"byte_limit"` // 0 unlimited
 		APITokens   []tokenOut `json:"api_tokens"`
 		WebSessions int64      `json:"web_sessions"`
+		DeleteAfter string     `json:"delete_after,omitempty"` // a scheduled self-deletion
 	}
 	d := out{adminUserOut: adminUserRow(row),
 		Keys: []keyOut{}, Emails: []emailOut{}, PGPKeys: []pgpOut{}, Orgs: []orgOut{}, APITokens: []tokenOut{}}
@@ -298,6 +299,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 	if d.WebSessions, err = c.Store.WebSessionCount(u.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	d.DeleteAfter = u.DeleteAfter
 
 	return c.emitView(d, func(w io.Writer) {
 		admin := ""
@@ -312,6 +314,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			"last seen", c.when(d.LastSeen),
 			"repos", fmt.Sprintf("%d", d.Repos),
 			"web sessions", fmt.Sprintf("%d", d.WebSessions),
+			"deletes at", c.when(d.DeleteAfter),
 		)
 		if len(d.Keys) > 0 {
 			v.section("keys")

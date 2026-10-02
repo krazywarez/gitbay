@@ -467,7 +467,16 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 // receive-pack. A nil limiter is no limit.
 func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, user store.User, key store.SSHKey, term control.Term, cmdline string,
 	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
+	// A person signing in with a full-scope key cancels a scheduled
+	// deletion; automation on narrower keys is refused and cannot.
+	if user.Disabled && user.DeleteAfter != "" && key.Scope == "full" && control.CancelScheduledDeletion(st, &user, "ssh") {
+		fmt.Fprintln(stderr, "deletion of your account was cancelled")
+	}
 	if user.Disabled {
+		if user.DeleteAfter != "" {
+			fmt.Fprintln(stderr, control.ScheduledRefusal(user))
+			return protocol.ExitDenied
+		}
 		fmt.Fprintln(stderr, "this account is disabled; contact the instance admin")
 		return protocol.ExitDenied
 	}

@@ -243,6 +243,16 @@ func (s *Server) accountSubmit(w http.ResponseWriter, r *http.Request, u store.U
 			return
 		}
 		back("", "key registered")
+	case "account-delete":
+		if ok, msg := confirmed(r, u.Username); !ok {
+			back(msg, "")
+			return
+		}
+		if _, msg, ok := s.runControl(u, []string{"account", "delete", "--confirm", u.Username}); !ok {
+			back(msg, "")
+			return
+		}
+		back("", "a deletion link was mailed to your primary address; nothing changes until it is opened")
 	case "key-remove":
 		want := prefix8(strings.TrimPrefix(r.FormValue("fingerprint"), "SHA256:"))
 		if ok, msg := confirmed(r, want); !ok {

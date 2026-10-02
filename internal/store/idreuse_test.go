@@ -149,8 +149,9 @@ func TestIDMigrationKeepsRowsAndForeignKeys(t *testing.T) {
 	}
 
 	// The triggers still fire.
-	alice, err := s.UserByUsername("alice")
-	if err != nil {
+	// Read by column: the schema here is 0074's, older than User's loader.
+	var alice User
+	if err := s.DB.QueryRow("SELECT id FROM users WHERE username = 'alice'").Scan(&alice.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec("DELETE FROM users WHERE id = ?", alice.ID); err == nil || !strings.Contains(err.Error(), "still owns repositories") {

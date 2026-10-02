@@ -17,6 +17,7 @@ import (
 // help print the CLI's path (#267). A change to this list is deliberate.
 func TestServerPathMismatches(t *testing.T) {
 	want := []string{
+		"auth delete",
 		"auth email add", "auth email list", "auth email primary",
 		"auth email remove", "auth email verify",
 		"auth export",

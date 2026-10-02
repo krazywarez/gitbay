@@ -13,7 +13,11 @@ type User struct {
 	Username string
 	IsAdmin  bool
 	Pending  bool // self-registered, email not yet verified
-	Disabled bool // administratively suspended
+	Disabled bool // administratively suspended, or scheduled for deletion
+	// DeleteAfter is when a scheduled deletion purges the account, ""
+	// when none is scheduled. A scheduled account is also Disabled.
+	DeleteAfter string
+	Ghost       bool // stands in as the author of deleted accounts' content
 	// SignedInAt is when the browser session this user came from was
 	// created by a login. Set by WebSessionUser only; zero elsewhere.
 	SignedInAt time.Time
@@ -137,15 +141,18 @@ func (s *Store) OwnerExists(name string) bool {
 
 func (s *Store) UserByUsername(name string) (User, error) {
 	var u User
-	var admin, pending, disabled int
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled FROM users WHERE username = ?", name).
-		Scan(&u.ID, &u.Username, &admin, &pending, &disabled)
+	var admin, pending, disabled, ghost int
+	var deleteAfter sql.NullString
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled, delete_after, ghost FROM users WHERE username = ?", name).
+		Scan(&u.ID, &u.Username, &admin, &pending, &disabled, &deleteAfter, &ghost)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
 	u.Pending = pending != 0
 	u.Disabled = disabled != 0
+	u.DeleteAfter = deleteAfter.String
+	u.Ghost = ghost != 0
 	return u, err
 }
 
@@ -203,10 +210,16 @@ func (s *Store) ListEmails(userID int64) ([]Email, error) {
 // are closed.
 func (s *Store) SetUserDisabled(userID int64, disabled bool) error {
 	v := 0
+	if _, err := s.DB.Exec("DELETE FROM account_deletions WHERE user_id = ?", userID); err != nil {
+		return err
+	}
 	if disabled {
 		v = 1
 	}
-	res, err := s.DB.Exec("UPDATE users SET disabled = ? WHERE id = ?", v, userID)
+	// An admin's decision replaces a scheduled or requested deletion
+	// either way: a disabled account stays disabled and is not purged,
+	// an enabled one is back in use. A purge already under way finishes.
+	res, err := s.DB.Exec("UPDATE users SET disabled = ?, delete_after = CASE WHEN delete_after = ? THEN delete_after END WHERE id = ?", v, Purging, userID)
 	if err != nil {
 		return err
 	}
@@ -321,15 +334,18 @@ func (s *Store) SetDiffLayout(userID int64, layout string) error {
 
 func (s *Store) UserByID(id int64) (User, error) {
 	var u User
-	var admin, pending, disabled int
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled FROM users WHERE id = ?", id).
-		Scan(&u.ID, &u.Username, &admin, &pending, &disabled)
+	var admin, pending, disabled, ghost int
+	var deleteAfter sql.NullString
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled, delete_after, ghost FROM users WHERE id = ?", id).
+		Scan(&u.ID, &u.Username, &admin, &pending, &disabled, &deleteAfter, &ghost)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
 	u.IsAdmin = admin != 0
 	u.Pending = pending != 0
 	u.Disabled = disabled != 0
+	u.DeleteAfter = deleteAfter.String
+	u.Ghost = ghost != 0
 	return u, err
 }
 

@@ -69,7 +69,9 @@ func RequestLoginLink(cfg config.Config, st *store.Store, identifier string) err
 	// read paths — which is the whole of what suspension prevents, and more
 	// than pendingAllowed grants an unverified account. Returning nil rather
 	// than an error keeps the response identical to a miss.
-	if user.Disabled || user.Pending {
+	// An account scheduled for deletion may still have a link: signing in
+	// is how its owner cancels.
+	if (user.Disabled && user.DeleteAfter == "") || user.Pending {
 		return nil
 	}
 

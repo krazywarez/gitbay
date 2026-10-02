@@ -107,7 +107,7 @@ func TestNeedsRecentSignInSet(t *testing.T) {
 	}
 	slices.Sort(got)
 	want := []string{
-		"admin email verify",
+		"account delete", "admin email verify",
 		"admin invite",
 		"admin repo visibility",
 		"admin user create",

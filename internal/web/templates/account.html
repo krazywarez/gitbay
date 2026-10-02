@@ -20,6 +20,7 @@
     <li><a href="#export">Export</a></li>
     <li><a href="#tokens">API tokens</a></li>
     <li><a href="#cli">On the command line</a></li>
+    <li><a href="#delete">Delete account</a></li>
   </ul></div>
 </details>
 </nav>
@@ -250,6 +251,16 @@ gitbay admin ...                       # instance administration</pre>
 <p class="meta">All of it works from stock OpenSSH too, with the CLI's
 grouping words dropped: <code>ssh git@{{.Host}} whoami</code>,
 <code>ssh git@{{.Host}} web sessions list</code>.</p>
+</section>
+
+<section id="delete"><h2>Delete account</h2>
+<p class="meta">Deletes your repositories, snippets, keys and addresses.
+Issues, merge requests and comments you wrote on other people's
+repositories stay, under the name <code>ghost</code>. A link is mailed to
+your primary address; once it is opened the account is disabled, and it
+is deleted seven days later. Signing in during those days cancels.
+<a href="#export">Export</a> first to keep a copy.</p>
+<form method="post" action="/settings" class="setform"><input type="hidden" name="field" value="account-delete">{{template "confirmfield" .Viewer}} <button type="submit" class="danger">Mail the deletion link</button></form>
 </section>
 </div>
 </div>

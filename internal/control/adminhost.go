@@ -160,6 +160,9 @@ func adminUserArg(c *Ctx, args []string, usage string) (store.User, int) {
 	} else if err != nil {
 		return u, c.fail(protocol.ExitFailure, "%v", err)
 	}
+	if u.Ghost {
+		return u, c.fail(protocol.ExitDenied, "%v", errGhost)
+	}
 	return u, -1
 }
 

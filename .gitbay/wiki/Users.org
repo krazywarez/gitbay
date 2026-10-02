@@ -366,6 +366,26 @@ in =$$= follows before a blank line. MathML typed as raw HTML is
 stripped like any other markup the sanitizer does not allow. The CLI
 shows the source.
 
+* Deleting your account
+
+#+begin_src sh
+gitbay auth delete --confirm <username>   # mails a link to your primary address
+gitbay auth delete --cancel               # withdraw it before the link is opened
+#+end_src
+
+The same is at the bottom of =/settings=. Nothing changes until the
+mailed link is opened (it works for 24 hours, and needs a verified
+address). Opening it disables the account at once and deletes it seven
+days later: its repositories, snippets, keys, addresses and tokens go.
+Issues, merge requests, comments and reviews it wrote on other people's
+repositories stay, under the name =ghost=. Signing in during the seven
+days — on the web, or any command over SSH with a full-scope key —
+cancels; git-, read-, runner-scoped keys and API tokens are refused and
+cannot cancel. The only admin of an organization is refused until
+another admin exists or the organization is deleted. Export first
+(=gitbay auth export=) to keep a copy. The username is free again after
+the purge.
+
 * Organizations
 
 Orgs share the owner namespace with users and own repositories at

@@ -247,6 +247,9 @@ func runChecked(c *Ctx, cmd Command, args []string) int {
 	// The SSH listener refuses a disabled account before it gets here; the
 	// API and the web reach Dispatch directly, so the check lives here too.
 	if c.User.Disabled {
+		if c.User.DeleteAfter != "" {
+			return c.fail(protocol.ExitDenied, "%s", ScheduledRefusal(c.User))
+		}
 		return c.fail(protocol.ExitDenied, "this account is disabled; ask an instance admin to enable it")
 	}
 	if cmd.NeedsRecentSignIn && c.Source == SourceWeb && staleSignIn(c.User.SignedInAt, time.Now()) {

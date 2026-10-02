@@ -703,20 +703,29 @@ func deleteRepo(c *Ctx, repo store.Repo) int {
 		return lockCode
 	}
 	defer release()
-	// Open MRs sourced from this repo keep working (targets own the
-	// objects) but must show that the source is gone.
-	if err := c.Store.MarkSourceGoneForRepo(repo.ID); err != nil {
+	if err := removeRepo(c.Store, c.Cfg.Server.Root, repo); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if err := c.Store.DeleteRepo(repo.ID); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	if err := os.RemoveAll(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)); err != nil {
-		return c.fail(protocol.ExitFailure, "database row removed but disk cleanup failed: %v", err)
 	}
 	return c.emit(map[string]string{"deleted": repo.Path()}, func(w io.Writer) {
 		fmt.Fprintf(w, "deleted %s\n", repo.Path())
 	})
+}
+
+// removeRepo is deleteRepo's work without a request: the caller holds
+// off the backup.
+func removeRepo(st *store.Store, root string, repo store.Repo) error {
+	// Open MRs sourced from this repo keep working (targets own the
+	// objects) but must show that the source is gone.
+	if err := st.MarkSourceGoneForRepo(repo.ID); err != nil {
+		return err
+	}
+	if err := st.DeleteRepo(repo.ID); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(RepoDir(root, repo.OwnerName, repo.Name)); err != nil {
+		return fmt.Errorf("database row removed but disk cleanup failed: %w", err)
+	}
+	return nil
 }
 
 // holdOffBackup keeps a full backup from starting while a repository
@@ -742,6 +751,9 @@ func runAccessGrant(c *Ctx, args []string) int {
 	target, err := c.Store.UserByUsername(args[1])
 	if err != nil {
 		return c.fail(protocol.ExitNotFound, "no such user %q", args[1])
+	}
+	if target.Ghost {
+		return c.fail(protocol.ExitDenied, "%v", errGhost)
 	}
 	if err := c.Store.GrantAccess(repo.ID, target.ID, args[2]); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

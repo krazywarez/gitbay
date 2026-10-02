@@ -274,6 +274,9 @@ func runOrgMembersAdd(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	if target.Ghost {
+		return c.fail(protocol.ExitDenied, "%v", errGhost)
+	}
 	if err := c.Store.SetOrgMember(org.ID, target.ID, role); err != nil {
 		return c.failErr(err)
 	}

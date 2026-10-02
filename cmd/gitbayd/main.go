@@ -242,6 +242,7 @@ func serveCmd() *cobra.Command {
 			if d := cfg.Registration.PendingExpiryDuration(); d > 0 {
 				go reapPending(whCtx, st, d)
 			}
+			go purgeDeletions(whCtx, st, cfg)
 			go sweep(whCtx, st, cfg)
 			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL,
 				RepoDir: func(owner, name string) string {
@@ -645,6 +646,31 @@ func reapPending(ctx context.Context, st *store.Store, maxAge time.Duration) {
 			slog.Error("reaping pending accounts", "err", err)
 		} else if len(removed) > 0 {
 			slog.Info("removed unverified accounts", "users", removed)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// purgeDeletions deletes accounts whose deletion grace has passed,
+// hourly and once at start, on the same tick override as reapPending.
+func purgeDeletions(ctx context.Context, st *store.Store, cfg config.Config) {
+	tick := time.Hour
+	if v := os.Getenv("GITBAY_REAP_TICK"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			tick = d
+		}
+	}
+	t := time.NewTicker(tick)
+	defer t.Stop()
+	for {
+		if purged, err := control.PurgeDueAccounts(cfg, st, time.Now()); err != nil {
+			slog.Error("purging deleted accounts", "err", err)
+		} else if len(purged) > 0 {
+			slog.Info("purged deleted accounts", "users", purged)
 		}
 		select {
 		case <-ctx.Done():
