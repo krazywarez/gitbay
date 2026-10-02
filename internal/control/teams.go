@@ -154,12 +154,22 @@ func runTeamList(c *Ctx, args []string) int {
 	for _, t := range teams {
 		names = append(names, t.Name)
 	}
-	return c.emit(names, func(w io.Writer) {
+	return c.emitView(names, func(w io.Writer) {
 		tb := c.table(w, "TEAM")
 		for _, n := range names {
 			tb.row(cRef(n))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(names))
+		for i, n := range names {
+			rows[i] = rowOf(cRef(n))
+		}
+		s := listScreen("Teams", rows)
+		if len(names) > 0 {
+			s.actions = []action{{"Read", []string{"org", "team", "show", org.Name, names[0]}}}
+		}
+		return s
 	})
 }
 
@@ -188,7 +198,7 @@ func runTeamShow(c *Ctx, args []string) int {
 		Members []string          `json:"members,omitempty"`
 		Grants  []store.TeamGrant `json:"grants,omitempty"`
 	}{team.Name, members, grants}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.title(org.Name+"/"+team.Name, "", "")
 		v.fields("members", strings.Join(members, ", "))
@@ -200,6 +210,20 @@ func runTeamShow(c *Ctx, args []string) int {
 			}
 			tb.flush()
 		}
+	}, func() screen {
+		grantsSec := section{title: "Grants", n: len(grants)}
+		for _, g := range grants {
+			grantsSec.rows = append(grantsSec.rows, rowOf(cLink(g.RepoPath, c.siteURL(g.RepoPath)), cState(g.Role)))
+		}
+		s := screen{fields: []field{{"Team", []cell{cText(org.Name + "/" + team.Name)}}}, sections: []section{grantsSec}}
+		if len(members) > 0 {
+			s.fields = append(s.fields, field{"Members", []cell{cText(strings.Join(members, ", "))}})
+		}
+		s.actions = []action{
+			{"Team", []string{"org", "team", "add", org.Name, team.Name, "<user>"}},
+			{"Team", []string{"org", "team", "grant", org.Name, team.Name, "<owner/name>", "write"}},
+		}
+		return s
 	})
 }
 

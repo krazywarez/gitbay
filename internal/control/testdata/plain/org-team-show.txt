@@ -1,0 +1,6 @@
+acme/core
+
+  members  alice
+
+grants:
+acme/site	write

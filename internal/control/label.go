@@ -38,6 +38,20 @@ func init() {
 // it is the one that types cleanly there.
 var labelColorPat = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
 
+// labelsScreen is a label list at a terminal: each label's name, colour
+// and how much carries it.
+func labelsScreen(labels []store.Label, actions ...action) screen {
+	rows := make([]row, len(labels))
+	for i, l := range labels {
+		org := ""
+		if l.Org {
+			org = "org"
+		}
+		rows[i] = rowOf(cRef(l.Name), cSwatch(l.Color), cMeta(fmt.Sprintf("%d issues", l.Issues), fmt.Sprintf("%d MRs", l.MRs), org))
+	}
+	return listScreen("Labels", rows, actions...)
+}
+
 func runLabelList(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.usage()
@@ -54,7 +68,7 @@ func runLabelList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(labels, func(w io.Writer) {
+	return c.emitView(labels, func(w io.Writer) {
 		tb := c.table(w, "NAME", "COLOR", "ISSUES", "MRS")
 		for _, l := range labels {
 			cells := []cell{cRef(l.Name), cSwatch(l.Color), cNum(l.Issues), cNum(l.MRs)}
@@ -64,6 +78,12 @@ func runLabelList(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		s := labelsScreen(labels, action{"Labels", []string{"label", "set", repo.Path(), "<label>", "--color", "rrggbb"}})
+		if len(labels) > 0 {
+			s.actions = append(s.actions, action{"Read", []string{"issue", "list", repo.Path(), "--label", labels[0].Name}})
+		}
+		return s
 	})
 }
 

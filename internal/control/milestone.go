@@ -116,11 +116,14 @@ func runMilestoneList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitMilestones(c, ms)
+	return emitMilestones(c, ms,
+		action{"Milestones", []string{"milestone", "create", repo.Path(), "<title>"}},
+		action{"Milestones", []string{"milestone", "list", repo.Path(), "--state", "all"}},
+	)
 }
 
 // emitMilestones renders a milestone list for the caller, JSON or plain.
-func emitMilestones(c *Ctx, ms []store.Milestone) int {
+func emitMilestones(c *Ctx, ms []store.Milestone, actions ...action) int {
 	type out struct {
 		Title       string `json:"title"`
 		Description string `json:"description,omitempty"`
@@ -134,30 +137,7 @@ func emitMilestones(c *Ctx, ms []store.Milestone) int {
 	for _, m := range ms {
 		ds = append(ds, out{m.Title, m.Description, m.DueDate, m.State, m.OrgID != 0, m.OpenItems, m.ClosedItems})
 	}
-	return c.emit(ds, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			tb := c.table(w, "TITLE", "STATE", "DUE", "PROGRESS", "SCOPE")
-			for _, d := range ds {
-				due := cText("")
-				if t, ok := parseStamp(d.Due + " 00:00:00"); ok {
-					due = cText(relAge(d.Due+" 00:00:00", termNow()))
-					if d.State == "open" && t.Before(termNow()) {
-						due = cMark("overdue "+d.Due, sgrRed)
-					}
-				}
-				progress := ""
-				if total := d.Open + d.Closed; total > 0 {
-					progress = fmt.Sprintf("%d/%d closed (%d%%)", d.Closed, total, d.Closed*100/total)
-				}
-				scope := ""
-				if d.Org {
-					scope = "org"
-				}
-				tb.row(cRef(d.Title), cState(d.State), due, cText(progress), cText(scope))
-			}
-			tb.flush()
-			return
-		}
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "TITLE", "STATE", "DUE", "PROGRESS")
 		for _, d := range ds {
 			due := d.Due
@@ -171,6 +151,24 @@ func emitMilestones(c *Ctx, ms []store.Milestone) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead, due := cGlyph(d.State), ""
+			if t, ok := parseStamp(d.Due + " 00:00:00"); ok {
+				due = "due " + relAge(d.Due+" 00:00:00", termNow())
+				if d.State == "open" && t.Before(termNow()) {
+					lead, due = cYou(), "overdue "+d.Due
+				}
+			}
+			progress := fmt.Sprintf("%d/%d closed", d.Closed, d.Open+d.Closed)
+			org := ""
+			if d.Org {
+				org = "org"
+			}
+			rows[i] = rowOf(cRef(d.Title), lead, cFlex(d.Description), cMeta(due, progress, org))
+		}
+		return listScreen("Milestones", rows, actions...)
 	})
 }
 

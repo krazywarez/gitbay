@@ -101,12 +101,22 @@ func runOrgList(c *Ctx, args []string) int {
 	for _, o := range orgs {
 		ds = append(ds, out{o.Username, o.Role})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "ORG", "ROLE")
 		for _, d := range ds {
 			tb.row(cRef(d.Org), cState(d.Role))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cLink(d.Org, c.siteURL(d.Org)), cState(d.Role))
+		}
+		s := listScreen("Organizations", rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{"org", "show", ds[0].Org}}}
+		}
+		return s
 	})
 }
 
@@ -137,7 +147,7 @@ func runOrgShow(c *Ctx, args []string) int {
 		Org     string      `json:"org"`
 		Members []memberOut `json:"members"`
 	}{org.Name, ms}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.title(d.Org, "", "")
 		if len(ms) > 0 {
@@ -147,6 +157,21 @@ func runOrgShow(c *Ctx, args []string) int {
 				tb.row(cRef(m.User), cState(m.Role))
 			}
 			tb.flush()
+		}
+	}, func() screen {
+		members := section{title: "Members", n: len(ms)}
+		for _, m := range ms {
+			members.rows = append(members.rows, rowOf(cRef(m.User), cState(m.Role)))
+		}
+		return screen{
+			fields:   []field{{"Org", []cell{cLink(d.Org, c.siteURL(d.Org))}}},
+			sections: []section{members},
+			actions: []action{
+				{"Members", []string{"org", "members", "add", d.Org, "<user>"}},
+				{"Org", []string{"org", "team", "list", d.Org}},
+				{"Org", []string{"org", "label", "list", d.Org}},
+				{"Org", []string{"org", "milestone", "list", d.Org}},
+			},
 		}
 	})
 }

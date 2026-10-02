@@ -151,12 +151,14 @@ func runOrgLabelList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(labels, func(w io.Writer) {
+	return c.emitView(labels, func(w io.Writer) {
 		tb := c.table(w, "NAME", "COLOR", "ISSUES", "MRS")
 		for _, l := range labels {
 			tb.row(cRef(l.Name), cSwatch(l.Color), cNum(l.Issues), cNum(l.MRs))
 		}
 		tb.flush()
+	}, func() screen {
+		return labelsScreen(labels, action{"Labels", []string{"org", "label", "set", org.Name, "<label>", "--color", "rrggbb"}})
 	})
 }
 
@@ -231,7 +233,10 @@ func runOrgMilestoneList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return emitMilestones(c, ms)
+	return emitMilestones(c, ms,
+		action{"Milestones", []string{"org", "milestone", "create", org.Name, "<title>"}},
+		action{"Milestones", []string{"org", "milestone", "list", org.Name, "--state", "all"}},
+	)
 }
 
 func runOrgMilestoneClose(c *Ctx, args []string) int  { return setOrgMilestoneState(c, args, "closed") }
