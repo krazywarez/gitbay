@@ -1,6 +1,6 @@
 # CLI views
 
-Status: proposed, 2026-10-01. Follows `2026-10-01-cli-terminal-output-design.md`
+Status: accepted, 2026-10-01. Follows `2026-10-01-cli-terminal-output-design.md`
 (v1.41.0, #312–#315).
 
 ## Problem
@@ -90,8 +90,12 @@ Nothing else is coloured. Refs and paths lose their cyan.
 
 **Legend.** A rule line, then up to three columns of action groups. Each
 group is a bold name over its commands, blue. Below 80 columns the groups
-stack in one column. Commands omit `<owner/name>` when the screen is for
-the repository the CLI would infer, so each line is what the user types.
+stack in one column. Commands omit `<owner/name>` when it equals the repository the CLI
+inferred from its clone, which the CLI sends as `here=<owner/name>` in
+`--term` (an older server ignores the option). Commands may name
+CLI-local commands (`mr rebase`, `mr checkout`). There is no `browse`:
+the header's first field links to the page where the terminal shows
+links, and a `URL:` field carries it otherwise.
 
 ## Model
 
@@ -117,14 +121,19 @@ type field struct {
 type section struct {
 	title string
 	n     int    // total, shown as "(n)"
-	rows  [][]cell
-	more  string // command for the rest, when n > len(rows)
+	rows  []row    // cells, plus a markup body drawn beneath (a comment)
+	more  []string // command for the rest, when n > len(rows)
 	empty bool   // draw "(0)" rather than omit
+}
+
+type row struct {
+	cells  []cell
+	body   string
+	format string
 }
 
 type action struct {
 	group string
-	label string
 	argv  []string
 }
 ```
@@ -145,7 +154,9 @@ command, replacing the `more:` line.
 
 The width logic in `table.flush` (`fit`, `capSparse`, `dropEmpty`) moves
 into the section renderer. At a terminal, `table` renders as one untitled
-section, so lists that have not migrated take the new row style in stage 1.
+section, so lists that have not migrated take the new row style in stage 1. Such a
+table keeps a dim header row only when a column is a number or size
+(`admin runners`, `admin stats`), which is unreadable without one.
 Piped `table` output is unchanged. `view`'s terminal branches are removed
 once no command reaches them.
 
@@ -176,19 +187,19 @@ command; a field without data is omitted.
 - Header: `Merge`, `State`, `Checks`, `Review`, `Gates` (each
   `MergeGates` gate as a glyph).
 - Body: description.
-- Sections: `Commits` (SHA, signature glyph, subject), `Files` with
-  `+a −d`, `Discussion` (threads as who · age and the first line;
-  suggestions marked; shown when empty).
-- Legend: Unblock (`mr rebase`; `mr checkout` on a conflict), Review (approve, comment,
-  `apply-suggestion` when there are suggestions), Merge (when the gates
-  pass), Read (`mr diff`, `browse`).
+- Sections: `Commits` (SHA, subject), `Files` with `+a −d`,
+  `Discussion` (each comment as who · age with its body beneath; shown
+  when empty).
+- Legend: Unblock (`mr rebase` when behind), Review (`mr review
+  --approve`, `mr comment`), Merge (when the gates pass), Read
+  (`mr diff`).
 
 **`issue show`**
 
 - Header: `Issue`, `State`, `Labels` (swatches), `Assignee`,
   `Milestone`, `Linked` (merge requests that close it).
 - Body: description.
-- Sections: `Discussion`.
+- Sections: `Discussion` as on `mr show`.
 - Legend: comment, assign, label, close or reopen, filtered by permission.
 
 **`repo show`**
@@ -197,7 +208,7 @@ command; a field without data is omitted.
   (only on error).
 - Body: description and topics.
 - Sections: `Open merge requests`, `Open issues`, `Recent commits` (5).
-- Legend: `mr create`, `issue create`, `repo log`, `browse`.
+- Legend: `mr create`, `issue create`, `repo log`.
 
 **`build show`**
 
