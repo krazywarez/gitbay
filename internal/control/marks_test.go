@@ -65,28 +65,6 @@ func TestLabelsMark(t *testing.T) {
 	}
 }
 
-func TestFailingBuilds(t *testing.T) {
-	builds := []DashboardBuild{
-		{Repo: "a/x", Job: "test", Ref: "main", Status: "success"},
-		{Repo: "a/x", Job: "test", Ref: "main", Status: "failure"}, // replaced by the newer success
-		{Repo: "a/y", Job: "pull", Ref: "main", Status: "failure"},
-	}
-	if got := failingBuilds(builds); got != 1 {
-		t.Errorf("failingBuilds = %d, want 1", got)
-	}
-}
-
-func TestNeedsYou(t *testing.T) {
-	term := Term{Cols: 80}
-	if got := term.needsYou(DashboardOut{}); got != "Nothing waits on you." {
-		t.Errorf("empty = %q", got)
-	}
-	d := DashboardOut{Reviews: make([]DashboardItem, 2), Unread: 1}
-	if got := term.needsYou(d); got != "Needs you: 2 reviews requested, 1 unread notification" {
-		t.Errorf("needsYou = %q", got)
-	}
-}
-
 func TestStepState(t *testing.T) {
 	cases := []struct {
 		status    string

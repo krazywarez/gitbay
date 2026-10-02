@@ -95,47 +95,7 @@ type DashboardOut struct {
 
 // dashboardActivity is how many feed lines the dashboard shows at a
 // terminal.
-const dashboardActivity = 8
-
-// needsYou is the dashboard's first line at a terminal: what waits on
-// the viewer, in yellow, or a dim line saying nothing does.
-func (t Term) needsYou(d DashboardOut) string {
-	var parts []string
-	add := func(n int, one, many string) {
-		switch {
-		case n == 1:
-			parts = append(parts, "1 "+one)
-		case n > 1:
-			parts = append(parts, fmt.Sprintf("%d %s", n, many))
-		}
-	}
-	add(len(d.Reviews), "review requested", "reviews requested")
-	add(len(d.Assigned), "assigned issue", "assigned issues")
-	add(failingBuilds(d.Builds), "failing build", "failing builds")
-	add(d.Unread, "unread notification", "unread notifications")
-	if len(parts) == 0 {
-		return t.paint(sgrDim, "Nothing waits on you.")
-	}
-	return t.paint(sgrBold+sgrYellow, "Needs you: "+strings.Join(parts, ", "))
-}
-
-// failingBuilds counts the jobs whose latest build failed: a failure a
-// later build of the same job and ref has already replaced is not one.
-func failingBuilds(builds []DashboardBuild) int {
-	seen := map[string]bool{}
-	n := 0
-	for _, b := range builds {
-		key := b.Repo + "\x00" + b.Job + "\x00" + b.Ref
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		if b.Status == "failure" {
-			n++
-		}
-	}
-	return n
-}
+const dashboardActivity = 5
 
 func runDashboard(c *Ctx, args []string) int {
 	if len(args) != 0 {
@@ -220,48 +180,25 @@ func runDashboard(c *Ctx, args []string) int {
 		d.Queues = &q
 	}
 
-	return c.emit(d, func(w io.Writer) {
-		// At a terminal sections are separated by a blank line, and an
-		// empty one is left out.
-		wrote := false
-		heading := func(title string) {
-			if c.Term.Cols == 0 {
-				fmt.Fprintln(w, title)
-				return
-			}
-			if wrote {
-				fmt.Fprintln(w)
-			}
-			wrote = true
-			fmt.Fprintln(w, c.Term.heading(title))
-		}
-		section := func(title string, header []string, rows [][]cell) {
-			if c.Term.Cols > 0 && len(rows) == 0 {
-				return
-			}
+	lines := FeedLines(events)
+	return c.emitView(d, func(w io.Writer) {
+		heading := func(title string) { fmt.Fprintln(w, title) }
+		section := func(title string, rows [][]cell) {
 			heading(title)
 			if len(rows) == 0 {
 				fmt.Fprintln(w, "  none")
 				return
 			}
-			if c.Term.Cols == 0 {
-				for _, r := range rows {
-					parts := make([]string, len(r))
-					for i, cl := range r {
-						parts[i] = cl.s
-						if cl.kind == kindAge {
-							parts[i] = stamp(cl.s)
-						}
-					}
-					fmt.Fprintf(w, "  %s\n", strings.Join(parts, "\t"))
-				}
-				return
-			}
-			tb := c.table(w, header...)
 			for _, r := range rows {
-				tb.row(r...)
+				parts := make([]string, len(r))
+				for i, cl := range r {
+					parts[i] = cl.s
+					if cl.kind == kindAge {
+						parts[i] = stamp(cl.s)
+					}
+				}
+				fmt.Fprintf(w, "  %s\n", strings.Join(parts, "\t"))
 			}
-			tb.flush()
 		}
 		itemRows := func(items []DashboardItem, marker string) [][]cell {
 			rows := make([][]cell, len(items))
@@ -276,17 +213,13 @@ func runDashboard(c *Ctx, args []string) int {
 			return rows
 		}
 
-		if c.Term.Cols > 0 {
-			fmt.Fprintln(w, c.Term.needsYou(d))
-			wrote = true
-		} else if d.Unread > 0 {
+		if d.Unread > 0 {
 			fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
 		}
-		itemHeader := []string{"REF", "TITLE", "AUTHOR"}
-		section("waiting on your review:", itemHeader, itemRows(d.Reviews, "!"))
-		section("assigned to you:", itemHeader, itemRows(d.Assigned, "#"))
-		section("open merge requests:", itemHeader, itemRows(d.MRs, "!"))
-		section("open issues:", itemHeader, itemRows(d.Issues, "#"))
+		section("waiting on your review:", itemRows(d.Reviews, "!"))
+		section("assigned to you:", itemRows(d.Assigned, "#"))
+		section("open merge requests:", itemRows(d.MRs, "!"))
+		section("open issues:", itemRows(d.Issues, "#"))
 		for _, q := range d.Queries {
 			rows := make([][]cell, 0, len(q.Items))
 			for _, it := range q.Items {
@@ -296,7 +229,7 @@ func runDashboard(c *Ctx, args []string) int {
 			if q.Error != "" {
 				title = fmt.Sprintf("query %s: %s", q.Name, q.Error)
 			}
-			section(title, itemHeader, rows)
+			section(title, rows)
 		}
 
 		pinnedRows := make([][]cell, len(d.Pinned))
@@ -307,32 +240,19 @@ func runDashboard(c *Ctx, args []string) int {
 			}
 			pinnedRows[i] = cells
 		}
-		section("pinned:", []string{"PATH", "VISIBILITY", "DESCRIPTION"}, pinnedRows)
+		section("pinned:", pinnedRows)
 
-		lines := FeedLines(events)
-		if c.Term.Cols > 0 {
-			// The feed has its own command; the dashboard shows the start.
-			rows := make([][]cell, 0, dashboardActivity)
-			for _, l := range lines[:min(len(lines), dashboardActivity)] {
-				rows = append(rows, l.termCells(c))
-			}
-			section("recent activity:", feedHeader, rows)
-			if len(lines) > dashboardActivity {
-				fmt.Fprintln(w, c.Term.paint(sgrDim, "more: gitbay feed"))
-			}
-		} else {
-			activityRows := make([][]cell, len(lines))
-			for i, l := range lines {
-				activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
-			}
-			section("recent activity:", []string{"WHEN", "EVENT"}, activityRows)
+		activityRows := make([][]cell, len(lines))
+		for i, l := range lines {
+			activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
 		}
+		section("recent activity:", activityRows)
 
 		buildRows := make([][]cell, len(d.Builds))
 		for i, b := range d.Builds {
 			buildRows[i] = []cell{cLink(b.Repo, c.siteURL(b.Repo, "builds", strconv.FormatInt(b.Number, 10))), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
 		}
-		section("builds:", []string{"REPO", "#", "JOB", "STATUS", "SHA", "REF"}, buildRows)
+		section("builds:", buildRows)
 
 		if d.Server != nil {
 			heading("server:")
@@ -377,11 +297,7 @@ func runDashboard(c *Ctx, args []string) int {
 				if it.Status == "pending" {
 					since = it.CreatedAt
 				}
-				if c.Term.Cols == 0 {
-					since = stamp(since)
-				} else {
-					since = relAge(since, termNow())
-				}
+				since = stamp(since)
 				tbq.row(cRef("    "+it.Repo), cNum(it.Number), cText(it.Job), cText(fmt.Sprintf("%s since %s", it.Status, since)))
 			}
 			tbq.flush()
@@ -393,7 +309,7 @@ func runDashboard(c *Ctx, args []string) int {
 			}
 			tde.flush()
 		}
-	})
+	}, func() screen { return dashboardScreen(c, d, lines) })
 }
 
 // feedDefaultLimit caps a bare `feed` call; pagination reaches further
@@ -456,4 +372,120 @@ func runFeed(c *Ctx, args []string) int {
 		}
 		tb.flush()
 	})
+}
+
+// dashboardScreen is dashboard at a terminal: what waits on the viewer
+// first, then open merge requests, failed builds, a few lines of
+// activity and the pinned repositories. The operator's queues are
+// admin stats'; a background failure shows as one header line.
+func dashboardScreen(c *Ctx, d DashboardOut, lines []FeedLine) screen {
+	var s screen
+	s.fields = append(s.fields, field{"User", []cell{cText(c.User.Username)}})
+	if host := c.Cfg.SiteHost(); host != "" {
+		s.fields = append(s.fields, field{"Instance", []cell{cText(host)}})
+	}
+	if q := d.Queues; q != nil {
+		if bad := q.Webhooks.Failed + q.Mail.Failed + q.Push.Failed + q.Mirrors.Errors + q.Deps.Errors; bad > 0 {
+			s.fields = append(s.fields, field{"Problems", []cell{cGlyph("failed"), cText(fmt.Sprintf("%d failing in the background", bad))}})
+		}
+	}
+	if d.Unread > 0 {
+		s.fields = append(s.fields, field{"Inbox", []cell{cYou(), cText(fmt.Sprintf("%d unread", d.Unread))}})
+	}
+
+	item := func(it DashboardItem, marker, page string, you bool) row {
+		lead := cell{kind: kindGlyph}
+		if you {
+			lead = cYou()
+		}
+		ref := cLink(fmt.Sprintf("%s%s%d", it.Repo, marker, it.Number), c.siteURL(it.Repo, page, strconv.FormatInt(it.Number, 10)))
+		return rowOf(ref, lead, cFlex(it.Title), cMeta(it.Author))
+	}
+	items := func(title string, its []DashboardItem, marker, page string, you bool) section {
+		sec := section{title: title, n: len(its)}
+		for _, it := range its {
+			sec.rows = append(sec.rows, item(it, marker, page, you))
+		}
+		return sec
+	}
+	s.sections = append(s.sections,
+		items("Review requested", d.Reviews, "!", "mrs", true),
+		items("Assigned issues", d.Assigned, "#", "issues", true),
+		items("Open merge requests", d.MRs, "!", "mrs", false),
+	)
+	for _, q := range d.Queries {
+		sec := section{title: q.Name, n: q.Count, more: []string{"query", "run", q.Name}}
+		if q.Error != "" {
+			sec.note, sec.empty = q.Error, true
+		}
+		for _, it := range q.Items {
+			sec.rows = append(sec.rows, rowOf(cRef(it.Ref()), cFlex(it.Title), cMeta(it.Author)))
+		}
+		s.sections = append(s.sections, sec)
+	}
+
+	// A job's latest build is the one that counts: a failure a later
+	// build of the same job and ref has replaced is not shown.
+	failed := section{title: "Failed builds"}
+	passed := 0
+	seen := map[string]bool{}
+	var firstFailed *DashboardBuild
+	for i, b := range d.Builds {
+		key := b.Repo + "\x00" + b.Job + "\x00" + b.Ref
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		switch b.Status {
+		case "success":
+			passed++
+		case "failure", "error":
+			n := strconv.FormatInt(b.Number, 10)
+			failed.n++
+			failed.rows = append(failed.rows, rowOf(cLink(n, c.siteURL(b.Repo, "builds", n)), cGlyph(b.Status),
+				cFlex(b.Job+"  "+b.Ref), cMeta(b.Repo, relAge(b.CreatedAt, termNow()))))
+			if firstFailed == nil {
+				firstFailed = &d.Builds[i]
+			}
+		}
+	}
+	s.sections = append(s.sections, failed)
+
+	activity := section{title: "Recent activity", n: len(lines), more: []string{"feed"}}
+	for _, l := range lines[:min(len(lines), dashboardActivity)] {
+		activity.rows = append(activity.rows, rowOf(l.termCells(c)...))
+	}
+	if passed > 0 {
+		word := "builds"
+		if passed == 1 {
+			word = "build"
+		}
+		activity.note, activity.empty = fmt.Sprintf("%d %s passed", passed, word), true
+	}
+	s.sections = append(s.sections, activity)
+
+	if len(d.Pinned) > 0 {
+		paths := make([]string, len(d.Pinned))
+		for i, p := range d.Pinned {
+			paths[i] = p.Path
+		}
+		s.sections = append(s.sections, section{title: "Pinned", n: len(d.Pinned), rows: []row{rowOf(cMeta(strings.Join(paths, "  ")))}})
+	}
+
+	if len(d.Reviews) > 0 {
+		it := d.Reviews[0]
+		s.actions = append(s.actions, action{"Next", []string{"mr", "show", it.Repo, strconv.FormatInt(it.Number, 10)}})
+	}
+	if len(d.Assigned) > 0 {
+		it := d.Assigned[0]
+		s.actions = append(s.actions, action{"Next", []string{"issue", "show", it.Repo, strconv.FormatInt(it.Number, 10)}})
+	}
+	if firstFailed != nil {
+		s.actions = append(s.actions, action{"Next", []string{"build", "log", firstFailed.Repo, strconv.FormatInt(firstFailed.Number, 10)}})
+	}
+	s.actions = append(s.actions, action{"More", []string{"feed"}})
+	if c.User.IsAdmin {
+		s.actions = append(s.actions, action{"Instance", []string{"admin", "stats"}})
+	}
+	return s
 }
