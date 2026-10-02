@@ -358,10 +358,15 @@ push=.
 - =max_snippet_bytes= (1MB) — cap per snippet file.
 - =max_snippets_per_user= (0, unlimited) — snippets an account may own.
 - =max_repos_per_user= (0, unlimited) — repositories an account may own
-  directly; =repo create=, =fork= and =import= refuse past it.
-  Organizations are not capped.
+  directly; =repo create=, =fork=, =import= and =repo transfer= refuse
+  past it.
 - =max_bytes_per_user= (0, unlimited) — disk the account's own
-  repositories may take; a push may be no larger than what is left.
+  repositories may take; a push may be no larger than what is left, and
+  a transfer in must fit.
+- =max_orgs_per_user= (0, unlimited) — organizations an account may
+  create. Membership in an org someone else created does not count.
+- =max_repos_per_org=, =max_bytes_per_org= (0, unlimited) — the same two
+  caps for each organization.
 - =pack_concurrency= (3), =pack_per_principal= (2), =pack_queue= (32),
   =pack_queue_wait= (="60s"=) — git pack generation (clones, fetches,
   =git archive --remote=, web archive downloads, =repo download= over
@@ -520,7 +525,8 @@ gitbayd admin audit verify           # check the hash chain; exit 1 names the fi
 ssh git@<host> audit ...             # the same, from an admin session
 ssh git@<host> admin user list [--state active|pending|disabled|admin]
 ssh git@<host> admin user show <name>   # keys, emails, orgs, tokens, sessions
-ssh git@<host> admin user limits <name> [--repos n|default] [--bytes n|default]   # per-account caps
+ssh git@<host> admin user limits <name> [--repos n|default] [--bytes n|default] [--orgs n|default]   # per-account caps
+ssh git@<host> admin org limits <org> [--repos n|default] [--bytes n|default]   # per-org caps
 ssh git@<host> admin user promote <name>   # grant instance admin
 ssh git@<host> admin user demote <name>    # remove it; the last admin is refused
 gitbayd admin user promote <name>    # host-local: recovery when no admin key is reachable

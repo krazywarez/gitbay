@@ -276,11 +276,9 @@ func runRepoCreate(c *Ctx, args []string) int {
 		return code
 	}
 	repoCreateMu.Lock()
-	if ownerKind == "user" {
-		if code := checkRepoQuota(c); code >= 0 {
-			repoCreateMu.Unlock()
-			return code
-		}
+	if code := checkRepoQuota(c, ownerKind, ownerID); code >= 0 {
+		repoCreateMu.Unlock()
+		return code
 	}
 	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
 	repoCreateMu.Unlock()
@@ -581,6 +579,16 @@ func runRepoTransfer(c *Ctx, args []string) int {
 
 	oldDir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	newDir := RepoDir(c.Cfg.Server.Root, newOwner, repo.Name)
+	// The receiving owner's caps apply as if the repository were created
+	// there. The lock covers the move so two transfers cannot both pass.
+	repoCreateMu.Lock()
+	defer repoCreateMu.Unlock()
+	if code := checkRepoQuota(c, newKind, newID); code >= 0 {
+		return code
+	}
+	if code := checkBytesLeft(c, newKind, newID, newOwner, gitutil.DirSize(oldDir)); code >= 0 {
+		return code
+	}
 	if _, err := os.Stat(newDir); err == nil {
 		return c.fail(protocol.ExitFailure, "repository directory already exists at %s/%s", newOwner, repo.Name)
 	}

@@ -5,39 +5,54 @@ import (
 	"time"
 )
 
-// UserLimits is an account's quota overrides; nil means the configured
-// default applies.
-type UserLimits struct {
+// Limits is an owner's quota overrides; nil means the configured default
+// applies. Orgs is the account's cap on organizations it creates and is
+// always nil for an org.
+type Limits struct {
 	Repos *int64
 	Bytes *int64
+	Orgs  *int64
 }
 
-func (s *Store) UserLimits(userID int64) (UserLimits, error) {
-	var repos, bytes sql.NullInt64
-	err := s.DB.QueryRow("SELECT repo_limit, byte_limit FROM users WHERE id = ?", userID).Scan(&repos, &bytes)
+func nullable(n sql.NullInt64) *int64 {
+	if !n.Valid {
+		return nil
+	}
+	return &n.Int64
+}
+
+func orNull(p *int64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// OwnerLimits reads the overrides of a user or an org.
+func (s *Store) OwnerLimits(kind string, id int64) (Limits, error) {
+	var repos, bytes, orgs sql.NullInt64
+	var err error
+	if kind == "org" {
+		err = s.DB.QueryRow("SELECT repo_limit, byte_limit FROM orgs WHERE id = ?", id).Scan(&repos, &bytes)
+	} else {
+		err = s.DB.QueryRow("SELECT repo_limit, byte_limit, org_limit FROM users WHERE id = ?", id).Scan(&repos, &bytes, &orgs)
+	}
 	if err != nil {
-		return UserLimits{}, err
+		return Limits{}, err
 	}
-	var l UserLimits
-	if repos.Valid {
-		l.Repos = &repos.Int64
-	}
-	if bytes.Valid {
-		l.Bytes = &bytes.Int64
-	}
-	return l, nil
+	return Limits{nullable(repos), nullable(bytes), nullable(orgs)}, nil
 }
 
-// SetUserLimits writes the overrides; a nil field clears back to default.
-func (s *Store) SetUserLimits(userID int64, l UserLimits) error {
-	var repos, bytes any
-	if l.Repos != nil {
-		repos = *l.Repos
+// SetOwnerLimits writes the overrides; a nil field clears back to default.
+func (s *Store) SetOwnerLimits(kind string, id int64, l Limits) error {
+	var res sql.Result
+	var err error
+	if kind == "org" {
+		res, err = s.DB.Exec("UPDATE orgs SET repo_limit = ?, byte_limit = ? WHERE id = ?", orNull(l.Repos), orNull(l.Bytes), id)
+	} else {
+		res, err = s.DB.Exec("UPDATE users SET repo_limit = ?, byte_limit = ?, org_limit = ? WHERE id = ?",
+			orNull(l.Repos), orNull(l.Bytes), orNull(l.Orgs), id)
 	}
-	if l.Bytes != nil {
-		bytes = *l.Bytes
-	}
-	res, err := s.DB.Exec("UPDATE users SET repo_limit = ?, byte_limit = ? WHERE id = ?", repos, bytes, userID)
 	if err != nil {
 		return err
 	}
@@ -45,6 +60,14 @@ func (s *Store) SetUserLimits(userID int64, l UserLimits) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// CreatedOrgCount counts the organizations an account created and that
+// still exist.
+func (s *Store) CreatedOrgCount(userID int64) (int64, error) {
+	var n int64
+	err := s.DB.QueryRow("SELECT COUNT(*) FROM orgs WHERE created_by = ?", userID).Scan(&n)
+	return n, err
 }
 
 // ReapPendingUsers deletes self-registered accounts still unverified

@@ -283,11 +283,11 @@ func runAdminUserShow(c *Ctx, args []string) int {
 	for _, m := range orgs {
 		d.Orgs = append(d.Orgs, orgOut{m.Username, m.Role})
 	}
-	if d.Repos, err = c.Store.OwnedRepoCount(u.ID); err != nil {
+	if d.Repos, err = c.Store.OwnedRepoCount("user", u.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	d.RepoLimit = RepoLimit(c.Store, limitsOf(c), u.ID)
-	d.ByteLimit = ByteLimit(c.Store, limitsOf(c), u.ID)
+	d.RepoLimit = RepoLimit(c.Store, limitsOf(c), "user", u.ID)
+	d.ByteLimit = ByteLimit(c.Store, limitsOf(c), "user", u.ID)
 	tokens, err := c.Store.ListAPITokens(u.ID)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)

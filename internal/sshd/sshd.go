@@ -586,9 +586,9 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 	// A storage quota on the owner rides the same mechanism as the pack
 	// cap: the pack may be no larger than what the owner has left.
 	maxPack := cfg.Limits.MaxPackBytes
-	if write && repo.OwnerKind == "user" {
-		if limit := control.ByteLimit(st, control.QuotaConfig(cfg), repo.OwnerID); limit > 0 {
-			used := control.OwnedBytes(st, cfg.Server.Root, repo.OwnerID)
+	if write {
+		if limit := control.ByteLimit(st, control.QuotaConfig(cfg), repo.OwnerKind, repo.OwnerID); limit > 0 {
+			used := control.OwnedBytes(st, cfg.Server.Root, repo.OwnerKind, repo.OwnerID)
 			left := limit - used
 			if left <= 0 {
 				fmt.Fprintf(stderr, "%s's storage quota is used up (%d of %d bytes); delete something, or ask an admin to raise the limit\n", repo.OwnerName, used, limit)

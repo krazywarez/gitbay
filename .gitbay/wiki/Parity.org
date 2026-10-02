@@ -478,6 +478,7 @@ when there is none.
 | disable, enable                 | yes | yes | no  |
 | account create, delete          | yes | no  | no  |
 | invite                          | yes | no  | no  |
+| account and org quotas          | yes | no  | no  |
 | worker queues                   | yes | yes | no  |
 | runners                         | yes | no  | no  |
 | repository list, archive, visibility | yes | no | no |

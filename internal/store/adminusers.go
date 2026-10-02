@@ -111,11 +111,10 @@ func (s *Store) AdminMailAddresses() ([]string, error) {
 	return out, rows.Err()
 }
 
-// OwnedRepoCount counts repositories the user owns directly, not through
-// an org.
-func (s *Store) OwnedRepoCount(userID int64) (int64, error) {
+// OwnedRepoCount counts repositories a user or an org owns directly.
+func (s *Store) OwnedRepoCount(kind string, id int64) (int64, error) {
 	var n int64
-	err := s.DB.QueryRow("SELECT COUNT(*) FROM repos WHERE owner_kind = 'user' AND owner_id = ?", userID).Scan(&n)
+	err := s.DB.QueryRow("SELECT COUNT(*) FROM repos WHERE owner_kind = ? AND owner_id = ?", kind, id).Scan(&n)
 	return n, err
 }
 

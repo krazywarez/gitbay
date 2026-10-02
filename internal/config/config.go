@@ -239,11 +239,14 @@ type Limits struct {
 	// counted in the dispatcher so every surface shares one budget. 0 uses
 	// the default; a negative value turns the limit off.
 	WriteRate int `toml:"write_rate"`
-	// Per-account quotas on what a user owns directly (organizations are
-	// not capped). 0 means unlimited; admin user limits overrides per
-	// account.
+	// Quotas on what a user or an org owns directly, and on the orgs an
+	// account creates. 0 means unlimited; admin user limits and admin org
+	// limits override per owner.
 	MaxReposPerUser int   `toml:"max_repos_per_user"`
 	MaxBytesPerUser int64 `toml:"max_bytes_per_user"`
+	MaxOrgsPerUser  int   `toml:"max_orgs_per_user"`
+	MaxReposPerOrg  int   `toml:"max_repos_per_org"`
+	MaxBytesPerOrg  int64 `toml:"max_bytes_per_org"`
 	// PackConcurrency caps git pack generation (upload-pack and
 	// upload-archive) running at once across SSH, smart HTTP and git://.
 	// PackPerPrincipal caps it per account, or per client address on the
@@ -675,8 +678,9 @@ func (c Config) Validate() error {
 			errs = append(errs, fmt.Errorf("registration.pending_expiry %q must be a positive duration such as 168h", c.Registration.PendingExpiry))
 		}
 	}
-	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 {
-		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user and max_snippets_per_user must not be negative"))
+	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 ||
+		c.Limits.MaxOrgsPerUser < 0 || c.Limits.MaxReposPerOrg < 0 || c.Limits.MaxBytesPerOrg < 0 {
+		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user, max_snippets_per_user, max_orgs_per_user, max_repos_per_org and max_bytes_per_org must not be negative"))
 	}
 	for _, w := range []struct{ name, val string }{
 		{"pack_queue_wait", c.Limits.PackQueueWait},

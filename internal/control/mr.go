@@ -244,13 +244,9 @@ func runRepoFork(c *Ctx, args []string) int {
 		return code
 	}
 	repoCreateMu.Lock()
-	// An organization's repositories are not counted against the quota,
-	// the same as repo create.
-	if ownerKind == "user" {
-		if code := checkRepoQuota(c); code >= 0 {
-			repoCreateMu.Unlock()
-			return code
-		}
+	if code := checkRepoQuota(c, ownerKind, ownerID); code >= 0 {
+		repoCreateMu.Unlock()
+		return code
 	}
 	id, err := c.Store.CreateFork(ownerKind, ownerID, name, src.Visibility, src.ID)
 	repoCreateMu.Unlock()

@@ -76,10 +76,8 @@ func runRepoImport(c *Ctx, args []string) int {
 		}
 		ownerKind, ownerID = "org", org.ID
 	}
-	if ownerKind == "user" {
-		if code := checkRepoQuota(c); code >= 0 {
-			return code
-		}
+	if code := checkRepoQuota(c, ownerKind, ownerID); code >= 0 {
+		return code
 	}
 
 	// http and https only. git:// has no equivalent of curl's resolve
@@ -138,11 +136,9 @@ func runRepoImport(c *Ctx, args []string) int {
 	// The early check above fails fast; this one holds the lock across
 	// the insert so a concurrent create cannot slip past the count.
 	repoCreateMu.Lock()
-	if ownerKind == "user" {
-		if code := checkRepoQuota(c); code >= 0 {
-			repoCreateMu.Unlock()
-			return code
-		}
+	if code := checkRepoQuota(c, ownerKind, ownerID); code >= 0 {
+		repoCreateMu.Unlock()
+		return code
 	}
 	id, err := c.Store.CreateRepo(ownerKind, ownerID, name, visibility)
 	repoCreateMu.Unlock()

@@ -80,7 +80,14 @@ func runOrgCreate(c *Ctx, args []string) int {
 	if err := policy.ValidateOwnerName(args[0]); err != nil {
 		return c.failInput(err)
 	}
-	if _, err := c.Store.CreateOrg(args[0], c.User.ID); err != nil {
+	orgCreateMu.Lock()
+	if code := checkOrgQuota(c); code >= 0 {
+		orgCreateMu.Unlock()
+		return code
+	}
+	_, err := c.Store.CreateOrg(args[0], c.User.ID)
+	orgCreateMu.Unlock()
+	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(map[string]string{"org": args[0], "role": "admin"}, func(w io.Writer) {

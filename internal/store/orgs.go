@@ -43,7 +43,7 @@ func (s *Store) CreateOrg(name string, creatorID int64) (int64, error) {
 	if taken {
 		return 0, fmt.Errorf("the name %q is taken", name)
 	}
-	res, err := tx.Exec("INSERT INTO orgs (name) VALUES (?)", name)
+	res, err := tx.Exec("INSERT INTO orgs (name, created_by) VALUES (?, ?)", name, creatorID)
 	if err != nil {
 		return 0, err
 	}
