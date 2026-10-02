@@ -2271,7 +2271,7 @@ func mrShowScreen(c *Ctx, repo store.Repo, d MRShow, files []gitutil.NumStat) sc
 	if len(files) > 0 {
 		fs.note = fmt.Sprintf("+%d −%d", add, del)
 	}
-	s.sections = []section{commits, fs, discussion(d.Comments)}
+	s.sections = []section{commits, fs, discussion(d.Comments), events(d.Comments)}
 
 	if open {
 		if behind {

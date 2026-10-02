@@ -285,7 +285,7 @@ func (c *Ctx) renderLegend(as []action) string {
 }
 
 // discussion is a thread's comments as a section, each author and age
-// with its body beneath. System events are left out. It is drawn when
+// with its body beneath. System events are events'. It is drawn when
 // empty, as "(0)".
 func discussion(cs []commentOut) section {
 	sec := section{title: "Discussion", empty: true}
@@ -295,6 +295,20 @@ func discussion(cs []commentOut) section {
 		}
 		sec.n++
 		sec.rows = append(sec.rows, row{cells: []cell{cText(cm.Author), cAge(cm.CreatedAt)}, body: cm.Body, format: cm.BodyFormat})
+	}
+	return sec
+}
+
+// events is a thread's system comments ("referenced in commit ...") as
+// a section, each its age and its text without link targets.
+func events(cs []commentOut) section {
+	sec := section{title: "Events"}
+	for _, cm := range cs {
+		if cm.Kind != "system" {
+			continue
+		}
+		sec.n++
+		sec.rows = append(sec.rows, rowOf(cAge(cm.CreatedAt), cFlex(termtext.Inline(cm.Body, cm.BodyFormat))))
 	}
 	return sec
 }

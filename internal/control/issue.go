@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -399,7 +400,13 @@ func runIssueShow(c *Ctx, args []string) int {
 		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind, reactionsOut(rx[cm.ID])})
 	}
 	d := IssueShow{issueOut: issueToOut(issue, true), Reactions: reactionsOut(rx[0]), Comments: cs}
-	return c.emit(d, func(w io.Writer) {
+	canWrite := false
+	if c.Term.Cols > 0 && !c.JSON {
+		if grant, err := c.Store.AccessRole(repo.ID, c.User.ID); err == nil {
+			canWrite = policy.CanWrite(c.User, repo, grant)
+		}
+	}
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.title(fmt.Sprintf("#%d", d.Number), d.Title, d.State)
 		v.fields(
@@ -429,7 +436,7 @@ func runIssueShow(c *Ctx, args []string) int {
 			v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
 			v.reactions(cm.Reactions)
 		}
-	})
+	}, func() screen { return issueShowScreen(c, repo, d, canWrite) })
 }
 
 func runIssueComment(c *Ctx, args []string) int {
@@ -716,4 +723,49 @@ func assignIssue(c *Ctx, repo store.Repo, issue store.Issue, adds, removes []sto
 			path:    fmt.Sprintf("%s/issues/%d", repo.Path(), issue.Number)})
 	}
 	return updated.Assignees, -1
+}
+
+// issueShowScreen is issue show at a terminal. canWrite is write access,
+// which assigning and labelling need; the author may also close.
+func issueShowScreen(c *Ctx, repo store.Repo, d IssueShow, canWrite bool) screen {
+	n := strconv.FormatInt(d.Number, 10)
+	path := repo.Path()
+	s := screen{body: d.Body, format: d.BodyFormat}
+	s.fields = append(s.fields,
+		field{"Issue", []cell{cLink("#"+n, c.siteURL(path, "issues", n)), cText(d.Title)}},
+		field{"State", []cell{cState(d.State), cMeta(d.Author, relAge(d.CreatedAt, termNow()))}},
+	)
+	if len(d.Labels) > 0 {
+		s.fields = append(s.fields, field{"Labels", []cell{cText(strings.Join(d.Labels, ", "))}})
+	}
+	if len(d.Assignees) > 0 {
+		v := cText(strings.Join(d.Assignees, ", "))
+		if slices.Contains(d.Assignees, c.User.Username) {
+			v.sgr = sgrYellow
+		}
+		s.fields = append(s.fields, field{"Assignee", []cell{v}})
+	}
+	if d.Milestone != "" {
+		s.fields = append(s.fields, field{"Milestone", []cell{cText(d.Milestone)}})
+	}
+	if !c.Term.Links {
+		s.fields = append(s.fields, field{"URL", []cell{cText(c.siteURL(path, "issues", n))}})
+	}
+	s.sections = []section{discussion(d.Comments), events(d.Comments)}
+
+	s.actions = append(s.actions, action{"Discuss", []string{"issue", "comment", path, n}})
+	if canWrite {
+		s.actions = append(s.actions,
+			action{"Triage", []string{"issue", "assign", path, n, "--add", c.User.Username}},
+			action{"Triage", []string{"issue", "label", path, n, "--add", "<label>"}},
+		)
+	}
+	if canWrite || d.Author == c.User.Username {
+		verb := "close"
+		if d.State == "closed" {
+			verb = "reopen"
+		}
+		s.actions = append(s.actions, action{"State", []string{"issue", verb, path, n}})
+	}
+	return s
 }

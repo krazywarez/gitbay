@@ -55,10 +55,14 @@ func TestIssueShowTerminal(t *testing.T) {
 	if !strings.Contains(out, sgrGreen+"open"+sgrReset) {
 		t.Errorf("state not coloured:\n%s", out)
 	}
-	if !strings.Contains(out, " UTC") {
-		t.Errorf("no web-format timestamp:\n%s", out)
+	if !strings.Contains(stripSGR(out), "referenced in commit abc1234567 by alice") {
+		t.Errorf("event missing:\n%s", out)
 	}
 	for _, line := range strings.Split(stripSGR(out), "\n") {
+		// A suggested command is never cut: it has to paste whole.
+		if strings.HasPrefix(line, "gitbay ") {
+			continue
+		}
 		if cells(line) > 60 {
 			t.Errorf("line over 60 cells: %q", line)
 		}
@@ -95,21 +99,23 @@ func TestIssueShowNarrowWraps(t *testing.T) {
 	var titleLines []string
 	inTitle := false
 	for _, line := range strings.Split(stripSGR(out), "\n") {
-		if cells(line) > 40 {
+		// A suggested command is never cut: it has to paste whole.
+		if cells(line) > 40 && !strings.HasPrefix(line, "gitbay ") {
 			t.Errorf("line over 40 cells: %q", line)
 		}
+		_, rest, isTitle := strings.Cut(line, "#1  ")
 		switch {
-		case strings.HasPrefix(line, "#1  "):
+		case strings.HasPrefix(line, "Issue:") && isTitle:
 			inTitle = true
-			titleLines = append(titleLines, strings.TrimPrefix(line, "#1  "))
-		case inTitle && strings.HasPrefix(line, "    "):
+			titleLines = append(titleLines, rest)
+		case inTitle && strings.HasPrefix(line, "     "):
 			titleLines = append(titleLines, strings.TrimSpace(line))
 		default:
 			inTitle = false
 		}
 	}
 	got := strings.Join(strings.Fields(strings.Join(titleLines, " ")), " ")
-	want := strings.Join(strings.Fields(title+" open"), " ")
+	want := strings.Join(strings.Fields(title), " ")
 	if got != want {
 		t.Errorf("title text lost across wrap: got %q, want %q", got, want)
 	}

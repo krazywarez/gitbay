@@ -1,0 +1,10 @@
+#1  Android app  open
+
+  author  alice, <time>
+  url     /alice/app/issues/1
+
+  An app.
+
+── alice, <time> (comment 1) 
+
+  Started.

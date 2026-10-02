@@ -126,7 +126,7 @@ func TestMRShowScreenRenders(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "marked ready") {
-		t.Errorf("system event in the discussion:\n%s", out)
+	if !strings.Contains(out, "Events (1)\n9m ago  marked ready\n") {
+		t.Errorf("system event not under Events:\n%s", out)
 	}
 }
