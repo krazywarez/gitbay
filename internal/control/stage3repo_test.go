@@ -27,6 +27,9 @@ func dispatchIn(t *testing.T, st *store.Store, u store.User, root, stdin string,
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdout: out, Stderr: errOut, Stdin: strings.NewReader(stdin)}
 	c.Cfg.Server.Root = root
+	// Fixtures write a lot as user 1; the write limiter is global to
+	// the package, so leave its budget to the tests that exercise it.
+	c.Cfg.Limits.WriteRate = -1
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}
@@ -46,6 +49,9 @@ func atTerminalIn(t *testing.T, st *store.Store, u store.User, root string, argv
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdout: out, Stderr: errOut, Stdin: strings.NewReader(""), Term: Term{Cols: 100}}
 	c.Cfg.Server.Root = root
+	// Fixtures write a lot as user 1; the write limiter is global to
+	// the package, so leave its budget to the tests that exercise it.
+	c.Cfg.Limits.WriteRate = -1
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}
