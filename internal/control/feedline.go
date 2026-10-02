@@ -42,11 +42,9 @@ func (l FeedLine) Sentence() string {
 	return s
 }
 
-// feedHeader and termCells are a feed line as a terminal table shows
-// it: who, what, where, and how a build came out, so the outcome and the
-// reference can carry their colours.
-var feedHeader = []string{"WHEN", "WHO", "EVENT", "WHERE", "DETAIL"}
-
+// termCells is a feed line as a screen row shows it: when, who, what,
+// where, and how a build came out, so the outcome and the reference can
+// carry their colours.
 func (l FeedLine) termCells(c *Ctx) []cell {
 	ref := l.Ref
 	if ref != "" && ref[0] != '#' && ref[0] != '!' {

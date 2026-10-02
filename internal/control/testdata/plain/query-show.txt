@@ -1,0 +1,5 @@
+open
+
+  query    is:open
+  matches  2
+  pinned   no

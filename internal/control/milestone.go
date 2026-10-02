@@ -293,12 +293,20 @@ func runIssueTemplates(c *Ctx, args []string) int {
 	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	ts := IssueTemplates(dir, repo.DefaultBranch)
-	return c.emit(ts, func(w io.Writer) {
+	return c.emitView(ts, func(w io.Writer) {
 		tb := c.table(w, "NAME")
 		for _, t := range ts {
 			tb.row(cRef(t.Name))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ts))
+		for i, tpl := range ts {
+			rows[i] = rowOf(cRef(tpl.Name))
+		}
+		return listScreen("Issue templates", rows,
+			action{"New", []string{"issue", "create", repo.Path(), "--title", "<title>"}},
+		)
 	})
 }
 

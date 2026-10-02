@@ -137,13 +137,25 @@ func runStatusList(c *Ctx, args []string) int {
 		Combined string `json:"combined"`
 		Statuses []out  `json:"statuses"`
 	}{full, combinedOf(statuses), ds}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		tb := c.table(w, "CONTEXT", "STATE", "DESCRIPTION")
 		tb.row(cText("combined"), cState(orNone(d.Combined)), cText(fmt.Sprintf("%.10s", d.SHA)))
 		for _, x := range ds {
 			tb.row(cText(x.Context), cState(x.State), cFlex(x.Description))
 		}
 		tb.flush()
+	}, func() screen {
+		combined := []cell{cGlyph(d.Combined), cState(orNone(d.Combined))}
+		statuses := section{title: "Statuses", n: len(ds)}
+		for _, x := range ds {
+			statuses.rows = append(statuses.rows, rowOf(cGlyph(x.State), cText(x.Context), cFlex(x.Description), cMeta(x.Creator)))
+		}
+		return screen{fields: []field{
+			{"Commit", []cell{cRef(fmt.Sprintf("%.10s", d.SHA))}},
+			{"Combined", combined},
+		}, sections: []section{statuses}, actions: []action{
+			{"Report", []string{"status", "set", repo.Path(), d.SHA, "--context", "<context>", "--state", "success"}},
+		}}
 	})
 }
 

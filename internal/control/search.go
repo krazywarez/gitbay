@@ -105,7 +105,9 @@ func runSearch(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(results, func(w io.Writer) { writeSearchTable(c, w, results) })
+	return c.emitView(results, func(w io.Writer) { writeSearchTable(c, w, results) }, func() screen {
+		return searchScreen(c, f.Pos[0], results)
+	})
 }
 
 // writeSearchTable renders search results: a repo hit has no ref number or
@@ -118,11 +120,7 @@ func writeSearchTable(c *Ctx, w io.Writer, results []SearchResult) {
 	for _, r := range results {
 		switch r.Kind {
 		case "repo":
-			if c.Term.Cols > 0 {
-				tb.row(cText("repo"), cLink(r.Repo, c.siteURL(r.Repo)), cState(""), cFlex(r.Title))
-			} else {
-				tb.row(cText("repo"), cRef(r.Repo), cFlex(r.Title))
-			}
+			tb.row(cText("repo"), cRef(r.Repo), cFlex(r.Title))
 		default:
 			page := "issues"
 			if r.Kind == "mr" {
@@ -132,6 +130,32 @@ func writeSearchTable(c *Ctx, w io.Writer, results []SearchResult) {
 		}
 	}
 	tb.flush()
+}
+
+// searchScreen is search at a terminal: a section per kind of result.
+func searchScreen(c *Ctx, query string, results []SearchResult) screen {
+	repos := section{title: "Repositories"}
+	issues := section{title: "Issues"}
+	mrs := section{title: "Merge requests"}
+	for _, r := range results {
+		switch r.Kind {
+		case "repo":
+			repos.n++
+			repos.rows = append(repos.rows, rowOf(cLink(r.Repo, c.siteURL(r.Repo)), cFlex(r.Title)))
+		default:
+			sec, page := &issues, "issues"
+			if r.Kind == "mr" {
+				sec, page = &mrs, "mrs"
+			}
+			sec.n++
+			ref := cLink(fmt.Sprintf("%s%s%d", r.Repo, SearchMarker(r.Kind), r.Number), c.siteURL(r.Repo, page, strconv.FormatInt(r.Number, 10)))
+			sec.rows = append(sec.rows, rowOf(ref, cGlyph(r.State), cFlex(r.Title), cMeta(r.Author)))
+		}
+	}
+	return screen{sections: []section{repos, issues, mrs}, actions: []action{
+		{"Narrow", []string{"search", query, "--kind", "issue"}},
+		{"Narrow", []string{"search", query, "--kind", "mr"}},
+	}}
 }
 
 // SearchMarker is the sigil a result's number carries, shared with the web

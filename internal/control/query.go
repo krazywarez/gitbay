@@ -193,7 +193,7 @@ func savedQuery(c *Ctx, name string) (store.SavedQuery, ItemQuery, int) {
 
 // runItemQuery lists what q matches in the tables issues and mrs allow,
 // one page at a time. The output is always the paged shape.
-func runItemQuery(c *Ctx, q ItemQuery, issues, mrs bool, p page) int {
+func runItemQuery(c *Ctx, q ItemQuery, issues, mrs bool, p page, title string) int {
 	var after *store.ItemCursor
 	if p.key != "" {
 		var err error
@@ -215,7 +215,7 @@ func runItemQuery(c *Ctx, q ItemQuery, issues, mrs bool, p page) int {
 		next = encodeItemCursor(items[len(items)-1].Cursor())
 	}
 	ds := queryItems(items)
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "REF", "STATE", "TITLE", "AUTHOR")
 		for _, d := range ds {
 			state := d.State
@@ -225,6 +225,25 @@ func runItemQuery(c *Ctx, q ItemQuery, issues, mrs bool, p page) int {
 			tb.row(cRef(d.Ref()), cState(state), cFlex(d.Title), cText(d.Author))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			state := d.State
+			if d.Draft {
+				state = "draft"
+			}
+			page := "issues"
+			if d.Kind == "mr" {
+				page = "mrs"
+			}
+			rows[i] = rowOf(cLink(d.Ref(), c.siteURL(d.Repo, page, strconv.FormatInt(d.Number, 10))), cGlyph(state), cFlex(d.Title),
+				cMeta(d.Author, d.Milestone, relAge(d.UpdatedAt, termNow())))
+		}
+		s := listScreen(title, rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{ds[0].Kind, "show", ds[0].Repo, strconv.FormatInt(ds[0].Number, 10)}}}
+		}
+		return s
 	})
 }
 
@@ -273,7 +292,7 @@ func listByQuery(c *Ctx, fl flags, kind string, p page) int {
 	if kind == "mr" && !mrs {
 		return c.usageWith("that query matches only issues; use issue list or query run")
 	}
-	return runItemQuery(c, q, kind == "issue", kind == "mr", p)
+	return runItemQuery(c, q, kind == "issue", kind == "mr", p, "Results")
 }
 
 func savedQueryOut(sq store.SavedQuery) SavedQueryOut {
@@ -335,7 +354,7 @@ func runQueryList(c *Ctx, args []string) int {
 	for _, sq := range saved {
 		ds = append(ds, savedQueryOut(sq))
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "NAME", "PINNED", "QUERY")
 		for _, d := range ds {
 			pinned := ""
@@ -345,6 +364,23 @@ func runQueryList(c *Ctx, args []string) int {
 			tb.row(cRef(d.Name), cText(pinned), cFlex(d.Query))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			pinned := ""
+			if d.Pinned {
+				pinned = "pinned"
+			}
+			rows[i] = rowOf(cRef(d.Name), cFlex(d.Query), cMeta(pinned))
+		}
+		s := listScreen("Saved queries", rows)
+		if len(ds) > 0 {
+			s.actions = []action{
+				{"Queries", []string{"query", "run", ds[0].Name}},
+				{"Queries", []string{"query", "pin", ds[0].Name}},
+			}
+		}
+		return s
 	})
 }
 
@@ -362,7 +398,7 @@ func runQueryShow(c *Ctx, args []string) int {
 	}
 	d := savedQueryOut(sq)
 	d.Count = &n
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.title(d.Name, "", "")
 		pinned := "no"
@@ -370,6 +406,19 @@ func runQueryShow(c *Ctx, args []string) int {
 			pinned = "yes"
 		}
 		v.fields("query", d.Query, "matches", strconv.Itoa(n), "pinned", pinned)
+	}, func() screen {
+		pin, pinned := "pin", "no"
+		if d.Pinned {
+			pin, pinned = "unpin", "yes"
+		}
+		return screen{fields: []field{
+			{"Query", []cell{cRef(d.Name), cText(d.Query)}},
+			{"Matches", []cell{cText(strconv.Itoa(n))}},
+			{"Pinned", []cell{cText(pinned)}},
+		}, actions: []action{
+			{"Queries", []string{"query", "run", d.Name}},
+			{"Queries", []string{"query", pin, d.Name}},
+		}}
 	})
 }
 
@@ -385,7 +434,7 @@ func runQueryRun(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	return runItemQuery(c, q, true, true, p)
+	return runItemQuery(c, q, true, true, p, rest[0])
 }
 
 func runQueryRemove(c *Ctx, args []string) int {

@@ -456,7 +456,7 @@ func runBuildJobs(c *Ctx, args []string) int {
 	for _, j := range jobs {
 		out = append(out, JobOut{Name: j.Name, Schedule: j.Schedule, Tags: j.Tags})
 	}
-	return c.emit(out, func(w io.Writer) {
+	return c.emitView(out, func(w io.Writer) {
 		tb := c.table(w, "NAME", "WHEN")
 		for _, j := range out {
 			when := "on push"
@@ -469,6 +469,23 @@ func runBuildJobs(c *Ctx, args []string) int {
 			tb.row(cRef(j.Name), cText(when))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(out))
+		for i, j := range out {
+			when := "on push"
+			switch {
+			case j.Schedule != "":
+				when = "schedule " + j.Schedule
+			case j.Tags != "":
+				when = "tags " + j.Tags
+			}
+			rows[i] = rowOf(cRef(j.Name), cMeta(when))
+		}
+		s := listScreen("Jobs", rows)
+		if len(out) > 0 {
+			s.actions = []action{{"Run", []string{"build", "trigger", repo.Path(), out[0].Name}}}
+		}
+		return s
 	})
 }
 

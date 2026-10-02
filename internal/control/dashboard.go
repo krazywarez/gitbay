@@ -357,20 +357,18 @@ func runFeed(c *Ctx, args []string) int {
 	})
 	ds := feedOutputs(events)
 	lines := FeedLines(events)
-	return c.emitPage(p, ds, next, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			tb := c.table(w, feedHeader...)
-			for _, l := range lines {
-				tb.row(l.termCells(c)...)
-			}
-			tb.flush()
-			return
-		}
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "WHEN", "EVENT")
 		for _, l := range lines {
 			tb.row(cAge(l.When), cFlex(l.Sentence()))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(lines))
+		for i, l := range lines {
+			rows[i] = rowOf(l.termCells(c)...)
+		}
+		return listScreen("Activity", rows)
 	})
 }
 

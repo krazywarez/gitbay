@@ -2089,7 +2089,7 @@ func runMRRevisions(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(revs, func(w io.Writer) {
+	return c.emitView(revs, func(w io.Writer) {
 		tb := c.table(w, "REV", "SHA", "WHEN")
 		for _, r := range revs {
 			mark := " "
@@ -2103,6 +2103,22 @@ func runMRRevisions(c *Ctx, args []string) int {
 			fmt.Fprintf(c.Stderr, "only one revision; %s!%d has not been pushed to since it was opened\n",
 				repo.Path(), mr.Number)
 		}
+	}, func() screen {
+		rows := make([]row, len(revs))
+		for i, r := range revs {
+			lead := cell{kind: kindGlyph}
+			if r.Current {
+				lead = cell{kind: kindGlyph, s: "●"}
+			}
+			rows[i] = rowOf(cRef(fmt.Sprintf("v%d", r.N)), lead, cRef(fmt.Sprintf("%.10s", r.SHA)), cAge(r.CreatedAt))
+		}
+		if len(revs) < 2 {
+			fmt.Fprintf(c.Stderr, "only one revision; %s!%d has not been pushed to since it was opened\n",
+				repo.Path(), mr.Number)
+		}
+		return listScreen("Revisions", rows,
+			action{"Compare", []string{"mr", "range-diff", repo.Path(), strconv.FormatInt(mr.Number, 10)}},
+		)
 	})
 }
 
