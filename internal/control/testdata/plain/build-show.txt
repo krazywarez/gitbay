@@ -1,0 +1,8 @@
+#1  test  failure
+
+  sha          a136534ff9
+  ref          main
+  queued       <time>
+  finished     <time>
+  failed step  2/2 go test ./... (exit 1)
+  url          /alice/app/builds/1

@@ -244,7 +244,13 @@ func runBuildShow(c *Ctx, args []string) int {
 	}
 	d := buildToOut(b)
 	json.Unmarshal([]byte(b.Steps), &d.Steps)
-	return c.emit(d, func(w io.Writer) {
+	var mr *store.MR
+	if c.Term.Cols > 0 && !c.JSON {
+		if m, ok, err := c.Store.OpenMRBySource(repo.ID, d.Ref); err == nil && ok {
+			mr = &m
+		}
+	}
+	return c.emitView(d, func(w io.Writer) {
 		failedStep, failed := "", ""
 		if d.FailedStep > 0 && d.FailedStep <= len(d.Steps) {
 			step, _, _ := strings.Cut(d.Steps[d.FailedStep-1], "\n")
@@ -259,15 +265,6 @@ func runBuildShow(c *Ctx, args []string) int {
 		if d.DurationS > 0 {
 			duration = (time.Duration(d.DurationS) * time.Second).String()
 		}
-		// At a terminal: the open merge request the build ran for, and
-		// the command that prints its log.
-		mr, logCmd := "", ""
-		if c.Term.Cols > 0 {
-			if m, ok, err := c.Store.OpenMRBySource(repo.ID, d.Ref); err == nil && ok {
-				mr = fmt.Sprintf("!%d %s", m.Number, m.Title)
-			}
-			logCmd = fmt.Sprintf("gitbay build log %s %d", repo.Path(), d.Number)
-		}
 		v := c.view(w)
 		v.title(fmt.Sprintf("#%d", d.Number), d.Job, d.Status)
 		v.fields(
@@ -278,20 +275,44 @@ func runBuildShow(c *Ctx, args []string) int {
 			"duration", duration,
 			"failed step", failedStep,
 			"failed", failed,
-			"mr", mr,
-			"log", logCmd,
 			"url", c.siteURL(repo.Path(), "builds", strconv.FormatInt(d.Number, 10)),
 		)
-		if c.Term.Cols > 0 && len(d.Steps) > 0 {
-			v.section("steps")
-			tb := c.table(w, "#", "STEP", "STATE")
-			for i, step := range d.Steps {
-				line, _, _ := strings.Cut(step, "\n")
-				tb.row(cNum(int64(i+1)), cFlex(line), cState(stepState(d.Status, d.FailedStep, i+1)))
-			}
-			tb.flush()
+	}, func() screen { return buildShowScreen(c, repo, d, mr) })
+}
+
+// buildShowScreen is build show at a terminal: the build's outcome, what
+// it ran on, each step's outcome, and the command for its log.
+func buildShowScreen(c *Ctx, repo store.Repo, d BuildOut, mr *store.MR) screen {
+	n := strconv.FormatInt(d.Number, 10)
+	path := repo.Path()
+	var s screen
+	s.fields = append(s.fields,
+		field{"Build", []cell{cLink(n, c.siteURL(path, "builds", n)), cText(d.Job)}},
+		field{"State", []cell{cGlyph(d.Status), cState(d.Status)}},
+		field{"Commit", []cell{cRef(fmt.Sprintf("%.10s", d.SHA)), cText(d.Subject)}},
+		field{"Ref", []cell{cText(d.Ref)}},
+	)
+	if mr != nil {
+		s.fields = append(s.fields, field{"MR", []cell{cRef(fmt.Sprintf("!%d", mr.Number)), cText(mr.Title)}})
+	}
+	if d.DurationS > 0 {
+		s.fields = append(s.fields, field{"Duration", []cell{cText(c.Term.dur(d.DurationS))}})
+	}
+	if !c.Term.Links {
+		s.fields = append(s.fields, field{"URL", []cell{cText(c.siteURL(path, "builds", n))}})
+	}
+	steps := section{title: "Steps", n: len(d.Steps)}
+	for i, step := range d.Steps {
+		line, _, _ := strings.Cut(step, "\n")
+		meta := ""
+		if i+1 == d.FailedStep {
+			meta = d.FailedReason
 		}
-	})
+		steps.rows = append(steps.rows, rowOf(cGlyph(stepState(d.Status, d.FailedStep, i+1)), cFlex(line), cMeta(meta)))
+	}
+	s.sections = []section{steps}
+	s.actions = []action{{"Read", []string{"build", "log", path, n}}}
+	return s
 }
 
 // stepState is what a finished build says about one of its steps: those
