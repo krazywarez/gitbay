@@ -119,8 +119,9 @@ var noColor bool
 // output stays the rows stock ssh prints, and when GITBAY_TERM is "off",
 // for an instance older than --term. GITBAY_TERM=basic sends the width
 // and colour only, for an instance older than truecolor and links, which
-// turns any other option into plain output.
-func termValue(isTerminal bool, cols int, env func(string) string) string {
+// turns any other option into plain output. here is the repository
+// inferred from the clone, for suggested commands to leave out.
+func termValue(isTerminal bool, cols int, here string, env func(string) string) string {
 	if !isTerminal || cols < 40 || env("GITBAY_TERM") == "off" {
 		return ""
 	}
@@ -137,6 +138,9 @@ func termValue(isTerminal bool, cols int, env func(string) string) string {
 	}
 	if linksWanted(env) {
 		v += ",links"
+	}
+	if here != "" {
+		v += ",here=" + here
 	}
 	return v
 }
@@ -235,7 +239,7 @@ func runSSHPaged(t target, serverArgv []string, stdin io.Reader, page bool) int 
 	if isTTY {
 		cols, _, _ = term.GetSize(fd)
 	}
-	if v := termValue(isTTY, cols, os.Getenv); v != "" && !slices.Contains(serverArgv, "--json") {
+	if v := termValue(isTTY, cols, t.repo, os.Getenv); v != "" && !slices.Contains(serverArgv, "--json") {
 		serverArgv = append([]string{"--term=" + v}, serverArgv...)
 	}
 

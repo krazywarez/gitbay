@@ -37,11 +37,24 @@ func TestTermValue(t *testing.T) {
 	}
 	for _, c := range cases {
 		noColor = c.noColor
-		if got := termValue(c.tty, c.cols, env(c.env)); got != c.want {
+		if got := termValue(c.tty, c.cols, "", env(c.env)); got != c.want {
 			t.Errorf("%+v: got %q", c, got)
 		}
 	}
 	noColor = false
+}
+
+func TestTermValueHere(t *testing.T) {
+	env := func(string) string { return "" }
+	if got, want := termValue(true, 100, "krz/gitbay", env), "100,color,here=krz/gitbay"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got := termValue(true, 100, "", env); strings.Contains(got, "here=") {
+		t.Errorf("here= without a repository: %q", got)
+	}
+	if got := termValue(false, 100, "krz/gitbay", env); got != "" {
+		t.Errorf("piped: %q", got)
+	}
 }
 
 func TestStripNoColor(t *testing.T) {
