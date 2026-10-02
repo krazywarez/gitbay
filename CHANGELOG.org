@@ -4,7 +4,18 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
-* Unreleased
+* v1.42.0 — 2026-10-02
+
+Every list and show at a terminal is a screen (#316–#319): a header
+block of labelled fields, the description, counted sections in bold
+blue, and a legend of the commands that apply now, chosen from the
+item's state and your access. Rows lead with a state glyph, references
+are dim, and nothing else is coloured. Piped and =--json= output are
+unchanged.
+
+*Upgrade note.* The instance draws the screens, so any CLI from v1.41.0
+shows them once the instance runs this release. The CLI from this
+release sends =here== in =--term=; an older instance ignores it.
 
 - Lists at a terminal drop their header row unless a column is a number
   or a size, and references are dim instead of cyan (#317). The next
