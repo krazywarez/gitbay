@@ -1024,11 +1024,17 @@ then prints:
   =krz/gitbay=, SHAs) dim. A marker piped output keeps as its own
   trailing cell (=[archived]=, =primary=) joins the state at a terminal:
   =public, archived=;
-- lists that say what to do next: =mr list= with checks, review state
-  and age, =issue list= with labels, assignee, comments and age, a
-  =dashboard= that opens with what needs you; a column empty on every
-  row is left out. These columns are terminal-only; piped rows keep
-  their own;
+- =mr list=, =issue list= and =build list= as one-section screens:
+  each row led by =●= when it waits on you (your review requested, an
+  issue assigned to you), otherwise by its checks' or state's glyph;
+  =mr list= with review state, branch and age, =issue list= with
+  labels, assignees, comments and age. A =dashboard= screen opens with
+  what waits on you, then open merge requests, failed builds (a job's
+  latest build only), five lines of activity with a count of builds
+  that passed, and pinned repositories; for admins a =Problems= line
+  counts background failures, and =admin stats= has the detail. A
+  column empty on every row is left out. These columns are
+  terminal-only; piped rows keep their own;
 - diffs coloured (file headers bold, hunks cyan, added green, removed
   red), and =build log= with its step lines bold, the failed one red;
   both made safe like any user text, the log's own colour codes dropped;

@@ -20,6 +20,11 @@ anything beyond "replace the binary and restart" is needed.
   the files with their line counts; =repo show= its open merge requests,
   open issues and latest commits; system events sit in their own
   =Events= section. Pending checks lead with =◐=.
+- =mr list=, =issue list=, =build list= and =dashboard= at a terminal
+  are screens (#318). Rows that wait on you lead with =●=. The terminal
+  dashboard drops the server build and queue tables (=admin stats= has
+  them; =--json= is unchanged) and shows a job's failed build only
+  while it is that job's latest.
 
 * v1.41.0 — 2026-10-01
 
