@@ -21,11 +21,11 @@ func TestTermEnvSelectsTerminalOutput(t *testing.T) {
 	}
 
 	plain, _, _ := inst.sshTerm(t, key, "", "repo", "list")
-	if strings.Contains(plain, "PATH") || !strings.Contains(plain, "alice/app\t") {
+	if strings.Contains(plain, "alice/app  ") || !strings.Contains(plain, "alice/app\t") {
 		t.Errorf("plain repo list: %q", plain)
 	}
 	term, _, _ := inst.sshTerm(t, key, "80,color", "repo", "list")
-	if !strings.HasPrefix(term, "\x1b[2mPATH") {
+	if !strings.HasPrefix(term, "\x1b[2malice/app\x1b[0m  ") {
 		t.Errorf("terminal repo list: %q", term)
 	}
 }
@@ -75,13 +75,13 @@ func TestTermEnvOverMultiplexedSession(t *testing.T) {
 		exec.Command("ssh", "-o", "ControlPath="+sock, "-O", "exit", "git@127.0.0.1").Run()
 	})
 
-	if out := mux("80"); !strings.HasPrefix(out, "PATH") {
+	if out := mux("80"); !strings.HasPrefix(out, "alice/app  ") {
 		t.Fatalf("master session: %q", out)
 	}
-	if out := mux("80,color"); !strings.HasPrefix(out, "\x1b[2mPATH") {
+	if out := mux("80,color"); !strings.HasPrefix(out, "\x1b[2malice/app") {
 		t.Errorf("second session kept the master's GITBAY_TERM: %q", out)
 	}
-	if out := mux(""); strings.Contains(out, "PATH") {
+	if out := mux(""); !strings.HasPrefix(out, "alice/app\t") {
 		t.Errorf("session without GITBAY_TERM got terminal output: %q", out)
 	}
 }
