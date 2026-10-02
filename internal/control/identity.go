@@ -140,7 +140,7 @@ func runKeysList(c *Ctx, args []string) int {
 			if d.Fingerprint == c.Source {
 				lead, used = cYou(), "this session"
 			}
-			rows[i] = rowOf(cRef(d.Fingerprint), lead, cState(d.Scope), cText(d.Label), cMeta(d.Algo, used, c.expiresText(d.ExpiresAt, now)))
+			rows[i] = rowOf(cFlexRef(d.Fingerprint), lead, cState(d.Scope), cText(d.Label), cMeta(d.Algo, used, c.expiresText(d.ExpiresAt, now)))
 		}
 		return listScreen("SSH keys", rows,
 			action{"Keys", []string{"keys", "label", "<fingerprint>", "<text>"}},

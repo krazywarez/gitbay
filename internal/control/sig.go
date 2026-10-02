@@ -115,7 +115,7 @@ func runPGPList(c *Ctx, args []string) int {
 			case d.ExpiresAt != nil:
 				note = "expires " + d.ExpiresAt.Format("2006-01-02")
 			}
-			rows[i] = rowOf(cRef(d.Fingerprint), lead, cFlex(emails), cMeta(note))
+			rows[i] = rowOf(cFlexRef(d.Fingerprint), lead, cText(emails), cMeta(note))
 		}
 		return listScreen("OpenPGP keys", rows,
 			action{"Keys", []string{"pgp", "remove", "<fingerprint>"}},
