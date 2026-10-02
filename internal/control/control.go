@@ -360,6 +360,16 @@ type emptyReader struct{}
 
 func (emptyReader) Read([]byte) (int, error) { return 0, io.EOF }
 
+// emitView is emit for a command with a terminal screen: --json and
+// piped output are emit's, and at a terminal build's screen is drawn
+// in place of plain.
+func (c *Ctx) emitView(data any, plain func(w io.Writer), build func() screen) int {
+	if c.Term.Cols == 0 || c.JSON {
+		return c.emit(data, plain)
+	}
+	return c.emit(data, func(w io.Writer) { c.render(w, build()) })
+}
+
 // emit writes data as the command result: a JSON envelope under --json,
 // otherwise via the plain formatter.
 func (c *Ctx) emit(data any, plain func(w io.Writer)) int {

@@ -1,7 +1,9 @@
 package control
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 )
@@ -175,5 +177,32 @@ func TestLegendColour(t *testing.T) {
 	}
 	if stripSGR(got) != screenCtx(120, false).renderLegend(legendSample()) {
 		t.Error("colour legend differs beyond SGR")
+	}
+}
+
+func TestEmitViewRoutes(t *testing.T) {
+	built := false
+	build := func() screen { built = true; return screen{fields: []field{{"Repo", []cell{cText("a/b")}}}} }
+	plain := func(w io.Writer) { io.WriteString(w, "plain\n") }
+
+	var out bytes.Buffer
+	c := &Ctx{Stdout: &out, Stderr: io.Discard}
+	c.emitView(map[string]string{"k": "v"}, plain, build)
+	if out.String() != "plain\n" || built {
+		t.Errorf("piped: %q built=%v", out.String(), built)
+	}
+
+	out.Reset()
+	c = &Ctx{Stdout: &out, Stderr: io.Discard, JSON: true, Term: Term{Cols: 80}}
+	c.emitView(map[string]string{"k": "v"}, plain, build)
+	if !strings.Contains(out.String(), `"k":"v"`) || built {
+		t.Errorf("json: %q built=%v", out.String(), built)
+	}
+
+	out.Reset()
+	c = &Ctx{Stdout: &out, Stderr: io.Discard, Term: Term{Cols: 80}}
+	c.emitView(map[string]string{"k": "v"}, plain, build)
+	if out.String() != "Repo:  a/b\n" || !built {
+		t.Errorf("terminal: %q built=%v", out.String(), built)
 	}
 }

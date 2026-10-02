@@ -81,12 +81,16 @@ func TestEmitPageHintsTheNextPageAtATerminal(t *testing.T) {
 		t.Errorf("cursor row on stdout at a terminal")
 	}
 	stderr := errOut.String()
-	want := "more: gitbay build list " + repo.Path() + " --limit 2 --cursor "
-	if !strings.Contains(stderr, want) {
-		t.Errorf("stderr = %q, want %q…", stderr, want)
+	cmd, ok := strings.CutPrefix(stderr, "Next page  ")
+	if !ok {
+		t.Fatalf("stderr = %q, want a Next page line", stderr)
 	}
-	// Ensure no double space in the output.
-	if strings.Contains(stderr, "  ") {
-		t.Errorf("stderr contains double space: %q", stderr)
+	want := "gitbay build list " + repo.Path() + " --limit 2 --cursor "
+	if !strings.HasPrefix(cmd, want) {
+		t.Errorf("command = %q, want %q…", cmd, want)
+	}
+	// No empty word in the command.
+	if strings.Contains(cmd, "  ") {
+		t.Errorf("command contains double space: %q", cmd)
 	}
 }

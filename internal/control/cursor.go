@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -141,19 +142,28 @@ func (c *Ctx) emitPage(p page, items any, next string, plain func(w io.Writer)) 
 			fmt.Fprintf(w, "next\t%s\n", next)
 			return
 		}
-		var again []string
-		for i := 0; i < len(c.Argv); i++ {
-			if c.Argv[i] == "--cursor" {
-				i++
-				continue
-			}
-			again = append(again, c.Argv[i])
-		}
-		cmd := []string{"gitbay", joinPath(c.Cmd.Path)}
-		for _, a := range again {
-			cmd = append(cmd, shellWord(a))
-		}
-		cmd = append(cmd, "--cursor", next)
-		fmt.Fprintf(c.Stderr, "more: %s\n", strings.Join(cmd, " "))
+		fmt.Fprintln(c.Stderr, c.Term.paint(sgrBold, "Next page")+"  "+c.Term.paint(sgrBlue, c.cmdline(c.nextArgv(next))))
 	})
+}
+
+// emitPageView is emitPage for a list with a terminal screen.
+func (c *Ctx) emitPageView(p page, items any, next string, plain func(w io.Writer), build func() screen) int {
+	if c.Term.Cols == 0 || c.JSON {
+		return c.emitPage(p, items, next, plain)
+	}
+	return c.emitPage(p, items, next, func(w io.Writer) { c.render(w, build()) })
+}
+
+// nextArgv is the command that fetches the page after this one: this
+// command's argv with its cursor replaced.
+func (c *Ctx) nextArgv(next string) []string {
+	argv := slices.Clone(c.Cmd.Path)
+	for i := 0; i < len(c.Argv); i++ {
+		if c.Argv[i] == "--cursor" {
+			i++
+			continue
+		}
+		argv = append(argv, c.Argv[i])
+	}
+	return append(argv, "--cursor", next)
 }
