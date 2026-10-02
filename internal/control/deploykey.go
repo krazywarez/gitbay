@@ -119,13 +119,23 @@ func runDeployKeyList(c *Ctx, args []string) int {
 		ds = append(ds, out{k.Fingerprint, k.Algo, mode, k.Label, k.LastUsedAt, k.ExpiresAt})
 	}
 	now := time.Now()
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "MODE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
 			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Mode), cText(d.Label),
 				cText(c.usedText(d.LastUsedAt)), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cRef(d.Fingerprint), cState(d.Mode), cText(d.Label),
+				cMeta(d.Algo, "used "+c.usedText(d.LastUsedAt), c.expiresText(d.ExpiresAt, now)))
+		}
+		return listScreen("Deploy keys", rows,
+			action{"Keys", []string{"repo", "deploy-key", "add", repo.Path()}},
+			action{"Keys", []string{"repo", "deploy-key", "remove", repo.Path(), "<fingerprint>"}},
+		)
 	})
 }
 

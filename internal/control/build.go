@@ -564,12 +564,21 @@ func runSecretList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(names, func(w io.Writer) {
+	return c.emitView(names, func(w io.Writer) {
 		tb := c.table(w, "NAME")
 		for _, n := range names {
 			tb.row(cRef(n))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(names))
+		for i, n := range names {
+			rows[i] = rowOf(cRef(n))
+		}
+		return listScreen("Build secrets", rows,
+			action{"Secrets", []string{"repo", "secret", "set", repo.Path(), "<NAME>"}},
+			action{"Secrets", []string{"repo", "secret", "remove", repo.Path(), "<NAME>"}},
+		)
 	})
 }
 

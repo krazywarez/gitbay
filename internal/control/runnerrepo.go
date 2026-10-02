@@ -114,7 +114,7 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 	if runners == nil {
 		runners = []store.RepoRunner{}
 	}
-	return c.emit(runners, func(w io.Writer) {
+	return c.emitView(runners, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "USER", "SEEN", "HELD")
 		for _, r := range runners {
 			seen := r.LastSeen
@@ -128,6 +128,22 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 			tb.row(cRef(r.Fingerprint), cText(r.Algo), cText(r.Username), cAge(seen), cText(held))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(runners))
+		for i, r := range runners {
+			lead, held := cGlyph(""), ""
+			if r.BuildNumber != 0 {
+				lead, held = cGlyph("running"), fmt.Sprintf("building %s #%d %s", r.BuildRepo, r.BuildNumber, r.BuildJob)
+			}
+			seen := "never seen"
+			if r.LastSeen != "" {
+				seen = "seen " + relAge(r.LastSeen, termNow())
+			}
+			rows[i] = rowOf(cRef(r.Fingerprint), lead, cFlex(r.Username), cMeta(r.Algo, seen, held))
+		}
+		return listScreen("Runners", rows,
+			action{"Runners", []string{"repo", "runner", "remove", repo.Path(), "<fingerprint>"}},
+		)
 	})
 }
 

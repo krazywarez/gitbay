@@ -122,7 +122,7 @@ func runMirrorList(c *Ctx, args []string) int {
 		// The token never leaves the server, in any encoding.
 		ds = append(ds, out{m.ID, m.Direction, m.URL, m.Username, m.Dirty, m.LastSync, m.LastError})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "ID", "DIRECTION", "URL", "LAST", "STATUS")
 		for _, d := range ds {
 			status := "ok"
@@ -135,6 +135,26 @@ func runMirrorList(c *Ctx, args []string) int {
 			tb.row(cRef(fmt.Sprintf("%d", d.ID)), cText(d.Direction), cText(d.URL), cText("last "+orDash(d.LastSync)), cState(status))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			state := "ok"
+			if d.Pending {
+				state = "pending"
+			}
+			if d.LastError != "" {
+				state = "error"
+			}
+			synced := "never synced"
+			if d.LastSync != "" {
+				synced = "synced " + relAge(d.LastSync, termNow())
+			}
+			rows[i] = rowOf(cRef(strconv.FormatInt(d.ID, 10)), cGlyph(state), cFlex(d.URL), cMeta(d.Direction, synced), cMark(d.LastError, sgrRed))
+		}
+		return listScreen("Mirrors", rows,
+			action{"Mirrors", []string{"repo", "mirror", "sync", repo.Path()}},
+			action{"Mirrors", []string{"repo", "mirror", "remove", repo.Path(), "<id>"}},
+		)
 	})
 }
 

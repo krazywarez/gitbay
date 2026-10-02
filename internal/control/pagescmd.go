@@ -220,11 +220,24 @@ func runDomainList(c *Ctx, args []string) int {
 		}
 		list = append(list, out{d.Domain, state, d.VerifiedAt})
 	}
-	return c.emit(list, func(w io.Writer) {
+	return c.emitView(list, func(w io.Writer) {
 		tb := c.table(w, "DOMAIN", "STATE")
 		for _, d := range list {
 			tb.row(cRef(d.Domain), cState(d.State))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(list))
+		for i, d := range list {
+			state := d.State
+			if state == "expired" {
+				state = "failed"
+			}
+			rows[i] = rowOf(cGlyph(state), cRef(d.Domain), cState(d.State))
+		}
+		return listScreen("Pages domains", rows,
+			action{"Domains", []string{"repo", "domain", "add", repo.Path(), "<domain>"}},
+			action{"Domains", []string{"repo", "domain", "verify", repo.Path(), "<domain>"}},
+		)
 	})
 }

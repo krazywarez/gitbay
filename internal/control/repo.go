@@ -360,7 +360,7 @@ func runRepoList(c *Ctx, args []string) int {
 		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
 		ds = append(ds, out{r.Path(), r.Visibility, desc, r.Settings.Archived})
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
 			cells := []cell{cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cFlex(d.Description)}
@@ -370,6 +370,20 @@ func runRepoList(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			state := d.Visibility
+			if d.Archived {
+				state += ", archived"
+			}
+			rows[i] = rowOf(cLink(d.Path, c.siteURL(d.Path)), cState(state), cFlex(d.Description))
+		}
+		s := listScreen("Repositories", rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{"repo", "show", ds[0].Path}}}
+		}
+		return s
 	})
 }
 
@@ -771,12 +785,21 @@ func runAccessList(c *Ctx, args []string) int {
 	for _, e := range entries {
 		ds = append(ds, out{e.Username, e.Role, e.Source})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "USER", "ROLE", "SOURCE")
 		for _, d := range ds {
 			tb.row(cRef(d.User), cState(d.Role), cText("via "+d.Source))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cRef(d.User), cState(d.Role), cMeta("via "+d.Source))
+		}
+		return listScreen("Access", rows,
+			action{"Access", []string{"repo", "access", "grant", repo.Path(), "<user>", "write"}},
+			action{"Access", []string{"repo", "access", "revoke", repo.Path(), "<user>"}},
+		)
 	})
 }
 
@@ -960,6 +983,19 @@ func archiveRepo(c *Ctx, repo store.Repo, archived bool) int {
 	return c.emit(s, func(w io.Writer) { fmt.Fprintf(w, "%sd %s\n", verb, repo.Path()) })
 }
 
+// topicsScreen is a repository's topics at a terminal, after a read or
+// an edit.
+func topicsScreen(repo store.Repo, topics []string) screen {
+	rows := make([]row, len(topics))
+	for i, t := range topics {
+		rows[i] = rowOf(cRef(t))
+	}
+	return listScreen("Topics", rows,
+		action{"Edit", []string{"repo", "topics", "add", repo.Path(), "<topic>"}},
+		action{"Edit", []string{"repo", "topics", "remove", repo.Path(), "<topic>"}},
+	)
+}
+
 func runTopicsList(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.usage()
@@ -972,12 +1008,14 @@ func runTopicsList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(topics, func(w io.Writer) {
+	return c.emitView(topics, func(w io.Writer) {
 		tb := c.table(w, "TOPIC")
 		for _, t := range topics {
 			tb.row(cRef(t))
 		}
 		tb.flush()
+	}, func() screen {
+		return topicsScreen(repo, topics)
 	})
 }
 
@@ -1031,12 +1069,14 @@ func editTopics(c *Ctx, args []string, add bool) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(now, func(w io.Writer) {
+	return c.emitView(now, func(w io.Writer) {
 		tb := c.table(w, "TOPIC")
 		for _, t := range now {
 			tb.row(cRef(t))
 		}
 		tb.flush()
+	}, func() screen {
+		return topicsScreen(repo, now)
 	})
 }
 
@@ -1079,12 +1119,22 @@ func runRepoSearch(c *Ctx, args []string) int {
 		}
 		ds = append(ds, out{r.Path(), r.Visibility, desc, topics})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "DESCRIPTION")
 		for _, d := range ds {
 			tb.row(cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cFlex(d.Description))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cFlex(d.Description), cMeta(strings.Join(d.Topics, ", ")))
+		}
+		s := listScreen(fmt.Sprintf("Repositories matching %q", args[0]), rows)
+		if len(ds) > 0 {
+			s.actions = []action{{"Read", []string{"repo", "show", ds[0].Path}}}
+		}
+		return s
 	})
 }
 
@@ -1249,12 +1299,26 @@ func runRepoBookmarks(c *Ctx, args []string) int {
 			Bookmarks:   c.Store.BookmarkCount(r.ID),
 		})
 	}
-	return c.emit(out, func(w io.Writer) {
+	return c.emitView(out, func(w io.Writer) {
 		tb := c.table(w, "PATH", "COUNT", "DESCRIPTION")
 		for _, b := range out {
 			tb.row(cRef(b.Path), cNum(int64(b.Bookmarks)), cFlex(b.Description))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(out))
+		for i, b := range out {
+			n := fmt.Sprintf("%d bookmarks", b.Bookmarks)
+			if b.Bookmarks == 1 {
+				n = "1 bookmark"
+			}
+			rows[i] = rowOf(cLink(b.Path, c.siteURL(b.Path)), cState(b.Visibility), cFlex(b.Description), cMeta(n))
+		}
+		s := listScreen("Bookmarks", rows)
+		if len(out) > 0 {
+			s.actions = []action{{"Read", []string{"repo", "show", out[0].Path}}}
+		}
+		return s
 	})
 }
 

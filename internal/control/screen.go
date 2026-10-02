@@ -57,6 +57,12 @@ type action struct {
 	argv  []string
 }
 
+// listScreen is a list command's terminal screen: one section of rows
+// and the commands that apply.
+func listScreen(title string, rows []row, actions ...action) screen {
+	return screen{sections: []section{{title: title, n: len(rows), rows: rows}}, actions: actions}
+}
+
 // render draws s: the parts in order, one blank line between parts and
 // between sections.
 func (c *Ctx) render(w io.Writer, s screen) {
