@@ -1034,7 +1034,20 @@ then prints:
   both made safe like any user text, the log's own colour codes dropped;
 - ages as =2h ago= and =in 5h=, sizes as =3.0 MiB=, durations as
   =53m43s=, where piped output keeps RFC3339, bytes and seconds;
-- =show= views with a title line, aligned fields, the body rendered
+- =mr show=, =issue show=, =repo show= and =build show= drawn as
+  screens: a header block of =Label:= lines (labels dim), the
+  description, sections titled =Title (n)= in bold blue (=Commits=,
+  =Files=, =Discussion=, =Events=, =Steps=, open merge requests and
+  issues), and a legend under a rule of the commands that apply now,
+  grouped (=Unblock=, =Review=, =Merge=, =Read=, ...) and chosen from
+  the item's state and your access. Rows have no header and no indent:
+  a dim reference, a state glyph, the text, then dim facts joined by
+  =·=. The glyphs are =✓= passed, =✗= failed or blocked, =◐= still
+  going, =●= waiting on you, =○= closed or draft. A section cut short
+  ends with =+n more= and the command for the rest. Below 80 columns the
+  legend's groups stack; a suggested command is never cut, so it may run
+  past the width;
+- other =show= views with a title line, aligned fields, the body rendered
   from markdown or org, one line per event, and comments under a rule;
   a sub-table (labels, revisions, and the like) carries a section label
   line in both terminal and piped output; timestamps as

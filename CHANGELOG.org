@@ -12,6 +12,14 @@ anything beyond "replace the binary and restart" is needed.
   sends the repository it inferred as =here== in =--term=, so suggested
   commands leave it out; an older instance ignores the option. Piped
   and =--json= output are unchanged.
+- =mr show=, =issue show=, =repo show= and =build show= at a terminal
+  are screens (#318): a header block, the description, counted
+  sections, and a legend of the commands that apply, chosen from the
+  item's state (=mr rebase= when behind, =mr merge= only when the gates
+  pass, =issue close= only for the author or a writer). =mr show= adds
+  the files with their line counts; =repo show= its open merge requests,
+  open issues and latest commits; system events sit in their own
+  =Events= section. Pending checks lead with =◐=.
 
 * v1.41.0 — 2026-10-01
 
