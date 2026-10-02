@@ -4,6 +4,45 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.43.0 — 2026-10-02
+
+What an instance owes the people who host on it: accounts delete
+themselves, organizations have quotas, and the footer links the
+operator's abuse and terms pages.
+
+*Upgrade note.* Migrations run on start. The new limits default to
+unlimited and the footer links to none, so nothing changes until the
+config sets them. Set an override on any large organization (=admin org
+limits <org> --repos 0 --bytes 0=) before setting =max_bytes_per_org=.
+The username =ghost= is now reserved: an instance with a real account of
+that name must rename it before an account can be deleted.
+
+- =account delete --confirm <username>= (=gitbay auth delete=, and the
+  bottom of =/settings=) mails a link to the primary verified address
+  (#322). Opening it disables the account; seven days later it is
+  purged. Signing in on the web, or any command over SSH with a
+  full-scope key, cancels; other key scopes and API tokens are refused.
+  The purge deletes the account's repositories, snippets, keys,
+  addresses and tokens, and moves the issues, merge requests, comments
+  and reviews it wrote elsewhere to a reserved =ghost= account. Pending
+  draft comments go, and its reviews no longer count toward a merge.
+  The only admin of an organization, or of the instance, is refused.
+  =admin user show= reports a scheduled deletion; an admin's disable or
+  enable replaces it.
+- Quotas for organizations (#325): =limits.max_orgs_per_user= caps the
+  organizations an account creates; =max_repos_per_org= and
+  =max_bytes_per_org= cap each one as the per-user limits cap an
+  account. =admin org limits= sets per-org overrides and =admin user
+  limits= takes =--orgs=. =repo transfer= now applies the receiving
+  owner's caps, user or organization.
+- =[web] abuse_url= and =terms_url= add "Report abuse" and "Terms" to
+  every page's footer (#323, #324). gitbay.org's are the wiki's =Abuse=
+  and =Terms= pages.
+- Dashboard rows with the same update time keep their order between
+  calls (#320).
+- Release binaries are gzipped, with =SHA256SUMS= over the archives
+  (#321).
+
 * v1.42.0 — 2026-10-02
 
 Every list and show at a terminal is a screen (#316–#319): a header
