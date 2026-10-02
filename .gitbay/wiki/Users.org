@@ -1010,16 +1010,18 @@ first argument, and ignores it over HTTP. =color= is the one option
 the server acts on; it ignores options it does not know. The server
 then prints:
 
-- lists under a header, padded, fitted to the width (the title or
-  description column is cut with =…= first; a title or description
-  column blank on most rows is held to a third of the width), with no
-  trailing whitespace, and the next page as a command on stderr (piped
-  output keeps a =next\t<cursor>= row instead);
+- lists padded and fitted to the width (the title or description
+  column is cut with =…= first; a title or description column blank on
+  most rows is held to a third of the width), with no trailing
+  whitespace. A list has a dim header row only when a column is a
+  number or a size, which would not say what it counts without one. The
+  next page is a =Next page= line on stderr with the command that
+  fetches it (piped output keeps a =next\t<cursor>= row instead);
 - colour by meaning: green for open, success, approved, verified; magenta
   for merged; red for failures, =private=, and bad or untrusted
   signatures; dim for closed, pending, archived, unsigned; yellow only
   for what waits on you (an unverified address); references (=#12=,
-  =krz/gitbay=, SHAs) in cyan. A marker piped output keeps as its own
+  =krz/gitbay=, SHAs) dim. A marker piped output keeps as its own
   trailing cell (=[archived]=, =primary=) joins the state at a terminal:
   =public, archived=;
 - lists that say what to do next: =mr list= with checks, review state
@@ -1050,6 +1052,11 @@ then prints:
 =$PAGER=, else =less= (with =LESS=FRX= when =LESS= is unset); an empty
 =GITBAY_PAGER= turns paging off. Paging never applies to =--follow=,
 =--json=, or piped output.
+
+Inside a clone of a repository on the instance, the CLI adds
+=here=<owner/name>= to =--term=, so a command the output suggests leaves
+that repository out, as the CLI would infer it. An instance that does
+not know the option ignores it.
 
 =GITBAY_TERM=off= stops the CLI sending =--term= at all, for an
 instance older than v1.36.0, which refuses the argument as an unknown

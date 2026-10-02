@@ -4,6 +4,15 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* Unreleased
+
+- Lists at a terminal drop their header row unless a column is a number
+  or a size, and references are dim instead of cyan (#317). The next
+  page is a =Next page= line with the command. Inside a clone, the CLI
+  sends the repository it inferred as =here== in =--term=, so suggested
+  commands leave it out; an older instance ignores the option. Piped
+  and =--json= output are unchanged.
+
 * v1.41.0 — 2026-10-01
 
 Terminal output that reads at a glance (#312–#315): colour by meaning,
