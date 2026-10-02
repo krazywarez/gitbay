@@ -108,24 +108,34 @@ func runRepoRefs(c *Ctx, args []string) int {
 	// Tags read newest version first; the JSON keeps git's order.
 	sorted := slices.Clone(tags)
 	gitutil.SortVersions(sorted)
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		tb := c.table(w, "KIND", "NAME", "SHA")
-		if c.Term.Cols > 0 {
-			for _, ref := range d.Branches {
-				if ref.Name == repo.DefaultBranch {
-					tb.row(cText("default"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
-				}
-			}
-		}
 		for _, ref := range d.Branches {
-			if c.Term.Cols == 0 || ref.Name != repo.DefaultBranch {
-				tb.row(cText("branch"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
-			}
+			tb.row(cText("branch"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
 		}
 		for _, ref := range sorted {
 			tb.row(cText("tag"), cRef(ref.Name), cRef(fmt.Sprintf("%.10s", ref.SHA)))
 		}
 		tb.flush()
+	}, func() screen {
+		branches := section{title: "Branches", n: len(d.Branches)}
+		for _, r := range d.Branches {
+			if r.Name == repo.DefaultBranch {
+				branches.rows = append(branches.rows, rowOf(cRef(r.Name), cMeta(fmt.Sprintf("%.10s", r.SHA), "default")))
+			}
+		}
+		for _, r := range d.Branches {
+			if r.Name != repo.DefaultBranch {
+				branches.rows = append(branches.rows, rowOf(cRef(r.Name), cMeta(fmt.Sprintf("%.10s", r.SHA))))
+			}
+		}
+		tags := section{title: "Tags", n: len(sorted)}
+		for _, r := range sorted {
+			tags.rows = append(tags.rows, rowOf(cRef(r.Name), cMeta(fmt.Sprintf("%.10s", r.SHA))))
+		}
+		return screen{sections: []section{branches, tags}, actions: []action{
+			{"Read", []string{"repo", "log", repo.Path(), "--ref", repo.DefaultBranch}},
+		}}
 	})
 }
 
@@ -323,21 +333,7 @@ func runRepoTree(c *Ctx, args []string) int {
 		}
 		d.Entries = append(d.Entries, eo)
 	}
-	return c.emit(d, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			tb := c.table(w, "NAME", "SIZE", "SHA")
-			for _, e := range d.Entries {
-				name, size := cText(e.Name), cText("")
-				if e.Type == "tree" {
-					name = cMark(e.Name+"/", sgrCyan)
-				} else {
-					size = cSize(e.Size)
-				}
-				tb.row(name, size, cMark(e.SHA[:min(10, len(e.SHA))], sgrDim))
-			}
-			tb.flush()
-			return
-		}
+	return c.emitView(d, func(w io.Writer) {
 		tb := c.table(w, "SHA", "SIZE", "NAME")
 		for _, e := range d.Entries {
 			name := e.Name
@@ -351,6 +347,35 @@ func runRepoTree(c *Ctx, args []string) int {
 			tb.row(cRef(e.SHA[:min(10, len(e.SHA))]), size, cFlex(name))
 		}
 		tb.flush()
+	}, func() screen {
+		title := repo.Path()
+		if dirPath != "" {
+			title += "/" + dirPath
+		}
+		rows := make([]row, len(d.Entries))
+		firstFile := ""
+		for i, e := range d.Entries {
+			name, size := cText(e.Name), cText("")
+			if e.Type == "tree" {
+				name = cMark(e.Name+"/", sgrBlue)
+			} else {
+				size = cSize(e.Size)
+				if firstFile == "" {
+					firstFile = path.Join(dirPath, e.Name)
+				}
+			}
+			rows[i] = rowOf(name, size, cMeta(e.SHA[:min(10, len(e.SHA))]))
+		}
+		s := listScreen(title+" at "+ref, rows)
+		if firstFile != "" {
+			s.actions = append(s.actions, action{"Read", []string{"repo", "cat", repo.Path(), firstFile, "--ref", ref}})
+		}
+		logArgs := []string{"repo", "log", repo.Path(), "--ref", ref}
+		if dirPath != "" {
+			logArgs = append(logArgs, "--path", dirPath)
+		}
+		s.actions = append(s.actions, action{"Read", logArgs})
+		return s
 	})
 }
 

@@ -3,6 +3,9 @@ package control
 import (
 	"bytes"
 	"crypto/ed25519"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,8 +18,15 @@ import (
 // non-zero exit fails t.
 func dispatchAs(t *testing.T, st *store.Store, u store.User, stdin string, argv ...string) string {
 	t.Helper()
+	return dispatchIn(t, st, u, "", stdin, argv...)
+}
+
+// dispatchIn is dispatchAs with repositories under root.
+func dispatchIn(t *testing.T, st *store.Store, u store.User, root, stdin string, argv ...string) string {
+	t.Helper()
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdout: out, Stderr: errOut, Stdin: strings.NewReader(stdin)}
+	c.Cfg.Server.Root = root
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}
@@ -27,8 +37,15 @@ func dispatchAs(t *testing.T, st *store.Store, u store.User, stdin string, argv 
 // and returns stdout; a non-zero exit fails t.
 func atTerminal(t *testing.T, st *store.Store, u store.User, argv ...string) string {
 	t.Helper()
+	return atTerminalIn(t, st, u, "", argv...)
+}
+
+// atTerminalIn is atTerminal with repositories under root.
+func atTerminalIn(t *testing.T, st *store.Store, u store.User, root string, argv ...string) string {
+	t.Helper()
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	c := &Ctx{User: u, Scope: "full", Store: st, Stdout: out, Stderr: errOut, Stdin: strings.NewReader(""), Term: Term{Cols: 100}}
+	c.Cfg.Server.Root = root
 	if code := Dispatch(c, argv); code != protocol.ExitOK {
 		t.Fatalf("%v: exit %d: %s", argv, code, errOut)
 	}
@@ -146,4 +163,84 @@ func TestRepoListScreens(t *testing.T) {
 		}
 		checkLegend(t, out)
 	}
+}
+
+// browseFixture is a repository on disk under root: two commits on main
+// (the second touching docs/), a branch, and a tag, with fixed dates so
+// the shas are the same on every run.
+func browseFixture(t *testing.T) (*store.Store, store.Repo, store.User, string) {
+	t.Helper()
+	st, repo, uid := newQueueTestRepo(t)
+	root := t.TempDir()
+	env := append(gitTestEnv(), "GIT_AUTHOR_DATE=2026-09-01T10:00:00Z", "GIT_COMMITTER_DATE=2026-09-01T10:00:00Z")
+	git := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir, cmd.Env = dir, env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(filepath.Join(src, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(src, "README.md"), []byte("# app\n"), 0o644)
+	git(root, "init", "-q", "-b", "main", "src")
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "first")
+	os.WriteFile(filepath.Join(src, "docs", "guide.md"), []byte("# guide\n"), 0o644)
+	git(src, "add", ".")
+	git(src, "commit", "-q", "-m", "docs: guide")
+	git(src, "tag", "v1.0.0")
+	git(src, "branch", "feature")
+	dir := RepoDir(root, repo.OwnerName, repo.Name)
+	os.MkdirAll(filepath.Dir(dir), 0o755)
+	git(root, "clone", "-q", "--bare", src, dir)
+	return st, repo, store.User{ID: uid, Username: "alice"}, root
+}
+
+func TestRepoBrowsePlainPinned(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	for name, argv := range map[string][]string{
+		"repo-log":       {"repo", "log", p},
+		"repo-log-path":  {"repo", "log", p, "--path", "docs/guide.md"},
+		"repo-tree":      {"repo", "tree", p},
+		"repo-tree-docs": {"repo", "tree", p, "docs"},
+		"repo-refs":      {"repo", "refs", p},
+	} {
+		pinPlain(t, name, dispatchIn(t, st, u, root, "", argv...))
+	}
+	sst, srepo, alice, _ := symbolsFixture(t)
+	pinPlain(t, "repo-symbols", dispatchAs(t, sst, alice, "", "repo", "symbols", srepo.Path(), "Pars"))
+}
+
+func TestRepoBrowseScreens(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	for _, tc := range []struct {
+		argv []string
+		want []string
+	}{
+		{[]string{"repo", "log", p}, []string{"Commits on main (2)\n", "  docs: guide  t · "}},
+		{[]string{"repo", "log", p, "--path", "docs/guide.md"}, []string{"Commits on main touching docs/guide.md (1)\n"}},
+		{[]string{"repo", "tree", p}, []string{"alice/app at main (2)\n", "docs/", "README.md"}},
+		{[]string{"repo", "tree", p, "docs"}, []string{"alice/app/docs at main (1)\n", "guide.md"}},
+		{[]string{"repo", "refs", p}, []string{"Branches (2)\nmain", "default", "Tags (1)\nv1.0.0"}},
+	} {
+		out := atTerminalIn(t, st, u, root, tc.argv...)
+		for _, w := range tc.want {
+			if !strings.Contains(out, w) {
+				t.Errorf("%v: missing %q in:\n%s", tc.argv, w, out)
+			}
+		}
+		checkLegend(t, out)
+	}
+	sst, srepo, alice, _ := symbolsFixture(t)
+	out := atTerminal(t, sst, alice, "repo", "symbols", srepo.Path(), "Pars")
+	if !strings.Contains(out, "Symbols matching \"Pars\" (") || !strings.Contains(out, "Parse       function  p.go:1") {
+		t.Errorf("symbols:\n%s", out)
+	}
+	checkLegend(t, out)
 }

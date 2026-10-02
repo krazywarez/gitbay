@@ -115,7 +115,7 @@ func runRepoSymbols(c *Ctx, args []string) int {
 	for _, r := range rows {
 		ds = append(ds, symbolOut{r.Name, r.Kind, r.Path, r.Line})
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "NAME", "KIND", "LOCATION")
 		for _, d := range ds {
 			tb.row(cRef(d.Name), cText(d.Kind), cFlex(fmt.Sprintf("%s:%d", d.Path, d.Line)))
@@ -127,6 +127,26 @@ func runRepoSymbols(c *Ctx, args []string) int {
 		if idx.State == "partial" {
 			fmt.Fprintf(c.Stderr, "the index is partial: %s\n", idx.Note)
 		}
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cRef(d.Name), cText(d.Kind), cFlex(fmt.Sprintf("%s:%d", d.Path, d.Line)))
+		}
+		if capped {
+			fmt.Fprintf(c.Stderr, "first %d matches; page with --limit and --cursor\n", symbolsUnpaged)
+		}
+		if idx.State == "partial" {
+			fmt.Fprintf(c.Stderr, "the index is partial: %s\n", idx.Note)
+		}
+		s := listScreen(fmt.Sprintf("Symbols matching %q", query), rows)
+		if len(ds) > 0 {
+			cat := []string{"repo", "cat", repo.Path(), ds[0].Path}
+			if ref != "" {
+				cat = append(cat, "--ref", ref)
+			}
+			s.actions = []action{{"Read", cat}}
+		}
+		return s
 	})
 }
 

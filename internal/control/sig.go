@@ -225,22 +225,28 @@ func runRepoLog(c *Ctx, args []string) int {
 		}
 		ds = append(ds, d)
 	}
-	return c.emit(ds, func(w io.Writer) {
-		if c.Term.Cols > 0 {
-			tb := c.table(w, "SHA", "SUBJECT", "AUTHOR", "WHEN", "SIGNATURE")
-			for _, d := range ds {
-				tb.row(cRef(fmt.Sprintf("%.10s", d.SHA)), cFlex(d.Subject), cText(d.AuthorName),
-					cAge(d.Date), cState(d.Signature.State))
-			}
-			tb.flush()
-			return
-		}
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "SHA", "STATE", "SUBJECT", "AUTHOR")
 		for _, d := range ds {
 			tb.row(cRef(fmt.Sprintf("%.10s", d.SHA)), cState(d.Signature.State), cFlex(d.Subject),
 				cText(fmt.Sprintf("(%s <%s>)", d.AuthorName, d.AuthorEmail)))
 		}
 		tb.flush()
+	}, func() screen {
+		title := "Commits on " + ref
+		if filePath != "" {
+			title += " touching " + filePath
+		}
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cRef(fmt.Sprintf("%.10s", d.SHA)), cGlyph(d.Signature.State), cFlex(d.Subject), cMeta(d.AuthorName, relAge(d.Date, termNow())))
+		}
+		s := listScreen(title, rows)
+		if len(ds) > 0 {
+			s.actions = append(s.actions, action{"Read", []string{"repo", "commit", repo.Path(), ds[0].SHA[:min(12, len(ds[0].SHA))]}})
+		}
+		s.actions = append(s.actions, action{"Read", []string{"repo", "tree", repo.Path(), "--ref", ref}})
+		return s
 	})
 }
 
