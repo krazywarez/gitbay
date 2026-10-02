@@ -43,8 +43,10 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 		Warning           string `json:"warning,omitempty"`
 	}
 	if !in.Enabled {
-		return c.emit(out{}, func(w io.Writer) {
+		return c.emitView(out{}, func(w io.Writer) {
 			fmt.Fprintln(w, "inbound mail is off ([mail.inbound] enabled = false)")
+		}, func() screen {
+			return screen{fields: []field{{"Inbound", []cell{cText("off")}}}}
 		})
 	}
 	cl, n, err := imapc.Open(in, true, 30*time.Second)
@@ -62,7 +64,7 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 		d.Warning = unauthenticatedWarning
 		fmt.Fprintln(c.Stderr, "warning: "+d.Warning)
 	}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		c.view(w).fields(
 			"server", d.Server,
 			"mailbox", d.Mailbox,
@@ -71,5 +73,21 @@ func runAdminMailInboundCheck(c *Ctx, args []string) int {
 			"require_dkim", fmt.Sprintf("%t", d.RequireDKIM),
 			"trusted_authserv_id", d.TrustedAuthservID,
 		)
+	}, func() screen {
+		auth := cMark("✓ dkim", sgrGreen)
+		if d.Warning != "" {
+			auth = cMark("✗ "+d.Warning, sgrRed)
+		} else if !d.RequireDKIM {
+			auth = cMeta("dkim not required")
+		}
+		s := screen{fields: []field{
+			{"Inbound", []cell{cText(d.Server), cMeta(d.Mailbox)}},
+			{"Messages", []cell{cText(fmt.Sprint(d.Messages)), cMeta(fmt.Sprintf("%d unseen", d.Unseen))}},
+			{"Auth", []cell{auth}},
+		}}
+		if d.TrustedAuthservID != "" {
+			s.fields = append(s.fields, field{"Authserv", []cell{cText(d.TrustedAuthservID)}})
+		}
+		return s
 	})
 }

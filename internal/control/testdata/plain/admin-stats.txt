@@ -1,0 +1,11 @@
+  users         3
+  orgs          0
+  repos         1
+  issues        1 (1 open)
+  MRs           1 (0 open)
+  database      0 B
+  repositories  <size>
+  lfs           0 B
+
+repos:
+alice/app	<size>

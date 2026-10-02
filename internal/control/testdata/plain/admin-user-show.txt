@@ -1,0 +1,6 @@
+alice  active
+
+  admin         yes
+  created       <time>
+  repos         1
+  web sessions  0

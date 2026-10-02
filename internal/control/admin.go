@@ -159,7 +159,7 @@ func runAdminUserList(c *Ctx, args []string) int {
 	for _, u := range users {
 		ds = append(ds, adminUserRow(u))
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "USERNAME", "STATE", "ADMIN", "CREATED", "LAST SEEN")
 		for _, d := range ds {
 			mark := ""
@@ -169,6 +169,25 @@ func runAdminUserList(c *Ctx, args []string) int {
 			tb.row(cRef(d.Username), cState(d.State), cText(mark), cAge(d.CreatedAt), cAge(d.LastSeen))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead := cGlyph("")
+			if d.State == "pending" {
+				lead = cYou()
+			}
+			admin, seen := "", ""
+			if d.Admin {
+				admin = "admin"
+			}
+			if d.LastSeen != "" {
+				seen = "seen " + relAge(d.LastSeen, termNow())
+			}
+			rows[i] = rowOf(cRef(d.Username), lead, cState(d.State), cMeta(admin, seen))
+		}
+		return listScreen("Accounts", rows,
+			action{"Filter", []string{"admin", "user", "list", "--state", "pending"}},
+		)
 	})
 }
 
@@ -280,7 +299,7 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		admin := ""
 		if d.Admin {
 			admin = "yes"
@@ -346,6 +365,66 @@ func runAdminUserShow(c *Ctx, args []string) int {
 			}
 			tt.flush()
 		}
+	}, func() screen {
+		s := screen{}
+		user := []cell{cRef(d.Username), cState(d.State)}
+		if d.Admin {
+			user = append(user, cMeta("admin"))
+		}
+		seen := "never seen"
+		if d.LastSeen != "" {
+			seen = "seen " + relAge(d.LastSeen, termNow())
+		}
+		s.fields = []field{
+			{"User", user},
+			{"Seen", []cell{cText(seen), cMeta("created " + relAge(d.CreatedAt, termNow()))}},
+			{"Repos", []cell{cText(strconv.FormatInt(d.Repos, 10))}},
+			{"Sessions", []cell{cText(strconv.FormatInt(d.WebSessions, 10))}},
+		}
+		keys := section{title: "Keys", n: len(d.Keys)}
+		for _, k := range d.Keys {
+			keys.rows = append(keys.rows, rowOf(cRef(k.Fingerprint), cState(k.Scope), cMeta(k.Algo, "used "+relAge(k.LastUsedAt, termNow()))))
+		}
+		emails := section{title: "Emails", n: len(d.Emails)}
+		for _, e := range d.Emails {
+			state, primary := "unverified", ""
+			if e.Verified {
+				state = "verified"
+			}
+			if e.Primary {
+				primary = "primary"
+			}
+			emails.rows = append(emails.rows, rowOf(cRef(e.Address), cState(state), cMeta(primary, e.VerifiedBy)))
+		}
+		pgp := section{title: "PGP keys", n: len(d.PGPKeys)}
+		for _, k := range d.PGPKeys {
+			pgp.rows = append(pgp.rows, rowOf(cRef(k.Fingerprint)))
+		}
+		orgs := section{title: "Orgs", n: len(d.Orgs)}
+		for _, o := range d.Orgs {
+			orgs.rows = append(orgs.rows, rowOf(cLink(o.Org, c.siteURL(o.Org)), cState(o.Role)))
+		}
+		tokens := section{title: "API tokens", n: len(d.APITokens)}
+		for _, tk := range d.APITokens {
+			used := ""
+			if tk.LastUsedAt != nil {
+				used = "used " + relAge(tk.LastUsedAt.UTC().Format(time.RFC3339Nano), termNow())
+			}
+			tokens.rows = append(tokens.rows, rowOf(cRef(tk.Name), cState(tk.Scope), cMeta(used)))
+		}
+		s.sections = []section{keys, emails, pgp, orgs, tokens}
+		role, state := "promote", "disable"
+		if d.Admin {
+			role = "demote"
+		}
+		if d.State == "disabled" {
+			state = "enable"
+		}
+		s.actions = []action{
+			{"Manage", []string{"admin", "user", role, d.Username}},
+			{"Manage", []string{"admin", "user", state, d.Username}},
+		}
+		return s
 	})
 }
 
@@ -439,7 +518,7 @@ func runAdminRepoList(c *Ctx, args []string) int {
 		size := gitutil.DirSize(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
 		ds = append(ds, out{r.Path, r.Visibility, r.Archived, r.CreatedAt, r.LastPush, size})
 	}
-	return c.emitPage(p, ds, next, func(w io.Writer) {
+	return c.emitPageView(p, ds, next, func(w io.Writer) {
 		tb := c.table(w, "PATH", "VISIBILITY", "BYTES", "CREATED", "LAST PUSH")
 		for _, d := range ds {
 			cells := []cell{cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility), cSize(d.Bytes), cAge(d.CreatedAt), cAge(d.LastPush)}
@@ -449,6 +528,22 @@ func runAdminRepoList(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			state := d.Visibility
+			if d.Archived {
+				state += ", archived"
+			}
+			pushed := ""
+			if d.LastPush != "" {
+				pushed = "pushed " + relAge(d.LastPush, termNow())
+			}
+			rows[i] = rowOf(cLink(d.Path, c.siteURL(d.Path)), cState(state), cSize(d.Bytes), cMeta(pushed))
+		}
+		return listScreen("Repositories", rows,
+			action{"Filter", []string{"admin", "repo", "list", "--visibility", "private"}},
+		)
 	})
 }
 
@@ -574,7 +669,7 @@ func runAdminRunners(c *Ctx, args []string) int {
 		}
 	}
 	d := map[string]any{"queue": queue, "runners": runners}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.fields(
 			"pending", fmt.Sprintf("%d", queue.Pending),
@@ -599,6 +694,32 @@ func runAdminRunners(c *Ctx, args []string) int {
 			tb.row(cText(r.Username), cText(r.Fingerprint), cAge(r.LastSeen), cFlex(scope), cText(held))
 		}
 		tb.flush()
+	}, func() screen {
+		s := screen{fields: []field{{"Queue", []cell{
+			cText(fmt.Sprintf("%d pending", queue.Pending)),
+			cMeta(fmt.Sprintf("%d claimed in 24h", queue.Claimed24h), "wait avg "+c.Term.dur(queue.ClaimWaitAvgS),
+				"max "+c.Term.dur(queue.ClaimWaitMaxS), fmt.Sprintf("%d reaped", queue.Reaped24h)),
+		}}}}
+		runnersSec := section{title: "Runners", n: len(runners)}
+		idle := ""
+		for _, r := range runners {
+			scope := r.Scope
+			if scope == "" {
+				scope = "any"
+			}
+			lead, held := cGlyph(""), "idle"
+			if r.BuildNumber != 0 {
+				lead, held = cGlyph("running"), fmt.Sprintf("building %s #%d %s", r.BuildRepo, r.BuildNumber, r.BuildJob)
+			} else if idle == "" {
+				idle = r.Fingerprint
+			}
+			runnersSec.rows = append(runnersSec.rows, rowOf(cRef(r.Username), lead, cFlex(scope), cMeta("seen "+relAge(r.LastSeen, termNow()), held)))
+		}
+		s.sections = []section{runnersSec}
+		if idle != "" {
+			s.actions = []action{{"Prune", []string{"admin", "runners", "remove", idle}}}
+		}
+		return s
 	})
 }
 
@@ -687,7 +808,7 @@ func runAdminMRPrune(c *Ctx, args []string) int {
 	if err := gitutil.PruneNow(dir); err != nil {
 		return c.fail(protocol.ExitFailure, "%v; the head refs are deleted but the objects are not yet pruned; re-run the same command", err)
 	}
-	return c.emit(rows, func(w io.Writer) {
+	return c.emitView(rows, func(w io.Writer) {
 		tb := c.table(w, "!", "HEAD")
 		for _, r := range rows {
 			if r.Head == "" {
@@ -697,5 +818,21 @@ func runAdminMRPrune(c *Ctx, args []string) int {
 			tb.row(cRef(fmt.Sprintf("!%d", r.Number)), cRef(r.Head))
 		}
 		tb.flush()
+	}, func() screen {
+		rs := make([]row, len(rows))
+		for i, r := range rows {
+			n := strconv.FormatInt(r.Number, 10)
+			ref := cLink("!"+n, c.siteURL(repo.Path(), "mrs", n))
+			if r.Head == "" {
+				rs[i] = rowOf(ref, cGlyph("skipped"), cMeta("already gone"))
+				continue
+			}
+			rs[i] = rowOf(ref, cGlyph("ok"), cRef(fmt.Sprintf("%.10s", r.Head)))
+		}
+		s := listScreen("Pruned", rs)
+		if len(rows) > 0 {
+			s.actions = []action{{"Read", []string{"mr", "show", repo.Path(), strconv.FormatInt(rows[0].Number, 10)}}}
+		}
+		return s
 	})
 }

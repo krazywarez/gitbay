@@ -1,10 +1,12 @@
 package control
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"golang.org/x/crypto/ssh"
 
@@ -324,7 +326,7 @@ func runAdminStats(c *Ctx, args []string) int {
 	if fi, err := os.Stat(c.Cfg.Server.Root + "/gitbay.db"); err == nil {
 		d.DBBytes = fi.Size()
 	}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		v := c.view(w)
 		v.fields(
 			"users", fmt.Sprintf("%d", counts.Users),
@@ -344,6 +346,30 @@ func runAdminStats(c *Ctx, args []string) int {
 			}
 			tb.flush()
 		}
+	}, func() screen {
+		count := func(all, open int64) []cell {
+			return []cell{cText(fmt.Sprint(all)), cMeta(fmt.Sprintf("%d open", open))}
+		}
+		s := screen{fields: []field{
+			{"Users", []cell{cText(fmt.Sprint(counts.Users))}},
+			{"Orgs", []cell{cText(fmt.Sprint(counts.Orgs))}},
+			{"Repos", []cell{cText(fmt.Sprint(counts.Repos))}},
+			{"Issues", count(counts.Issues, counts.OpenIssues)},
+			{"MRs", count(counts.MRs, counts.OpenMRs)},
+			{"Disk", []cell{cSize(d.DBBytes), cMeta("database", "repositories "+humanBytes(d.RepoBytes), "lfs "+humanBytes(d.LFSBytes))}},
+		}}
+		repos := slices.Clone(d.Repos)
+		slices.SortStableFunc(repos, func(a, b repoDisk) int { return cmp.Compare(b.Bytes, a.Bytes) })
+		top := section{title: "Repositories", n: len(repos), more: []string{"admin", "repo", "list"}}
+		for _, r := range repos[:min(20, len(repos))] {
+			top.rows = append(top.rows, rowOf(cLink(r.Path, c.siteURL(r.Path)), cSize(r.Bytes)))
+		}
+		s.sections = []section{top}
+		s.actions = []action{
+			{"Admin", []string{"admin", "user", "list"}},
+			{"Admin", []string{"admin", "runners"}},
+		}
+		return s
 	})
 }
 

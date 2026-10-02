@@ -1,0 +1,5 @@
+  pending      0
+  claimed 24h  0
+  wait avg     0s
+  wait max     0s
+  reaped 24h   0
