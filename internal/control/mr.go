@@ -816,7 +816,11 @@ func runMRShow(c *Ctx, args []string) int {
 			}
 		}
 	}
-	return c.emit(d, func(w io.Writer) {
+	var files []gitutil.NumStat
+	if c.Term.Cols > 0 && !c.JSON && base != "" {
+		files, _ = gitutil.DiffNumstat(dir, base, mrHeadRef(mr.Number))
+	}
+	return c.emitView(d, func(w io.Writer) {
 		state := d.State
 		if d.Draft {
 			state = "draft"
@@ -967,7 +971,7 @@ func runMRShow(c *Ctx, args []string) int {
 			v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
 			v.reactions(cm.Reactions)
 		}
-	})
+	}, func() screen { return mrShowScreen(c, repo, d, files) })
 }
 
 // reviewLine renders one review as fields prose: "reviewer verdict
@@ -2195,4 +2199,92 @@ func ReviewersWhoCount(st *store.Store, repo store.Repo, reviews []store.MRRevie
 		counts[r.Reviewer] = policy.CanWrite(u, repo, grant)
 	}
 	return counts
+}
+
+// mrShowScreen is mr show at a terminal: where the merge request stands,
+// its description, its commits, files and discussion, and what can be
+// done about it now.
+func mrShowScreen(c *Ctx, repo store.Repo, d MRShow, files []gitutil.NumStat) screen {
+	n := strconv.FormatInt(d.Number, 10)
+	path := repo.Path()
+	state := d.State
+	if d.Draft {
+		state = "draft"
+	}
+	s := screen{body: d.Body, format: d.BodyFormat}
+	s.fields = append(s.fields,
+		field{"Merge", []cell{cLink("!"+n, c.siteURL(path, "mrs", n)), cText(d.Title)}},
+		field{"State", []cell{cState(state), cMeta(d.Source+" → "+d.TargetRef, d.Author, relAge(d.CreatedAt, termNow()))}},
+	)
+	if len(d.Checks) > 0 {
+		sts := make([]store.CommitStatus, len(d.Checks))
+		for i, x := range d.Checks {
+			sts[i] = store.CommitStatus{Context: x.Context, State: x.State}
+		}
+		s.fields = append(s.fields, field{"Checks", []cell{checksMark(sts)}})
+	}
+	open := d.State == "open" || d.State == "source_gone"
+	behind := false
+	if g := d.Gates; g != nil && open {
+		behind = !g.FastForward
+		if len(g.Unmet) == 0 {
+			s.fields = append(s.fields, field{"Gates", []cell{cMark("✓ ready to merge", sgrGreen)}})
+		} else {
+			parts := make([]string, len(g.Unmet))
+			for i, u := range g.Unmet {
+				parts[i] = "✗ " + u
+			}
+			s.fields = append(s.fields, field{"Gates", []cell{cMark(strings.Join(parts, " · "), sgrRed)}})
+		}
+	}
+	if len(d.ReviewRequests) > 0 {
+		v := cText("requested of " + strings.Join(d.ReviewRequests, ", "))
+		if slices.Contains(d.ReviewRequests, c.User.Username) {
+			v.sgr = sgrYellow
+		}
+		s.fields = append(s.fields, field{"Review", []cell{v}})
+	}
+	if d.Milestone != "" {
+		s.fields = append(s.fields, field{"Milestone", []cell{cText(d.Milestone)}})
+	}
+	if len(d.Labels) > 0 {
+		s.fields = append(s.fields, field{"Labels", []cell{cText(strings.Join(d.Labels, ", "))}})
+	}
+	if !c.Term.Links {
+		s.fields = append(s.fields, field{"URL", []cell{cText(c.siteURL(path, "mrs", n))}})
+	}
+
+	commits := section{title: "Commits", n: len(d.Commits)}
+	for _, cm := range d.Commits {
+		commits.rows = append(commits.rows, rowOf(cRef(fmt.Sprintf("%.7s", cm.SHA)), cFlex(cm.Subject)))
+	}
+	fs := section{title: "Files", n: len(files)}
+	add, del := 0, 0
+	for _, f := range files {
+		counts := "binary"
+		if f.Added >= 0 {
+			add, del = add+f.Added, del+f.Deleted
+			counts = fmt.Sprintf("+%d −%d", f.Added, f.Deleted)
+		}
+		fs.rows = append(fs.rows, rowOf(cRef(f.Status), cFlex(f.Path), cMeta(counts)))
+	}
+	if len(files) > 0 {
+		fs.note = fmt.Sprintf("+%d −%d", add, del)
+	}
+	s.sections = []section{commits, fs, discussion(d.Comments)}
+
+	if open {
+		if behind {
+			s.actions = append(s.actions, action{"Unblock", []string{"mr", "rebase", n}})
+		}
+		s.actions = append(s.actions,
+			action{"Review", []string{"mr", "review", path, n, "--approve"}},
+			action{"Review", []string{"mr", "comment", path, n}},
+		)
+		if d.Gates != nil && len(d.Gates.Unmet) == 0 {
+			s.actions = append(s.actions, action{"Merge", []string{"mr", "merge", path, n}})
+		}
+	}
+	s.actions = append(s.actions, action{"Read", []string{"mr", "diff", path, n}})
+	return s
 }

@@ -27,12 +27,14 @@ type field struct {
 	value []cell
 }
 
-// section is a titled run of rows. n is the total, shown as "(n)"; when
-// it is more than the rows shown, more is the command for the rest. An
-// empty section is left out unless empty says to draw "(0)".
+// section is a titled run of rows. n is the total, shown as "(n)", and
+// note follows it dim ("+86 −12"); when n is more than the rows shown,
+// more is the command for the rest. An empty section is left out unless
+// empty says to draw "(0)".
 type section struct {
 	title string
 	n     int
+	note  string
 	rows  []row
 	more  []string
 	empty bool
@@ -181,7 +183,11 @@ func (c *Ctx) renderSection(s section) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(c.Term.paint(sgrBold+sgrBlue, fmt.Sprintf("%s (%d)", s.title, s.n)) + "\n")
+	b.WriteString(c.Term.paint(sgrBold+sgrBlue, fmt.Sprintf("%s (%d)", s.title, s.n)))
+	if s.note != "" {
+		b.WriteString("  " + c.Term.paint(sgrDim, termSafe(s.note)))
+	}
+	b.WriteString("\n")
 	if len(s.rows) > 0 {
 		tb := &table{term: c.Term, w: io.Discard}
 		for _, r := range s.rows {
@@ -276,4 +282,19 @@ func (c *Ctx) renderLegend(as []action) string {
 		}
 	}
 	return b.String()
+}
+
+// discussion is a thread's comments as a section, each author and age
+// with its body beneath. System events are left out. It is drawn when
+// empty, as "(0)".
+func discussion(cs []commentOut) section {
+	sec := section{title: "Discussion", empty: true}
+	for _, cm := range cs {
+		if cm.Kind == "system" {
+			continue
+		}
+		sec.n++
+		sec.rows = append(sec.rows, row{cells: []cell{cText(cm.Author), cAge(cm.CreatedAt)}, body: cm.Body, format: cm.BodyFormat})
+	}
+	return sec
 }

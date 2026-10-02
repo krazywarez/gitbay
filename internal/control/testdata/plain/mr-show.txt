@@ -1,0 +1,14 @@
+!1  one  open
+
+  author  alice, <time>
+  source  feature1 -> main
+  head    abc111
+  url     /alice/app/mrs/1
+
+checks (2):
+build	success		<time>
+test	success		<time>
+
+── alice, <time> (comment 1) 
+
+  Looks right.

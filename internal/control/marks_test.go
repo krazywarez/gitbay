@@ -20,7 +20,7 @@ func TestChecksMark(t *testing.T) {
 	}{
 		{nil, "", ""},
 		{st("success", "success", "skipped"), "✓ 3/3", sgrGreen},
-		{st("success", "pending"), "• 1 pending", sgrDim},
+		{st("success", "pending"), "◐ 1 pending", sgrDim},
 		{st("success", "failure", "error", "pending"), "✗ 2 failed", sgrRed},
 	}
 	for _, tc := range cases {

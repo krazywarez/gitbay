@@ -9,7 +9,7 @@ import (
 )
 
 // checksMark sums a commit's statuses for a list row at a terminal:
-// "✗ 2 failed" red, "• 1 pending" dim, "✓ 3/3" green, blank with none.
+// "✗ 2 failed" red, "◐ 1 pending" dim, "✓ 3/3" green, blank with none.
 // The glyph leads so the column reads at a glance; the words stay for
 // a terminal without colour.
 func checksMark(sts []store.CommitStatus) cell {
@@ -30,7 +30,7 @@ func checksMark(sts []store.CommitStatus) cell {
 	case failed > 0:
 		return cMark(fmt.Sprintf("✗ %d failed", failed), sgrRed)
 	case pending > 0:
-		return cMark(fmt.Sprintf("• %d pending", pending), sgrDim)
+		return cMark(fmt.Sprintf("◐ %d pending", pending), sgrDim)
 	}
 	return cMark(fmt.Sprintf("✓ %d/%d", passed, len(sts)), sgrGreen)
 }
