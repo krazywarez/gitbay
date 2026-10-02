@@ -39,16 +39,20 @@ func runWebSessionsList(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(sessions, func(w io.Writer) {
+	return c.emitView(sessions, func(w io.Writer) {
 		tb := c.table(w, "ID", "SINCE", "UNTIL", "USED")
 		for _, s := range sessions {
-			if c.Term.Cols > 0 {
-				tb.row(cRef(s.ID), cAge(s.CreatedAt), cAge(s.ExpiresAt), cText(c.usedText(s.LastUsedAt)))
-				continue
-			}
 			tb.row(cRef(s.ID), cText("since "+stamp(s.CreatedAt)), cText("until "+stamp(s.ExpiresAt)), cText(c.usedText(s.LastUsedAt)))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(sessions))
+		for i, s := range sessions {
+			rows[i] = rowOf(cRef(s.ID), cMeta("since "+relAge(s.CreatedAt, termNow()), "until "+relAge(s.ExpiresAt, termNow()), "used "+c.usedText(s.LastUsedAt)))
+		}
+		return listScreen("Browser sessions", rows,
+			action{"Sessions", []string{"web", "sessions", "revoke", "<id>"}},
+		)
 	})
 }
 

@@ -92,12 +92,34 @@ func runPGPList(c *Ctx, args []string) int {
 	for _, k := range keys {
 		ds = append(ds, out{k.Fingerprint, k.UIDsJSON, k.ExpiresAt, k.RevokedAt})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "EMAILS")
 		for _, d := range ds {
 			tb.row(cRef(d.Fingerprint), cText(d.Emails))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			emails := d.Emails
+			var uids []string
+			if json.Unmarshal([]byte(d.Emails), &uids) == nil {
+				emails = strings.Join(uids, ", ")
+			}
+			lead, note := cGlyph(""), ""
+			switch {
+			case d.RevokedAt != nil:
+				lead, note = cGlyph("failed"), "revoked"
+			case d.ExpiresAt != nil && !d.ExpiresAt.After(time.Now()):
+				lead, note = cGlyph("failed"), "expired"
+			case d.ExpiresAt != nil:
+				note = "expires " + d.ExpiresAt.Format("2006-01-02")
+			}
+			rows[i] = rowOf(cRef(d.Fingerprint), lead, cFlex(emails), cMeta(note))
+		}
+		return listScreen("OpenPGP keys", rows,
+			action{"Keys", []string{"pgp", "remove", "<fingerprint>"}},
+		)
 	})
 }
 

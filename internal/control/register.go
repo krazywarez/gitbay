@@ -73,7 +73,7 @@ func runEmailList(c *Ctx, args []string) int {
 	for _, e := range emails {
 		ds = append(ds, out{e.Address, e.Verified, e.VerifiedBy, e.Primary})
 	}
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "ADDRESS", "STATE")
 		for _, d := range ds {
 			state := "unverified"
@@ -87,6 +87,23 @@ func runEmailList(c *Ctx, args []string) int {
 			tb.row(cells...)
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead, state := cYou(), "unverified"
+			if d.Verified {
+				lead, state = cGlyph(""), "verified"
+			}
+			primary := ""
+			if d.Primary {
+				primary = "primary"
+			}
+			rows[i] = rowOf(cRef(d.Address), lead, cState(state), cMeta(primary, d.VerifiedBy))
+		}
+		return listScreen("Emails", rows,
+			action{"Email", []string{"email", "add", "<address>"}},
+			action{"Email", []string{"email", "primary", "<address>"}},
+		)
 	})
 }
 

@@ -118,12 +118,28 @@ func runTokenList(c *Ctx, args []string) int {
 		ds = append(ds, out{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt, t.CreatedBy})
 	}
 	now := time.Now()
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "NAME", "SCOPE", "EXPIRES")
 		for _, d := range ds {
 			tb.row(cRef(d.Name), cState(d.Scope), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead := cGlyph("")
+			if d.ExpiresAt != nil && !d.ExpiresAt.After(now) {
+				lead = cGlyph("failed")
+			}
+			by := ""
+			if d.CreatedBy != "" {
+				by = "by " + d.CreatedBy
+			}
+			rows[i] = rowOf(cRef(d.Name), lead, cState(d.Scope), cMeta(by, c.expiresText(d.ExpiresAt, now)))
+		}
+		return listScreen("API tokens", rows,
+			action{"Tokens", []string{"token", "revoke", "<name>"}},
+		)
 	})
 }
 

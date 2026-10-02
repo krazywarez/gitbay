@@ -1,0 +1,10 @@
+alice  Builds forges  user
+
+  website  https://alice.example.test
+  url      /alice
+
+orgs:
+acme	admin
+
+repos:
+alice/app	public	

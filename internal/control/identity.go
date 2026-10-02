@@ -71,15 +71,15 @@ func runWhoami(c *Ctx, args []string) int {
 		KeyScope string `json:"key_scope"`
 	}
 	d := out{Username: c.User.Username, Admin: c.User.IsAdmin, KeyScope: c.Scope}
-	return c.emit(d, func(w io.Writer) {
-		if c.Term.Cols == 0 {
-			fmt.Fprintln(w, d.Username)
-			return
-		}
-		// At a terminal: where, and with what.
-		role := ""
+	return c.emitView(d, func(w io.Writer) {
+		fmt.Fprintln(w, d.Username)
+	}, func() screen {
+		s := screen{fields: []field{{"User", []cell{cText(d.Username)}}}}
 		if d.Admin {
-			role = "admin"
+			s.fields = append(s.fields, field{"Role", []cell{cState("admin")}})
+		}
+		if c.Cfg.Server.SiteURL != "" {
+			s.fields = append(s.fields, field{"Instance", []cell{cText(c.Cfg.Server.SiteURL)}})
 		}
 		// The key's label, or the start of its fingerprint: keys list
 		// has the whole of it.
@@ -89,13 +89,18 @@ func runWhoami(c *Ctx, args []string) int {
 		} else if len(via) > 20 {
 			via = via[:19] + "…"
 		}
-		v := c.view(w)
-		v.title(d.Username, "", role)
-		v.fields(
-			"instance", c.Cfg.Server.SiteURL,
-			"key", via,
-			"scope", d.KeyScope,
-		)
+		if via != "" {
+			s.fields = append(s.fields, field{"Key", []cell{cText(via)}})
+		}
+		if d.KeyScope != "" {
+			s.fields = append(s.fields, field{"Scope", []cell{cState(d.KeyScope)}})
+		}
+		s.actions = []action{
+			{"Account", []string{"keys", "list"}},
+			{"Account", []string{"token", "list"}},
+			{"Account", []string{"email", "list"}},
+		}
+		return s
 	})
 }
 
@@ -121,17 +126,26 @@ func runKeysList(c *Ctx, args []string) int {
 		ds = append(ds, out{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedBy, k.LastUsedAt, k.ExpiresAt})
 	}
 	now := time.Now()
-	return c.emit(ds, func(w io.Writer) {
+	return c.emitView(ds, func(w io.Writer) {
 		tb := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LABEL", "USED", "EXPIRES")
 		for _, d := range ds {
-			used := cText(c.usedText(d.LastUsedAt))
-			if c.Term.Cols > 0 && d.Fingerprint == c.Source {
-				used = cMark("this session", sgrGreen)
-			}
 			tb.row(cFlex(d.Fingerprint), cText(d.Algo), cState(d.Scope), cText(d.Label),
-				used, cText(c.expiresText(d.ExpiresAt, now)))
+				cText(c.usedText(d.LastUsedAt)), cText(c.expiresText(d.ExpiresAt, now)))
 		}
 		tb.flush()
+	}, func() screen {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			lead, used := cGlyph(""), "used "+c.usedText(d.LastUsedAt)
+			if d.Fingerprint == c.Source {
+				lead, used = cYou(), "this session"
+			}
+			rows[i] = rowOf(cRef(d.Fingerprint), lead, cState(d.Scope), cText(d.Label), cMeta(d.Algo, used, c.expiresText(d.ExpiresAt, now)))
+		}
+		return listScreen("SSH keys", rows,
+			action{"Keys", []string{"keys", "label", "<fingerprint>", "<text>"}},
+			action{"Keys", []string{"keys", "remove", "<fingerprint>"}},
+		)
 	})
 }
 

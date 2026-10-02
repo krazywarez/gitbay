@@ -1,0 +1,6 @@
+acme  org
+
+  url  /acme
+
+members:
+alice	admin

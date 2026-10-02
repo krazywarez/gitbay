@@ -252,7 +252,7 @@ func ActivityWindow() string {
 }
 
 func emitProfile(c *Ctx, d ProfileOut) int {
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		activity := ""
 		if d.ActivityTotal > 0 {
 			activity = fmt.Sprintf("%d in the last year", d.ActivityTotal)
@@ -297,6 +297,40 @@ func emitProfile(c *Ctx, d ProfileOut) int {
 			tb.flush()
 		}
 		v.body(d.About, d.AboutFormat)
+	}, func() screen {
+		s := screen{body: d.About, format: d.AboutFormat, fields: []field{
+			{"Profile", []cell{cLink(d.Name, c.siteURL(d.Name)), cMeta(d.Kind, d.Description)}},
+		}}
+		if d.Website != "" {
+			s.fields = append(s.fields, field{"Website", []cell{cText(d.Website)}})
+		}
+		if d.ActivityTotal > 0 {
+			s.fields = append(s.fields, field{"Activity", []cell{cText(fmt.Sprintf("%d in the last year", d.ActivityTotal))}})
+		}
+		links := section{title: "Links", n: len(d.Links)}
+		for _, l := range d.Links {
+			links.rows = append(links.rows, rowOf(cText(l.Label), cFlex(l.URL)))
+		}
+		orgs := section{title: "Orgs", n: len(d.Orgs)}
+		for _, m := range d.Orgs {
+			orgs.rows = append(orgs.rows, rowOf(cLink(m.Name, c.siteURL(m.Name)), cState(m.Role)))
+		}
+		members := section{title: "Members", n: len(d.Members)}
+		for _, m := range d.Members {
+			members.rows = append(members.rows, rowOf(cRef(m.Name), cState(m.Role)))
+		}
+		repos := section{title: "Repos", n: len(d.Repos)}
+		for _, r := range d.Repos {
+			repos.rows = append(repos.rows, rowOf(cLink(r.Path, c.siteURL(r.Path)), cState(r.Visibility), cFlex(r.Description)))
+		}
+		s.sections = []section{links, orgs, members, repos}
+		switch {
+		case d.Kind == "org":
+			s.actions = []action{{"Edit", []string{"org", "profile", d.Name, "--description", "<text>"}}}
+		case d.Name == c.User.Username:
+			s.actions = []action{{"Edit", []string{"profile", "set", "--description", "<text>"}}}
+		}
+		return s
 	})
 }
 

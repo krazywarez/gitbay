@@ -1,0 +1,2 @@
+alice@example.test	verified	primary
+old@example.test	unverified
