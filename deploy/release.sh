@@ -1,12 +1,13 @@
 #!/bin/sh
 # Build release binaries for a tag: reproducible cross-compiled gitbay,
-# gitbayd and gitbay-runner with a checksum manifest.
+# gitbayd and gitbay-runner, each gzipped, with a checksum manifest.
 #
 #   git checkout v0.2.0 && ./deploy/release.sh v0.2.0
 #
 # Reproducibility: CGO off, -trimpath, stripped, empty build id; the VCS
 # revision embedded by the toolchain is deterministic per commit. Anyone on
-# the same Go toolchain and commit gets byte-identical binaries.
+# the same Go toolchain and commit gets byte-identical binaries; compare
+# against the decompressed asset, since gzip output varies by implementation.
 set -eu
 
 V="${1:-}"
@@ -25,6 +26,7 @@ for target in linux/amd64 linux/arm64 darwin/arm64; do
         CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
             go build -trimpath -ldflags='-s -w -buildid=' \
             -o "$out/$name" "./cmd/$bin"
+        gzip -n -9 "$out/$name"
     done
 done
 

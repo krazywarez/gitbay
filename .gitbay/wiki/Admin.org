@@ -9,11 +9,12 @@ startup and on every admin command.
 Build from source (=go build ./cmd/gitbayd=), install via the vanity
 module path (=go install gitbay.org/gitbay/cmd/gitbayd@latest=), or use
 a release build: =deploy/release.sh <tag>= cross-compiles reproducible
-linux/amd64, linux/arm64, and darwin/arm64 binaries with a SHA256SUMS
-manifest (CGO off, trimpath, stripped — byte-identical per commit and
-toolchain).
+linux/amd64, linux/arm64, and darwin/arm64 binaries, each gzipped, with
+a SHA256SUMS manifest over the =.gz= files (CGO off, trimpath, stripped —
+the decompressed binary is byte-identical per commit and toolchain).
 
 #+begin_src sh
+gunzip -c gitbayd-<tag>-linux-amd64.gz > gitbayd
 install -m 755 gitbayd /usr/local/bin/
 adduser --system --group --home /var/lib/gitbay --shell /usr/sbin/nologin gitbay
 install -d -o gitbay -g gitbay -m 750 /var/lib/gitbay

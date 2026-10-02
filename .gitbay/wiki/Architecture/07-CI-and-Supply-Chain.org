@@ -89,7 +89,7 @@ Who may do what:
 | CI             | =build= (build, vet) and =test= (full suite against real git, ssh, sshd, gpg) on every push; =vuln= (govulncheck) nightly and before release (=.gitbay/ci.yml=) |
 | Static checks  | =deploy/audit.sh=: vet, govulncheck, short fuzz runs of the pkt-line, commit, signature, PGP key and tokenizer parsers |
 | Build          | =CGO_ENABLED=0 -trimpath -ldflags='-s -w -buildid='= for reproducible binaries; the commit is stamped in (=deploy/release.sh=, =Makefile=) |
-| Release        | =SHA256SUMS= for every binary; a minisign signature of the manifest when the release key is present (optional) |
+| Release        | binaries gzipped; =SHA256SUMS= for every archive; a minisign signature of the manifest when the release key is present (optional) |
 | Distribution   | release assets on the forge; Homebrew formula in krz/homebrew-tap built from the tag; push mirror to GitHub (read-only copy) |
 | Deploy         | =make deploy= refuses a dirty tree, then copies, checks config and restarts over operator SSH |
 | CI image       | built on the host from =deploy/Containerfile.ci= (=golang:1.27-trixie= plus git-lfs, gnupg, openssh, python3, sqlite3); tagged, never pulled at build time |
