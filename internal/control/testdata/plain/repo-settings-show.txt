@@ -1,0 +1,7 @@
+alice/app  settings
+
+  require mr              false
+  require checks          false
+  require signed commits  false
+  git daemon              false
+  archived                false

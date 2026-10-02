@@ -1,0 +1,16 @@
+commit aee4475ad9033773a17e148aafa3105212ac9c10
+Author: t <t@example.test>
+Date:   <time>
+
+    docs: guide
+
+ docs/guide.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/docs/guide.md b/docs/guide.md
+new file mode 100644
+index 0000000..cd51204
+--- /dev/null
++++ b/docs/guide.md
+@@ -0,0 +1 @@
++# guide

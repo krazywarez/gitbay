@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
@@ -92,9 +93,14 @@ func runDepsStatus(c *Ctx, args []string) int {
 	}
 	check, err := c.Store.DepCheckFor(repo.ID)
 	if errors.Is(err, store.ErrNotFound) {
-		return c.emit(map[string]any{"enabled": false}, func(w io.Writer) {
+		return c.emitView(map[string]any{"enabled": false}, func(w io.Writer) {
 			v := c.view(w)
 			v.fields("checks", fmt.Sprintf("off (repo deps enable %s)", repo.Path()))
+		}, func() screen {
+			return screen{
+				fields:  []field{{"Checks", []cell{cText("off")}}},
+				actions: []action{{"Deps", []string{"repo", "deps", "enable", repo.Path()}}},
+			}
 		})
 	}
 	if err != nil {
@@ -109,7 +115,7 @@ func runDepsStatus(c *Ctx, args []string) int {
 	for _, r := range reports {
 		out.Behind = append(out.Behind, DepBehind{r.Ecosystem, r.Name, r.Current, r.Latest})
 	}
-	return c.emit(out, func(w io.Writer) {
+	return c.emitView(out, func(w io.Writer) {
 		tracked := ""
 		if check.IssueNumber != 0 {
 			tracked = fmt.Sprintf("#%d", check.IssueNumber)
@@ -129,5 +135,26 @@ func runDepsStatus(c *Ctx, args []string) int {
 			}
 			tb.flush()
 		}
+	}, func() screen {
+		state := []cell{cGlyph("ok"), cText("on")}
+		if check.LastError != "" {
+			state = []cell{cGlyph("failed"), cText("on")}
+		}
+		s := screen{fields: []field{
+			{"Checks", state},
+			{"Last check", []cell{cAge(check.LastCheck)}},
+			{"Error", []cell{cMark(check.LastError, sgrRed)}},
+		}}
+		if check.IssueNumber != 0 {
+			n := strconv.FormatInt(check.IssueNumber, 10)
+			s.fields = append(s.fields, field{"Tracked in", []cell{cLink("#"+n, c.siteURL(repo.Path(), "issues", n))}})
+		}
+		behind := section{title: "Behind", n: len(out.Behind)}
+		for _, b := range out.Behind {
+			behind.rows = append(behind.rows, rowOf(cRef(b.Name), cText(b.Ecosystem), cMeta(b.Current+" → "+b.Latest)))
+		}
+		s.sections = []section{behind}
+		s.actions = []action{{"Deps", []string{"repo", "deps", "disable", repo.Path()}}}
+		return s
 	})
 }

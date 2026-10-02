@@ -244,3 +244,43 @@ func TestRepoBrowseScreens(t *testing.T) {
 	}
 	checkLegend(t, out)
 }
+
+func TestRepoShowsPlainPinned(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	pinPlain(t, "repo-settings-show", dispatchIn(t, st, u, root, "", "repo", "settings", "show", p))
+	pinPlain(t, "repo-deps-status-off", dispatchIn(t, st, u, root, "", "repo", "deps", "status", p))
+	pinPlain(t, "repo-commit", dispatchIn(t, st, u, root, "", "repo", "commit", p, "aee4475ad9"))
+	dispatchIn(t, st, u, root, "", "repo", "deps", "enable", p)
+	pinPlain(t, "repo-deps-status", dispatchIn(t, st, u, root, "", "repo", "deps", "status", p))
+}
+
+func TestRepoShowScreens(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	for _, tc := range []struct {
+		argv []string
+		want []string
+	}{
+		{[]string{"repo", "settings", "show", p}, []string{"Repo:", "alice/app", "Require MR:", "off", "Approvals:"}},
+		{[]string{"repo", "deps", "status", p}, []string{"Checks:  off\n", "gitbay repo deps enable alice/app"}},
+		{[]string{"repo", "commit", p, "aee4475ad9"}, []string{"Commit:", "aee4475ad9  docs: guide", "Author:", "t <t@example.test>", "gitbay repo log alice/app --ref aee4475ad9", "+# guide"}},
+	} {
+		out := atTerminalIn(t, st, u, root, tc.argv...)
+		for _, w := range tc.want {
+			if !strings.Contains(out, w) {
+				t.Errorf("%v: missing %q in:\n%s", tc.argv, w, out)
+			}
+		}
+		checkLegend(t, out)
+	}
+	dispatchIn(t, st, u, root, "", "repo", "deps", "enable", p)
+	out := atTerminalIn(t, st, u, root, "repo", "deps", "status", p)
+	if !strings.Contains(out, "Checks:") || !strings.Contains(out, "gitbay repo deps disable alice/app") {
+		t.Errorf("deps on:\n%s", out)
+	}
+	checkLegend(t, out)
+	if i, j := strings.Index(out, "gitbay repo deps"), strings.Index(out, "Checks:"); i < j {
+		t.Errorf("legend before the header:\n%s", out)
+	}
+}

@@ -354,27 +354,28 @@ func runRepoCommit(c *Ctx, args []string) int {
 			fmt.Fprintf(w, "\n%s", d.Diff)
 			return
 		}
-		v := c.view(w)
-		v.title(d.SHA[:10], d.Subject, d.Signature.State)
-		signer := d.Signature.Signer
-		if signer != "" && d.Signature.Fingerprint != "" {
-			signer += ", key " + d.Signature.Fingerprint
+		short, url := d.SHA[:min(10, len(d.SHA))], c.siteURL(repo.OwnerName, repo.Name, "commit", d.SHA[:min(12, len(d.SHA))])
+		s := screen{body: body, format: "text", fields: []field{
+			{"Commit", []cell{cLink(short, url), cText(d.Subject)}},
+			{"Author", []cell{cText(fmt.Sprintf("%s <%s>", d.AuthorName, d.AuthorEmail)), cAge(d.Date)}},
+		}}
+		if d.CommitterEmail != "" && d.CommitterEmail != d.AuthorEmail {
+			s.fields = append(s.fields, field{"Committer", []cell{cText(d.CommitterEmail)}})
 		}
-		v.fields(
-			"author", fmt.Sprintf("%s <%s>, %s", d.AuthorName, d.AuthorEmail, c.when(d.Date)),
-			"committer", d.CommitterEmail,
-			"signer", signer,
-			"url", c.siteURL(repo.OwnerName, repo.Name, "commit", d.SHA[:12]),
-		)
-		v.text(body)
-		if len(d.Checks) > 0 {
-			v.section("checks")
-			tb := c.table(w, "CHECK", "STATE")
-			for _, ch := range d.Checks {
-				tb.row(cText(ch.Context), cState(ch.State))
-			}
-			tb.flush()
+		s.fields = append(s.fields, field{"Signature", []cell{cGlyph(d.Signature.State), cState(d.Signature.State), cMeta(d.Signature.Signer, d.Signature.Fingerprint)}})
+		if !c.Term.Links {
+			s.fields = append(s.fields, field{"URL", []cell{cText(url)}})
 		}
+		checks := section{title: "Checks", n: len(d.Checks)}
+		for _, ch := range d.Checks {
+			checks.rows = append(checks.rows, rowOf(cGlyph(ch.State), cFlex(ch.Context)))
+		}
+		s.sections = []section{checks}
+		s.actions = []action{
+			{"Read", []string{"repo", "log", repo.Path(), "--ref", short}},
+			{"Read", []string{"repo", "tree", repo.Path(), "--ref", short}},
+		}
+		c.render(w, s)
 		fmt.Fprintf(w, "\n%s", c.Term.diff(d.Diff))
 	})
 }

@@ -811,7 +811,7 @@ func runSettingsShow(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	return c.emit(repo.Settings, func(w io.Writer) {
+	return c.emitView(repo.Settings, func(w io.Writer) {
 		v := c.view(w)
 		v.title(repo.Path(), "settings", "")
 		v.fields(
@@ -824,6 +824,49 @@ func runSettingsShow(c *Ctx, args []string) int {
 			"git daemon", strconv.FormatBool(repo.Settings.GitDaemon),
 			"archived", strconv.FormatBool(repo.Settings.Archived),
 		)
+	}, func() screen {
+		set := repo.Settings
+		onOff := func(b bool) cell {
+			if b {
+				return cText("on")
+			}
+			return cMeta("off")
+		}
+		approvals := cMeta("off")
+		if set.RequireApprovals > 0 {
+			approvals = cText(strconv.Itoa(set.RequireApprovals))
+		}
+		list := func(xs []string) cell {
+			if len(xs) == 0 {
+				return cMeta("none")
+			}
+			return cText(strings.Join(xs, ", "))
+		}
+		mr := "on"
+		if set.RequireMR {
+			mr = "off"
+		}
+		s := screen{fields: []field{
+			{"Repo", []cell{cLink(repo.Path(), c.siteURL(repo.Path())), cMeta("settings")}},
+			{"Protected", []cell{list(set.ProtectedBranches)}},
+			{"Protected tags", []cell{list(set.ProtectedTags)}},
+			{"Require MR", []cell{onOff(set.RequireMR)}},
+			{"Require checks", []cell{onOff(set.RequireChecks)}},
+			{"Contexts", []cell{list(set.RequiredContexts)}},
+			{"Approvals", []cell{approvals}},
+			{"Resolved threads", []cell{onOff(set.RequireResolved)}},
+			{"Code owners", []cell{onOff(set.RequireCodeowners)}},
+			{"Signed commits", []cell{onOff(set.RequireSignedCommits)}},
+			{"Git daemon", []cell{onOff(set.GitDaemon)}},
+			{"Archived", []cell{onOff(set.Archived)}},
+		}, actions: []action{
+			{"Settings", []string{"repo", "settings", "protect", repo.Path(), "<branch>"}},
+			{"Settings", []string{"repo", "settings", "require-mr", repo.Path(), mr}},
+		}}
+		if set.Website != "" {
+			s.fields = append(s.fields, field{"Website", []cell{cText(set.Website)}})
+		}
+		return s
 	})
 }
 
