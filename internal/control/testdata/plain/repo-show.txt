@@ -1,0 +1,4 @@
+alice/app  public
+
+  default branch  main
+  url             /alice/app

@@ -373,6 +373,36 @@ func runRepoList(c *Ctx, args []string) int {
 	})
 }
 
+// repoMirrorOut is one mirror as repo show emits it, for admins.
+type repoMirrorOut struct {
+	Direction string `json:"direction"`
+	URL       string `json:"url"`
+	Pending   bool   `json:"pending"`
+	LastSync  string `json:"last_sync,omitempty"`
+	LastError string `json:"last_error,omitempty"`
+}
+
+// repoShowOut is what repo show emits.
+type repoShowOut struct {
+	Path              string          `json:"path"`
+	Description       string          `json:"description,omitempty"`
+	Website           string          `json:"website,omitempty"`
+	Visibility        string          `json:"visibility"`
+	DefaultBranch     string          `json:"default_branch"`
+	ProtectedBranches []string        `json:"protected_branches,omitempty"`
+	Archived          bool            `json:"archived,omitempty"`
+	Topics            []string        `json:"topics,omitempty"`
+	Domains           []string        `json:"domains,omitempty"`
+	Mirrors           []repoMirrorOut `json:"mirrors,omitempty"`
+	// ForkOf names the parent only when the caller can read it: a
+	// private parent is not confirmed to exist, here as anywhere.
+	ForkOf string `json:"fork_of,omitempty"`
+	// Watch and Bookmarked are the caller's own state, so a client
+	// can draw a toggle rather than two stateless buttons (#178).
+	Watch      string `json:"watch,omitempty"` // watching, muted, or absent
+	Bookmarked bool   `json:"bookmarked,omitempty"`
+}
+
 func runRepoShow(c *Ctx, args []string) int {
 	if len(args) != 1 {
 		return c.usage()
@@ -380,32 +410,6 @@ func runRepoShow(c *Ctx, args []string) int {
 	repo, code := resolveRepo(c, args[0], policy.CanRead)
 	if code >= 0 {
 		return code
-	}
-	type mirrorOut struct {
-		Direction string `json:"direction"`
-		URL       string `json:"url"`
-		Pending   bool   `json:"pending"`
-		LastSync  string `json:"last_sync,omitempty"`
-		LastError string `json:"last_error,omitempty"`
-	}
-	type out struct {
-		Path              string      `json:"path"`
-		Description       string      `json:"description,omitempty"`
-		Website           string      `json:"website,omitempty"`
-		Visibility        string      `json:"visibility"`
-		DefaultBranch     string      `json:"default_branch"`
-		ProtectedBranches []string    `json:"protected_branches,omitempty"`
-		Archived          bool        `json:"archived,omitempty"`
-		Topics            []string    `json:"topics,omitempty"`
-		Domains           []string    `json:"domains,omitempty"`
-		Mirrors           []mirrorOut `json:"mirrors,omitempty"`
-		// ForkOf names the parent only when the caller can read it: a
-		// private parent is not confirmed to exist, here as anywhere.
-		ForkOf string `json:"fork_of,omitempty"`
-		// Watch and Bookmarked are the caller's own state, so a client
-		// can draw a toggle rather than two stateless buttons (#178).
-		Watch      string `json:"watch,omitempty"` // watching, muted, or absent
-		Bookmarked bool   `json:"bookmarked,omitempty"`
 	}
 	desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name))
 	topics, err := c.Store.ListTopics(repo.ID)
@@ -420,7 +424,7 @@ func runRepoShow(c *Ctx, args []string) int {
 			}
 		}
 	}
-	d := out{Path: repo.Path(), Description: desc, Website: repo.Settings.Website, Visibility: repo.Visibility,
+	d := repoShowOut{Path: repo.Path(), Description: desc, Website: repo.Settings.Website, Visibility: repo.Visibility,
 		DefaultBranch: repo.DefaultBranch, ProtectedBranches: repo.Settings.ProtectedBranches,
 		Archived: repo.Settings.Archived, Topics: topics, Domains: domains}
 	if repo.ForkOf != 0 {
@@ -442,14 +446,26 @@ func runRepoShow(c *Ctx, args []string) int {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		for _, m := range ms {
-			d.Mirrors = append(d.Mirrors, mirrorOut{m.Direction, m.URL, m.Dirty, m.LastSync, m.LastError})
+			d.Mirrors = append(d.Mirrors, repoMirrorOut{m.Direction, m.URL, m.Dirty, m.LastSync, m.LastError})
 		}
 	}
 	var glance repoGlance
+	var mrs []store.MR
+	var issues []store.Issue
+	var commits []CommitOut
 	if c.Term.Cols > 0 && !c.JSON {
 		glance = repoAtAGlance(c, repo)
+		mrs, _ = c.Store.ListMRs(repo.ID, "open", 5, 0)
+		issues, _ = c.Store.QueryIssues(repo.ID, store.IssueFilter{State: "open", Limit: 5})
+		dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+		if shas, err := gitutil.RevList(dir, "refs/heads/"+repo.DefaultBranch, 5); err == nil {
+			subjects := gitutil.Subjects(dir, shas)
+			for _, sha := range shas {
+				commits = append(commits, CommitOut{sha, subjects[sha]})
+			}
+		}
 	}
-	return c.emit(d, func(w io.Writer) {
+	return c.emitView(d, func(w io.Writer) {
 		bookmarked, archived := "", ""
 		if d.Bookmarked {
 			bookmarked = "yes"
@@ -458,41 +474,19 @@ func runRepoShow(c *Ctx, args []string) int {
 			archived = "yes"
 		}
 		v := c.view(w)
-		if c.Term.Cols > 0 {
-			v.title(d.Path, "", d.Visibility)
-			v.text(d.Description)
-			v.fields(
-				"clone", glance.clone,
-				"issues", glance.issues,
-				"merge requests", glance.mrs,
-				"release", glance.release,
-				"checks", glance.checks,
-				"default branch", d.DefaultBranch,
-				"website", d.Website,
-				"topics", strings.Join(d.Topics, ", "),
-				"protected", strings.Join(d.ProtectedBranches, ", "),
-				"pages domains", strings.Join(d.Domains, ", "),
-				"fork of", d.ForkOf,
-				"watch", d.Watch,
-				"bookmarked", bookmarked,
-				"archived", archived,
-				"url", c.siteURL(d.Path),
-			)
-		} else {
-			v.title(d.Path, d.Description, d.Visibility)
-			v.fields(
-				"default branch", d.DefaultBranch,
-				"website", d.Website,
-				"topics", strings.Join(d.Topics, ", "),
-				"protected", strings.Join(d.ProtectedBranches, ", "),
-				"pages domains", strings.Join(d.Domains, ", "),
-				"fork of", d.ForkOf,
-				"watch", d.Watch,
-				"bookmarked", bookmarked,
-				"archived", archived,
-				"url", c.siteURL(d.Path),
-			)
-		}
+		v.title(d.Path, d.Description, d.Visibility)
+		v.fields(
+			"default branch", d.DefaultBranch,
+			"website", d.Website,
+			"topics", strings.Join(d.Topics, ", "),
+			"protected", strings.Join(d.ProtectedBranches, ", "),
+			"pages domains", strings.Join(d.Domains, ", "),
+			"fork of", d.ForkOf,
+			"watch", d.Watch,
+			"bookmarked", bookmarked,
+			"archived", archived,
+			"url", c.siteURL(d.Path),
+		)
 		if len(d.Mirrors) > 0 {
 			v.section("mirror")
 			tb := c.table(w, "DIRECTION", "URL", "LAST SYNC", "STATUS")
@@ -508,13 +502,14 @@ func runRepoShow(c *Ctx, args []string) int {
 			}
 			tb.flush()
 		}
-	})
+	}, func() screen { return repoShowScreen(c, d, glance, mrs, issues, commits) })
 }
 
 // repoGlance is what repo show adds at a terminal: how to clone it and
 // what is going on in it.
 type repoGlance struct {
-	clone, issues, mrs, release, checks string
+	clone, release, checks string
+	issuesN, mrsN          int
 }
 
 // repoAtAGlance reads the glance fields. Each is left blank when it
@@ -525,9 +520,7 @@ func repoAtAGlance(c *Ctx, repo store.Repo) repoGlance {
 		host += ":" + strconv.Itoa(c.Cfg.SSH.Port)
 	}
 	g := repoGlance{clone: "ssh://git@" + host + "/" + repo.Path() + ".git"}
-	issues, mrs := c.Store.OpenCounts(repo.ID)
-	g.issues = fmt.Sprintf("%d open", issues)
-	g.mrs = fmt.Sprintf("%d open", mrs)
+	g.issuesN, g.mrsN = c.Store.OpenCounts(repo.ID)
 	if rs, err := c.Store.ListReleasesPage(repo.ID, 1, "", 0); err == nil && len(rs) > 0 {
 		g.release = rs[0].Tag + ", " + relAge(rs[0].CreatedAt, termNow())
 	}
@@ -1373,4 +1366,60 @@ func runRepoDiff(c *Ctx, args []string) int {
 		fmt.Fprintln(c.Stderr, "diff truncated at 4 MiB")
 	}
 	return protocol.ExitOK
+}
+
+// repoShowScreen is repo show at a terminal: how to clone it, where the
+// default branch stands, what is open, and the latest commits.
+func repoShowScreen(c *Ctx, d repoShowOut, g repoGlance, mrs []store.MR, issues []store.Issue, commits []CommitOut) screen {
+	s := screen{body: d.Description, format: "text"}
+	name := []cell{cLink(d.Path, c.siteURL(d.Path)), cState(d.Visibility)}
+	if d.Archived {
+		name[1].s += ", archived"
+	}
+	s.fields = append(s.fields, field{"Repo", name})
+	if g.clone != "" {
+		s.fields = append(s.fields, field{"Clone", []cell{cText(g.clone)}})
+	}
+	head := []cell{cText(d.DefaultBranch)}
+	if g.checks != "" {
+		head = []cell{cText(d.DefaultBranch), cText(strings.TrimSuffix(g.checks, " on "+d.DefaultBranch))}
+	}
+	s.fields = append(s.fields, field{"Head", head})
+	if g.release != "" {
+		s.fields = append(s.fields, field{"Release", []cell{cText(g.release)}})
+	}
+	if len(d.Topics) > 0 {
+		s.fields = append(s.fields, field{"Topics", []cell{cText(strings.Join(d.Topics, ", "))}})
+	}
+	if d.ForkOf != "" {
+		s.fields = append(s.fields, field{"Fork of", []cell{cRef(d.ForkOf)}})
+	}
+	for _, m := range d.Mirrors {
+		if m.LastError != "" {
+			s.fields = append(s.fields, field{"Mirror", []cell{cGlyph("failed"), cText(m.Direction + " " + m.URL + ": " + m.LastError)}})
+		}
+	}
+	if !c.Term.Links {
+		s.fields = append(s.fields, field{"URL", []cell{cText(c.siteURL(d.Path))}})
+	}
+
+	ms := section{title: "Open merge requests", n: g.mrsN, more: []string{"mr", "list", d.Path}}
+	for _, m := range mrs {
+		ms.rows = append(ms.rows, rowOf(cRef(fmt.Sprintf("!%d", m.Number)), cFlex(m.Title), cAge(m.UpdatedAt)))
+	}
+	is := section{title: "Open issues", n: g.issuesN, more: []string{"issue", "list", d.Path}}
+	for _, i := range issues {
+		is.rows = append(is.rows, rowOf(cRef(fmt.Sprintf("#%d", i.Number)), cFlex(i.Title), cAge(i.UpdatedAt)))
+	}
+	cs := section{title: "Recent commits", n: len(commits), more: []string{"repo", "log", d.Path}}
+	for _, cm := range commits {
+		cs.rows = append(cs.rows, rowOf(cRef(fmt.Sprintf("%.7s", cm.SHA)), cFlex(cm.Subject)))
+	}
+	s.sections = []section{ms, is, cs}
+	s.actions = []action{
+		{"Contribute", []string{"mr", "create", d.Path}},
+		{"Contribute", []string{"issue", "create", d.Path}},
+		{"Read", []string{"repo", "log", d.Path}},
+	}
+	return s
 }
