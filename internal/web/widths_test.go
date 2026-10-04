@@ -31,8 +31,10 @@ func TestListPagesAreWide(t *testing.T) {
 			t.Errorf("%s does not use one-line rows", name)
 		}
 	}
-	if src, _ := templateFS.ReadFile("templates/explore.html"); !strings.Contains(string(src), `<ul class="repolist rows">`) {
-		t.Error("explore.html does not use one-line rows")
+	for _, name := range []string{"explore.html", "owner.html"} {
+		if src, _ := templateFS.ReadFile("templates/" + name); !strings.Contains(string(src), `<ul class="repolist rows">`) {
+			t.Errorf("%s does not use one-line repository rows", name)
+		}
 	}
 	// Settings pages carry a section column: every section id has a link
 	// in the column, and the page is wide with the narrow grid.

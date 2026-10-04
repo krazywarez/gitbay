@@ -9,11 +9,9 @@ import (
 	"io"
 	"io/fs"
 	"reflect"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -31,36 +29,6 @@ var FontFS embed.FS
 
 //go:embed static/img/*.gif static/img/*.webm static/img/*.mp4
 var ImageFS embed.FS
-
-// version returns the short VCS revision baked into the binary, or "" when
-// built outside a checkout. Used by the layout footer.
-var version = sync.OnceValue(func() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return ""
-	}
-	for _, s := range info.Settings {
-		if s.Key == "vcs.revision" && len(s.Value) >= 10 {
-			return s.Value[:10]
-		}
-	}
-	return ""
-})
-
-// fullVersion is the complete VCS revision, for linking the footer hash
-// to the upstream commit page.
-var fullVersion = sync.OnceValue(func() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return ""
-	}
-	for _, s := range info.Settings {
-		if s.Key == "vcs.revision" {
-			return s.Value
-		}
-	}
-	return ""
-})
 
 // StyleVersion identifies the bytes /static/style.css serves. The httpd
 // package sets it; the layout stamps it on the stylesheet URL so a deploy
@@ -127,10 +95,8 @@ func railOptItems(v any) []railItem {
 }
 
 var funcs = template.FuncMap{
-	"gitbayVersion": func() string { return version() },
-	"gitbayCommit":  func() string { return fullVersion() },
-	"styleVersion":  func() string { return StyleVersion },
-	"join":          strings.Join,
+	"styleVersion": func() string { return StyleVersion },
+	"join":         strings.Join,
 	// paragraphs splits plain text on blank lines for safe rich display.
 	"paragraphs": func(s string) []string {
 		var out []string

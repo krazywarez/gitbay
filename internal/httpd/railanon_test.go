@@ -14,13 +14,7 @@ import (
 // signed-out phone had no route to the listing from any page (#248).
 func TestSignedOutRailDropsNothing(t *testing.T) {
 	var sb strings.Builder
-	err := web.Render(&sb, "explore.html", struct {
-		basePage
-		Tab    string
-		Query  string
-		Facets []facetGroup
-		Repos  []describedRepo
-	}{basePage{Site: "gitbay"}, "explore", "", nil, nil})
+	err := web.Render(&sb, "explore.html", explorePage{basePage: basePage{Site: "gitbay"}, Tab: "explore", Pages: 1})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}

@@ -460,6 +460,29 @@ func (s *Store) ListPublicRepos() ([]Repo, error) {
 	return out, rows.Err()
 }
 
+// ListPublicReposByActivity returns all public repositories, the most
+// recent event first. Builds are not activity: a nightly job would keep
+// its repository on top. A repository with no events sorts last, newest
+// first.
+func (s *Store) ListPublicReposByActivity() ([]Repo, error) {
+	rows, err := s.DB.Query(repoSelect + ` WHERE r.visibility = 'public'
+		ORDER BY COALESCE((SELECT MAX(e.id) FROM events e
+			WHERE e.repo_id = r.id AND e.kind NOT LIKE 'build.%'), 0) DESC, r.id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Repo
+	for rows.Next() {
+		r, err := scanRepo(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // ListForks returns the repositories forked from one repo. The caller
 // filters by what the viewer may see.
 func (s *Store) ListForks(repoID int64) ([]Repo, error) {

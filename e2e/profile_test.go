@@ -214,10 +214,10 @@ func TestOwnerProfiles(t *testing.T) {
 	if !strings.Contains(body, `class="activity"`) {
 		t.Error("the about tab has no activity graph")
 	}
-	if strings.Contains(body, `<ul class="repolist"`) {
+	if strings.Contains(body, `<ul class="repolist`) {
 		t.Error("the repository list still sits under the about text")
 	}
-	if _, repos := inst.get(t, "/alice/-/repositories"); !strings.Contains(repos, `<ul class="repolist"`) {
+	if _, repos := inst.get(t, "/alice/-/repositories"); !strings.Contains(repos, `<ul class="repolist rows">`) {
 		t.Error("the repositories tab has no repository list")
 	}
 

@@ -223,8 +223,26 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request, viewer store.
 	}{s.baseFor(viewer), "dashboard", s.pinnedRows(viewer), reviews, assigned, mrs, issues, queries, control.FeedLines(events)})
 }
 
+// explorePageSize is how many repositories one page of /explore lists.
+const explorePageSize = 20
+
+// explorePage is /explore: one page of the filtered listing, most recent
+// activity first. Total counts the whole filtered listing.
+type explorePage struct {
+	basePage
+	Tab    string
+	Query  string
+	Facets []facetGroup
+	Repos  []describedRepo
+	Total  int
+	Page   int
+	Pages  int
+	Prev   string
+	Next   string
+}
+
 func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
-	repos, err := s.st.ListPublicRepos()
+	repos, err := s.st.ListPublicReposByActivity()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -235,13 +253,40 @@ func (s *Server) explore(w http.ResponseWriter, r *http.Request) {
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	described := s.describeAll(repos)
-	s.render(w, "explore.html", struct {
-		basePage
-		Tab    string
-		Query  string
-		Facets []facetGroup
-		Repos  []describedRepo
-	}{s.baseFor(viewer), "explore", q, []facetGroup{topicFacets(described, q)}, s.filterRepos(q, described)})
+	p := explorePage{basePage: s.baseFor(viewer), Tab: "explore", Query: q,
+		Facets: []facetGroup{topicFacets(described, q)}}
+	p.Repos, p.Total, p.Page, p.Pages = pageOf(s.filterRepos(q, described), r.URL.Query().Get("page"))
+	if p.Page > 1 {
+		p.Prev = explorePageURL(q, p.Page-1)
+	}
+	if p.Page < p.Pages {
+		p.Next = explorePageURL(q, p.Page+1)
+	}
+	s.render(w, "explore.html", p)
+}
+
+// pageOf returns page n (1-based, clamped) of repos at explorePageSize.
+func pageOf(repos []describedRepo, n string) (page []describedRepo, total, num, pages int) {
+	total = len(repos)
+	pages = max(1, (total+explorePageSize-1)/explorePageSize)
+	num, _ = strconv.Atoi(n)
+	num = min(max(num, 1), pages)
+	lo := (num - 1) * explorePageSize
+	return repos[lo:min(lo+explorePageSize, total)], total, num, pages
+}
+
+func explorePageURL(q string, page int) string {
+	v := url.Values{}
+	if q != "" {
+		v.Set("q", q)
+	}
+	if page > 1 {
+		v.Set("page", strconv.Itoa(page))
+	}
+	if len(v) == 0 {
+		return "/explore"
+	}
+	return "/explore?" + v.Encode()
 }
 
 // privacy renders the privacy page: what the gitbay software does with

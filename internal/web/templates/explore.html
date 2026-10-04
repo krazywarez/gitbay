@@ -12,11 +12,12 @@
 </form>
 <span class="spacer"></span>
 </div>
-<p class="meta">{{len .Repos}} repositor{{if eq (len .Repos) 1}}y{{else}}ies{{end}}{{if .Query}} matching <strong>{{.Query}}</strong>, <a href="/explore">clear filter</a>{{end}}</p>
+<p class="meta">{{.Total}} repositor{{if eq .Total 1}}y{{else}}ies{{end}}{{if .Query}} matching <strong>{{.Query}}</strong>, <a href="/explore">clear filter</a>{{end}}</p>
 <ul class="repolist rows">
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">{{if .Query}}nothing matches that filter{{else}}no public repositories yet{{end}}</li>{{end}}
 </ul>
+{{if gt .Pages 1}}<p class="pager">page {{.Page}} of {{.Pages}}{{with .Prev}} · <a href="{{.}}">← newer</a>{{end}}{{with .Next}} · <a href="{{.}}">older →</a>{{end}}</p>{{end}}
 </div>
 </div>
 {{end}}

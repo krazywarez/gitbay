@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -41,16 +42,52 @@ func TestExplorePageSummarisesTheFilter(t *testing.T) {
 
 func renderExplore(t *testing.T, q string, repos []describedRepo) string {
 	t.Helper()
+	p := explorePage{basePage: basePage{Site: "gitbay"}, Tab: "explore", Query: q}
+	p.Repos, p.Total, p.Page, p.Pages = pageOf(repos, "")
+	return renderExplorePage(t, p)
+}
+
+func renderExplorePage(t *testing.T, p explorePage) string {
+	t.Helper()
 	var sb strings.Builder
-	err := web.Render(&sb, "explore.html", struct {
-		basePage
-		Tab    string
-		Query  string
-		Facets []facetGroup
-		Repos  []describedRepo
-	}{basePage{Site: "gitbay"}, "explore", q, nil, repos})
-	if err != nil {
+	if err := web.Render(&sb, "explore.html", p); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return sb.String()
+}
+
+func TestExplorePages(t *testing.T) {
+	var repos []describedRepo
+	for i := range 45 {
+		repos = append(repos, describedRepo{Repo: store.Repo{OwnerName: "krz", Name: fmt.Sprintf("r%02d", i)}})
+	}
+	for _, tc := range []struct {
+		in        string
+		page, len int
+		first     string
+	}{
+		{"", 1, 20, "r00"}, {"2", 2, 20, "r20"}, {"3", 3, 5, "r40"},
+		{"9", 3, 5, "r40"}, {"0", 1, 20, "r00"}, {"x", 1, 20, "r00"},
+	} {
+		got, total, page, pages := pageOf(repos, tc.in)
+		if total != 45 || pages != 3 || page != tc.page || len(got) != tc.len || got[0].Name != tc.first {
+			t.Errorf("page %q: total %d, page %d of %d, %d rows from %s", tc.in, total, page, pages, len(got), got[0].Name)
+		}
+	}
+	if got, _, page, pages := pageOf(nil, "2"); len(got) != 0 || page != 1 || pages != 1 {
+		t.Errorf("empty listing: %d rows, page %d of %d", len(got), page, pages)
+	}
+
+	p := explorePage{basePage: basePage{Site: "gitbay"}, Tab: "explore", Query: "go"}
+	p.Repos, p.Total, p.Page, p.Pages = pageOf(repos, "2")
+	p.Prev, p.Next = explorePageURL("go", 1), explorePageURL("go", 3)
+	out := renderExplorePage(t, p)
+	for _, want := range []string{"45 repositories", "page 2 of 3", `href="/explore?q=go"`, `href="/explore?page=3&amp;q=go"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explore.html missing %q:\n%s", want, out)
+		}
+	}
+	if out := renderExplore(t, "", repos[:3]); strings.Contains(out, `class="pager"`) {
+		t.Errorf("a single page has a pager:\n%s", out)
+	}
 }

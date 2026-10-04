@@ -46,7 +46,7 @@
 {{end}}
 
 {{if eq .Tab "repos"}}
-<ul class="repolist">
+<ul class="repolist rows">
 {{range .Repos}}{{template "reporow" .}}
 {{else}}<li class="empty">no visible repositories</li>{{end}}
 </ul>
