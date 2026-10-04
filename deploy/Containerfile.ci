@@ -15,6 +15,10 @@
 # .gitbay/ci.yml rather than a silent change under a running branch.
 FROM docker.io/library/golang:1.27-trixie
 
+# gitbay-runner-prune.service skips images carrying this label. A localhost/
+# image cannot be pulled back, so pruning it fails every job that names it.
+LABEL org.gitbay.keep=true
+
 # The suite drives real git, ssh, sshd and gpg rather than mocking them,
 # and asserts they are present before running. git-lfs has its own tests;
 # sshd must be the binary at /usr/sbin/sshd that the tests exec.

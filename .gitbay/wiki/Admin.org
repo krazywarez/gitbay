@@ -1295,6 +1295,9 @@ refused to start would stop every build.
 =gitbay-runner-prune.timer= prunes unused images weekly, as the runner's
 user: rootless storage belongs to that user, and root's prune would not
 see it. An unpruned image store on a 40GB host is a slow outage.
+Images labelled =org.gitbay.keep=true= are skipped, since a locally
+built =localhost/= image cannot be pulled back; =deploy/Containerfile.ci=
+sets it.
 
 * LFS storage
 

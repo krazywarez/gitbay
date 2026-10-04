@@ -10,7 +10,8 @@ User=ci-runner
 # Rootless podman reads storage.conf under HOME; a User= unit does not
 # set it.
 Environment=HOME=/var/lib/gitbay-runner
-# Images not used by a container and older than a week. A build that
-# names an image again re-pulls it; the cost is one pull, not a failure.
-ExecStart=/usr/bin/podman image prune --all --force --filter until=168h
+# Images not used by a container and created more than a week ago. A
+# registry image is pulled again on next use. A locally built image cannot
+# be, so one labelled org.gitbay.keep=true (deploy/Containerfile.ci) is kept.
+ExecStart=/usr/bin/podman image prune --all --force --filter until=168h --filter label!=org.gitbay.keep=true
 ExecStart=/usr/bin/podman container prune --force
