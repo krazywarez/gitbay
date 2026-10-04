@@ -9,7 +9,7 @@
 
 HOST     ?= gitbay.org
 PORT     ?= 2222
-CLI_DEST ?= /opt/homebrew/bin/gitbay
+CLI_DEST ?= $(HOME)/go/bin/gitbay
 
 CROSS   := CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 
