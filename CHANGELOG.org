@@ -4,6 +4,13 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.43.1 — 2026-10-03
+
+- =/explore= lists public repositories by latest activity, builds not
+  counted, 20 to a page (#326). The =explore= command keeps its order.
+- A profile's repositories tab uses the one-line rows of =/explore=.
+- The footer no longer shows the commit hash.
+
 * v1.43.0 — 2026-10-02
 
 What an instance owes the people who host on it: accounts delete
