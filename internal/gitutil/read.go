@@ -88,6 +88,26 @@ func ReadBlob(dir, ref, path string, limit int64) ([]byte, error) {
 	return data, err
 }
 
+// BlobID returns the object id of the blob at ref:path; errors if the path
+// is absent or not a blob.
+func BlobID(dir, ref, path string) (string, error) {
+	spec := ref + ":" + path
+	if strings.ContainsAny(spec, "\n\r") {
+		return "", fmt.Errorf("no blob %s", spec)
+	}
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "cat-file", "--batch-check=%(objecttype) %(objectname)")
+	cmd.Stdin = strings.NewReader(spec + "\n")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("cat-file %s: %w", spec, err)
+	}
+	f := strings.Fields(string(out))
+	if len(f) != 2 || f[0] != "blob" {
+		return "", fmt.Errorf("no blob %s", spec)
+	}
+	return f[1], nil
+}
+
 // ResolveRef resolves a ref or sha to a full commit sha; errors if absent.
 func ResolveRef(dir, ref string) (string, error) {
 	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}")

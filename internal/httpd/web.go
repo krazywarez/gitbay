@@ -1222,6 +1222,14 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filePath := strings.Trim(r.PathValue("path"), "/")
+	oid, err := gitutil.BlobID(p.Dir, p.Ref, filePath)
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	if blobNotModified(w, r, p.Repo, p.Ref, oid) {
+		return
+	}
 	data, err := gitutil.ReadBlob(p.Dir, p.Ref, filePath, s.cfg.Limits.MaxBlobBytes)
 	if err != nil {
 		s.notFound(w, r)
@@ -1237,6 +1245,43 @@ func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", ct)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(data)
+}
+
+// blobNotModified sets the caching headers for blob oid served at ref and
+// writes a 304 when the request already holds it. The ETag is the blob id,
+// so a revalidation costs one object lookup. A full commit sha cannot
+// change what it names, so that response is immutable; a branch or tag is
+// revalidated on every use. Private content stays out of shared caches.
+func blobNotModified(w http.ResponseWriter, r *http.Request, repo store.Repo, ref, oid string) bool {
+	scope := "public"
+	if repo.Visibility == "private" {
+		scope = "private"
+	}
+	if fullSHA(ref) {
+		w.Header().Set("Cache-Control", scope+", max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", scope+", no-cache")
+	}
+	etag := `"` + oid + `"`
+	w.Header().Set("ETag", etag)
+	if match := r.Header.Get("If-None-Match"); match != "" && etagMatches(match, etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	return false
+}
+
+// fullSHA reports whether ref is a whole SHA-1 or SHA-256 object name.
+func fullSHA(ref string) bool {
+	if len(ref) != 40 && len(ref) != 64 {
+		return false
+	}
+	for i := 0; i < len(ref); i++ {
+		if c := ref[i]; (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // imageTypes are the formats raw serves with a real content type and blob

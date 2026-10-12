@@ -173,6 +173,14 @@ func (s *Server) wikiRaw(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
+	oid, err := gitutil.BlobID(dir, branch, rel)
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	if blobNotModified(w, r, p.Repo, branch, oid) {
+		return
+	}
 	data, err := gitutil.ReadBlob(dir, branch, rel, s.cfg.Limits.MaxBlobBytes)
 	if err != nil {
 		s.notFound(w, r)
