@@ -35,15 +35,15 @@ browser-only and the iOS build screen unable to say more than the log.
 | review and check times | yes | yes | yes |
 | who resolved it, when  | yes | yes | yes |
 | comment                | yes | yes | yes |
-| react to it or a comment | yes | yes | no  |
+| react to it or a comment | yes | yes | yes |
 | edit title and body    | yes | yes | yes |
 | review (approve etc.)  | yes | yes | yes |
 | resolve a thread       | yes | yes | yes |
 | comment on a diff line | yes | yes | yes |
-| suggest a change       | yes | yes | no  |
-| apply a suggestion     | yes | yes | no  |
+| suggest a change       | yes | yes | yes |
+| apply a suggestion     | yes | yes | yes |
 | merge (all strategies) | yes | yes | yes |
-| merge when ready, cancel | yes | yes | no  |
+| merge when ready, cancel | yes | yes | yes |
 | close                  | yes | yes | yes |
 | close in favour of another | yes | yes | yes |
 | create                 | yes | yes | yes |
@@ -117,7 +117,7 @@ reviews, since an approval was of the diff against the old branch.
 | search title and body | yes | yes | yes |
 | create              | yes | yes | yes |
 | comment             | yes | yes | yes |
-| react to it or a comment | yes | yes | no  |
+| react to it or a comment | yes | yes | yes |
 | edit title and body | yes | yes | yes |
 | close and reopen    | yes | yes | yes |
 | labels, assignees   | yes | yes | yes |
@@ -209,7 +209,7 @@ there shows the app's rendering rather than the one the web page shows.
 | merge requests only         | yes | yes | yes |
 | protected tags              | yes | yes | yes |
 | require codeowners          | yes | yes | yes |
-| require contexts            | yes | yes | no  |
+| require contexts            | yes | yes | yes |
 | access grants               | yes | yes | yes |
 | effective access            | yes | yes | yes |
 | webhooks                    | yes | yes | yes |
