@@ -567,6 +567,7 @@ func repoCmd() *cobra.Command {
 		pass("search", passOpts{server: []string{"repo", "search"}}),
 		pass("grep", passOpts{server: []string{"repo", "grep"}, needsRepo: true}),
 		pass("symbols", passOpts{server: []string{"repo", "symbols"}, needsRepo: true}),
+		pass("definitions", passOpts{server: []string{"repo", "definitions"}, needsRepo: true}),
 		pass("diff", passOpts{server: []string{"repo", "diff"}, needsRepo: true}),
 		pass("tree", passOpts{server: []string{"repo", "tree"}, needsRepo: true}),
 		pass("cat", passOpts{server: []string{"repo", "cat"}, needsRepo: true}),

@@ -261,6 +261,11 @@ line; =--limit= and =--cursor= page it, and without them it stops at
 ref only when its tree is the indexed one. The index follows read
 access: a repository you cannot read has no symbols either.
 
+=repo definitions <owner/name> <path>= goes the other way: for each
+name the file uses that the index defines, the first definition and how
+many there are. It is what the blob page links names from, for a client
+that draws the file itself.
+
 What is indexed:
 
 | language                       | kinds                                                     |

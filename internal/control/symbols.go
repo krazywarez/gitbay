@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -29,6 +31,14 @@ func init() {
 			"repo symbols krz/gitbay --kind method Ctx.",
 		},
 		ReadOnly: true, Run: runRepoSymbols})
+	register(Command{Path: []string{"repo", "definitions"},
+		Summary: "where each name a file uses is defined, from the symbol index",
+		Usage:   "repo definitions <owner/name> <path> [--ref <ref>]",
+		Flags: []Flag{
+			{"--ref", "<ref>", "a ref whose tree is the indexed one; only the default branch is indexed", "the default branch"},
+		},
+		Examples: []string{"repo definitions krz/gitbay internal/control/control.go"},
+		ReadOnly: true, Run: runRepoDefinitions})
 	register(Command{Path: []string{"admin", "symbols", "reindex"},
 		Summary:  "rebuild a repository's symbol index, even when its tree is already indexed (instance admins)",
 		Usage:    "admin symbols reindex <owner/name>",
@@ -202,5 +212,100 @@ func runAdminSymbolsReindex(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]string{"repo": repo.Path(), "state": "queued"}, func(w io.Writer) {
 		fmt.Fprintf(w, "queued a rebuild of the symbol index of %s\n", repo.Path())
+	})
+}
+
+// definitionOut is one name a file uses and where it is defined: the
+// first definition, and Count of them. A client links a name defined once
+// to its line and one defined more often to repo symbols, as the blob page
+// does.
+type definitionOut struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+	Path  string `json:"path"`
+	Line  int    `json:"line"`
+}
+
+// identifier is a name as the index keys it. The blob page takes names
+// from the highlighter's spans; a command has no highlighter, so it takes
+// every identifier, and keywords fall out because nothing defines them.
+var identifier = regexp.MustCompile(`[\p{L}_$][\p{L}\p{N}_$]*`)
+
+// maxDefinitionNames bounds the lookup for one file.
+const maxDefinitionNames = 5000
+
+func runRepoDefinitions(c *Ctx, args []string) int {
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--ref"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	path, file, ref := f.pos(0), f.pos(1), f.Value("--ref")
+	if path == "" || file == "" {
+		return c.usage()
+	}
+	filePath, ok := cleanRepoPath(file)
+	if !ok || filePath == "" {
+		return c.fail(protocol.ExitUsage, "path must stay inside the repository")
+	}
+	repo, code := resolveRepo(c, path, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	idx, err := c.Store.SymbolIndexFor(repo.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		return c.fail(protocol.ExitNotFound, "%s has no symbol index yet; one is built after a push to %s", repo.Path(), repo.DefaultBranch)
+	} else if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if ref == "" {
+		ref = repo.DefaultBranch
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	sha, err := gitutil.ResolveRef(dir, ref)
+	if err != nil || !IndexedTree(dir, sha, idx) {
+		return c.fail(protocol.ExitNotFound, "only the default branch, %s, is indexed; %s is not at the indexed tree", repo.DefaultBranch, ref)
+	}
+	data, err := gitutil.ReadBlob(dir, sha, filePath, c.Cfg.Limits.MaxBlobBytes)
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no such file %q in %s at %s", filePath, repo.Path(), ref)
+	}
+	var keys []string
+	if !gitutil.IsBinary(data) {
+		seen := map[string]bool{}
+		for _, name := range identifier.FindAllString(string(data), -1) {
+			if !seen[name] && len(keys) < maxDefinitionNames {
+				seen[name] = true
+				keys = append(keys, name)
+			}
+		}
+	}
+	targets, err := c.Store.SymbolTargets(idx.ID, keys)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	ds := make([]definitionOut, 0, len(targets))
+	for name, t := range targets {
+		ds = append(ds, definitionOut{name, t.Count, t.Path, t.Line})
+	}
+	sort.Slice(ds, func(i, j int) bool { return ds[i].Name < ds[j].Name })
+	rowsOf := func() []row {
+		rows := make([]row, len(ds))
+		for i, d := range ds {
+			rows[i] = rowOf(cRef(d.Name), cText(strconv.Itoa(d.Count)), cFlex(fmt.Sprintf("%s:%d", d.Path, d.Line)))
+		}
+		return rows
+	}
+	return c.emitView(ds, func(w io.Writer) {
+		tb := c.table(w, "NAME", "DEFINED", "FIRST")
+		for _, d := range ds {
+			tb.row(cRef(d.Name), cText(strconv.Itoa(d.Count)), cFlex(fmt.Sprintf("%s:%d", d.Path, d.Line)))
+		}
+		tb.flush()
+	}, func() screen {
+		s := listScreen("Definitions used in "+filePath, rowsOf())
+		if len(ds) > 0 {
+			s.actions = []action{{"Find", []string{"repo", "symbols", repo.Path(), ds[0].Name}}}
+		}
+		return s
 	})
 }

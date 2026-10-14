@@ -160,6 +160,7 @@ var summaries = map[string]string{
 	"repo commit":                      "show one commit with its patch",
 	"repo commit-file":                 "write a file and commit it",
 	"repo create":                      "create a repository",
+	"repo definitions":                 "where each name a file uses is defined, from the symbol index",
 	"repo delete":                      "delete a repository",
 	"repo deploy-key add":              "bind a read-only (or --rw) key to one repository",
 	"repo deploy-key list":             "list deploy keys",

@@ -189,7 +189,7 @@ there shows the app's rendering rather than the one the web page shows.
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
 | find a definition (symbols) | yes | yes | no  |
-| jump to definition from a file | n/a | yes | no  |
+| jump to definition from a file | yes | yes | no  |
 | compare two refs            | yes | yes | yes |
 | branches and tags           | yes | yes | yes |
 | wiki (read)                 | yes | yes | yes |
