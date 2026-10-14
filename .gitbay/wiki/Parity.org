@@ -475,19 +475,19 @@ when there is none.
 | capability                      | cli | web | ios |
 |---------------------------------+-----+-----+-----|
 | account list, filter by state   | yes | yes | yes |
-| account show                    | yes | no  | no  |
+| account show                    | yes | no  | yes |
 | promote, demote                 | yes | yes | yes |
 | disable, enable                 | yes | yes | yes |
-| account create, delete          | yes | no  | no  |
-| invite                          | yes | no  | no  |
-| account and org quotas          | yes | no  | no  |
+| account create, delete          | yes | no  | yes |
+| invite                          | yes | no  | yes |
+| account and org quotas          | yes | no  | yes |
 | worker queues                   | yes | yes | yes |
-| runners                         | yes | no  | no  |
-| repository list, archive, visibility | yes | no | no |
-| rebuild a symbol index          | yes | no  | no  |
-| audit log                       | yes | no  | no  |
-| instance statistics             | yes | no  | no  |
-| inbound mail check              | yes | no  | no  |
+| runners                         | yes | no  | yes |
+| repository list, archive, visibility | yes | no | yes|
+| rebuild a symbol index          | yes | no  | yes |
+| audit log                       | yes | no  | yes |
+| instance statistics             | yes | no  | yes |
+| inbound mail check              | yes | no  | yes |
 
 =/admin/users= carries the account list with the command's state
 filter and cursor, and promote, demote, disable and enable per row;
