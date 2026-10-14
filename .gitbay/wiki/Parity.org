@@ -389,14 +389,14 @@ client has no use for one (krz/gitbay#57).
 |-----------------------------+-----+-----+-----|
 | SSH keys: list, add, remove | yes | yes | yes |
 | SSH key label               | yes | yes | yes |
-| SSH key expiry and last use | yes | no  | no  |
+| SSH key expiry and last use | yes | no  | yes |
 | PGP keys: list, add, remove | yes | yes | yes |
 | email add and verify        | yes | yes | yes |
 | email list, remove, primary | yes | yes | yes |
 | dashboard aggregate         | yes | yes | yes |
 | notification inbox          | yes | yes | yes |
 | activity mail on, off       | yes | yes | yes |
-| reply by mail on, off       | yes | yes | no  |
+| reply by mail on, off       | yes | yes | yes |
 | watch writable repos        | yes | yes | yes |
 | push device add             | yes | yes | yes |
 | push device list            | yes | yes | yes |
@@ -404,11 +404,11 @@ client has no use for one (krz/gitbay#57).
 | activity push on, off       | yes | yes | yes |
 | web colour scheme           | yes | yes | n/a |
 | web diff layout             | yes | yes | n/a |
-| API token mint              | yes | yes | no  |
-| API token list, revoke      | yes | yes | no  |
-| API token revoke with what it created | yes | no  | no  |
+| API token mint              | yes | yes | yes |
+| API token list, revoke      | yes | yes | yes |
+| API token revoke with what it created | yes | no  | yes |
 | account export bundle       | yes | yes | n/a |
-| delete your own account     | yes | yes | no  |
+| delete your own account     | yes | yes | yes |
 | profile set                 | yes | yes | yes |
 | write the profile about     | yes | yes | yes |
 | request a login link        | n/a | yes | n/a |
