@@ -4,6 +4,21 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.43.2 — 2026-10-13
+
+- Go 1.27.2 and =golang.org/x/net= v0.60.0. govulncheck reported twelve
+  reachable findings in =net/http=, =net/textproto=, =crypto/tls= and
+  =html/template= (GO-2026-6599 through GO-2026-6617); all are fixed in
+  these versions, and the release binaries are built with the fixed
+  toolchain.
+- Raw files and =wiki/_raw= send =ETag= and =Cache-Control=: a matching
+  =If-None-Match= gets a 304 before the blob is read, a branch or tag is
+  no-cache, a full commit sha is immutable for a year, and a private
+  repository's responses are private (#329).
+- A release asset's size, checksum and actions each keep one line.
+- The weekly runner prune keeps the locally built CI image; it cannot be
+  pulled back, and every job naming it failed without it.
+
 * v1.43.1 — 2026-10-03
 
 - =/explore= lists public repositories by latest activity, builds not
