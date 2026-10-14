@@ -1,9 +1,13 @@
 package control
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -70,5 +74,28 @@ func TestNotifyScreens(t *testing.T) {
 			}
 		}
 		checkLegend(t, out)
+	}
+}
+
+// A client shows the reply switch only where the instance reads replies,
+// as the account page does; turning it on is refused elsewhere.
+func TestNotificationSettingsSayWhetherRepliesAreRead(t *testing.T) {
+	st, _, u := notifyFixture(t)
+	for _, enabled := range []bool{false, true} {
+		var out bytes.Buffer
+		c := &Ctx{User: u, Scope: "full", Store: st, Stdout: &out, Stderr: io.Discard, JSON: true}
+		c.Cfg.Mail.Inbound.Enabled = enabled
+		if code := Dispatch(c, []string{"notifications", "settings", "show"}); code != protocol.ExitOK {
+			t.Fatalf("exit %d", code)
+		}
+		var env struct {
+			Data map[string]bool `json:"data"`
+		}
+		if err := json.Unmarshal(out.Bytes(), &env); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := env.Data["reply_available"]; !ok || got != enabled {
+			t.Errorf("inbound %v: reply_available %v (present %v)", enabled, got, ok)
+		}
 	}
 }

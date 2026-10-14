@@ -268,7 +268,10 @@ func emitNotificationSettings(c *Ctx) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emitView(map[string]bool{"mail": mail, "watch": watch, "push": push, "reply": reply}, func(w io.Writer) {
+	// reply_available says whether the instance reads replies, so a client
+	// offers the reply switch only where turning it on can succeed.
+	return c.emitView(map[string]bool{"mail": mail, "watch": watch, "push": push, "reply": reply,
+		"reply_available": c.Cfg.Mail.Inbound.Enabled}, func(w io.Writer) {
 		onOff := func(on bool) string {
 			if on {
 				return "on"
