@@ -1,6 +1,6 @@
 module gitbay.org/gitbay
 
-go 1.27.0
+go 1.27.2
 
 require (
 	filippo.io/age v1.3.2
@@ -16,7 +16,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/term v0.46.0
 	golang.org/x/text v0.42.0
 	modernc.org/sqlite v1.60.1
