@@ -239,7 +239,7 @@ there shows the app's rendering rather than the one the web page shows.
 | job image (ci.yml)          | yes | n/a | n/a |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
-| delete, transfer            | yes | yes | no  |
+| delete, transfer            | yes | yes | yes |
 | rename                      | yes | yes | yes |
 | release delete              | yes | yes | yes |
 | release asset add           | yes | yes | n/a |
@@ -315,9 +315,9 @@ now render the way the reference does. go-org is not yet on the corpus.
 |----------------------------------+-----+-----+-----|
 | search repositories              | yes | yes | yes |
 | search issues and merge requests | yes | yes | yes |
-| saved query save, remove, pin    | yes | no  | no  |
-| saved query list and results     | yes | yes | no  |
-| pinned queries on the dashboard  | yes | yes | no  |
+| saved query save, remove, pin    | yes | no  | yes |
+| saved query list and results     | yes | yes | yes |
+| pinned queries on the dashboard  | yes | yes | yes |
 | browse all public repositories   | yes | yes | yes |
 | profile page                     | yes | yes | yes |
 | profile sections as tabs         | n/a | yes | n/a |
