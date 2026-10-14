@@ -266,7 +266,7 @@ func runImportIssues(c *Ctx, args []string) int {
 					return c.fail(protocol.ExitFailure, "%v", err)
 				}
 				if pr.MergedAt != "" {
-					c.Store.MarkMerged(mr.ID, pr.Base.SHA, 0, pr.MergedAt)
+					c.Store.MarkMerged(mr.ID, pr.Base.SHA, "", 0, pr.MergedAt)
 				} else {
 					c.Store.MarkClosed(mr.ID, 0, it.ClosedAt)
 				}

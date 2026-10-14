@@ -477,7 +477,17 @@ gitbay release create v1.0 --title "First light" [--notes|--file -|$EDITOR]
 gitbay release asset add v1.0 tool-linux-amd64 < dist/tool-linux-amd64
 gitbay release asset get v1.0 tool-linux-amd64 > tool   # or the web download link
 gitbay release list / show v1.0 / delete v1.0 --yes
+gitbay release notes v1.0 [--since <tag>]   # one line per merge request since the previous release
 #+end_src
+
+=release notes= drafts the notes: every merge request landed between the
+previous release's tag (or =--since=) and the ref, oldest first, as
+=- <title> (!<n>) by @<author>=. The ref may be a branch, for drafting
+before the tag exists. Pipe it into =release create --file -=, or press
+Summarize changes on the web form, which appends the same lines to the
+notes box. A merge request is attributed by the commit it landed as;
+one merged by squash or rebase before the instance recorded it is not
+listed.
 
 The web shows them under the repository's =releases= tab with rendered
 notes, sha256 sums, and download links; writers add and remove assets

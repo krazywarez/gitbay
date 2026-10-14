@@ -63,6 +63,34 @@ func TestReleaseAndBuildWeb(t *testing.T) {
 	if !strings.Contains(out, "Second light") || !strings.Contains(out, "revised") {
 		t.Fatalf("release not edited:\n%s", out)
 	}
+	// Summarize changes fills the notes box with one line per merge
+	// request landed since the previous release, after what was typed,
+	// and writes nothing (#331).
+	mustGit(t, dir, env, "checkout", "-q", "-b", "feat")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	mustGit(t, dir, env, "add", ".")
+	mustGit(t, dir, env, "commit", "-q", "-m", "feat")
+	mustGit(t, dir, env, "push", "-q", "origin", "feat")
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "create", "alice/app", "--source", "feat", "--target", "main", "--title", "add-b"); code != 0 {
+		t.Fatalf("mr create: %s", errOut)
+	}
+	if _, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "1"); code != 0 {
+		t.Fatalf("mr merge: %s", errOut)
+	}
+	mustGit(t, dir, env, "fetch", "-q", "origin")
+	mustGit(t, dir, env, "tag", "v2.0", "origin/main")
+	mustGit(t, dir, env, "push", "-q", "origin", "v2.0")
+	status, page := browserPost(t, alice, base+"/releases", url.Values{
+		"tag": {"v2.0"}, "notes": {"Second cut."}, "summarize": {"1"}})
+	if status != 200 || !strings.Contains(page, "Second cut.\n\n- add-b (!1) by @alice\n</textarea>") ||
+		!strings.Contains(page, `<option value="v2.0" selected>`) {
+		t.Fatalf("summarize did not fill the draft (%d):\n%s", status, page)
+	}
+	out, _, _ = inst.ssh(t, aliceKey, "", "release", "list", "alice/app", "--json")
+	if strings.Contains(out, "v2.0") {
+		t.Fatalf("summarize created a release: %s", out)
+	}
+
 	// A released tag is no longer offered for creation.
 	if _, page = browserGet(t, alice, base+"/releases"); strings.Contains(page, `<option value="v1.0"`) {
 		t.Fatalf("released tag still offered:\n%s", page)

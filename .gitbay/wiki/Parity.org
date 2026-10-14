@@ -222,6 +222,7 @@ rather than the one the web page shows.
 | atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
 | preview release notes       | n/a | yes | no  |
+| summarize changes since the previous release | yes | yes | no  |
 | build list                  | yes | yes | yes |
 | build list paging (limit, cursor) | yes | yes | no  |
 | build row names its commit  | yes | yes | no  |

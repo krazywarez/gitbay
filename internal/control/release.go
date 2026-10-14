@@ -58,6 +58,17 @@ func init() {
 		Usage:    "release show <owner/name> <tag>",
 		Examples: []string{"release show krz/gitbay v1.30.0"},
 		ReadOnly: true, Run: runReleaseShow})
+	register(Command{Path: []string{"release", "notes"},
+		Summary: "draft notes: one line per merge request since the previous release",
+		Usage:   "release notes <owner/name> <ref> [--since <tag>]",
+		Flags: []Flag{
+			{"--since", "<tag>", "the start of the range", "the previous release's tag"},
+		},
+		Examples: []string{
+			"release notes krz/gitbay main",
+			"release notes krz/gitbay v1.44.0 --since v1.43.0",
+		},
+		ReadOnly: true, Run: runReleaseNotes})
 	register(Command{Path: []string{"release", "delete"},
 		Summary: "delete a release and its assets",
 		Usage:   "release delete <owner/name> <tag> --yes",
@@ -483,5 +494,100 @@ func runAssetRemove(c *Ctx, args []string) int {
 	}
 	return c.emit(map[string]string{"removed": name}, func(w io.Writer) {
 		fmt.Fprintf(w, "removed %s\n", name)
+	})
+}
+
+type releaseNoteItem struct {
+	Number   int64  `json:"number"`
+	Title    string `json:"title"`
+	Author   string `json:"author"`
+	MergedAt string `json:"merged_at"`
+}
+
+type releaseNotesOut struct {
+	Since string            `json:"since"` // the tag the range starts after; "" for all of history
+	Items []releaseNoteItem `json:"items"`
+}
+
+// runReleaseNotes lists the merge requests landed in <since>..<ref>,
+// oldest first. A merge request is in the range when the commit it
+// landed as is; one merged before merged_sha existed is matched on its
+// head, which is right for fast-forward and merge-commit merges and
+// misses old squashes and rebases. Without --since the range starts at
+// the most recent release other than the ref's own, so regenerating a
+// released tag's notes gives the same answer as drafting them did.
+func runReleaseNotes(c *Ctx, args []string) int {
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--since"}, MaxPos: 2, Usage: c.Cmd.Usage})
+	if err != nil {
+		return c.fail(protocol.ExitUsage, "%v", err)
+	}
+	path, ref, since := f.pos(0), f.pos(1), f.Value("--since")
+	if path == "" || ref == "" {
+		return c.usage()
+	}
+	repo, code := resolveRepo(c, path, policy.CanRead)
+	if code >= 0 {
+		return code
+	}
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	refSHA, err := gitutil.ResolveRef(dir, ref)
+	if err != nil {
+		return c.fail(protocol.ExitNotFound, "no ref %q in %s", ref, repo.Path())
+	}
+	if since == "" {
+		rels, err := c.Store.ListReleases(repo.ID)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		for _, rel := range rels {
+			if rel.Tag != ref {
+				since = rel.Tag
+				break
+			}
+		}
+	}
+	var shas []string
+	if since == "" {
+		shas, err = gitutil.RevList(dir, refSHA, -1) // a negative max-count is no limit
+	} else {
+		var sinceSHA string
+		if sinceSHA, err = gitutil.ResolveRef(dir, since); err != nil {
+			return c.fail(protocol.ExitNotFound, "no tag %q in %s", since, repo.Path())
+		}
+		shas, err = gitutil.RevListRange(dir, sinceSHA, refSHA)
+	}
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	mrs, err := c.Store.QueryMRs(repo.ID, store.MRFilter{State: "merged"})
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	landed := map[string]store.MR{}
+	for _, mr := range mrs {
+		sha := mr.MergedSHA
+		if sha == "" {
+			sha = mr.HeadSHA
+		}
+		landed[sha] = mr
+	}
+	out := releaseNotesOut{Since: since, Items: []releaseNoteItem{}}
+	for i := len(shas) - 1; i >= 0; i-- {
+		if mr, ok := landed[shas[i]]; ok {
+			out.Items = append(out.Items, releaseNoteItem{mr.Number, mr.Title, mr.Author, mr.MergedAt})
+		}
+	}
+	if len(out.Items) == 0 && !c.JSON {
+		if since == "" {
+			fmt.Fprintf(c.Stderr, "no merge requests landed on %s\n", ref)
+		} else {
+			fmt.Fprintf(c.Stderr, "no merge requests landed between %s and %s\n", since, ref)
+		}
+		return protocol.ExitOK
+	}
+	return c.emit(out, func(w io.Writer) {
+		for _, it := range out.Items {
+			fmt.Fprintf(w, "- %s (!%d) by @%s\n", it.Title, it.Number, it.Author)
+		}
 	})
 }

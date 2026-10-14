@@ -153,7 +153,7 @@ func TestQueryItemsFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 	merged := f.mr(t, f.pub, f.alice, "merged mr")
-	if err := f.s.MarkMerged(merged.ID, "", f.alice, ""); err != nil {
+	if err := f.s.MarkMerged(merged.ID, "", "", f.alice, ""); err != nil {
 		t.Fatal(err)
 	}
 	f.mr(t, f.pub, f.bob, "open mr")

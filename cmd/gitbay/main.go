@@ -676,6 +676,7 @@ func releaseCmd() *cobra.Command {
 		pass("edit", passOpts{server: []string{"release", "edit"}, needsRepo: true, stdinOK: true}),
 		pass("list", passOpts{server: []string{"release", "list"}, needsRepo: true}),
 		pass("show", passOpts{server: []string{"release", "show"}, needsRepo: true}),
+		pass("notes", passOpts{server: []string{"release", "notes"}, needsRepo: true}),
 		pass("delete", passOpts{server: []string{"release", "delete"}, needsRepo: true}),
 		group("asset", "binary assets on a release",
 			pass("add", passOpts{server: []string{"release", "asset", "add"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the asset's bytes"}),

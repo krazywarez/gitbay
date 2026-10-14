@@ -1420,7 +1420,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		// a merge whose ref update landed and whose record did not. Record
 		// it rather than refuse, so a merge request cannot be stuck open
 		// with no way to close it as merged (#108).
-		if err := c.Store.MarkMerged(mr.ID, targetSHA, c.User.ID, ""); err != nil {
+		if err := c.Store.MarkMerged(mr.ID, targetSHA, headSHA, c.User.ID, ""); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
 		c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d}`, mr.Number))
@@ -1636,7 +1636,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 	if err := gitutil.UpdateRefCAS(dir, targetRef, newSHA, targetSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "target branch moved during merge; retry: %v", err)
 	}
-	if err := c.Store.MarkMerged(mr.ID, targetSHA, c.User.ID, ""); err != nil {
+	if err := c.Store.MarkMerged(mr.ID, targetSHA, newSHA, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))

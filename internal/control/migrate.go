@@ -292,7 +292,7 @@ func runAccountImportBundle(c *Ctx, args []string) int {
 				// MarkMerged, not SetMRState: a merged MR's diff is
 				// measured from the base recorded at merge time, and
 				// SetMRState leaves that empty.
-				c.Store.MarkMerged(mr.ID, bm.MergedBase, 0, bm.MergedAt)
+				c.Store.MarkMerged(mr.ID, bm.MergedBase, "", 0, bm.MergedAt)
 			case bm.State != "open":
 				state := bm.State
 				if state == "source_gone" {

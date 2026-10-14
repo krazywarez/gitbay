@@ -147,6 +147,7 @@ var summaries = map[string]string{
 	"release delete":                   "delete a release and its assets",
 	"release edit":                     "update a release's title and notes",
 	"release list":                     "list releases",
+	"release notes":                    "draft notes: one line per merge request since the previous release",
 	"release show":                     "show a release with assets",
 	"repo access grant":                "grant access",
 	"repo access list":                 "list who can reach the repository, with the role and where it comes from",

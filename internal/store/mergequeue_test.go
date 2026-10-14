@@ -62,7 +62,7 @@ func TestMergeQueueLeftOnMergeOrClose(t *testing.T) {
 	s, repoID, uid := mrFixture(t)
 	mr, _ := s.MRByNumber(repoID, 1)
 	for _, mark := range []func() error{
-		func() error { return s.MarkMerged(mr.ID, "base", uid, "") },
+		func() error { return s.MarkMerged(mr.ID, "base", "", uid, "") },
 		func() error { return s.MarkClosed(mr.ID, uid, "") },
 	} {
 		if err := s.SetMRState(mr.ID, "open"); err != nil {

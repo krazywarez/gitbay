@@ -25,6 +25,7 @@ type MR struct {
 	Milestone  string
 	HeadSHA    string
 	MergedBase string // target tip at merge time; base for historical diffs
+	MergedSHA  string // the commit it landed as; "" when merged before 0079
 	MergedAt   string // "" unless merged
 	MergedBy   string // "" when unknown (imports) or the account is gone
 	ClosedAt   string // "" unless closed without merging
@@ -102,7 +103,7 @@ const mrSelect = `
 	       COALESCE(COALESCE(su.username, so.name) || '/' || sr.name, ''),
 	       m.source_ref, m.target_ref, m.title, m.body, m.body_format, m.state, m.draft,
 	       COALESCE(ms.title, ''), m.head_sha,
-	       m.merged_base, m.merged_at, COALESCE(mu.username, ''),
+	       m.merged_base, m.merged_sha, m.merged_at, COALESCE(mu.username, ''),
 	       m.closed_at, COALESCE(cu.username, ''), COALESCE(m.superseded_by, 0), m.created_at, m.updated_at,
 	       COALESCE(q.user_id, 0), COALESCE(qu.username, ''), COALESCE(q.strategy, ''),
 	       COALESCE(q.reason, ''), COALESCE(q.queued_at, '')
@@ -120,7 +121,7 @@ const mrSelect = `
 func scanMR(row interface{ Scan(...any) error }) (MR, error) {
 	var m MR
 	err := row.Scan(&m.ID, &m.RepoID, &m.Number, &m.Author, &m.SourceRepoID, &m.SourcePath,
-		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Draft, &m.Milestone, &m.HeadSHA, &m.MergedBase,
+		&m.SourceRef, &m.TargetRef, &m.Title, &m.Body, &m.BodyFormat, &m.State, &m.Draft, &m.Milestone, &m.HeadSHA, &m.MergedBase, &m.MergedSHA,
 		&m.MergedAt, &m.MergedBy, &m.ClosedAt, &m.ClosedBy, &m.SupersededBy, &m.CreatedAt, &m.UpdatedAt,
 		&m.QueuedByID, &m.QueuedBy, &m.QueueStrategy, &m.QueueReason, &m.QueuedAt)
 	return m, err
@@ -282,16 +283,18 @@ func (s *Store) OpenMRsBySource(sourceRepoID int64, sourceRef string) ([]MR, err
 }
 
 // MarkMerged records the merge along with the target tip it landed on, so
-// the MR's diff stays reconstructable after fast-forwards. actorID 0 and an
-// empty at leave the merger unknown and stamp the current time, which is
-// what an import that carries neither can say.
-func (s *Store) MarkMerged(mrID int64, baseSHA string, actorID int64, at string) error {
+// the MR's diff stays reconstructable after fast-forwards, and the commit
+// it landed as, which release notes match against a range. actorID 0 and
+// an empty at leave the merger unknown and stamp the current time, and an
+// empty mergedSHA leaves the landed commit unknown, which is what an
+// import that carries none of them can say.
+func (s *Store) MarkMerged(mrID int64, baseSHA, mergedSHA string, actorID int64, at string) error {
 	_, err := s.DB.Exec(
-		`UPDATE merge_requests SET state = 'merged', merged_base = ?,
+		`UPDATE merge_requests SET state = 'merged', merged_base = ?, merged_sha = ?,
 			merged_at = COALESCE(NULLIF(?, ''), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
 			merged_by = NULLIF(?, 0),
 			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
-		baseSHA, at, actorID, mrID)
+		baseSHA, mergedSHA, at, actorID, mrID)
 	return err
 }
 
@@ -343,7 +346,7 @@ func (s *Store) MRsSuperseding(repoID, number int64) ([]MR, error) {
 func (s *Store) SetMRState(mrID int64, state string) error {
 	stamp := ""
 	if state == "open" || state == "source_gone" {
-		stamp = ", merged_at = '', merged_by = NULL, closed_at = '', closed_by = NULL"
+		stamp = ", merged_sha = '', merged_at = '', merged_by = NULL, closed_at = '', closed_by = NULL"
 	}
 	res, err := s.DB.Exec(
 		"UPDATE merge_requests SET state = ?"+stamp+", updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",

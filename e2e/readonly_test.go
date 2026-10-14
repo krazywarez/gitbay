@@ -157,6 +157,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"build log":                   {"alice/app", "1"},
 		"release list":                {"alice/app"},
 		"release show":                {"alice/app", "v1"},
+		"release notes":               {"alice/app", "main"},
 		"release asset get":           {"alice/app", "v1", "a.txt"},
 		"snippet show":                {snippetID},
 		"snippet list":                {},

@@ -33,11 +33,11 @@ func TestResolutionStamps(t *testing.T) {
 	if mr.MergedAt != "" || mr.ClosedAt != "" {
 		t.Fatalf("open MR carries a stamp: %+v", mr)
 	}
-	if err := s.MarkMerged(mr.ID, "base1", uid, ""); err != nil {
+	if err := s.MarkMerged(mr.ID, "base1", "landed1", uid, ""); err != nil {
 		t.Fatal(err)
 	}
 	mr, _ = s.MRByNumber(repoID, 1)
-	if mr.State != "merged" || mr.MergedAt == "" || mr.MergedBy != "cmc" {
+	if mr.State != "merged" || mr.MergedAt == "" || mr.MergedBy != "cmc" || mr.MergedSHA != "landed1" {
 		t.Fatalf("merge stamp: %+v", mr)
 	}
 
@@ -46,7 +46,7 @@ func TestResolutionStamps(t *testing.T) {
 		t.Fatal(err)
 	}
 	mr, _ = s.MRByNumber(repoID, 1)
-	if mr.MergedAt != "" || mr.MergedBy != "" {
+	if mr.MergedAt != "" || mr.MergedBy != "" || mr.MergedSHA != "" {
 		t.Fatalf("reopen kept the merge stamp: %+v", mr)
 	}
 
@@ -105,11 +105,11 @@ func TestSupersededBy(t *testing.T) {
 func TestResolutionStampImported(t *testing.T) {
 	s, repoID, _ := mrFixture(t)
 	mr, _ := s.MRByNumber(repoID, 1)
-	if err := s.MarkMerged(mr.ID, "base1", 0, "2024-03-02T10:00:00Z"); err != nil {
+	if err := s.MarkMerged(mr.ID, "base1", "", 0, "2024-03-02T10:00:00Z"); err != nil {
 		t.Fatal(err)
 	}
 	mr, _ = s.MRByNumber(repoID, 1)
-	if mr.MergedAt != "2024-03-02T10:00:00Z" || mr.MergedBy != "" {
+	if mr.MergedAt != "2024-03-02T10:00:00Z" || mr.MergedBy != "" || mr.MergedSHA != "" {
 		t.Fatalf("imported merge stamp: %+v", mr)
 	}
 }

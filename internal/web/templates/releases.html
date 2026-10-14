@@ -15,7 +15,7 @@
   </p>
   <p><input type="text" name="title" aria-label="Title" placeholder="title (defaults to the tag)" value="{{.Draft.Or "release" "title" ""}}"></p>
   <p><textarea name="notes" aria-label="Notes" rows="6" placeholder="what changed">{{.Draft.Or "release" "notes" ""}}</textarea></p>
-  <p><button type="submit" class="btn">Create release</button> {{template "previewbtn"}}</p>
+  <p><button type="submit" class="btn">Create release</button> {{template "previewbtn"}} <button type="submit" name="summarize" value="1" class="btn">Summarize changes</button></p>
 </form>
 </details>
 {{else if .CanWrite}}<p class="meta">Push a tag to create a release from it.</p>{{end}}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -39,6 +40,23 @@ func (s *Server) releaseSubmit(w http.ResponseWriter, r *http.Request, u store.U
 		return
 	}
 	back := func(w http.ResponseWriter, r *http.Request, msg string) { s.backTo(w, r, "releases", msg) }
+	// Summarize changes: the create form back with one line per merge
+	// request since the previous release appended to the notes, nothing
+	// written (#331). An empty range reports why instead of a silent
+	// round trip.
+	if r.FormValue("summarize") != "" {
+		out, msg, code := s.runControlCode(u, []string{"release", "notes", repo, tag})
+		if code != protocol.ExitOK || out == "" {
+			back(w, r, msg)
+			return
+		}
+		if notes != "" {
+			out = notes + "\n\n" + out
+		}
+		r.Form.Set("notes", out)
+		s.releasesPage(w, r, "release")
+		return
+	}
 	// The CLI's --yes guards against a mistyped tag; here the tag comes
 	// from the page, so the browser's own confirm field stands in.
 	if r.FormValue("action") == "delete" {

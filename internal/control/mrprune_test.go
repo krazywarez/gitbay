@@ -48,7 +48,7 @@ func prunedRepo(t *testing.T) (*store.Store, store.Repo, string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.MarkMerged(mr.ID, headSHA, uid, ""); err != nil {
+	if err := st.MarkMerged(mr.ID, headSHA, headSHA, uid, ""); err != nil {
 		t.Fatal(err)
 	}
 	return st, repo, root, headSHA
