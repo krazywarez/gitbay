@@ -50,13 +50,23 @@ func authorOrWrite(c *Ctx, repo store.Repo, author, what string) int {
 
 // commentOut is one comment as show emits it, for both nouns.
 type commentOut struct {
-	ID         int64         `json:"id"`
-	Author     string        `json:"author"`
-	Body       string        `json:"body"`
-	BodyFormat string        `json:"body_format,omitempty"`
-	CreatedAt  string        `json:"created_at"`
-	Kind       string        `json:"-"` // "comment" or "system"; not part of the wire shape
-	Reactions  []ReactionOut `json:"reactions,omitempty"`
+	ID         int64  `json:"id"`
+	Author     string `json:"author"`
+	Body       string `json:"body"`
+	BodyFormat string `json:"body_format,omitempty"`
+	CreatedAt  string `json:"created_at"`
+	// Kind is "system" for a line the server posted and "" for a comment,
+	// so the wire shape of a comment is unchanged.
+	Kind      string        `json:"kind,omitempty"`
+	Reactions []ReactionOut `json:"reactions,omitempty"`
+}
+
+// wireKind is the stored comment kind as commentOut carries it.
+func wireKind(kind string) string {
+	if kind == "system" {
+		return kind
+	}
+	return ""
 }
 
 // thread is what a comment command needs to know about its noun.

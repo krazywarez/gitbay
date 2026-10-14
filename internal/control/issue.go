@@ -381,7 +381,7 @@ func runIssueShow(c *Ctx, args []string) int {
 	}
 	var cs []commentOut
 	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, cm.Kind, reactionsOut(rx[cm.ID])})
+		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, wireKind(cm.Kind), reactionsOut(rx[cm.ID])})
 	}
 	d := IssueShow{issueOut: issueToOut(issue, true), Reactions: reactionsOut(rx[0]), Comments: cs}
 	canWrite := false
