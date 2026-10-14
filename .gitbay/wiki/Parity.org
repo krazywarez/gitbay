@@ -188,8 +188,8 @@ there shows the app's rendering rather than the one the web page shows.
 | one commit with its patch   | yes | yes | yes |
 | blame                       | yes | yes | yes |
 | search file contents        | yes | yes | yes |
-| find a definition (symbols) | yes | yes | no  |
-| jump to definition from a file | yes | yes | no  |
+| find a definition (symbols) | yes | yes | yes |
+| jump to definition from a file | yes | yes | yes |
 | compare two refs            | yes | yes | yes |
 | branches and tags           | yes | yes | yes |
 | wiki (read)                 | yes | yes | yes |
@@ -222,7 +222,7 @@ there shows the app's rendering rather than the one the web page shows.
 | atom feeds                  | n/a | yes | n/a |
 | release create, edit        | yes | yes | yes |
 | preview release notes       | n/a | yes | yes |
-| summarize changes since the previous release | yes | yes | no  |
+| summarize changes since the previous release | yes | yes | yes |
 | build list                  | yes | yes | yes |
 | build list paging (limit, cursor) | yes | yes | yes |
 | build row names its commit  | yes | yes | yes |
@@ -232,7 +232,7 @@ there shows the app's rendering rather than the one the web page shows.
 | build log follow (until it ends) | yes | yes | yes |
 | build failed step, duration | yes | yes | yes |
 | build log one step          | yes | yes | yes |
-| build log tail              | yes | no  | no  |
+| build log tail              | yes | no  | yes |
 | build jobs                  | yes | yes | yes |
 | build trigger               | yes | yes | yes |
 | build cancel                | yes | yes | yes |
