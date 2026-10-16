@@ -700,6 +700,12 @@ editor, and the server's merge is its only writer. Creating the branch
 is still a push, since there is nothing to open a merge request against
 yet.
 
+A merge request whose head reaches its target some other way — a direct
+push, or inside another merge request that is merged — is recorded as
+merged by whoever moved the branch, including one whose source branch
+is gone. One whose head was on the target before the update is left
+alone; =mr merge= on it records it as merged.
+
 A merge request whose target is another open merge request's source
 branch is stacked on it: =mr create= says so, =mr show= carries
 =stacked_on= and =stacked=, and merging the lower one retargets the

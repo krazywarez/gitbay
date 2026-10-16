@@ -7,11 +7,10 @@ import (
 	"testing"
 )
 
-// A merge request whose head the target already contains is recorded as
-// merged rather than refused: the branch was merged by hand and pushed,
-// or a merge moved the ref and then failed to record itself. Either way
-// refusing left the merge request open for good (#108).
-func TestMergeRecordedWhenTargetContainsHead(t *testing.T) {
+// A merge request whose head is pushed onto its target by hand is
+// recorded as merged by the push (#330); mr merge on it then reports the
+// state rather than merging again.
+func TestMergeRecordedWhenPushLandsHead(t *testing.T) {
 	t.Parallel()
 	inst := startInstance(t)
 	aliceKey := inst.newKey(t, "alice")
@@ -39,12 +38,11 @@ func TestMergeRecordedWhenTargetContainsHead(t *testing.T) {
 	// Merged by hand: main fast-forwards to the branch outside the forge.
 	mustGit(t, dir, env, "push", "-q", "origin", "feat:main")
 
-	out, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "1", "--json")
-	if code != 0 || !strings.Contains(out, `"strategy":"recorded"`) {
-		t.Fatalf("merge of an already-landed head: exit %d\n%s%s", code, out, errOut)
-	}
 	show, _, _ := inst.ssh(t, aliceKey, "", "mr", "show", "alice/app", "1", "--json")
 	if !strings.Contains(show, `"state":"merged"`) || !strings.Contains(show, `"merged_by":"alice"`) {
-		t.Fatalf("merge request not recorded as merged:\n%s", show)
+		t.Fatalf("merge request not recorded as merged by the push:\n%s", show)
+	}
+	if out, errOut, code := inst.ssh(t, aliceKey, "", "mr", "merge", "alice/app", "1"); code == 0 || !strings.Contains(errOut, "is merged") {
+		t.Fatalf("merge of a merged MR: exit %d\n%s%s", code, out, errOut)
 	}
 }

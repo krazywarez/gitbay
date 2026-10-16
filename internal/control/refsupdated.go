@@ -3,6 +3,7 @@ package control
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"path"
 	"strings"
@@ -116,6 +117,64 @@ func RefsUpdated(st *store.Store, cfg config.Config, repoID, userID int64, scope
 			if mr.QueuedAt != "" {
 				QueuedMergePushed(st, cfg, mr.ID, userID, scope)
 			}
+		}
+	}
+	// After every MR head above is refreshed, so a push carrying both a
+	// source branch and its target compares against the new head.
+	if pushedRepoErr == nil {
+		for _, u := range updates {
+			if branch, ok := cutHeads(u.Ref); ok && !u.IsDelete {
+				MarkLandedMRs(st, cfg, pushedRepo, userID, branch, u.Old, u.New)
+			}
+		}
+	}
+}
+
+// MarkLandedMRs records as merged each open or source_gone merge request
+// into branch whose head the move from old to new brought onto it: a
+// direct push, or the head riding in with another merge request (#330).
+// A head already on old is left alone.
+func MarkLandedMRs(st *store.Store, cfg config.Config, repo store.Repo, userID int64, branch, old, new string) {
+	mrs, err := st.UnmergedMRsByTarget(repo.ID, branch)
+	if err != nil {
+		slog.Error("post-receive: listing MRs by target", "err", err)
+		return
+	}
+	dir := RepoDir(cfg.Server.Root, repo.OwnerName, repo.Name)
+	var c *Ctx
+	for _, mr := range mrs {
+		head, err := gitutil.ResolveRef(dir, mrHeadRef(mr.Number))
+		if err != nil {
+			continue
+		}
+		if landed, err := gitutil.IsAncestor(dir, head, new); err != nil || !landed {
+			continue
+		}
+		base := ""
+		if !gitutil.ZeroSHA(old) {
+			if was, err := gitutil.IsAncestor(dir, head, old); err != nil || was {
+				continue
+			}
+			base, _ = gitutil.MergeBase(dir, old, head)
+		}
+		if err := st.MarkMerged(mr.ID, base, head, userID, ""); err != nil {
+			slog.Error("post-receive: recording landed MR", "mr", mr.Number, "err", err)
+			continue
+		}
+		st.DequeueMerge(mr.ID)
+		st.RecordEvent(repo.ID, userID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, head))
+		if c == nil {
+			u, err := st.UserByID(userID)
+			if err != nil {
+				continue
+			}
+			c = &Ctx{User: u, Store: st, Cfg: cfg, Stdin: emptyReader{}, Stdout: io.Discard, Stderr: io.Discard}
+		}
+		if parts, err := st.MRParticipants(mr.ID); err == nil {
+			notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
+				subject: mrSubject(repo, mr.Number, mr.Title),
+				action:  fmt.Sprintf("merged !%d into %s (pushed)", mr.Number, branch),
+				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 		}
 	}
 }

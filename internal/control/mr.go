@@ -1640,6 +1640,7 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
+	MarkLandedMRs(c.Store, c.Cfg, repo, c.User.ID, mr.TargetRef, targetSHA, newSHA)
 	// The stack moves up: whatever targeted this branch now targets what
 	// it merged into, reviews intact, since that diff is the one they
 	// were of.

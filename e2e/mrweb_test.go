@@ -407,8 +407,8 @@ func (i *instance) mrThreads(t *testing.T, key, repo, n string) []mrThread {
 	return env.Data
 }
 
-// TestMRDiffEmptyExplained: a merge request whose head was fast-forwarded
-// into the target outside the request shows why its diff is empty.
+// TestMRDiffEmptyExplained: a merge request opened on a head the target
+// already contains shows why its diff is empty.
 func TestMRDiffEmptyExplained(t *testing.T) {
 	t.Parallel()
 	inst := startInstanceWith(t, "[web]\nmode = \"accounts\"\n")
@@ -431,11 +431,10 @@ func TestMRDiffEmptyExplained(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644)
 	mustGit(t, dir, env, "add", ".")
 	mustGit(t, dir, env, "commit", "-q", "-m", "one")
-	mustGit(t, dir, env, "push", "-q", "origin", "feature")
+	mustGit(t, dir, env, "push", "-q", "origin", "feature", "feature:main")
 	if _, errOut, code := inst.ssh(t, key, "", "mr", "create", "alice/app", "--source", "feature", "--target", "main", "--title", "one"); code != 0 {
 		t.Fatal(errOut)
 	}
-	mustGit(t, dir, env, "push", "-q", "origin", "feature:main")
 	_, body := inst.get(t, "/alice/app/mrs/1?view=diff")
 	if !strings.Contains(body, "No changes between the source and target.") ||
 		!strings.Contains(body, "already merged or fast-forwarded into <code>main</code>") {

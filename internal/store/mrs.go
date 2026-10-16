@@ -282,6 +282,27 @@ func (s *Store) OpenMRsBySource(sourceRepoID int64, sourceRef string) ([]MR, err
 	return out, rows.Err()
 }
 
+// UnmergedMRsByTarget returns the open and source_gone MRs in repoID
+// targeting targetRef, oldest first.
+func (s *Store) UnmergedMRsByTarget(repoID int64, targetRef string) ([]MR, error) {
+	rows, err := s.DB.Query(
+		mrSelect+" WHERE m.repo_id = ? AND m.target_ref = ? AND m.state IN ('open','source_gone') ORDER BY m.number",
+		repoID, targetRef)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MR
+	for rows.Next() {
+		m, err := scanMR(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // MarkMerged records the merge along with the target tip it landed on, so
 // the MR's diff stays reconstructable after fast-forwards, and the commit
 // it landed as, which release notes match against a range. actorID 0 and
