@@ -4,6 +4,20 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.45.0 — 2026-10-16
+
+What krz/gitbay-ios 1.8.0 through 1.13.1 read. No migrations.
+
+- =issue show= and =mr show --json= mark a comment the server posted
+  (an event, not a person's words) with ="kind": "system"=; a person's
+  comment has no =kind= (#332).
+- =repo definitions <owner/name> <path> [--ref <ref>]= lists the names a
+  file uses that the repository's symbol index defines, with each
+  definition's count, path and line, for linking a name to its
+  definition (#333). Read-only, so it is on =GET /api/v1/read=.
+- =notifications settings show --json= carries =reply_available=,
+  whether the instance reads replies to its mail (#334).
+
 * v1.44.0 — 2026-10-13
 
 - =release notes <ref> [--since <tag>]= drafts release notes: one line
