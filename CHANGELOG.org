@@ -4,6 +4,18 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.45.1 — 2026-10-16
+
+No migrations.
+
+- An open or =source_gone= merge request whose head reaches its target
+  by a direct push, or inside another merge request that is merged, is
+  recorded as merged by whoever moved the branch, and its participants
+  are notified (#330). A head already on the target before the update
+  is left open; =mr merge= on it records it.
+- =golang.org/x/crypto= v0.58.0, =x/image= v0.47.0, =x/net= v0.61.0,
+  =x/term= v0.47.0, =x/text= v0.43.0 (#328).
+
 * v1.45.0 — 2026-10-16
 
 What krz/gitbay-ios 1.8.0 through 1.13.1 read. No migrations.
