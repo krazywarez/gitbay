@@ -214,8 +214,9 @@ func TestBuildLogSaysWhenItTruncates(t *testing.T) {
 	}
 }
 
-// A success is found by tree across commits; an empty tree never matches,
-// so builds queued without one (scheduled, tag) are never reused (#177).
+// A success is found by tree across commits on one ref; an empty tree
+// never matches, so builds queued without one (scheduled, tag) are never
+// reused (#177).
 func TestSuccessBuildForTree(t *testing.T) {
 	s := open(t)
 	if err := s.MigrateUp(); err != nil {
@@ -239,13 +240,16 @@ func TestSuccessBuildForTree(t *testing.T) {
 	if err := s.FinishBuild(b["unit"].ID, "success"); err != nil {
 		t.Fatal(err)
 	}
-	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", ""); !ok || prev.SHA != "aaa" {
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "main", "unit", ""); !ok || prev.SHA != "aaa" {
 		t.Fatalf("success not found by tree: ok=%v prev=%+v", ok, prev)
 	}
-	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "other", ""); ok {
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "main", "other", ""); ok {
 		t.Error("matched a different job")
 	}
-	if _, ok, _ := s.SuccessBuildForTree(repoID, "", "unit", ""); ok {
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "feat", "unit", ""); ok {
+		t.Error("matched a build for another ref")
+	}
+	if _, ok, _ := s.SuccessBuildForTree(repoID, "", "main", "unit", ""); ok {
 		t.Error("an empty tree matched")
 	}
 }
@@ -278,10 +282,10 @@ func TestSuccessReuseNeedsTrustAndImage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", ""); ok {
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "main", "unit", ""); ok {
 		t.Fatalf("reused build %d: untrusted, or on another image", prev.Number)
 	}
-	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "unit", "localhost/old:1"); !ok || prev.SHA != "bbb" {
+	if prev, ok, _ := s.SuccessBuildForTree(repoID, "tree1", "main", "unit", "localhost/old:1"); !ok || prev.SHA != "bbb" {
 		t.Fatalf("trusted build on the same image not found: ok=%v prev=%+v", ok, prev)
 	}
 	if _, ok, _ := s.SuccessBuildFor(repoID, "aaa", "unit"); ok {

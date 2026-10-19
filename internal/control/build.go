@@ -1020,20 +1020,28 @@ func queueJobs(
 		st.SetCommitStatus(repo.ID, sha, "ci/config", "failure", err.Error(), "", userID)
 		return
 	}
-	// A build is a fact about a commit, not a ref: a job has no branch
-	// filter, so a commit that already passed a job on another branch has
-	// nothing left to prove when a fast-forward lands it here, and one
-	// still queued or running there will say soon enough. A failed,
-	// abandoned or cancelled build does not count; that commit runs again.
-	built, err := st.BuildsForCommit(repo.ID, sha)
+	// A build is a fact about a commit on a ref: a job sees GITBAY_REF and
+	// may act on it, as a job that publishes only from the default branch
+	// does, so a build for another ref does not stand for this one. A
+	// commit already built for this ref, or queued or running for it, has
+	// nothing left to prove. A failed, abandoned or cancelled build does
+	// not count; that commit runs again.
+	built, err := st.BuildsForCommitOnRef(repo.ID, sha, ref)
 	if err != nil {
 		built = nil
 	}
-	// A job's result is a property of the tree, not the commit: a rebase
-	// onto a base that touched nothing the branch did gives every commit
-	// a new sha and the same tree, and re-running the suite over it
-	// proves nothing it did not already prove (#177). A success recorded
-	// against the tree stands for the new commit.
+	// The ci/<job> status belongs to the commit, so a build of it for
+	// another ref reports there too, and a skip here must not overwrite it.
+	elsewhere, err := st.BuildsForCommit(repo.ID, sha)
+	if err != nil {
+		elsewhere = nil
+	}
+	// A job's result is a property of the tree and the ref, not the
+	// commit: a rebase onto a base that touched nothing the branch did
+	// gives every commit a new sha and the same tree, and re-running the
+	// suite over it proves nothing it did not already prove (#177). A
+	// success recorded against the tree on this ref stands for the new
+	// commit; a squash merge onto another branch is built there.
 	tree, _ := gitutil.ResolveTree(dir, sha)
 	// The changed-file list a job's path filters run against, computed
 	// once and only if some job actually declares one. When the diff
@@ -1092,11 +1100,15 @@ func queueJobs(
 		// stands for it — unless this queue is trusted and that build was
 		// not: a fork's head that lands on a branch is built again as the
 		// repository's own (#258).
-		if b, ok := built[j.Name]; ok && (b.Trusted || !trusted) &&
-			(b.Status == "success" || b.Status == "pending" || b.Status == "running") {
+		stands := func(m map[string]store.Build) bool {
+			b, ok := m[j.Name]
+			return ok && (b.Trusted || !trusted) &&
+				(b.Status == "success" || b.Status == "pending" || b.Status == "running")
+		}
+		if stands(built) {
 			continue
 		}
-		if prev, ok, _ := st.SuccessBuildForTree(repo.ID, tree, j.Name, j.Image); ok && prev.SHA != sha {
+		if prev, ok, _ := st.SuccessBuildForTree(repo.ID, tree, ref, j.Name, j.Image); ok && prev.SHA != sha {
 			url := fmt.Sprintf("%s/%s/builds/%d", siteURL, repo.Path(), prev.Number)
 			st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "success",
 				fmt.Sprintf("passed in build %d as %.10s, same tree", prev.Number, prev.SHA), url, userID)
@@ -1117,7 +1129,9 @@ func queueJobs(
 		// require_checks with a skipped status instead of leaving the
 		// commit with none at all, which the gate refuses outright (#172).
 		if filtered && !ci.Selected(j, changed) {
-			st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "skipped", skipReason(j, changed), "", userID)
+			if !stands(elsewhere) {
+				st.SetCommitStatus(repo.ID, sha, "ci/"+j.Name, "skipped", skipReason(j, changed), "", userID)
+			}
 			continue
 		}
 		steps, _ := json.Marshal(j.Steps)

@@ -330,7 +330,20 @@ var pushShapes = []pushShape{
 		f.git(f.src, "merge", "-q", "--ff-only", "feat")
 		f.mark(c1)
 		f.push("main", f.base, c1)
-	}, []string{"—", "—", "—", "registered", "—", "—"}},
+	}, []string{"queued", "queued", "—", "registered", "—", "—"}},
+
+	{"squash merge onto the default branch, same tree as a branch build", func(f *shapeFixture) {
+		f.git(f.src, "checkout", "-q", "-b", "feat")
+		c1 := f.appCommit("more")
+		f.push("feat", zeroSHA40, c1)
+		f.finish("success")
+		f.git(f.src, "checkout", "-q", "main")
+		f.git(f.src, "merge", "-q", "--squash", "feat")
+		f.git(f.src, "commit", "-q", "-m", "squashed")
+		c2 := f.sha("HEAD")
+		f.mark(c2)
+		f.push("main", f.base, c2)
+	}, []string{"queued", "queued", "skipped", "registered", "—", "—"}},
 
 	{"a commit whose earlier build failed, on a new branch", func(f *shapeFixture) {
 		f.git(f.src, "checkout", "-q", "-b", "feat")

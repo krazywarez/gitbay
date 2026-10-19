@@ -437,7 +437,18 @@ func (s *Store) LatestBuild(repoID int64, job string) (Build, error) {
 // request's checks are ci/<job> statuses; this is where their timing comes
 // from, in one query rather than one per check.
 func (s *Store) BuildsForCommit(repoID int64, sha string) (map[string]Build, error) {
-	rows, err := s.DB.Query(buildSelect+" WHERE repo_id = ? AND sha = ? ORDER BY number ASC", repoID, sha)
+	return s.newestPerJob(" WHERE repo_id = ? AND sha = ? ORDER BY number ASC", repoID, sha)
+}
+
+// BuildsForCommitOnRef returns the newest build per job for one commit
+// made for one ref. A job sees GITBAY_REF, so a build for another ref
+// says nothing about what the job does on this one.
+func (s *Store) BuildsForCommitOnRef(repoID int64, sha, ref string) (map[string]Build, error) {
+	return s.newestPerJob(" WHERE repo_id = ? AND sha = ? AND ref = ? ORDER BY number ASC", repoID, sha, ref)
+}
+
+func (s *Store) newestPerJob(where string, args ...any) (map[string]Build, error) {
+	rows, err := s.DB.Query(buildSelect+where, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -490,18 +501,20 @@ func (s *Store) CancelBuild(id int64) error {
 
 // SuccessBuildForTree finds a passed build of the job for a tree rather
 // than a commit: a rebase that changes nothing in the tree has already
-// been built (#177). Only a trusted build on the image the job names
+// been built (#177). Only a build for the same ref counts, since a job
+// sees GITBAY_REF and may do something else on another one. Only a
+// trusted build on the image the job names
 // counts: a fork's result, or one from an image the job has left, does
 // not stand for the repository's own (#258). A job naming no image
 // matches builds that named none, whichever default the runner used;
 // the CI wiki page says so. An empty tree never matches.
-func (s *Store) SuccessBuildForTree(repoID int64, tree, job, image string) (Build, bool, error) {
+func (s *Store) SuccessBuildForTree(repoID int64, tree, ref, job, image string) (Build, bool, error) {
 	if tree == "" {
 		return Build{}, false, nil
 	}
 	b, err := scanBuild(s.DB.QueryRow(buildSelect+
-		" WHERE repo_id = ? AND tree = ? AND job = ? AND image = ? AND trusted = 1 AND status = 'success'"+
-		" ORDER BY number DESC LIMIT 1", repoID, tree, job, image))
+		" WHERE repo_id = ? AND tree = ? AND ref = ? AND job = ? AND image = ? AND trusted = 1 AND status = 'success'"+
+		" ORDER BY number DESC LIMIT 1", repoID, tree, ref, job, image))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Build{}, false, nil
 	}

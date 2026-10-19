@@ -2,10 +2,13 @@
 
 Three mechanisms decide what a push does to CI, and they interact:
 
-- *Dedupe.* A job's result is a property of the commit's tree. A commit
-  that already has a passed, queued or running build for a job is not
-  queued again; a commit whose tree already passed a job gets that
-  result as its status, naming the build it came from (#177). Only a
+- *Dedupe.* A job's result is a property of the commit's tree and the
+  ref it ran for, since a job sees =GITBAY_REF=. A commit that already
+  has a passed, queued or running build for a job on this ref is not
+  queued again; a commit whose tree already passed a job on this ref
+  gets that result as its status, naming the build it came from (#177).
+  A merge onto the default branch is built there even when the branch
+  passed. Only a
   trusted build counts, and for tree reuse only one on the image the
   job names: a fork's green build does not stand for the repository's
   own, so its commit is built again when it lands on a branch (#258). A
@@ -168,7 +171,8 @@ push produced for that job; the commit's =ci/<job>= status follows:
 | a new branch, no old sha | queued | queued | skipped | — | — | — |
 | rebase onto a moved default branch, old not an ancestor | queued | queued | skipped | — | — | — |
 | rewritten commit, same tree as a passed build | reused | reused | skipped | — | — | — |
-| fast-forward of a commit built on another branch | — | — | — | registered | — | — |
+| fast-forward of a commit built on another branch | queued | queued | — | registered | — | — |
+| squash merge onto the default branch, same tree as a branch build | queued | queued | skipped | registered | — | — |
 | a commit whose earlier build failed, on a new branch | queued | queued | — | — | — | — |
 | merge request head from a fork | queued, untrusted | queued, untrusted | queued, untrusted | — | — | — |
 | tag push | — | — | — | — | queued | — |
@@ -190,9 +194,12 @@ Rows worth a second look:
   because the tree check comes before the filter. =notapp= never had a
   passed build to reuse, and the push changed nothing, so the filter
   skips it again.
-- A fast-forward of a commit built elsewhere queues nothing: the
-  builds belong to the commit, not the branch. The default-branch push
-  still registers the schedule.
+- A build stands for its commit, or its tree, only on the ref it ran
+  for: a job sees =GITBAY_REF= and may act on it, as one that publishes
+  only from the default branch does. A fast-forward or a squash merge
+  onto the default branch is built there although the branch passed.
+  =notapp= on the fast-forward keeps the skipped status the branch push
+  gave the same commit.
 - A failed build does not stand for its commit. The same commit pushed
   to another branch runs again; =notapp= keeps its skipped status.
 - A merge request head from a fork has no diff base and, unlike a
