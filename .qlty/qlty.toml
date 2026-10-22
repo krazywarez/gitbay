@@ -1,0 +1,66 @@
+config_version = "0"
+
+# Qlty's generated defaults exclude **/config/** and **/templates/**, which
+# would skip internal/config.
+exclude_patterns = [
+  "**/testdata/**",
+  "**/vendor/**",
+  ".gitbay/wiki/**",
+]
+
+test_patterns = [
+  "**/*_test.go",
+  "e2e/**",
+]
+
+[smells]
+mode = "comment"
+
+[[source]]
+name = "default"
+default = true
+
+[[plugin]]
+name = "golangci-lint"
+version = "2.15.0"
+drivers = ["lint"]
+
+[[plugin]]
+name = "gofmt"
+
+[[plugin]]
+name = "radarlint-go"
+
+[[plugin]]
+name = "osv-scanner"
+
+[[plugin]]
+name = "trufflehog"
+
+[[plugin]]
+name = "shellcheck"
+
+[[plugin]]
+name = "ruff"
+drivers = ["lint"]
+
+# Repeated literals are expected in table-driven and end-to-end tests.
+[[triage]]
+match.plugins = ["radarlint-go"]
+match.rules = ["radarlint-go:go:S1192"]
+match.file_patterns = ["**/*_test.go", "e2e/**"]
+set.ignored = true
+
+# Unchecked errors in tests are setup and teardown calls.
+[[triage]]
+match.plugins = ["golangci-lint"]
+match.rules = ["golangci-lint:errcheck"]
+match.file_patterns = ["**/*_test.go", "e2e/**"]
+set.ignored = true
+
+# x/crypto/openpgp is deprecated with no fixed version. gitbay imports
+# github.com/ProtonMail/go-crypto/openpgp, not that package.
+[[triage]]
+match.plugins = ["osv-scanner"]
+match.rules = ["osv-scanner:GO-2026-5932"]
+set.ignored = true
