@@ -17,10 +17,10 @@ func TestFocusableBlocks(t *testing.T) {
 func TestImageAlt(t *testing.T) {
 	cases := map[string]string{
 		`<a href="/b"><img src="https://forge.test/krz/gitbay/badge/build.svg"/></a>`: `<a href="/b"><img alt="build" src="https://forge.test/krz/gitbay/badge/build.svg"/></a>`,
-		`<img src="pic.png?v=2">`:       `<img alt="pic" src="pic.png?v=2">`,
-		`<img alt="" src="pic.png">`:    `<img alt="" src="pic.png">`,
+		`<img src="pic.png?v=2">`:         `<img alt="pic" src="pic.png?v=2">`,
+		`<img alt="" src="pic.png">`:      `<img alt="" src="pic.png">`,
 		`<img alt="a chart" src="c.png">`: `<img alt="a chart" src="c.png">`,
-		`<img>`:                         `<img alt="">`,
+		`<img>`:                           `<img alt="">`,
 	}
 	for in, want := range cases {
 		if got := string(imageAlt(template.HTML(in))); got != want {
