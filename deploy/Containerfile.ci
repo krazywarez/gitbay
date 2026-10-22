@@ -8,12 +8,12 @@
 #
 #   scp -P 2222 deploy/Containerfile.ci root@gitbay.org:/var/lib/gitbay-runner/gitbay-ci.Containerfile
 #   ssh -p 2222 root@gitbay.org 'chown ci-runner /var/lib/gitbay-runner/gitbay-ci.Containerfile \
-#     && su - ci-runner -s /bin/sh -c "podman build -t localhost/gitbay-ci:2 -f gitbay-ci.Containerfile ." \
+#     && su - ci-runner -s /bin/sh -c "podman build -t localhost/gitbay-ci:3 -f gitbay-ci.Containerfile ." \
 #     && rm /var/lib/gitbay-runner/gitbay-ci.Containerfile'
 #
 # Tagged, not :latest, so a change to this file is a deliberate bump in
 # .gitbay/ci.yml rather than a silent change under a running branch.
-FROM docker.io/library/golang:1.27-trixie
+FROM docker.io/library/golang:1.27.3-trixie
 
 # gitbay-runner-prune.service skips images carrying this label. A localhost/
 # image cannot be pulled back, so pruning it fails every job that names it.

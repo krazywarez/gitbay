@@ -2,7 +2,7 @@ jobs:
   # Fast feedback: this finishes in seconds, so it is not held behind the
   # suite.
   build:
-    image: localhost/gitbay-ci:2
+    image: localhost/gitbay-ci:3
     steps:
       - go build ./...
       - go vet ./...
@@ -13,7 +13,7 @@ jobs:
   # The 20m is under the runner's own 30m limit, so go times out first and
   # says which test hung instead of the runner killing it blind.
   test:
-    image: localhost/gitbay-ci:2
+    image: localhost/gitbay-ci:3
     steps:
       - missing=""; for t in git git-lfs gpg; do command -v "$t" >/dev/null || missing="$missing $t"; done; test -x /usr/sbin/sshd || missing="$missing sshd"; test -z "$missing" || { echo "runner is missing:$missing"; exit 1; }
       - go test ./... -count=1 -timeout 20m
@@ -24,9 +24,9 @@ jobs:
   # printed without failing it. The CLI is pinned, and unpacked with Python
   # because this image has no xz.
   quality:
-    image: localhost/gitbay-ci:2
+    image: localhost/gitbay-ci:3
     steps:
-      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp')"
+      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --filter trufflehog,gofmt
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --no-fail
     paths-ignore:
@@ -45,11 +45,11 @@ jobs:
   # `build trigger krz/gitbay vuln` runs it on demand before a release
   # (#177).
   vuln:
-    image: localhost/gitbay-ci:2
+    image: localhost/gitbay-ci:3
     schedule: "0 3 * * *"
     steps:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       # osv-scanner also reports advisories in dependencies the code does not
       # call, which govulncheck skips.
-      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp')"
+      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --filter osv-scanner
