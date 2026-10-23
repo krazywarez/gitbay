@@ -297,40 +297,20 @@ func runRequireApprovals(c *Ctx, args []string) int {
 }
 
 func runRequireResolved(c *Ctx, args []string) int {
-	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireResolved = args[1] == "on" })
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(s, func(w io.Writer) {
-		fmt.Fprintf(w, "require_resolved %s on %s\n", args[1], repo.Path())
-	})
+	return setRepoToggle(c, args, "require_resolved", func(s *store.RepoSettings, on bool) { s.RequireResolved = on })
 }
 
 func runRequireCodeowners(c *Ctx, args []string) int {
-	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireCodeowners = args[1] == "on" })
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(s, func(w io.Writer) {
-		fmt.Fprintf(w, "require_codeowners %s on %s\n", args[1], repo.Path())
-	})
+	return setRepoToggle(c, args, "require_codeowners", func(s *store.RepoSettings, on bool) { s.RequireCodeowners = on })
 }
 
 func runRequireChecks(c *Ctx, args []string) int {
+	return setRepoToggle(c, args, "require_checks", func(s *store.RepoSettings, on bool) { s.RequireChecks = on })
+}
+
+// setRepoToggle is `<owner/name> on|off` for one boolean repository setting,
+// reported under `name`.
+func setRepoToggle(c *Ctx, args []string, name string, set func(*store.RepoSettings, bool)) int {
 	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
 		return c.usage()
 	}
@@ -338,12 +318,12 @@ func runRequireChecks(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireChecks = args[1] == "on" })
+	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { set(s, args[1] == "on") })
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	return c.emit(s, func(w io.Writer) {
-		fmt.Fprintf(w, "require_checks %s on %s\n", args[1], repo.Path())
+		fmt.Fprintf(w, "%s %s on %s\n", name, args[1], repo.Path())
 	})
 }
 
@@ -396,37 +376,11 @@ func runRequireContexts(c *Ctx, args []string) int {
 }
 
 func runRequireMR(c *Ctx, args []string) int {
-	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireMR = args[1] == "on" })
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(s, func(w io.Writer) {
-		fmt.Fprintf(w, "require_mr %s on %s\n", args[1], repo.Path())
-	})
+	return setRepoToggle(c, args, "require_mr", func(s *store.RepoSettings, on bool) { s.RequireMR = on })
 }
 
 func runRequireSigned(c *Ctx, args []string) int {
-	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	s, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.RequireSignedCommits = args[1] == "on" })
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(s, func(w io.Writer) {
-		fmt.Fprintf(w, "require_signed_commits %s on %s\n", args[1], repo.Path())
-	})
+	return setRepoToggle(c, args, "require_signed_commits", func(s *store.RepoSettings, on bool) { s.RequireSignedCommits = on })
 }
 
 // mrRef parses "<owner/name> <n>" and loads the MR.
@@ -758,67 +712,14 @@ func runMRShow(c *Ctx, args []string) int {
 	if len(args) != 2 {
 		return c.usage()
 	}
-	comments, err := c.Store.ListMRComments(mr.ID)
+	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	d, err := mrShowData(c, repo, mr)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	reviews, err := c.Store.ListMRReviews(mr.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	statuses, combined, err := c.Store.ChecksForCommit(repo.ID, mr.HeadSHA)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	unresolved, err := c.Store.UnresolvedThreadCount(mr.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	var checks []CheckOut
-	for _, st := range statuses {
-		out := CheckOut{Context: st.Context, State: st.State, URL: st.TargetURL, UpdatedAt: st.UpdatedAt}
-		if st.Duration > 0 {
-			out.Duration = st.Duration.String()
-		}
-		checks = append(checks, out)
-	}
-	rx, err := c.Store.ReactionCounts("mr", mr.ID, c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	var cs []commentOut
-	for _, cm := range comments {
-		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, wireKind(cm.Kind), reactionsOut(rx[cm.ID])})
-	}
-	var rs []ReviewOut
-	counts := ReviewersWhoCount(c.Store, repo, reviews)
-	for _, r := range reviews {
-		rs = append(rs, ReviewOut{r.Reviewer, r.Verdict, r.Stale, counts[r.Reviewer], r.CreatedAt})
 	}
 	// The commits this MR carries: base..head, the diff's range.
-	var commits []CommitOut
-	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
-	base := mr.MergedBase
-	if base == "" {
-		if b, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, mrHeadRef(mr.Number)); err == nil {
-			base = b
-		}
-	}
-	if base != "" {
-		if shas, err := gitutil.RevListRange(dir, base, mrHeadRef(mr.Number)); err == nil {
-			for _, sha := range shas {
-				subject := ""
-				if raw, err := gitutil.ReadCommit(dir, sha); err == nil {
-					if parsed, err := sig.ParseCommit(raw); err == nil {
-						subject = parsed.Subject
-					}
-				}
-				commits = append(commits, CommitOut{sha, subject})
-			}
-		}
-	}
-	d := MRShow{mrOut: mrToOut(repo, mr, true), Checks: checks, Combined: combined,
-		UnresolvedThreads: unresolved, Commits: commits, Reactions: reactionsOut(rx[0]), Comments: cs, Reviews: rs}
+	base := mrBase(dir, mr)
+	d.Commits = mrCommits(dir, base, mr)
 	d.StackedOn, d.Stacked = stackOf(c, repo, mr)
 	if mr.State == "open" || mr.State == "source_gone" {
 		if targetSHA, err := gitutil.ResolveRef(dir, "refs/heads/"+mr.TargetRef); err == nil {
@@ -831,158 +732,258 @@ func runMRShow(c *Ctx, args []string) int {
 	if c.Term.Cols > 0 && !c.JSON && base != "" {
 		files, _ = gitutil.DiffNumstat(dir, base, mrHeadRef(mr.Number))
 	}
-	return c.emitView(d, func(w io.Writer) {
-		state := d.State
-		if d.Draft {
-			state = "draft"
-		}
-		v := c.view(w)
-		v.title(fmt.Sprintf("!%d", d.Number), d.Title, state)
+	return c.emitView(d, func(w io.Writer) { writeMRShow(c, w, repo, d) },
+		func() screen { return mrShowScreen(c, repo, d, files) })
+}
 
-		stackedOn, stacked := "", ""
-		if d.StackedOn != nil {
-			stackedOn = fmt.Sprintf("!%d %s", d.StackedOn.Number, d.StackedOn.Title)
+// mrShowData is a merge request with its comments, reviews, checks and
+// reactions; commits, stack and gates are filled in by the caller.
+func mrShowData(c *Ctx, repo store.Repo, mr store.MR) (MRShow, error) {
+	comments, err := c.Store.ListMRComments(mr.ID)
+	if err != nil {
+		return MRShow{}, err
+	}
+	reviews, err := c.Store.ListMRReviews(mr.ID)
+	if err != nil {
+		return MRShow{}, err
+	}
+	statuses, combined, err := c.Store.ChecksForCommit(repo.ID, mr.HeadSHA)
+	if err != nil {
+		return MRShow{}, err
+	}
+	unresolved, err := c.Store.UnresolvedThreadCount(mr.ID)
+	if err != nil {
+		return MRShow{}, err
+	}
+	var checks []CheckOut
+	for _, st := range statuses {
+		out := CheckOut{Context: st.Context, State: st.State, URL: st.TargetURL, UpdatedAt: st.UpdatedAt}
+		if st.Duration > 0 {
+			out.Duration = st.Duration.String()
 		}
-		for _, k := range d.Stacked {
-			if stacked != "" {
-				stacked += ", "
-			}
-			stacked += fmt.Sprintf("!%d %s", k.Number, k.Title)
-		}
-		merged, closed, superseded := "", "", ""
-		if d.MergedAt != "" {
-			merged = c.when(d.MergedAt) + byWhom(d.MergedBy)
-		}
-		if d.ClosedAt != "" {
-			closed = c.when(d.ClosedAt) + byWhom(d.ClosedBy)
-		}
-		if d.SupersededBy != 0 {
-			superseded = fmt.Sprintf("!%d", d.SupersededBy)
-		}
-		gates := ""
-		if g := d.Gates; g != nil {
-			ff := "fast-forward possible"
-			if !g.FastForward {
-				ff = "fast-forward not possible"
-			}
-			if len(g.Unmet) == 0 {
-				gates = "met; " + ff
-			} else {
-				gates = fmt.Sprintf("%d unmet; %s", len(g.Unmet), ff)
-			}
-		}
-		queued, waiting := "", ""
-		if q := d.Queued; q != nil {
-			queued = "by " + q.By
-			if q.Strategy != "" {
-				queued += " (" + q.Strategy + ")"
-			}
-			queued += ", " + c.when(q.QueuedAt)
-			waiting = q.Reason
-		}
-		unresolved := ""
-		if d.UnresolvedThreads > 0 {
-			unresolved = fmt.Sprintf("%d", d.UnresolvedThreads)
-		}
-		// One fields call for every one-row fact, including the unmet
-		// gates and the commit/check/review that only has a single row
-		// to show: separate calls each compute their own key width, so
-		// keeping them in one call keeps every key aligned.
-		kv := []string{
-			"author", d.Author + ", " + c.when(d.CreatedAt),
-			"source", fmt.Sprintf("%s -> %s", d.Source, d.TargetRef),
-			"head", fmt.Sprintf("%.10s", d.HeadSHA),
-			"milestone", d.Milestone,
-			"labels", strings.Join(d.Labels, ", "),
-			"reviewers", strings.Join(d.ReviewRequests, ", "),
-			"stacked on", stackedOn,
-			"stacked", stacked,
-			"merged", merged,
-			"closed", closed,
-			"superseded by", superseded,
-			"queued to merge", queued,
-			"waiting on", waiting,
-			"unresolved threads", unresolved,
-			"gates", gates,
-		}
-		if g := d.Gates; g != nil {
-			for _, u := range g.Unmet {
-				kv = append(kv, "unmet", u)
-			}
-		}
-		if len(commits) == 1 {
-			kv = append(kv, "commit", fmt.Sprintf("%.10s %s", commits[0].SHA, commits[0].Subject))
-		}
-		if len(checks) == 1 {
-			x := checks[0]
-			dur := ""
-			if x.Duration != "" {
-				dur = " in " + x.Duration
-			}
-			kv = append(kv, "check", fmt.Sprintf("%s %s at %s%s", x.Context, x.State, c.when(x.UpdatedAt), dur))
-		}
-		if len(rs) == 1 {
-			kv = append(kv, "review", reviewLine(rs[0])+" at "+c.when(rs[0].CreatedAt))
-		}
-		kv = append(kv, "url", c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)))
-		v.fields(kv...)
+		checks = append(checks, out)
+	}
+	rx, err := c.Store.ReactionCounts("mr", mr.ID, c.User.ID)
+	if err != nil {
+		return MRShow{}, err
+	}
+	var cs []commentOut
+	for _, cm := range comments {
+		cs = append(cs, commentOut{cm.ID, cm.Author, cm.Body, cm.BodyFormat, cm.CreatedAt, wireKind(cm.Kind), reactionsOut(rx[cm.ID])})
+	}
+	var rs []ReviewOut
+	counts := ReviewersWhoCount(c.Store, repo, reviews)
+	for _, r := range reviews {
+		rs = append(rs, ReviewOut{r.Reviewer, r.Verdict, r.Stale, counts[r.Reviewer], r.CreatedAt})
+	}
+	return MRShow{mrOut: mrToOut(repo, mr, true), Checks: checks, Combined: combined,
+		UnresolvedThreads: unresolved, Reactions: reactionsOut(rx[0]), Comments: cs, Reviews: rs}, nil
+}
 
-		v.body(d.Body, d.BodyFormat)
-		v.reactions(d.Reactions)
+// mrBase is where a merge request's diff starts: the base recorded at merge,
+// or the live merge base with its target. Empty when neither is known.
+func mrBase(dir string, mr store.MR) string {
+	if mr.MergedBase != "" {
+		return mr.MergedBase
+	}
+	if b, err := gitutil.MergeBase(dir, "refs/heads/"+mr.TargetRef, mrHeadRef(mr.Number)); err == nil {
+		return b
+	}
+	return ""
+}
 
-		if len(commits) > 1 {
-			v.section(fmt.Sprintf("commits (%d)", len(commits)))
-			tb := c.table(w, "SHA", "SUBJECT")
-			for _, cm := range commits {
-				tb.row(cRef(fmt.Sprintf("%.10s", cm.SHA)), cFlex(cm.Subject))
+// mrCommits is base..head with each commit's subject, when it can be read.
+func mrCommits(dir, base string, mr store.MR) []CommitOut {
+	if base == "" {
+		return nil
+	}
+	shas, err := gitutil.RevListRange(dir, base, mrHeadRef(mr.Number))
+	if err != nil {
+		return nil
+	}
+	var commits []CommitOut
+	for _, sha := range shas {
+		subject := ""
+		if raw, err := gitutil.ReadCommit(dir, sha); err == nil {
+			if parsed, err := sig.ParseCommit(raw); err == nil {
+				subject = parsed.Subject
 			}
-			tb.flush()
 		}
+		commits = append(commits, CommitOut{sha, subject})
+	}
+	return commits
+}
 
-		if len(checks) > 1 {
-			v.section(fmt.Sprintf("checks (%d)", len(checks)))
-			tb := c.table(w, "CHECK", "STATE", "DURATION", "UPDATED")
-			for _, x := range checks {
-				tb.row(cText(x.Context), cState(x.State), cText(x.Duration), cText(c.when(x.UpdatedAt)))
-			}
-			tb.flush()
-		}
+// writeMRShow is `mr show` as text.
+func writeMRShow(c *Ctx, w io.Writer, repo store.Repo, d MRShow) {
+	state := d.State
+	if d.Draft {
+		state = "draft"
+	}
+	v := c.view(w)
+	v.title(fmt.Sprintf("!%d", d.Number), d.Title, state)
+	v.fields(mrShowFields(c, repo, d)...)
 
-		if len(rs) > 1 {
-			v.section(fmt.Sprintf("reviews (%d)", len(rs)))
-			tb := c.table(w, "REVIEWER", "VERDICT", "WHEN")
-			for _, r := range rs {
-				verdict := r.Verdict
-				if r.Stale {
-					verdict += " (stale)"
-				}
-				if !r.Counts {
-					verdict += " (advisory)"
-				}
-				tb.row(cText(r.Reviewer), cState(verdict), cText(c.when(r.CreatedAt)))
-			}
-			tb.flush()
-		}
+	v.body(d.Body, d.BodyFormat)
+	v.reactions(d.Reactions)
+	writeMRTables(c, w, v, d)
 
-		events := false
-		for _, cm := range cs {
-			if cm.Kind != "system" {
-				continue
-			}
-			if !events {
-				io.WriteString(w, "\n")
-				events = true
-			}
-			v.event(cm.Body, cm.BodyFormat, cm.CreatedAt)
+	events := false
+	for _, cm := range d.Comments {
+		if cm.Kind != "system" {
+			continue
 		}
-		for _, cm := range cs {
-			if cm.Kind == "system" {
-				continue
-			}
-			v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
-			v.reactions(cm.Reactions)
+		if !events {
+			io.WriteString(w, "\n")
+			events = true
 		}
-	}, func() screen { return mrShowScreen(c, repo, d, files) })
+		v.event(cm.Body, cm.BodyFormat, cm.CreatedAt)
+	}
+	for _, cm := range d.Comments {
+		if cm.Kind == "system" {
+			continue
+		}
+		v.comment(cm.ID, cm.Author, cm.CreatedAt, cm.Body, cm.BodyFormat)
+		v.reactions(cm.Reactions)
+	}
+}
+
+// mrShowFields is every one-row fact as key, value pairs, including the
+// unmet gates and the commit/check/review that only has a single row to
+// show: separate fields calls each compute their own key width, so keeping
+// them in one call keeps every key aligned.
+func mrShowFields(c *Ctx, repo store.Repo, d MRShow) []string {
+	stackedOn, stacked := mrStackLines(d)
+	merged, closed, superseded := "", "", ""
+	if d.MergedAt != "" {
+		merged = c.when(d.MergedAt) + byWhom(d.MergedBy)
+	}
+	if d.ClosedAt != "" {
+		closed = c.when(d.ClosedAt) + byWhom(d.ClosedBy)
+	}
+	if d.SupersededBy != 0 {
+		superseded = fmt.Sprintf("!%d", d.SupersededBy)
+	}
+	queued, waiting := mrQueuedLines(c, d.Queued)
+	unresolved := ""
+	if d.UnresolvedThreads > 0 {
+		unresolved = fmt.Sprintf("%d", d.UnresolvedThreads)
+	}
+	kv := []string{
+		"author", d.Author + ", " + c.when(d.CreatedAt),
+		"source", fmt.Sprintf("%s -> %s", d.Source, d.TargetRef),
+		"head", fmt.Sprintf("%.10s", d.HeadSHA),
+		"milestone", d.Milestone,
+		"labels", strings.Join(d.Labels, ", "),
+		"reviewers", strings.Join(d.ReviewRequests, ", "),
+		"stacked on", stackedOn,
+		"stacked", stacked,
+		"merged", merged,
+		"closed", closed,
+		"superseded by", superseded,
+		"queued to merge", queued,
+		"waiting on", waiting,
+		"unresolved threads", unresolved,
+		"gates", gatesSummary(d.Gates),
+	}
+	if g := d.Gates; g != nil {
+		for _, u := range g.Unmet {
+			kv = append(kv, "unmet", u)
+		}
+	}
+	if len(d.Commits) == 1 {
+		kv = append(kv, "commit", fmt.Sprintf("%.10s %s", d.Commits[0].SHA, d.Commits[0].Subject))
+	}
+	if len(d.Checks) == 1 {
+		x := d.Checks[0]
+		dur := ""
+		if x.Duration != "" {
+			dur = " in " + x.Duration
+		}
+		kv = append(kv, "check", fmt.Sprintf("%s %s at %s%s", x.Context, x.State, c.when(x.UpdatedAt), dur))
+	}
+	if len(d.Reviews) == 1 {
+		kv = append(kv, "review", reviewLine(d.Reviews[0])+" at "+c.when(d.Reviews[0].CreatedAt))
+	}
+	return append(kv, "url", c.siteURL(repo.Path(), "mrs", strconv.FormatInt(d.Number, 10)))
+}
+
+// mrStackLines names the merge request this one is stacked on, and those
+// stacked on it.
+func mrStackLines(d MRShow) (stackedOn, stacked string) {
+	if d.StackedOn != nil {
+		stackedOn = fmt.Sprintf("!%d %s", d.StackedOn.Number, d.StackedOn.Title)
+	}
+	for _, k := range d.Stacked {
+		if stacked != "" {
+			stacked += ", "
+		}
+		stacked += fmt.Sprintf("!%d %s", k.Number, k.Title)
+	}
+	return stackedOn, stacked
+}
+
+// mrQueuedLines is who queued the merge, how and when, and what it waits on.
+func mrQueuedLines(c *Ctx, q *QueuedOut) (queued, waiting string) {
+	if q == nil {
+		return "", ""
+	}
+	queued = "by " + q.By
+	if q.Strategy != "" {
+		queued += " (" + q.Strategy + ")"
+	}
+	return queued + ", " + c.when(q.QueuedAt), q.Reason
+}
+
+// gatesSummary is "met" or the unmet count, and whether fast-forward is possible.
+func gatesSummary(g *GatesOut) string {
+	if g == nil {
+		return ""
+	}
+	ff := "fast-forward possible"
+	if !g.FastForward {
+		ff = "fast-forward not possible"
+	}
+	if len(g.Unmet) == 0 {
+		return "met; " + ff
+	}
+	return fmt.Sprintf("%d unmet; %s", len(g.Unmet), ff)
+}
+
+// writeMRTables lists commits, checks and reviews when there is more than
+// one of each; a single one is a field instead.
+func writeMRTables(c *Ctx, w io.Writer, v *view, d MRShow) {
+	if len(d.Commits) > 1 {
+		v.section(fmt.Sprintf("commits (%d)", len(d.Commits)))
+		tb := c.table(w, "SHA", "SUBJECT")
+		for _, cm := range d.Commits {
+			tb.row(cRef(fmt.Sprintf("%.10s", cm.SHA)), cFlex(cm.Subject))
+		}
+		tb.flush()
+	}
+	if len(d.Checks) > 1 {
+		v.section(fmt.Sprintf("checks (%d)", len(d.Checks)))
+		tb := c.table(w, "CHECK", "STATE", "DURATION", "UPDATED")
+		for _, x := range d.Checks {
+			tb.row(cText(x.Context), cState(x.State), cText(x.Duration), cText(c.when(x.UpdatedAt)))
+		}
+		tb.flush()
+	}
+	if len(d.Reviews) > 1 {
+		v.section(fmt.Sprintf("reviews (%d)", len(d.Reviews)))
+		tb := c.table(w, "REVIEWER", "VERDICT", "WHEN")
+		for _, r := range d.Reviews {
+			verdict := r.Verdict
+			if r.Stale {
+				verdict += " (stale)"
+			}
+			if !r.Counts {
+				verdict += " (advisory)"
+			}
+			tb.row(cText(r.Reviewer), cState(verdict), cText(c.when(r.CreatedAt)))
+		}
+		tb.flush()
+	}
 }
 
 // reviewLine renders one review as fields prose: "reviewer verdict
@@ -1394,256 +1395,357 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 		return c.fail(protocol.ExitUsage, "MR !%d is %s", mr.Number, mr.State)
 	}
 
-	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
-	targetRef := "refs/heads/" + mr.TargetRef
-	targetSHA, err := gitutil.ResolveRef(dir, targetRef)
+	p := &mergePlan{repo: repo, mr: mr, strategy: strategy}
+	p.dir = RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
+	p.targetRef = "refs/heads/" + mr.TargetRef
+	var err error
+	p.targetSHA, err = gitutil.ResolveRef(p.dir, p.targetRef)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "target branch %s: %v", mr.TargetRef, err)
 	}
-	headSHA, err := gitutil.ResolveRef(dir, mrHeadRef(mr.Number))
+	p.headSHA, err = gitutil.ResolveRef(p.dir, mrHeadRef(mr.Number))
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "MR head ref: %v", err)
 	}
 
 	// Merge gates: draft, checks, approvals, CODEOWNERS, resolved threads,
 	// all reported at once.
-	if code := c.reviewGates(repo, mr, dir, targetSHA, headSHA); code >= 0 {
+	if code := c.reviewGates(repo, mr, p.dir, p.targetSHA, p.headSHA); code >= 0 {
 		return code
 	}
 
-	upToDate, err := gitutil.IsAncestor(dir, headSHA, targetSHA)
+	upToDate, err := gitutil.IsAncestor(p.dir, p.headSHA, p.targetSHA)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	if upToDate {
-		// The head is already on the target: merged by hand and pushed, or
-		// a merge whose ref update landed and whose record did not. Record
-		// it rather than refuse, so a merge request cannot be stuck open
-		// with no way to close it as merged (#108).
-		if err := c.Store.MarkMerged(mr.ID, targetSHA, headSHA, c.User.ID, ""); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d}`, mr.Number))
-		return c.emit(map[string]any{"number": mr.Number, "strategy": "recorded", "sha": headSHA}, func(w io.Writer) {
-			fmt.Fprintf(w, "%s already contains !%d; recorded as merged at %.10s\n", mr.TargetRef, mr.Number, headSHA)
-		})
+		return c.recordAlreadyMerged(p)
 	}
-	ffPossible, err := gitutil.IsAncestor(dir, targetSHA, headSHA)
+	p.ffPossible, err = gitutil.IsAncestor(p.dir, p.targetSHA, p.headSHA)
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 
-	// Signature policy matrix: with require_signed_commits, only
-	// fast-forward is allowed — squash, rebase-replay, and merge commits
-	// are all server-created and unsigned, violating the branch's own
-	// policy — and every landed commit must be verified. An explicit
-	// rebase when fast-forward is already possible IS a fast-forward
-	// (nothing is rewritten), so it stays legal.
 	if repo.Settings.RequireSignedCommits {
-		if c.Source == queueSource && !ffPossible {
-			return c.fail(protocol.ExitDenied,
-				"%s is behind %s and %s requires signed commits, so the server cannot rebase it; rebase and push, and the merge stays queued",
-				mr.SourceRef, mr.TargetRef, repo.Path())
-		}
-		if strategy == "merge" || strategy == "squash" || !ffPossible {
-			return c.fail(protocol.ExitDenied,
-				"%s requires signed commits, so only fast-forward merges are allowed; rebase %s onto %s locally, re-push, and merge again",
-				repo.Path(), mr.SourceRef, mr.TargetRef)
-		}
-		strategy = "ff"
-		commits, err := gitutil.RevListRange(dir, targetSHA, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		for _, sha := range commits {
-			raw, err := gitutil.ReadCommit(dir, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			parsed, err := sigParse(raw)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			res, err := VerifyCommitCached(c.Store, repo, parsed, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			if res.State != "verified" {
-				return c.fail(protocol.ExitDenied,
-					"%s requires signed commits: %.10s is %s", repo.Path(), sha, res.State)
-			}
+		if code := c.requireSignedMerge(p); code >= 0 {
+			return code
 		}
 	}
-	if strategy == "" {
-		if ffPossible {
-			strategy = "ff"
-		} else {
-			strategy = "merge"
-		}
+	p.chooseStrategy()
+	if code := c.mergerIdentity(p); code >= 0 {
+		return code
 	}
-	if strategy == "rebase" && ffPossible {
-		// Nothing to rewrite: a rebase onto an ancestor is a fast-forward,
-		// and taking it keeps the original commits and their signatures.
-		strategy = "ff"
+	newSHA, code := c.mergedCommit(p)
+	if code >= 0 {
+		return code
 	}
-
-	// Every server-created commit needs the merger's verified identity.
-	mergerEmail := ""
-	if strategy != "ff" {
-		email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if email == "" {
-			return c.fail(protocol.ExitDenied,
-				"%s merges create commits carrying your identity: verify a primary email first (or use a fast-forward merge)", strategy)
-		}
-		mergerEmail = email
-	}
-
-	var newSHA string
-	switch strategy {
-	case "ff":
-		if !ffPossible {
-			return c.fail(protocol.ExitUsage,
-				"fast-forward not possible: %s has diverged from the MR head; merge with the merge strategy, or rebase and push again", mr.TargetRef)
-		}
-		newSHA = headSHA
-
-	case "merge":
-		tree, conflict, err := gitutil.MergeTree(dir, targetSHA, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		if conflict {
-			return c.fail(protocol.ExitUsage,
-				"merge conflicts between %s and the MR head; resolve locally and re-push", mr.TargetRef)
-		}
-		msg := fmt.Sprintf("Merge request !%d: %s\n\nMerged %s into %s", mr.Number, mr.Title, mr.SourceRef, mr.TargetRef)
-		newSHA, err = gitutil.CommitTree(dir, tree, []string{targetSHA, headSHA}, c.User.Username, mergerEmail, msg)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-
-	case "squash":
-		// One new commit with the merged tree. Authorship credit goes to
-		// the MR author (their verified identity when they have one); the
-		// committer is the merger.
-		tree := ""
-		if ffPossible {
-			t, err := gitutil.ResolveTree(dir, headSHA)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			tree = t
-		} else {
-			t, conflict, err := gitutil.MergeTree(dir, targetSHA, headSHA)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			if conflict {
-				return c.fail(protocol.ExitUsage,
-					"merge conflicts between %s and the MR head; resolve locally and re-push", mr.TargetRef)
-			}
-			tree = t
-		}
-		authorName, authorEmail := c.User.Username, mergerEmail
-		if author, err := c.Store.UserByUsername(mr.Author); err == nil {
-			if ae, err := c.Store.PrimaryVerifiedEmail(author.ID); err == nil && ae != "" {
-				authorName, authorEmail = author.Username, ae
-			}
-		}
-		msg := fmt.Sprintf("%s (!%d)", mr.Title, mr.Number)
-		if mr.Body != "" {
-			msg += "\n\n" + mr.Body
-		}
-		var err error
-		newSHA, err = gitutil.CommitTreeIdent(dir, tree, []string{targetSHA},
-			authorName, authorEmail, "", c.User.Username, mergerEmail, msg)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-
-	case "rebase":
-		commits, err := gitutil.RevListRange(dir, targetSHA, headSHA)
-		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-		// Oldest first.
-		for i, j := 0, len(commits)-1; i < j; i, j = i+1, j-1 {
-			commits[i], commits[j] = commits[j], commits[i]
-		}
-		onto := targetSHA
-		for _, sha := range commits {
-			parents, err := gitutil.CommitParents(dir, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			if len(parents) > 1 {
-				return c.fail(protocol.ExitUsage,
-					"the MR contains merge commit %.10s; a rebase merge needs linear history — choose the merge or squash strategy", sha)
-			}
-			base := onto // root commit: replay against the new tip itself
-			if len(parents) == 1 {
-				base = parents[0]
-			}
-			tree, conflict, err := gitutil.MergeTreeOnto(dir, base, onto, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			if conflict {
-				return c.fail(protocol.ExitUsage,
-					"commit %.10s does not apply cleanly onto %s; rebase locally and re-push", sha, mr.TargetRef)
-			}
-			aName, aEmail, aDate, err := gitutil.AuthorIdent(dir, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			msg, err := gitutil.CommitMessage(dir, sha)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-			onto, err = gitutil.CommitTreeIdent(dir, tree, []string{onto},
-				aName, aEmail, aDate, c.User.Username, mergerEmail, msg)
-			if err != nil {
-				return c.fail(protocol.ExitFailure, "%v", err)
-			}
-		}
-		newSHA = onto
-	}
-
-	// A stacked merge request's diff is against this branch. After a
-	// fast-forward or merge commit the same commits are on the target and
-	// its diff is unchanged there; after a squash or rebase they are not,
-	// and the stack would carry this merge request's changes a second
-	// time. Refuse rather than leave the stack wrong.
-	var stack []store.MR
-	if mr.SourceRepoID == repo.ID {
-		stack, _ = c.Store.OpenMRsByTarget(repo.ID, mr.SourceRef)
-	}
-	if len(stack) > 0 && (strategy == "squash" || strategy == "rebase") {
-		var nums []string
-		for _, k := range stack {
-			nums = append(nums, fmt.Sprintf("!%d", k.Number))
-		}
-		return c.fail(protocol.ExitUsage,
-			"%s is stacked on by %s; a %s merge rewrites the commits they build on. Merge with the fast-forward or merge strategy, or merge the stack into %s first",
-			fmt.Sprintf("!%d", mr.Number), strings.Join(nums, ", "), strategy, mr.SourceRef)
+	stack, code := c.stackForMerge(p)
+	if code >= 0 {
+		return code
 	}
 
 	// CAS so a concurrent push between our read and this write fails the
 	// merge instead of silently discarding the push.
-	if err := gitutil.UpdateRefCAS(dir, targetRef, newSHA, targetSHA); err != nil {
+	if err := gitutil.UpdateRefCAS(p.dir, p.targetRef, newSHA, p.targetSHA); err != nil {
 		return c.fail(protocol.ExitFailure, "target branch moved during merge; retry: %v", err)
 	}
-	if err := c.Store.MarkMerged(mr.ID, targetSHA, newSHA, c.User.ID, ""); err != nil {
+	if err := c.Store.MarkMerged(mr.ID, p.targetSHA, newSHA, c.User.ID, ""); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d,"sha":%q}`, mr.Number, newSHA))
-	MarkLandedMRs(c.Store, c.Cfg, repo, c.User.ID, mr.TargetRef, targetSHA, newSHA)
-	// The stack moves up: whatever targeted this branch now targets what
-	// it merged into, reviews intact, since that diff is the one they
-	// were of.
+	MarkLandedMRs(c.Store, c.Cfg, repo, c.User.ID, mr.TargetRef, p.targetSHA, newSHA)
+	c.retargetStack(p, stack)
+	c.afterMerge(p, newSHA)
+	return c.emit(map[string]any{"number": mr.Number, "strategy": p.strategy, "sha": newSHA}, func(w io.Writer) {
+		fmt.Fprintf(w, "merged %s!%d into %s (%s) at %.10s\n", repo.Path(), mr.Number, mr.TargetRef, p.strategy, newSHA)
+	})
+}
+
+// mergePlan is a merge in progress: what is merged where, how, and as whom.
+type mergePlan struct {
+	repo                  store.Repo
+	mr                    store.MR
+	dir, targetRef        string
+	targetSHA, headSHA    string
+	ffPossible            bool
+	strategy, mergerEmail string
+}
+
+// recordAlreadyMerged handles a head that is already on the target: merged
+// by hand and pushed, or a merge whose ref update landed and whose record
+// did not. Recording it rather than refusing means a merge request cannot be
+// stuck open with no way to close it as merged (#108).
+func (c *Ctx) recordAlreadyMerged(p *mergePlan) int {
+	mr := p.mr
+	if err := c.Store.MarkMerged(mr.ID, p.targetSHA, p.headSHA, c.User.ID, ""); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	c.Store.RecordEvent(p.repo.ID, c.User.ID, "mr.merged", fmt.Sprintf(`{"number":%d}`, mr.Number))
+	return c.emit(map[string]any{"number": mr.Number, "strategy": "recorded", "sha": p.headSHA}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s already contains !%d; recorded as merged at %.10s\n", mr.TargetRef, mr.Number, p.headSHA)
+	})
+}
+
+// requireSignedMerge applies the signature policy matrix: with
+// require_signed_commits, only fast-forward is allowed — squash,
+// rebase-replay, and merge commits are all server-created and unsigned,
+// violating the branch's own policy — and every landed commit must be
+// verified. An explicit rebase when fast-forward is already possible IS a
+// fast-forward (nothing is rewritten), so it stays legal. Returns -1 to
+// proceed, with the strategy set to fast-forward.
+func (c *Ctx) requireSignedMerge(p *mergePlan) int {
+	repo, mr := p.repo, p.mr
+	if c.Source == queueSource && !p.ffPossible {
+		return c.fail(protocol.ExitDenied,
+			"%s is behind %s and %s requires signed commits, so the server cannot rebase it; rebase and push, and the merge stays queued",
+			mr.SourceRef, mr.TargetRef, repo.Path())
+	}
+	if p.strategy == "merge" || p.strategy == "squash" || !p.ffPossible {
+		return c.fail(protocol.ExitDenied,
+			"%s requires signed commits, so only fast-forward merges are allowed; rebase %s onto %s locally, re-push, and merge again",
+			repo.Path(), mr.SourceRef, mr.TargetRef)
+	}
+	p.strategy = "ff"
+	commits, err := gitutil.RevListRange(p.dir, p.targetSHA, p.headSHA)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	for _, sha := range commits {
+		state, err := c.commitSignatureState(repo, p.dir, sha)
+		if err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+		if state != "verified" {
+			return c.fail(protocol.ExitDenied,
+				"%s requires signed commits: %.10s is %s", repo.Path(), sha, state)
+		}
+	}
+	return -1
+}
+
+// commitSignatureState is a commit's signature verification state, such as "verified".
+func (c *Ctx) commitSignatureState(repo store.Repo, dir, sha string) (sig.State, error) {
+	raw, err := gitutil.ReadCommit(dir, sha)
+	if err != nil {
+		return "", err
+	}
+	parsed, err := sigParse(raw)
+	if err != nil {
+		return "", err
+	}
+	res, err := VerifyCommitCached(c.Store, repo, parsed, sha)
+	if err != nil {
+		return "", err
+	}
+	return res.State, nil
+}
+
+// chooseStrategy fills in the default strategy: fast-forward when possible,
+// otherwise a merge commit. A rebase onto an ancestor has nothing to
+// rewrite, so it is a fast-forward, which keeps the original commits and
+// their signatures.
+func (p *mergePlan) chooseStrategy() {
+	if p.strategy == "" {
+		if p.ffPossible {
+			p.strategy = "ff"
+		} else {
+			p.strategy = "merge"
+		}
+	}
+	if p.strategy == "rebase" && p.ffPossible {
+		p.strategy = "ff"
+	}
+}
+
+// mergerIdentity sets the email every server-created commit is committed
+// under: the merger's verified primary one. Returns -1 to proceed.
+func (c *Ctx) mergerIdentity(p *mergePlan) int {
+	if p.strategy == "ff" {
+		return -1
+	}
+	email, err := c.Store.PrimaryVerifiedEmail(c.User.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if email == "" {
+		return c.fail(protocol.ExitDenied,
+			"%s merges create commits carrying your identity: verify a primary email first (or use a fast-forward merge)", p.strategy)
+	}
+	p.mergerEmail = email
+	return -1
+}
+
+// mergedCommit is the commit the target moves to under the plan's strategy.
+// The code is -1 unless the merge is refused.
+func (c *Ctx) mergedCommit(p *mergePlan) (string, int) {
+	switch p.strategy {
+	case "ff":
+		if !p.ffPossible {
+			return "", c.fail(protocol.ExitUsage,
+				"fast-forward not possible: %s has diverged from the MR head; merge with the merge strategy, or rebase and push again", p.mr.TargetRef)
+		}
+		return p.headSHA, -1
+	case "merge":
+		return c.mergeCommit(p)
+	case "squash":
+		return c.squashCommit(p)
+	case "rebase":
+		return c.rebaseCommits(p)
+	}
+	return "", -1
+}
+
+// mergedTree is the tree of the target and head merged, refusing on conflict.
+func (c *Ctx) mergedTree(p *mergePlan) (string, int) {
+	tree, conflict, err := gitutil.MergeTree(p.dir, p.targetSHA, p.headSHA)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if conflict {
+		return "", c.fail(protocol.ExitUsage,
+			"merge conflicts between %s and the MR head; resolve locally and re-push", p.mr.TargetRef)
+	}
+	return tree, -1
+}
+
+func (c *Ctx) mergeCommit(p *mergePlan) (string, int) {
+	tree, code := c.mergedTree(p)
+	if code >= 0 {
+		return "", code
+	}
+	mr := p.mr
+	msg := fmt.Sprintf("Merge request !%d: %s\n\nMerged %s into %s", mr.Number, mr.Title, mr.SourceRef, mr.TargetRef)
+	sha, err := gitutil.CommitTree(p.dir, tree, []string{p.targetSHA, p.headSHA}, c.User.Username, p.mergerEmail, msg)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return sha, -1
+}
+
+// squashCommit is one new commit with the merged tree. Authorship credit
+// goes to the MR author (their verified identity when they have one); the
+// committer is the merger.
+func (c *Ctx) squashCommit(p *mergePlan) (string, int) {
+	var tree string
+	if p.ffPossible {
+		t, err := gitutil.ResolveTree(p.dir, p.headSHA)
+		if err != nil {
+			return "", c.fail(protocol.ExitFailure, "%v", err)
+		}
+		tree = t
+	} else {
+		t, code := c.mergedTree(p)
+		if code >= 0 {
+			return "", code
+		}
+		tree = t
+	}
+	mr := p.mr
+	authorName, authorEmail := c.User.Username, p.mergerEmail
+	if author, err := c.Store.UserByUsername(mr.Author); err == nil {
+		if ae, err := c.Store.PrimaryVerifiedEmail(author.ID); err == nil && ae != "" {
+			authorName, authorEmail = author.Username, ae
+		}
+	}
+	msg := fmt.Sprintf("%s (!%d)", mr.Title, mr.Number)
+	if mr.Body != "" {
+		msg += "\n\n" + mr.Body
+	}
+	sha, err := gitutil.CommitTreeIdent(p.dir, tree, []string{p.targetSHA},
+		authorName, authorEmail, "", c.User.Username, p.mergerEmail, msg)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return sha, -1
+}
+
+// rebaseCommits replays the merge request's commits, oldest first, onto the
+// target, keeping each one's author.
+func (c *Ctx) rebaseCommits(p *mergePlan) (string, int) {
+	commits, err := gitutil.RevListRange(p.dir, p.targetSHA, p.headSHA)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	slices.Reverse(commits)
+	onto := p.targetSHA
+	for _, sha := range commits {
+		next, code := c.replayCommit(p, sha, onto)
+		if code >= 0 {
+			return "", code
+		}
+		onto = next
+	}
+	return onto, -1
+}
+
+// replayCommit applies one commit onto `onto` as a new commit with its
+// author, message and date, committed by the merger.
+func (c *Ctx) replayCommit(p *mergePlan, sha, onto string) (string, int) {
+	parents, err := gitutil.CommitParents(p.dir, sha)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if len(parents) > 1 {
+		return "", c.fail(protocol.ExitUsage,
+			"the MR contains merge commit %.10s; a rebase merge needs linear history — choose the merge or squash strategy", sha)
+	}
+	base := onto // root commit: replay against the new tip itself
+	if len(parents) == 1 {
+		base = parents[0]
+	}
+	tree, conflict, err := gitutil.MergeTreeOnto(p.dir, base, onto, sha)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	if conflict {
+		return "", c.fail(protocol.ExitUsage,
+			"commit %.10s does not apply cleanly onto %s; rebase locally and re-push", sha, p.mr.TargetRef)
+	}
+	aName, aEmail, aDate, err := gitutil.AuthorIdent(p.dir, sha)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	msg, err := gitutil.CommitMessage(p.dir, sha)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	next, err := gitutil.CommitTreeIdent(p.dir, tree, []string{onto},
+		aName, aEmail, aDate, c.User.Username, p.mergerEmail, msg)
+	if err != nil {
+		return "", c.fail(protocol.ExitFailure, "%v", err)
+	}
+	return next, -1
+}
+
+// stackForMerge is the merge requests stacked on this one. A stacked merge
+// request's diff is against this branch. After a fast-forward or merge
+// commit the same commits are on the target and its diff is unchanged
+// there; after a squash or rebase they are not, and the stack would carry
+// this merge request's changes a second time. Refuse rather than leave the
+// stack wrong.
+func (c *Ctx) stackForMerge(p *mergePlan) ([]store.MR, int) {
+	mr := p.mr
+	var stack []store.MR
+	if mr.SourceRepoID == p.repo.ID {
+		stack, _ = c.Store.OpenMRsByTarget(p.repo.ID, mr.SourceRef)
+	}
+	if len(stack) > 0 && (p.strategy == "squash" || p.strategy == "rebase") {
+		var nums []string
+		for _, k := range stack {
+			nums = append(nums, fmt.Sprintf("!%d", k.Number))
+		}
+		return nil, c.fail(protocol.ExitUsage,
+			"%s is stacked on by %s; a %s merge rewrites the commits they build on. Merge with the fast-forward or merge strategy, or merge the stack into %s first",
+			fmt.Sprintf("!%d", mr.Number), strings.Join(nums, ", "), p.strategy, mr.SourceRef)
+	}
+	return stack, -1
+}
+
+// retargetStack moves the stack up: whatever targeted this branch now
+// targets what it merged into, reviews intact, since that diff is the one
+// they were of.
+func (c *Ctx) retargetStack(p *mergePlan, stack []store.MR) {
+	repo, mr := p.repo, p.mr
 	for _, k := range stack {
 		if err := c.Store.RetargetKeepingReviews(k.ID, mr.TargetRef); err != nil {
 			continue
@@ -1656,14 +1758,19 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 				path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), k.Number)})
 		}
 	}
+}
+
+// afterMerge does the work a push of the target would have done.
+func (c *Ctx) afterMerge(p *mergePlan, newSHA string) {
+	repo, mr := p.repo, p.mr
 	// Merges bypass receive-pack, so the commit-message issue actions
 	// (closes #N, references) run here for the newly landed commits. The
 	// description is scanned after them, so a commit wins the attribution
 	// when both name the same issue.
 	if mr.TargetRef == repo.DefaultBranch {
-		ProcessCommitMessages(c.Store, dir, repo, c.User.ID, c.Scope, targetSHA, newSHA)
+		ProcessCommitMessages(c.Store, p.dir, repo, c.User.ID, c.Scope, p.targetSHA, newSHA)
 		ProcessMRDescription(c.Store, repo, mr, c.User.ID, c.Scope)
-		RecordLandedCommits(c.Store, dir, repo, targetSHA, newSHA)
+		RecordLandedCommits(c.Store, p.dir, repo, p.targetSHA, newSHA)
 		c.Store.RequestSymbolIndex(repo.ID, false)
 	}
 	// A merge moves the ref directly, so it never reaches post-receive and
@@ -1671,19 +1778,16 @@ func mergeMR(c *Ctx, repo store.Repo, mr store.MR, strategy string) int {
 	// subscribe to, and the branch's CI jobs, happen here instead.
 	c.Store.RecordEvent(repo.ID, c.User.ID, "push", fmt.Sprintf(
 		`{"ref":%q,"old":%q,"new":%q,"forced":false,"deleted":false}`,
-		targetRef, targetSHA, newSHA))
+		p.targetRef, p.targetSHA, newSHA))
 	QueueBranchBuilds(c.Store, c.Cfg.Server.Root, c.Cfg.Server.SiteURL,
-		repo, c.User.ID, mr.TargetRef, targetSHA, newSHA, time.Now())
+		repo, c.User.ID, mr.TargetRef, p.targetSHA, newSHA, time.Now())
 	c.Store.MarkMirrorsDirty(repo.ID, "push")
 	if parts, err := c.Store.MRParticipants(mr.ID); err == nil {
 		notify(c, parts, notice{repo: repo, kind: "mr", number: mr.Number,
 			subject: mrSubject(repo, mr.Number, mr.Title),
-			action:  fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, strategy),
+			action:  fmt.Sprintf("merged !%d into %s (%s)", mr.Number, mr.TargetRef, p.strategy),
 			path:    fmt.Sprintf("%s/mrs/%d", repo.Path(), mr.Number)})
 	}
-	return c.emit(map[string]any{"number": mr.Number, "strategy": strategy, "sha": newSHA}, func(w io.Writer) {
-		fmt.Fprintf(w, "merged %s!%d into %s (%s) at %.10s\n", repo.Path(), mr.Number, mr.TargetRef, strategy, newSHA)
-	})
 }
 
 // reviewGates refuses a merge whose gates are not all met, naming every
@@ -1746,152 +1850,21 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 	g := GatesOut{Draft: mr.Draft, ApprovalsRequired: set.RequireApprovals,
 		CodeownersRequired: set.RequireCodeowners, ResolvedRequired: set.RequireResolved,
 		ChecksRequired: set.RequireChecks}
+	in := gateInputs{st: st, repo: repo, mr: mr, dir: dir, targetSHA: targetSHA, headSHA: headSHA}
 	// A draft is open but not asking. This gate is unconditional — no
 	// setting turns it off — because the author said so themselves.
 	if mr.Draft {
 		g.Unmet = append(g.Unmet, fmt.Sprintf("!%d is a draft; `gitbay mr ready %s %d` first", mr.Number, repo.Path(), mr.Number))
 	}
-
-	// Checks: with require_checks, every status the head carries must be
-	// green, a head something was going to report on must carry some, and
-	// every required context must have reported: one that has not is
-	// pending whatever the others say (#258). Setting contexts turns
-	// require_checks on; turned off again, the list is kept and unread.
-	statuses, err := st.ListCommitStatuses(repo.ID, headSHA)
-	if err != nil {
+	if err := in.checksGate(&g); err != nil {
 		return g, err
 	}
-	g.Checks = store.CombinedStatus(statuses)
-	if set.RequireChecks {
-		reported := map[string]bool{}
-		for _, s := range statuses {
-			reported[s.Context] = true
-		}
-		for _, want := range set.RequiredContexts {
-			if !reported[want] {
-				g.ChecksMissing = append(g.ChecksMissing, want)
-			}
-		}
-		if len(g.ChecksMissing) > 0 && (g.Checks == "" || g.Checks == "success") {
-			g.Checks = "pending"
-		}
-		switch g.Checks {
-		case "success":
-		case "":
-			if checksExpected(st, repo.ID, dir, headSHA) {
-				g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", repo.Path(), headSHA))
-			}
-		default:
-			var bad []string
-			for _, st := range statuses {
-				if st.State != "success" {
-					bad = append(bad, st.Context+"="+st.State)
-				}
-			}
-			for _, m := range g.ChecksMissing {
-				bad = append(bad, m+"=missing")
-			}
-			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks; %.10s has %s", repo.Path(), headSHA, strings.Join(bad, ", ")))
-		}
-	}
-
-	reviews, err := st.ListMRReviews(mr.ID)
-	if err != nil {
+	if err := in.approvalsGate(&g); err != nil {
 		return g, err
 	}
-	// Latest fresh review per reviewer decides their stance — but only
-	// from someone the repository trusts to write to it. Reviewing is
-	// open to any reader, which is what makes an outside opinion on a
-	// public change possible; deciding a merge gate is not the same
-	// thing, and counting every verdict let anyone with an account
-	// satisfy require_approvals or block a merge indefinitely (#147).
-	counts := ReviewersWhoCount(st, repo, reviews)
-	latest := map[string]string{}
-	for _, r := range reviews {
-		if r.Stale || r.Reviewer == mr.Author || !counts[r.Reviewer] {
-			continue
-		}
-		latest[r.Reviewer] = r.Verdict
-	}
-	for who, verdict := range latest {
-		switch verdict {
-		case "approve":
-			g.Approvals = append(g.Approvals, who)
-		case "request_changes":
-			g.ChangesRequested = append(g.ChangesRequested, who)
-		}
-	}
-	slices.Sort(g.Approvals)
-	slices.Sort(g.ChangesRequested)
-	if set.RequireApprovals > 0 {
-		if len(g.ChangesRequested) > 0 {
-			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requested changes on !%d; resolve their review before merging", strings.Join(g.ChangesRequested, ", "), mr.Number))
-		}
-		if len(g.Approvals) < set.RequireApprovals {
-			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires %d fresh approval(s); !%d has %d", repo.Path(), set.RequireApprovals, mr.Number, len(g.Approvals)))
-		}
-	}
-
-	// CODEOWNERS: every owned changed file needs an approval from one of
-	// its owners. require_codeowners is the opt-in — a repository can
-	// carry the file as documentation of who to ask without it gating
-	// merges — and it does not wait on require_approvals (#99).
 	if set.RequireCodeowners {
-		content, err := gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, "CODEOWNERS", 1<<20)
-		if err != nil {
-			content, err = gitutil.ReadBlob(dir, "refs/heads/"+mr.TargetRef, ".gitbay/CODEOWNERS", 1<<20)
-		}
-		if err != nil || len(content) == 0 {
-			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires CODEOWNERS approval but %s carries no CODEOWNERS file", repo.Path(), mr.TargetRef))
-		} else {
-			rules := policy.ParseCodeowners(string(content))
-			base, err := gitutil.MergeBase(dir, targetSHA, headSHA)
-			if err != nil {
-				return g, err
-			}
-			files, err := gitutil.DiffFiles(dir, base, headSHA)
-			if err != nil {
-				return g, err
-			}
-			approved := map[string]bool{}
-			for _, a := range g.Approvals {
-				approved[a] = true
-			}
-			missing := map[string][]string{} // owner-set key -> paths
-			var keys []string
-			for _, f := range files {
-				owners := policy.OwnersFor(rules, f)
-				if owners == nil {
-					continue
-				}
-				ok := false
-				for _, o := range owners {
-					if approved[o] {
-						ok = true
-						break
-					}
-				}
-				if !ok {
-					key := strings.Join(owners, ",")
-					if _, seen := missing[key]; !seen {
-						keys = append(keys, key)
-					}
-					missing[key] = append(missing[key], f)
-				}
-			}
-			if len(missing) > 0 {
-				slices.Sort(keys)
-				var parts []string
-				for _, key := range keys {
-					paths := missing[key]
-					g.OwnersOutstanding = append(g.OwnersOutstanding, OwnersOut{Files: paths, Owners: strings.Split(key, ",")})
-					if len(paths) > 3 {
-						paths = paths[:3]
-					}
-					parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), key))
-				}
-				g.Unmet = append(g.Unmet, "CODEOWNERS approval missing for: "+strings.Join(parts, "; "))
-			}
+		if err := in.codeownersGate(&g); err != nil {
+			return g, err
 		}
 	}
 
@@ -1908,6 +1881,169 @@ func MergeGates(st *store.Store, repo store.Repo, mr store.MR, dir, targetSHA, h
 		g.FastForward = ff
 	}
 	return g, nil
+}
+
+// gateInputs is what MergeGates judges a merge request on.
+type gateInputs struct {
+	st                 *store.Store
+	repo               store.Repo
+	mr                 store.MR
+	dir                string
+	targetSHA, headSHA string
+}
+
+// checksGate records the head's combined status. With require_checks, every
+// status the head carries must be green, a head something was going to
+// report on must carry some, and every required context must have reported:
+// one that has not is pending whatever the others say (#258). Setting
+// contexts turns require_checks on; turned off again, the list is kept and
+// unread.
+func (in gateInputs) checksGate(g *GatesOut) error {
+	statuses, err := in.st.ListCommitStatuses(in.repo.ID, in.headSHA)
+	if err != nil {
+		return err
+	}
+	g.Checks = store.CombinedStatus(statuses)
+	set := in.repo.Settings
+	if !set.RequireChecks {
+		return nil
+	}
+	reported := map[string]bool{}
+	for _, s := range statuses {
+		reported[s.Context] = true
+	}
+	for _, want := range set.RequiredContexts {
+		if !reported[want] {
+			g.ChecksMissing = append(g.ChecksMissing, want)
+		}
+	}
+	if len(g.ChecksMissing) > 0 && (g.Checks == "" || g.Checks == "success") {
+		g.Checks = "pending"
+	}
+	switch g.Checks {
+	case "success":
+	case "":
+		if checksExpected(in.st, in.repo.ID, in.dir, in.headSHA) {
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks and none were reported on %.10s", in.repo.Path(), in.headSHA))
+		}
+	default:
+		var bad []string
+		for _, st := range statuses {
+			if st.State != "success" {
+				bad = append(bad, st.Context+"="+st.State)
+			}
+		}
+		for _, m := range g.ChecksMissing {
+			bad = append(bad, m+"=missing")
+		}
+		g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires green checks; %.10s has %s", in.repo.Path(), in.headSHA, strings.Join(bad, ", ")))
+	}
+	return nil
+}
+
+// approvalsGate records approvals and change requests. The latest fresh
+// review per reviewer decides their stance — but only from someone the
+// repository trusts to write to it. Reviewing is open to any reader, which
+// is what makes an outside opinion on a public change possible; deciding a
+// merge gate is not the same thing, and counting every verdict let anyone
+// with an account satisfy require_approvals or block a merge indefinitely
+// (#147).
+func (in gateInputs) approvalsGate(g *GatesOut) error {
+	reviews, err := in.st.ListMRReviews(in.mr.ID)
+	if err != nil {
+		return err
+	}
+	counts := ReviewersWhoCount(in.st, in.repo, reviews)
+	latest := map[string]string{}
+	for _, r := range reviews {
+		if r.Stale || r.Reviewer == in.mr.Author || !counts[r.Reviewer] {
+			continue
+		}
+		latest[r.Reviewer] = r.Verdict
+	}
+	for who, verdict := range latest {
+		switch verdict {
+		case "approve":
+			g.Approvals = append(g.Approvals, who)
+		case "request_changes":
+			g.ChangesRequested = append(g.ChangesRequested, who)
+		}
+	}
+	slices.Sort(g.Approvals)
+	slices.Sort(g.ChangesRequested)
+	required := in.repo.Settings.RequireApprovals
+	if required > 0 {
+		if len(g.ChangesRequested) > 0 {
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requested changes on !%d; resolve their review before merging", strings.Join(g.ChangesRequested, ", "), in.mr.Number))
+		}
+		if len(g.Approvals) < required {
+			g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires %d fresh approval(s); !%d has %d", in.repo.Path(), required, in.mr.Number, len(g.Approvals)))
+		}
+	}
+	return nil
+}
+
+// codeownersGate requires every owned changed file to have an approval from
+// one of its owners. require_codeowners is the opt-in — a repository can
+// carry the file as documentation of who to ask without it gating merges —
+// and it does not wait on require_approvals (#99).
+func (in gateInputs) codeownersGate(g *GatesOut) error {
+	target := "refs/heads/" + in.mr.TargetRef
+	content, err := gitutil.ReadBlob(in.dir, target, "CODEOWNERS", 1<<20)
+	if err != nil {
+		content, err = gitutil.ReadBlob(in.dir, target, ".gitbay/CODEOWNERS", 1<<20)
+	}
+	if err != nil || len(content) == 0 {
+		g.Unmet = append(g.Unmet, fmt.Sprintf("%s requires CODEOWNERS approval but %s carries no CODEOWNERS file", in.repo.Path(), in.mr.TargetRef))
+		return nil
+	}
+	base, err := gitutil.MergeBase(in.dir, in.targetSHA, in.headSHA)
+	if err != nil {
+		return err
+	}
+	files, err := gitutil.DiffFiles(in.dir, base, in.headSHA)
+	if err != nil {
+		return err
+	}
+	keys, missing := unapprovedOwners(policy.ParseCodeowners(string(content)), files, g.Approvals)
+	if len(missing) == 0 {
+		return nil
+	}
+	var parts []string
+	for _, key := range keys {
+		paths := missing[key]
+		g.OwnersOutstanding = append(g.OwnersOutstanding, OwnersOut{Files: paths, Owners: strings.Split(key, ",")})
+		if len(paths) > 3 {
+			paths = paths[:3]
+		}
+		parts = append(parts, fmt.Sprintf("%s (owned by %s)", strings.Join(paths, ", "), key))
+	}
+	g.Unmet = append(g.Unmet, "CODEOWNERS approval missing for: "+strings.Join(parts, "; "))
+	return nil
+}
+
+// unapprovedOwners groups the owned files no owner has approved by their
+// owner set, joined with commas: the sorted keys, and the paths under each.
+func unapprovedOwners(rules []policy.CodeownersRule, files, approvals []string) ([]string, map[string][]string) {
+	approved := map[string]bool{}
+	for _, a := range approvals {
+		approved[a] = true
+	}
+	missing := map[string][]string{} // owner-set key -> paths
+	var keys []string
+	for _, f := range files {
+		owners := policy.OwnersFor(rules, f)
+		if owners == nil || slices.ContainsFunc(owners, func(o string) bool { return approved[o] }) {
+			continue
+		}
+		key := strings.Join(owners, ",")
+		if _, seen := missing[key]; !seen {
+			keys = append(keys, key)
+		}
+		missing[key] = append(missing[key], f)
+	}
+	slices.Sort(keys)
+	return keys, missing
 }
 
 func runMRDraft(c *Ctx, args []string) int { return setMRDraft(c, args, true) }
