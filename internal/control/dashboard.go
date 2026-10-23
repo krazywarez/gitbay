@@ -101,215 +101,231 @@ func runDashboard(c *Ctx, args []string) int {
 	if len(args) != 0 {
 		return c.usage()
 	}
+	d, events, err := dashboardData(c)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	lines := FeedLines(events)
+	return c.emitView(d, func(w io.Writer) { writeDashboard(c, w, d, lines) },
+		func() screen { return dashboardScreen(c, d, lines) })
+}
+
+// dashboardData is the signed-in user's dashboard, with the events its
+// activity was made from.
+func dashboardData(c *Ctx) (DashboardOut, []store.FeedEvent, error) {
 	d := DashboardOut{
 		Reviews: []DashboardItem{}, Assigned: []DashboardItem{}, MRs: []DashboardItem{},
 		Issues: []DashboardItem{}, Pinned: []PinnedOut{}, Activity: []FeedOut{}, Builds: []DashboardBuild{},
 	}
-
-	pinned, err := c.Store.PinnedRepos(c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+	var err error
+	if d.Pinned, err = pinnedOutputs(c); err != nil {
+		return d, nil, err
 	}
-	for _, r := range pinned {
-		grant, err := c.Store.AccessRole(r.ID, c.User.ID)
+	lists := []struct {
+		into  *[]DashboardItem
+		fetch func(int64) ([]store.DashboardItem, error)
+	}{
+		{&d.MRs, c.Store.DashboardMRs},
+		{&d.Reviews, c.Store.ReviewQueue},
+		{&d.Assigned, c.Store.AssignedIssues},
+		{&d.Issues, c.Store.DashboardIssues},
+	}
+	for _, l := range lists {
+		items, err := l.fetch(c.User.ID)
 		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return d, nil, err
 		}
-		if !policy.CanRead(c.User, r, grant) {
-			continue
+		for _, m := range items {
+			*l.into = append(*l.into, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt, m.Queued})
 		}
-		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
-		d.Pinned = append(d.Pinned, PinnedOut{r.Path(), r.Visibility, desc, r.Settings.Archived})
-	}
-
-	mrs, err := c.Store.DashboardMRs(c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	for _, m := range mrs {
-		d.MRs = append(d.MRs, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt, m.Queued})
-	}
-
-	reviews, err := c.Store.ReviewQueue(c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	for _, m := range reviews {
-		d.Reviews = append(d.Reviews, DashboardItem{m.RepoPath, m.Number, m.Title, m.Author, m.State, m.UpdatedAt, m.Queued})
-	}
-
-	assigned, err := c.Store.AssignedIssues(c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	for _, i := range assigned {
-		d.Assigned = append(d.Assigned, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt, i.Queued})
-	}
-
-	issues, err := c.Store.DashboardIssues(c.User.ID)
-	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	for _, i := range issues {
-		d.Issues = append(d.Issues, DashboardItem{i.RepoPath, i.Number, i.Title, i.Author, i.State, i.UpdatedAt, i.Queued})
 	}
 
 	events, err := c.Store.RecentEvents(c.User.ID, 20, 0)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, nil, err
 	}
 	d.Activity = feedOutputs(events)
 
 	builds, err := c.Store.RecentBuilds(c.User.ID, 20)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, nil, err
 	}
 	for _, b := range builds {
 		d.Builds = append(d.Builds, DashboardBuild{b.RepoPath, b.Number, b.Job, b.Status, b.SHA, b.Ref, b.CreatedAt, b.FinishedAt})
 	}
 	if d.Queries, err = PinnedQueries(c.Store, c.User); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, nil, err
 	}
 	d.Unread = c.Store.UnreadNotices(c.User.ID)
 	if c.User.IsAdmin {
 		d.Server = &ServerOut{Commit: buildinfo.String()}
 		q, err := c.Store.QueueStatus()
 		if err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
+			return d, nil, err
 		}
 		d.Queues = &q
 	}
+	return d, events, nil
+}
 
-	lines := FeedLines(events)
-	return c.emitView(d, func(w io.Writer) {
-		heading := func(title string) { fmt.Fprintln(w, title) }
-		section := func(title string, rows [][]cell) {
-			heading(title)
-			if len(rows) == 0 {
-				fmt.Fprintln(w, "  none")
-				return
+// pinnedOutputs is the user's pinned repositories they can still read.
+func pinnedOutputs(c *Ctx) ([]PinnedOut, error) {
+	pinned, err := c.Store.PinnedRepos(c.User.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := []PinnedOut{}
+	for _, r := range pinned {
+		grant, err := c.Store.AccessRole(r.ID, c.User.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !policy.CanRead(c.User, r, grant) {
+			continue
+		}
+		desc := gitutil.ReadDescription(RepoDir(c.Cfg.Server.Root, r.OwnerName, r.Name))
+		out = append(out, PinnedOut{r.Path(), r.Visibility, desc, r.Settings.Archived})
+	}
+	return out, nil
+}
+
+// writeDashboard is `dashboard` as text: one section per list, then the
+// server's build and queues for an admin.
+func writeDashboard(c *Ctx, w io.Writer, d DashboardOut, lines []FeedLine) {
+	section := func(title string, rows [][]cell) { writeDashboardSection(w, title, rows) }
+	itemRows := func(items []DashboardItem, marker string) [][]cell {
+		rows := make([][]cell, len(items))
+		for i, item := range items {
+			page := "issues"
+			if marker == "!" {
+				page = "mrs"
 			}
-			for _, r := range rows {
-				parts := make([]string, len(r))
-				for i, cl := range r {
-					parts[i] = cl.s
-					if cl.kind == kindAge {
-						parts[i] = stamp(cl.s)
-					}
-				}
-				fmt.Fprintf(w, "  %s\n", strings.Join(parts, "\t"))
+			ref := cLink(fmt.Sprintf("%s%s%d", item.Repo, marker, item.Number), c.siteURL(item.Repo, page, strconv.FormatInt(item.Number, 10)))
+			rows[i] = []cell{ref, cFlex(item.Title), cText(item.Author)}
+		}
+		return rows
+	}
+
+	if d.Unread > 0 {
+		fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
+	}
+	section("waiting on your review:", itemRows(d.Reviews, "!"))
+	section("assigned to you:", itemRows(d.Assigned, "#"))
+	section("open merge requests:", itemRows(d.MRs, "!"))
+	section("open issues:", itemRows(d.Issues, "#"))
+	for _, q := range d.Queries {
+		rows := make([][]cell, 0, len(q.Items))
+		for _, it := range q.Items {
+			rows = append(rows, []cell{cRef(it.Ref()), cFlex(it.Title), cText(it.Author)})
+		}
+		title := fmt.Sprintf("query %s (%d):", q.Name, q.Count)
+		if q.Error != "" {
+			title = fmt.Sprintf("query %s: %s", q.Name, q.Error)
+		}
+		section(title, rows)
+	}
+
+	pinnedRows := make([][]cell, len(d.Pinned))
+	for i, p := range d.Pinned {
+		cells := []cell{cLink(p.Path, c.siteURL(p.Path)), cState(p.Visibility), cFlex(p.Description)}
+		if p.Archived {
+			cells = c.note(cells, 1, "[archived]", "archived")
+		}
+		pinnedRows[i] = cells
+	}
+	section("pinned:", pinnedRows)
+
+	activityRows := make([][]cell, len(lines))
+	for i, l := range lines {
+		activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
+	}
+	section("recent activity:", activityRows)
+
+	buildRows := make([][]cell, len(d.Builds))
+	for i, b := range d.Builds {
+		buildRows[i] = []cell{cLink(b.Repo, c.siteURL(b.Repo, "builds", strconv.FormatInt(b.Number, 10))), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
+	}
+	section("builds:", buildRows)
+
+	if d.Server != nil {
+		fmt.Fprintln(w, "server:")
+		fmt.Fprintf(w, "  build %s\n", d.Server.Commit)
+	}
+	if d.Queues != nil {
+		writeQueues(c, w, *d.Queues)
+	}
+}
+
+// writeDashboardSection is a titled list of tab-separated rows, or "none".
+func writeDashboardSection(w io.Writer, title string, rows [][]cell) {
+	fmt.Fprintln(w, title)
+	if len(rows) == 0 {
+		fmt.Fprintln(w, "  none")
+		return
+	}
+	for _, r := range rows {
+		parts := make([]string, len(r))
+		for i, cl := range r {
+			parts[i] = cl.s
+			if cl.kind == kindAge {
+				parts[i] = stamp(cl.s)
 			}
 		}
-		itemRows := func(items []DashboardItem, marker string) [][]cell {
-			rows := make([][]cell, len(items))
-			for i, item := range items {
-				page := "issues"
-				if marker == "!" {
-					page = "mrs"
-				}
-				ref := cLink(fmt.Sprintf("%s%s%d", item.Repo, marker, item.Number), c.siteURL(item.Repo, page, strconv.FormatInt(item.Number, 10)))
-				rows[i] = []cell{ref, cFlex(item.Title), cText(item.Author)}
-			}
-			return rows
+		fmt.Fprintf(w, "  %s\n", strings.Join(parts, "\t"))
+	}
+}
+
+// writeQueues is each background queue's counts and stuck items.
+func writeQueues(c *Ctx, w io.Writer, q store.Queues) {
+	fmt.Fprintln(w, "queues:")
+
+	fmt.Fprintf(w, "  webhooks\tpending %d\tretrying %d\tfailed %d\n", q.Webhooks.Pending, q.Webhooks.Retrying, q.Webhooks.Failed)
+	twh := c.table(w, "REPO", "URL", "ATTEMPTS", "ERROR")
+	for _, it := range q.Webhooks.Items {
+		twh.row(cRef("    "+it.Repo), cText(it.URL), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
+	}
+	twh.flush()
+
+	fmt.Fprintf(w, "  mail\tpending %d\tretrying %d\tfailed %d\n", q.Mail.Pending, q.Mail.Retrying, q.Mail.Failed)
+	tma := c.table(w, "RECIPIENT", "SUBJECT", "ATTEMPTS", "ERROR")
+	for _, it := range q.Mail.Items {
+		tma.row(cRef("    "+it.Recipient), cText(it.Subject), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
+	}
+	tma.flush()
+
+	// The device id, not the token: a token is never echoed.
+	fmt.Fprintf(w, "  push\tpending %d\tretrying %d\tfailed %d\n", q.Push.Pending, q.Push.Retrying, q.Push.Failed)
+	tpu := c.table(w, "DEVICE", "TITLE", "ATTEMPTS", "ERROR")
+	for _, it := range q.Push.Items {
+		tpu.row(cRef(fmt.Sprintf("    device %d", it.DeviceID)), cText(it.Title), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
+	}
+	tpu.flush()
+
+	fmt.Fprintf(w, "  mirrors\tdirty %d\terrors %d\n", q.Mirrors.Dirty, q.Mirrors.Errors)
+	tmi := c.table(w, "REPO", "DIRECTION", "URL", "ERROR")
+	for _, it := range q.Mirrors.Items {
+		tmi.row(cRef("    "+it.Repo), cText(it.Direction), cText(it.URL), cText(it.LastError))
+	}
+	tmi.flush()
+
+	fmt.Fprintf(w, "  builds\tpending %d\trunning %d\n", q.Builds.Pending, q.Builds.Running)
+	tbq := c.table(w, "REPO", "#", "JOB", "STATUS")
+	for _, it := range q.Builds.Items {
+		since := it.StartedAt
+		if it.Status == "pending" {
+			since = it.CreatedAt
 		}
+		since = stamp(since)
+		tbq.row(cRef("    "+it.Repo), cNum(it.Number), cText(it.Job), cText(fmt.Sprintf("%s since %s", it.Status, since)))
+	}
+	tbq.flush()
 
-		if d.Unread > 0 {
-			fmt.Fprintf(w, "unread notifications: %d\n", d.Unread)
-		}
-		section("waiting on your review:", itemRows(d.Reviews, "!"))
-		section("assigned to you:", itemRows(d.Assigned, "#"))
-		section("open merge requests:", itemRows(d.MRs, "!"))
-		section("open issues:", itemRows(d.Issues, "#"))
-		for _, q := range d.Queries {
-			rows := make([][]cell, 0, len(q.Items))
-			for _, it := range q.Items {
-				rows = append(rows, []cell{cRef(it.Ref()), cFlex(it.Title), cText(it.Author)})
-			}
-			title := fmt.Sprintf("query %s (%d):", q.Name, q.Count)
-			if q.Error != "" {
-				title = fmt.Sprintf("query %s: %s", q.Name, q.Error)
-			}
-			section(title, rows)
-		}
-
-		pinnedRows := make([][]cell, len(d.Pinned))
-		for i, p := range d.Pinned {
-			cells := []cell{cLink(p.Path, c.siteURL(p.Path)), cState(p.Visibility), cFlex(p.Description)}
-			if p.Archived {
-				cells = c.note(cells, 1, "[archived]", "archived")
-			}
-			pinnedRows[i] = cells
-		}
-		section("pinned:", pinnedRows)
-
-		activityRows := make([][]cell, len(lines))
-		for i, l := range lines {
-			activityRows[i] = []cell{cAge(l.When), cFlex(l.Sentence())}
-		}
-		section("recent activity:", activityRows)
-
-		buildRows := make([][]cell, len(d.Builds))
-		for i, b := range d.Builds {
-			buildRows[i] = []cell{cLink(b.Repo, c.siteURL(b.Repo, "builds", strconv.FormatInt(b.Number, 10))), cNum(b.Number), cText(b.Job), cState(b.Status), cRef(fmt.Sprintf("%.10s", b.SHA)), cText(b.Ref)}
-		}
-		section("builds:", buildRows)
-
-		if d.Server != nil {
-			heading("server:")
-			fmt.Fprintf(w, "  build %s\n", d.Server.Commit)
-		}
-		if q := d.Queues; q != nil {
-			heading("queues:")
-
-			fmt.Fprintf(w, "  webhooks\tpending %d\tretrying %d\tfailed %d\n", q.Webhooks.Pending, q.Webhooks.Retrying, q.Webhooks.Failed)
-			twh := c.table(w, "REPO", "URL", "ATTEMPTS", "ERROR")
-			for _, it := range q.Webhooks.Items {
-				twh.row(cRef("    "+it.Repo), cText(it.URL), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
-			}
-			twh.flush()
-
-			fmt.Fprintf(w, "  mail\tpending %d\tretrying %d\tfailed %d\n", q.Mail.Pending, q.Mail.Retrying, q.Mail.Failed)
-			tma := c.table(w, "RECIPIENT", "SUBJECT", "ATTEMPTS", "ERROR")
-			for _, it := range q.Mail.Items {
-				tma.row(cRef("    "+it.Recipient), cText(it.Subject), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
-			}
-			tma.flush()
-
-			// The device id, not the token: a token is never echoed.
-			fmt.Fprintf(w, "  push\tpending %d\tretrying %d\tfailed %d\n", q.Push.Pending, q.Push.Retrying, q.Push.Failed)
-			tpu := c.table(w, "DEVICE", "TITLE", "ATTEMPTS", "ERROR")
-			for _, it := range q.Push.Items {
-				tpu.row(cRef(fmt.Sprintf("    device %d", it.DeviceID)), cText(it.Title), cText(fmt.Sprintf("attempts %d", it.Attempts)), cText(it.LastError))
-			}
-			tpu.flush()
-
-			fmt.Fprintf(w, "  mirrors\tdirty %d\terrors %d\n", q.Mirrors.Dirty, q.Mirrors.Errors)
-			tmi := c.table(w, "REPO", "DIRECTION", "URL", "ERROR")
-			for _, it := range q.Mirrors.Items {
-				tmi.row(cRef("    "+it.Repo), cText(it.Direction), cText(it.URL), cText(it.LastError))
-			}
-			tmi.flush()
-
-			fmt.Fprintf(w, "  builds\tpending %d\trunning %d\n", q.Builds.Pending, q.Builds.Running)
-			tbq := c.table(w, "REPO", "#", "JOB", "STATUS")
-			for _, it := range q.Builds.Items {
-				since := it.StartedAt
-				if it.Status == "pending" {
-					since = it.CreatedAt
-				}
-				since = stamp(since)
-				tbq.row(cRef("    "+it.Repo), cNum(it.Number), cText(it.Job), cText(fmt.Sprintf("%s since %s", it.Status, since)))
-			}
-			tbq.flush()
-
-			fmt.Fprintf(w, "  deps\terrors %d\n", q.Deps.Errors)
-			tde := c.table(w, "REPO", "ERROR")
-			for _, it := range q.Deps.Items {
-				tde.row(cRef("    "+it.Repo), cText(it.LastError))
-			}
-			tde.flush()
-		}
-	}, func() screen { return dashboardScreen(c, d, lines) })
+	fmt.Fprintf(w, "  deps\terrors %d\n", q.Deps.Errors)
+	tde := c.table(w, "REPO", "ERROR")
+	for _, it := range q.Deps.Items {
+		tde.row(cRef("    "+it.Repo), cText(it.LastError))
+	}
+	tde.flush()
 }
 
 // feedDefaultLimit caps a bare `feed` call; pagination reaches further

@@ -210,225 +210,240 @@ func runAdminUserShow(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 
-	type keyOut struct {
-		Fingerprint string `json:"fingerprint"`
-		Algo        string `json:"algo"`
-		Scope       string `json:"scope"`
-		Label       string `json:"label"`
-		CreatedAt   string `json:"created_at"`
-		LastUsedAt  string `json:"last_used_at,omitempty"`
+	d, err := adminUserShowData(c, u, row)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	type emailOut struct {
-		Address    string `json:"address"`
-		Verified   bool   `json:"verified"`
-		VerifiedBy string `json:"verified_by,omitempty"` // smtp | admin
-		Primary    bool   `json:"primary"`
-	}
-	type pgpOut struct {
-		Fingerprint string     `json:"fingerprint"`
-		ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-		RevokedAt   *time.Time `json:"revoked_at,omitempty"`
-	}
-	type orgOut struct {
-		Org  string `json:"org"`
-		Role string `json:"role"`
-	}
-	type tokenOut struct {
-		Name       string     `json:"name"`
-		Scope      string     `json:"scope"`
-		CreatedAt  string     `json:"created_at"`
-		ExpiresAt  *time.Time `json:"expires_at,omitempty"`
-		LastUsedAt *time.Time `json:"last_used_at,omitempty"`
-	}
-	type out struct {
-		adminUserOut
-		Keys        []keyOut   `json:"keys"`
-		Emails      []emailOut `json:"emails"`
-		PGPKeys     []pgpOut   `json:"pgp_keys"`
-		Orgs        []orgOut   `json:"orgs"`
-		Repos       int64      `json:"repos"`
-		RepoLimit   int64      `json:"repo_limit"` // 0 unlimited
-		ByteLimit   int64      `json:"byte_limit"` // 0 unlimited
-		APITokens   []tokenOut `json:"api_tokens"`
-		WebSessions int64      `json:"web_sessions"`
-		DeleteAfter string     `json:"delete_after,omitempty"` // a scheduled self-deletion
-	}
-	d := out{adminUserOut: adminUserRow(row),
-		Keys: []keyOut{}, Emails: []emailOut{}, PGPKeys: []pgpOut{}, Orgs: []orgOut{}, APITokens: []tokenOut{}}
+	return c.emitView(d, func(w io.Writer) { writeAdminUserShow(c, w, d) },
+		func() screen { return adminUserScreen(c, d) })
+}
+
+type adminKeyOut struct {
+	Fingerprint string `json:"fingerprint"`
+	Algo        string `json:"algo"`
+	Scope       string `json:"scope"`
+	Label       string `json:"label"`
+	CreatedAt   string `json:"created_at"`
+	LastUsedAt  string `json:"last_used_at,omitempty"`
+}
+type adminEmailOut struct {
+	Address    string `json:"address"`
+	Verified   bool   `json:"verified"`
+	VerifiedBy string `json:"verified_by,omitempty"` // smtp | admin
+	Primary    bool   `json:"primary"`
+}
+type adminPGPOut struct {
+	Fingerprint string     `json:"fingerprint"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	RevokedAt   *time.Time `json:"revoked_at,omitempty"`
+}
+type adminOrgOut struct {
+	Org  string `json:"org"`
+	Role string `json:"role"`
+}
+type adminTokenOut struct {
+	Name       string     `json:"name"`
+	Scope      string     `json:"scope"`
+	CreatedAt  string     `json:"created_at"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+}
+type adminUserShowOut struct {
+	adminUserOut
+	Keys        []adminKeyOut   `json:"keys"`
+	Emails      []adminEmailOut `json:"emails"`
+	PGPKeys     []adminPGPOut   `json:"pgp_keys"`
+	Orgs        []adminOrgOut   `json:"orgs"`
+	Repos       int64           `json:"repos"`
+	RepoLimit   int64           `json:"repo_limit"` // 0 unlimited
+	ByteLimit   int64           `json:"byte_limit"` // 0 unlimited
+	APITokens   []adminTokenOut `json:"api_tokens"`
+	WebSessions int64           `json:"web_sessions"`
+	DeleteAfter string          `json:"delete_after,omitempty"` // a scheduled self-deletion
+}
+
+// adminUserShowData is everything `admin user show` reports about a user.
+func adminUserShowData(c *Ctx, u store.User, row store.AdminUser) (adminUserShowOut, error) {
+	d := adminUserShowOut{adminUserOut: adminUserRow(row),
+		Keys: []adminKeyOut{}, Emails: []adminEmailOut{}, PGPKeys: []adminPGPOut{}, Orgs: []adminOrgOut{}, APITokens: []adminTokenOut{}}
 
 	keys, err := c.Store.ListSSHKeys(u.ID)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	for _, k := range keys {
-		d.Keys = append(d.Keys, keyOut{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedAt, k.LastUsedAt})
+		d.Keys = append(d.Keys, adminKeyOut{k.Fingerprint, k.Algo, k.Scope, k.Label, k.CreatedAt, k.LastUsedAt})
 	}
 	emails, err := c.Store.ListEmails(u.ID)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	for _, e := range emails {
-		d.Emails = append(d.Emails, emailOut{e.Address, e.Verified, e.VerifiedBy, e.Primary})
+		d.Emails = append(d.Emails, adminEmailOut{e.Address, e.Verified, e.VerifiedBy, e.Primary})
 	}
 	pgp, err := c.Store.ListPGPKeys(u.ID)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	for _, k := range pgp {
-		d.PGPKeys = append(d.PGPKeys, pgpOut{k.Fingerprint, k.ExpiresAt, k.RevokedAt})
+		d.PGPKeys = append(d.PGPKeys, adminPGPOut{k.Fingerprint, k.ExpiresAt, k.RevokedAt})
 	}
 	orgs, err := c.Store.ListOrgsForUser(u.ID)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	for _, m := range orgs {
-		d.Orgs = append(d.Orgs, orgOut{m.Username, m.Role})
+		d.Orgs = append(d.Orgs, adminOrgOut{m.Username, m.Role})
 	}
 	if d.Repos, err = c.Store.OwnedRepoCount("user", u.ID); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	d.RepoLimit = RepoLimit(c.Store, limitsOf(c), "user", u.ID)
 	d.ByteLimit = ByteLimit(c.Store, limitsOf(c), "user", u.ID)
 	tokens, err := c.Store.ListAPITokens(u.ID)
 	if err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	for _, t := range tokens {
-		d.APITokens = append(d.APITokens, tokenOut{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt})
+		d.APITokens = append(d.APITokens, adminTokenOut{t.Name, t.Scope, t.CreatedAt, t.ExpiresAt, t.LastUsedAt})
 	}
 	if d.WebSessions, err = c.Store.WebSessionCount(u.ID); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+		return d, err
 	}
 	d.DeleteAfter = u.DeleteAfter
+	return d, nil
+}
 
-	return c.emitView(d, func(w io.Writer) {
-		admin := ""
-		if d.Admin {
-			admin = "yes"
-		}
-		v := c.view(w)
-		v.title(d.Username, "", d.State)
-		v.fields(
-			"admin", admin,
-			"created", c.when(d.CreatedAt),
-			"last seen", c.when(d.LastSeen),
-			"repos", fmt.Sprintf("%d", d.Repos),
-			"web sessions", fmt.Sprintf("%d", d.WebSessions),
-			"deletes at", c.when(d.DeleteAfter),
-		)
-		if len(d.Keys) > 0 {
-			v.section("keys")
-			tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
-			for _, k := range d.Keys {
-				tk.row(cFlex(k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
-			}
-			tk.flush()
-		}
-		if len(d.Emails) > 0 {
-			v.section("emails")
-			te := c.table(w, "ADDRESS", "STATE")
-			for _, e := range d.Emails {
-				state := "unverified"
-				if e.Verified {
-					state = "verified by " + e.VerifiedBy
-				}
-				cells := []cell{cRef(e.Address), cState(state)}
-				if e.Primary {
-					cells = c.note(cells, 1, "primary", "primary")
-				}
-				te.row(cells...)
-			}
-			te.flush()
-		}
-		if len(d.PGPKeys) > 0 {
-			v.section("pgp keys")
-			tp := c.table(w, "FINGERPRINT")
-			for _, k := range d.PGPKeys {
-				tp.row(cFlex(k.Fingerprint))
-			}
-			tp.flush()
-		}
-		if len(d.Orgs) > 0 {
-			v.section("orgs")
-			to := c.table(w, "ORG", "ROLE")
-			for _, o := range d.Orgs {
-				to.row(cRef(o.Org), cState(o.Role))
-			}
-			to.flush()
-		}
-		if len(d.APITokens) > 0 {
-			v.section("api tokens")
-			tt := c.table(w, "NAME", "SCOPE", "LAST USED")
-			for _, t := range d.APITokens {
-				used := ""
-				if t.LastUsedAt != nil {
-					used = t.LastUsedAt.UTC().Format(time.RFC3339Nano)
-				}
-				tt.row(cRef(t.Name), cState(t.Scope), cAge(used))
-			}
-			tt.flush()
-		}
-	}, func() screen {
-		s := screen{}
-		user := []cell{cRef(d.Username), cState(d.State)}
-		if d.Admin {
-			user = append(user, cMeta("admin"))
-		}
-		seen := "never seen"
-		if d.LastSeen != "" {
-			seen = "seen " + relAge(d.LastSeen, termNow())
-		}
-		s.fields = []field{
-			{"User", user},
-			{"Seen", []cell{cText(seen), cMeta("created " + relAge(d.CreatedAt, termNow()))}},
-			{"Repos", []cell{cText(strconv.FormatInt(d.Repos, 10))}},
-			{"Sessions", []cell{cText(strconv.FormatInt(d.WebSessions, 10))}},
-		}
-		keys := section{title: "Keys", n: len(d.Keys)}
+// writeAdminUserShow is `admin user show` as text.
+func writeAdminUserShow(c *Ctx, w io.Writer, d adminUserShowOut) {
+	admin := ""
+	if d.Admin {
+		admin = "yes"
+	}
+	v := c.view(w)
+	v.title(d.Username, "", d.State)
+	v.fields(
+		"admin", admin,
+		"created", c.when(d.CreatedAt),
+		"last seen", c.when(d.LastSeen),
+		"repos", fmt.Sprintf("%d", d.Repos),
+		"web sessions", fmt.Sprintf("%d", d.WebSessions),
+		"deletes at", c.when(d.DeleteAfter),
+	)
+	if len(d.Keys) > 0 {
+		v.section("keys")
+		tk := c.table(w, "FINGERPRINT", "ALGO", "SCOPE", "LAST USED")
 		for _, k := range d.Keys {
-			keys.rows = append(keys.rows, rowOf(cFlexRef(k.Fingerprint), cState(k.Scope), cMeta(k.Algo, "used "+relAge(k.LastUsedAt, termNow()))))
+			tk.row(cFlex(k.Fingerprint), cText(k.Algo), cState(k.Scope), cAge(k.LastUsedAt))
 		}
-		emails := section{title: "Emails", n: len(d.Emails)}
+		tk.flush()
+	}
+	if len(d.Emails) > 0 {
+		v.section("emails")
+		te := c.table(w, "ADDRESS", "STATE")
 		for _, e := range d.Emails {
-			state, primary := "unverified", ""
+			state := "unverified"
 			if e.Verified {
-				state = "verified"
+				state = "verified by " + e.VerifiedBy
 			}
+			cells := []cell{cRef(e.Address), cState(state)}
 			if e.Primary {
-				primary = "primary"
+				cells = c.note(cells, 1, "primary", "primary")
 			}
-			emails.rows = append(emails.rows, rowOf(cRef(e.Address), cState(state), cMeta(primary, e.VerifiedBy)))
+			te.row(cells...)
 		}
-		pgp := section{title: "PGP keys", n: len(d.PGPKeys)}
+		te.flush()
+	}
+	if len(d.PGPKeys) > 0 {
+		v.section("pgp keys")
+		tp := c.table(w, "FINGERPRINT")
 		for _, k := range d.PGPKeys {
-			pgp.rows = append(pgp.rows, rowOf(cFlexRef(k.Fingerprint)))
+			tp.row(cFlex(k.Fingerprint))
 		}
-		orgs := section{title: "Orgs", n: len(d.Orgs)}
+		tp.flush()
+	}
+	if len(d.Orgs) > 0 {
+		v.section("orgs")
+		to := c.table(w, "ORG", "ROLE")
 		for _, o := range d.Orgs {
-			orgs.rows = append(orgs.rows, rowOf(cLink(o.Org, c.siteURL(o.Org)), cState(o.Role)))
+			to.row(cRef(o.Org), cState(o.Role))
 		}
-		tokens := section{title: "API tokens", n: len(d.APITokens)}
-		for _, tk := range d.APITokens {
+		to.flush()
+	}
+	if len(d.APITokens) > 0 {
+		v.section("api tokens")
+		tt := c.table(w, "NAME", "SCOPE", "LAST USED")
+		for _, t := range d.APITokens {
 			used := ""
-			if tk.LastUsedAt != nil {
-				used = "used " + relAge(tk.LastUsedAt.UTC().Format(time.RFC3339Nano), termNow())
+			if t.LastUsedAt != nil {
+				used = t.LastUsedAt.UTC().Format(time.RFC3339Nano)
 			}
-			tokens.rows = append(tokens.rows, rowOf(cRef(tk.Name), cState(tk.Scope), cMeta(used)))
+			tt.row(cRef(t.Name), cState(t.Scope), cAge(used))
 		}
-		s.sections = []section{keys, emails, pgp, orgs, tokens}
-		role, state := "promote", "disable"
-		if d.Admin {
-			role = "demote"
+		tt.flush()
+	}
+}
+
+func adminUserScreen(c *Ctx, d adminUserShowOut) screen {
+	s := screen{}
+	user := []cell{cRef(d.Username), cState(d.State)}
+	if d.Admin {
+		user = append(user, cMeta("admin"))
+	}
+	seen := "never seen"
+	if d.LastSeen != "" {
+		seen = "seen " + relAge(d.LastSeen, termNow())
+	}
+	s.fields = []field{
+		{"User", user},
+		{"Seen", []cell{cText(seen), cMeta("created " + relAge(d.CreatedAt, termNow()))}},
+		{"Repos", []cell{cText(strconv.FormatInt(d.Repos, 10))}},
+		{"Sessions", []cell{cText(strconv.FormatInt(d.WebSessions, 10))}},
+	}
+	keys := section{title: "Keys", n: len(d.Keys)}
+	for _, k := range d.Keys {
+		keys.rows = append(keys.rows, rowOf(cFlexRef(k.Fingerprint), cState(k.Scope), cMeta(k.Algo, "used "+relAge(k.LastUsedAt, termNow()))))
+	}
+	emails := section{title: "Emails", n: len(d.Emails)}
+	for _, e := range d.Emails {
+		state, primary := "unverified", ""
+		if e.Verified {
+			state = "verified"
 		}
-		if d.State == "disabled" {
-			state = "enable"
+		if e.Primary {
+			primary = "primary"
 		}
-		s.actions = []action{
-			{"Manage", []string{"admin", "user", role, d.Username}},
-			{"Manage", []string{"admin", "user", state, d.Username}},
+		emails.rows = append(emails.rows, rowOf(cRef(e.Address), cState(state), cMeta(primary, e.VerifiedBy)))
+	}
+	pgp := section{title: "PGP keys", n: len(d.PGPKeys)}
+	for _, k := range d.PGPKeys {
+		pgp.rows = append(pgp.rows, rowOf(cFlexRef(k.Fingerprint)))
+	}
+	orgs := section{title: "Orgs", n: len(d.Orgs)}
+	for _, o := range d.Orgs {
+		orgs.rows = append(orgs.rows, rowOf(cLink(o.Org, c.siteURL(o.Org)), cState(o.Role)))
+	}
+	tokens := section{title: "API tokens", n: len(d.APITokens)}
+	for _, tk := range d.APITokens {
+		used := ""
+		if tk.LastUsedAt != nil {
+			used = "used " + relAge(tk.LastUsedAt.UTC().Format(time.RFC3339Nano), termNow())
 		}
-		return s
-	})
+		tokens.rows = append(tokens.rows, rowOf(cRef(tk.Name), cState(tk.Scope), cMeta(used)))
+	}
+	s.sections = []section{keys, emails, pgp, orgs, tokens}
+	role, state := "promote", "disable"
+	if d.Admin {
+		role = "demote"
+	}
+	if d.State == "disabled" {
+		state = "enable"
+	}
+	s.actions = []action{
+		{"Manage", []string{"admin", "user", role, d.Username}},
+		{"Manage", []string{"admin", "user", state, d.Username}},
+	}
+	return s
 }
 
 func runAdminUserPromote(c *Ctx, args []string) int { return setAdmin(c, args, true) }
