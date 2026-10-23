@@ -348,20 +348,7 @@ func (s *Store) ListBuilds(repoID int64, f BuildFilter, limit int) ([]Build, err
 	}
 	q += " ORDER BY number DESC LIMIT ?"
 	args = append(args, limit)
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Build
-	for rows.Next() {
-		b, err := scanBuild(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, b)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanBuild, q, args...)
 }
 
 // BuildLog returns the stored log bytes.

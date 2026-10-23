@@ -115,22 +115,9 @@ func (s *Store) UnpinRepo(userID, repoID int64) error {
 // PinnedRepos returns the user's pinned repositories in pin order. The
 // caller applies visibility checks before rendering.
 func (s *Store) PinnedRepos(userID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+`
+	return queryAll(s.DB, scanRepo, repoSelect+`
 		JOIN repo_pins p ON p.repo_id = r.id AND p.user_id = ?
 		ORDER BY p.pinned_at`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
 }
 
 // reviewQueueQuery is ReviewQueue's involved half: open merge requests the
@@ -304,29 +291,8 @@ type FeedEvent struct {
 // newest first, for readers carrying no session. Push events are
 // excluded as in RecentEvents.
 func (s *Store) OwnerPublicEvents(ownerKind string, ownerID int64, limit int) ([]FeedEvent, error) {
-	rows, err := s.DB.Query(`
-		SELECT e.id, COALESCE(u.username, o.name) || '/' || r.name,
-		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
-		FROM events e
-		JOIN repos r ON r.id = e.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		LEFT JOIN users ac ON ac.id = e.actor_id
-		WHERE e.kind <> 'push' AND r.visibility = 'public' AND r.owner_kind = ? AND r.owner_id = ?
+	return queryAll(s.DB, scanFeedEvent, feedSelect+`r.visibility = 'public' AND r.owner_kind = ? AND r.owner_id = ?
 		ORDER BY e.id DESC LIMIT ?`, ownerKind, ownerID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []FeedEvent
-	for rows.Next() {
-		var e FeedEvent
-		if err := rows.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
-	}
-	return out, rows.Err()
 }
 
 // UserPublicEvents returns what a user did on public repositories,
@@ -335,29 +301,8 @@ func (s *Store) OwnerPublicEvents(ownerKind string, ownerID int64, limit int) ([
 // agree with the total printed above its graph. Push events are
 // excluded as in RecentEvents.
 func (s *Store) UserPublicEvents(userID int64, limit int) ([]FeedEvent, error) {
-	rows, err := s.DB.Query(`
-		SELECT e.id, COALESCE(u.username, o.name) || '/' || r.name,
-		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
-		FROM events e
-		JOIN repos r ON r.id = e.repo_id
-		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
-		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
-		LEFT JOIN users ac ON ac.id = e.actor_id
-		WHERE e.kind <> 'push' AND r.visibility = 'public' AND e.actor_id = ?
+	return queryAll(s.DB, scanFeedEvent, feedSelect+`r.visibility = 'public' AND e.actor_id = ?
 		ORDER BY e.id DESC LIMIT ?`, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []FeedEvent
-	for rows.Next() {
-		var e FeedEvent
-		if err := rows.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
-	}
-	return out, rows.Err()
 }
 
 // RecentEvents returns activity on repositories the user can reach. Push
@@ -365,7 +310,19 @@ func (s *Store) UserPublicEvents(userID int64, limit int) ([]FeedEvent, error) {
 // before (an event id) starts the page strictly below it, matching the
 // id-descending order; 0 starts at the newest.
 func (s *Store) RecentEvents(userID int64, limit int, before int64) ([]FeedEvent, error) {
-	q := `
+	q := feedSelect + reachableCond
+	args := []any{userID, limit}
+	if before > 0 {
+		q += " AND e.id < ?3"
+		args = append(args, before)
+	}
+	q += " ORDER BY e.id DESC LIMIT ?2"
+	return queryAll(s.DB, scanFeedEvent, q, args...)
+}
+
+// feedSelect reads FeedEvents, push events left out; callers append the
+// rest of the WHERE clause.
+const feedSelect = `
 		SELECT e.id, COALESCE(u.username, o.name) || '/' || r.name,
 		       COALESCE(ac.username, ''), e.kind, e.data_json, e.created_at
 		FROM events e
@@ -373,25 +330,10 @@ func (s *Store) RecentEvents(userID int64, limit int, before int64) ([]FeedEvent
 		LEFT JOIN users u ON r.owner_kind = 'user' AND u.id = r.owner_id
 		LEFT JOIN orgs o  ON r.owner_kind = 'org'  AND o.id = r.owner_id
 		LEFT JOIN users ac ON ac.id = e.actor_id
-		WHERE e.kind <> 'push' AND ` + reachableCond
-	args := []any{userID, limit}
-	if before > 0 {
-		q += " AND e.id < ?3"
-		args = append(args, before)
-	}
-	q += " ORDER BY e.id DESC LIMIT ?2"
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []FeedEvent
-	for rows.Next() {
-		var e FeedEvent
-		if err := rows.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, e)
-	}
-	return out, rows.Err()
+		WHERE e.kind <> 'push' AND `
+
+func scanFeedEvent(row interface{ Scan(...any) error }) (FeedEvent, error) {
+	var e FeedEvent
+	err := row.Scan(&e.ID, &e.RepoPath, &e.Actor, &e.Kind, &e.Data, &e.CreatedAt)
+	return e, err
 }

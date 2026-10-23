@@ -74,20 +74,7 @@ func (s *Store) scanMirror(row interface{ Scan(...any) error }) (Mirror, error) 
 }
 
 func (s *Store) mirrorQuery(q string, args ...any) ([]Mirror, error) {
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Mirror
-	for rows.Next() {
-		m, err := s.scanMirror(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, s.scanMirror, q, args...)
 }
 
 func (s *Store) ListMirrors(repoID int64) ([]Mirror, error) {

@@ -311,7 +311,57 @@ func (s *Store) migrateStep(sqlText string, newVersion int, fkOff bool) (retErr 
 func IsInternal(err error) bool {
 	var sqlErr *sqlite.Error
 	var pathErr *fs.PathError
-	return errors.As(err, &sqlErr) || errors.As(err, &pathErr) ||
-		errors.Is(err, sql.ErrTxDone) || errors.Is(err, sql.ErrConnDone) ||
-		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+	if errors.As(err, &sqlErr) || errors.As(err, &pathErr) {
+		return true
+	}
+	for _, target := range []error{sql.ErrTxDone, sql.ErrConnDone, context.DeadlineExceeded, context.Canceled} {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// stmt is one statement and its arguments.
+type stmt struct {
+	query string
+	args  []any
+}
+
+// execAll runs stmts in one transaction. The first must change a row;
+// when it changes none, nothing is kept and the error is ErrNotFound.
+func (s *Store) execAll(stmts ...stmt) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for i, st := range stmts {
+		res, err := tx.Exec(st.query, st.args...)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); i == 0 && n == 0 {
+			return ErrNotFound
+		}
+	}
+	return tx.Commit()
+}
+
+// queryAll runs query on q and reads every row it returns with scan.
+func queryAll[T any](q queryer, scan func(interface{ Scan(...any) error }) (T, error), query string, args ...any) ([]T, error) {
+	rows, err := q.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []T
+	for rows.Next() {
+		v, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }

@@ -43,20 +43,7 @@ func (s *Store) BookmarkCount(repoID int64) int {
 // The caller filters by what the viewer may see: a bookmarked repository
 // can since have gone private.
 func (s *Store) ListBookmarks(userID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+`
+	return queryAll(s.DB, scanRepo, repoSelect+`
 		JOIN repo_bookmarks b ON b.repo_id = r.id
 		WHERE b.user_id = ? ORDER BY b.bookmarked_at DESC`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
 }

@@ -206,20 +206,8 @@ func (s *Store) SetSnippetFile(id int64, name string, content []byte) error {
 }
 
 func (s *Store) RemoveSnippetFile(id int64, name string) error {
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	res, err := tx.Exec("DELETE FROM snippet_files WHERE snippet_id = ? AND name = ?", id, name)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	if _, err := tx.Exec("UPDATE snippets SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", id); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return s.execAll(
+		stmt{"DELETE FROM snippet_files WHERE snippet_id = ? AND name = ?", []any{id, name}},
+		stmt{"UPDATE snippets SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", []any{id}},
+	)
 }

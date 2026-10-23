@@ -49,32 +49,18 @@ func (s *Store) RecordCommitActivity(repoID int64, sha string, userID int64, day
 // commits landed on default branches plus everything the events table
 // attributes to them (issues, MRs, comments, releases, pushes).
 func (s *Store) ActivityByDay(userID int64, sinceDay string) (map[string]int, error) {
-	rows, err := s.DB.Query(`
+	return s.dayCounts(`
 		SELECT day, COUNT(*) FROM (
 			SELECT day FROM commit_activity WHERE user_id = ?1 AND day >= ?2
 			UNION ALL
 			SELECT date(created_at) AS day FROM events
 			WHERE actor_id = ?1 AND date(created_at) >= ?2 AND kind <> 'push'
 		) GROUP BY day`, userID, sinceDay)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[string]int{}
-	for rows.Next() {
-		var day string
-		var n int
-		if err := rows.Scan(&day, &n); err != nil {
-			return nil, err
-		}
-		out[day] = n
-	}
-	return out, rows.Err()
 }
 
 // OrgActivityByDay aggregates activity across an org's repositories.
 func (s *Store) OrgActivityByDay(orgID int64, sinceDay string) (map[string]int, error) {
-	rows, err := s.DB.Query(`
+	return s.dayCounts(`
 		SELECT day, COUNT(*) FROM (
 			SELECT ca.day FROM commit_activity ca
 			JOIN repos r ON r.id = ca.repo_id
@@ -85,6 +71,11 @@ func (s *Store) OrgActivityByDay(orgID int64, sinceDay string) (map[string]int, 
 			WHERE r.owner_kind = 'org' AND r.owner_id = ?1
 			  AND date(e.created_at) >= ?2 AND e.kind <> 'push'
 		) GROUP BY day`, orgID, sinceDay)
+}
+
+// dayCounts reads a query's (day, count) rows into a map.
+func (s *Store) dayCounts(query string, args ...any) (map[string]int, error) {
+	rows, err := s.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -49,7 +49,7 @@ func split(v string) ([]int, string) {
 	i := 0
 	for i < len(v) {
 		j := i
-		for j < len(v) && v[j] >= '0' && v[j] <= '9' {
+		for j < len(v) && isDigit(v[j]) {
 			j++
 		}
 		if j == i {
@@ -60,7 +60,7 @@ func split(v string) ([]int, string) {
 			break
 		}
 		nums = append(nums, n)
-		if j < len(v) && v[j] == '.' && j+1 < len(v) && v[j+1] >= '0' && v[j+1] <= '9' {
+		if j+1 < len(v) && v[j] == '.' && isDigit(v[j+1]) {
 			i = j + 1
 			continue
 		}
@@ -89,3 +89,5 @@ func rank(suffix string) int {
 	}
 	return -1
 }
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }

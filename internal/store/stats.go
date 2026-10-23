@@ -2,20 +2,7 @@ package store
 
 // ListAllRepos returns every repository, for host-local admin tooling.
 func (s *Store) ListAllRepos() ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect + " ORDER BY 4, r.name")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanRepo, repoSelect+" ORDER BY 4, r.name")
 }
 
 type Counts struct {

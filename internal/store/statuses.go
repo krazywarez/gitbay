@@ -34,23 +34,10 @@ func (s *Store) SetCommitStatus(repoID int64, sha, context, state, description, 
 
 // ListCommitStatuses returns the latest status per context for a commit.
 func (s *Store) ListCommitStatuses(repoID int64, sha string) ([]CommitStatus, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, scanCommitStatus, `
 		SELECT cs.context, cs.state, cs.description, cs.target_url, COALESCE(u.username, ''), cs.updated_at
 		FROM commit_statuses cs LEFT JOIN users u ON u.id = cs.creator_id
 		WHERE cs.repo_id = ? AND cs.commit_sha = ? ORDER BY cs.context`, repoID, sha)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []CommitStatus
-	for rows.Next() {
-		var c CommitStatus
-		if err := rows.Scan(&c.Context, &c.State, &c.Description, &c.TargetURL, &c.Creator, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
 }
 
 // CommitStatusesFor is ListCommitStatuses for every commit on a list
@@ -187,4 +174,10 @@ func (s *Store) ChecksForCommit(repoID int64, sha string) ([]Check, string, erro
 		checks = append(checks, c)
 	}
 	return checks, CombinedStatus(statuses), nil
+}
+
+func scanCommitStatus(row interface{ Scan(...any) error }) (CommitStatus, error) {
+	var c CommitStatus
+	err := row.Scan(&c.Context, &c.State, &c.Description, &c.TargetURL, &c.Creator, &c.UpdatedAt)
+	return c, err
 }

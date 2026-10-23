@@ -26,24 +26,11 @@ func (s *Store) EnqueueMailReplyTo(recipient, replyTo, subject, body string) err
 }
 
 func (s *Store) DueMail(limit int) ([]QueuedMail, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, scanQueuedMail, `
 		SELECT id, recipient, reply_to, subject, body, attempts FROM notifications
 		WHERE sent_at IS NULL AND failed_at IS NULL
 		  AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
 		ORDER BY id LIMIT ?`, fmtTime(time.Now()), limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []QueuedMail
-	for rows.Next() {
-		var m QueuedMail
-		if err := rows.Scan(&m.ID, &m.Recipient, &m.ReplyTo, &m.Subject, &m.Body, &m.Attempts); err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
 }
 
 func (s *Store) MarkMailSent(id int64) error {
@@ -123,4 +110,10 @@ func (s *Store) idQuery(q string, args ...any) ([]int64, error) {
 		out = append(out, id)
 	}
 	return out, rows.Err()
+}
+
+func scanQueuedMail(row interface{ Scan(...any) error }) (QueuedMail, error) {
+	var m QueuedMail
+	err := row.Scan(&m.ID, &m.Recipient, &m.ReplyTo, &m.Subject, &m.Body, &m.Attempts)
+	return m, err
 }

@@ -231,62 +231,23 @@ func (s *Store) QueryMRs(repoID int64, f MRFilter) ([]MR, error) {
 		q += " LIMIT ?"
 		args = append(args, f.Limit)
 	}
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []MR
-	for rows.Next() {
-		m, err := scanMR(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanMR, q, args...)
 }
 
 // OpenMRsBySource returns open (and source_gone) MRs fed by the given source
 // repo branch — the cross-repo hook effect consults this.
 func (s *Store) OpenMRsBySource(sourceRepoID int64, sourceRef string) ([]MR, error) {
-	rows, err := s.DB.Query(
+	return queryAll(s.DB, scanMR,
 		mrSelect+" WHERE m.source_repo_id = ? AND m.source_ref = ? AND m.state IN ('open','source_gone')",
 		sourceRepoID, sourceRef)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []MR
-	for rows.Next() {
-		m, err := scanMR(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
 }
 
 // UnmergedMRsByTarget returns the open and source_gone MRs in repoID
 // targeting targetRef, oldest first.
 func (s *Store) UnmergedMRsByTarget(repoID int64, targetRef string) ([]MR, error) {
-	rows, err := s.DB.Query(
+	return queryAll(s.DB, scanMR,
 		mrSelect+" WHERE m.repo_id = ? AND m.target_ref = ? AND m.state IN ('open','source_gone') ORDER BY m.number",
 		repoID, targetRef)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []MR
-	for rows.Next() {
-		m, err := scanMR(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
 }
 
 // MarkMerged records the merge along with the target tip it landed on, so
@@ -332,20 +293,7 @@ func (s *Store) SetSupersededBy(mrID, n int64) error {
 // superseded_by names number, oldest first — the reverse of
 // MR.SupersededBy.
 func (s *Store) MRsSuperseding(repoID, number int64) ([]MR, error) {
-	rows, err := s.DB.Query(mrSelect+" WHERE m.repo_id = ? AND m.superseded_by = ? ORDER BY m.number ASC", repoID, number)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []MR
-	for rows.Next() {
-		m, err := scanMR(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanMR, mrSelect+" WHERE m.repo_id = ? AND m.superseded_by = ? ORDER BY m.number ASC", repoID, number)
 }
 
 // SetMRState moves an MR between states that carry no resolution stamp.
@@ -443,24 +391,11 @@ func (s *Store) MRHeads(mrID int64) ([]MRHead, error) {
 // target on every read, so nothing else has to move; an approval,
 // though, was of the diff against the old branch.
 func (s *Store) SetMRTarget(mrID int64, targetRef string) error {
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	res, err := tx.Exec(
-		"UPDATE merge_requests SET target_ref = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-		targetRef, mrID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	if _, err := tx.Exec("UPDATE mr_reviews SET stale = 1 WHERE mr_id = ?", mrID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return s.execAll(
+		stmt{"UPDATE merge_requests SET target_ref = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+			[]any{targetRef, mrID}},
+		stmt{"UPDATE mr_reviews SET stale = 1 WHERE mr_id = ?", []any{mrID}},
+	)
 }
 
 // MarkSourceGoneForRepo flags every open MR sourced from the repo; called

@@ -106,7 +106,7 @@ func (s *Store) RemoveWebhook(repoID, hookID int64) error {
 // DueDeliveries returns pending deliveries whose time has come, with the
 // event and hook context needed to send them.
 func (s *Store) DueDeliveries(limit int) ([]Delivery, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, s.scanDelivery, `
 		SELECT d.id, d.webhook_id, w.url, w.secret, d.event_id, e.kind,
 		       COALESCE(u2.username, o.name, '') || '/' || COALESCE(r.name, ''),
 		       COALESCE(u.username, ''), e.data_json, e.created_at, d.attempts
@@ -120,23 +120,21 @@ func (s *Store) DueDeliveries(limit int) ([]Delivery, error) {
 		WHERE d.delivered_at IS NULL AND d.failed_at IS NULL
 		  AND (d.next_attempt_at IS NULL OR d.next_attempt_at <= ?)
 		ORDER BY d.id LIMIT ?`, fmtTime(time.Now()), limit)
+}
+
+// scanDelivery reads a due delivery and opens its hook's secret.
+func (s *Store) scanDelivery(row interface{ Scan(...any) error }) (Delivery, error) {
+	var d Delivery
+	if err := row.Scan(&d.ID, &d.WebhookID, &d.URL, &d.Secret, &d.EventID, &d.EventKind,
+		&d.RepoPath, &d.Actor, &d.DataJSON, &d.EventAt, &d.Attempts); err != nil {
+		return d, err
+	}
+	secret, err := s.openValue(webhookAAD(d.WebhookID), d.Secret)
 	if err != nil {
-		return nil, err
+		return d, fmt.Errorf("webhook %d: %w", d.WebhookID, err)
 	}
-	defer rows.Close()
-	var out []Delivery
-	for rows.Next() {
-		var d Delivery
-		if err := rows.Scan(&d.ID, &d.WebhookID, &d.URL, &d.Secret, &d.EventID, &d.EventKind,
-			&d.RepoPath, &d.Actor, &d.DataJSON, &d.EventAt, &d.Attempts); err != nil {
-			return nil, err
-		}
-		if d.Secret, err = s.openValue(webhookAAD(d.WebhookID), d.Secret); err != nil {
-			return nil, fmt.Errorf("webhook %d: %w", d.WebhookID, err)
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
+	d.Secret = secret
+	return d, nil
 }
 
 func (s *Store) MarkDelivered(id int64, status int) error {
@@ -161,7 +159,7 @@ func (s *Store) MarkAttemptFailed(id int64, status int, errMsg string, nextAt *t
 }
 
 func (s *Store) ListDeliveries(repoID int64, limit int) ([]DeliveryStatus, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, scanDeliveryStatus, `
 		SELECT d.id, w.url, e.kind,
 		       CASE WHEN d.delivered_at IS NOT NULL THEN 'delivered'
 		            WHEN d.failed_at IS NOT NULL THEN 'failed'
@@ -171,19 +169,6 @@ func (s *Store) ListDeliveries(repoID int64, limit int) ([]DeliveryStatus, error
 		JOIN webhooks w ON w.id = d.webhook_id
 		JOIN events e ON e.id = d.event_id
 		WHERE w.repo_id = ? ORDER BY d.id DESC LIMIT ?`, repoID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []DeliveryStatus
-	for rows.Next() {
-		var d DeliveryStatus
-		if err := rows.Scan(&d.ID, &d.URL, &d.EventKind, &d.Status, &d.Attempts, &d.LastStatus, &d.LastError, &d.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
 }
 
 // Redeliver resets a delivery for an immediate retry.
@@ -198,4 +183,10 @@ func (s *Store) Redeliver(repoID, deliveryID int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func scanDeliveryStatus(row interface{ Scan(...any) error }) (DeliveryStatus, error) {
+	var d DeliveryStatus
+	err := row.Scan(&d.ID, &d.URL, &d.EventKind, &d.Status, &d.Attempts, &d.LastStatus, &d.LastError, &d.CreatedAt)
+	return d, err
 }

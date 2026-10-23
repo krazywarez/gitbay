@@ -257,20 +257,7 @@ func (s *Store) ListReposForUser(userID int64, limit int, after string) ([]Repo,
 		q += " LIMIT ?"
 		args = append(args, limit)
 	}
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanRepo, q, args...)
 }
 
 // AccessRole returns the user's effective role on the repo ("" if none):
@@ -444,20 +431,7 @@ func (s *Store) RepoByID(id int64) (Repo, error) {
 
 // ListPublicRepos returns all public repositories, for the anonymous index.
 func (s *Store) ListPublicRepos() ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect + " WHERE r.visibility = 'public' ORDER BY 4, r.name")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanRepo, repoSelect+" WHERE r.visibility = 'public' ORDER BY 4, r.name")
 }
 
 // ListPublicReposByActivity returns all public repositories, the most
@@ -486,20 +460,7 @@ func (s *Store) ListPublicReposByActivity() ([]Repo, error) {
 // ListForks returns the repositories forked from one repo. The caller
 // filters by what the viewer may see.
 func (s *Store) ListForks(repoID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+" WHERE r.fork_of = ? ORDER BY 4, r.name", repoID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanRepo, repoSelect+" WHERE r.fork_of = ? ORDER BY 4, r.name", repoID)
 }
 
 func (s *Store) UpdateDefaultBranch(repoID int64, branch string) error {
@@ -510,21 +471,8 @@ func (s *Store) UpdateDefaultBranch(repoID int64, branch string) error {
 // ListReposForOwner returns every repo owned by one user or org; the caller
 // filters by viewer visibility.
 func (s *Store) ListReposForOwner(ownerKind string, ownerID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+" WHERE r.owner_kind = ? AND r.owner_id = ? ORDER BY r.name",
+	return queryAll(s.DB, scanRepo, repoSelect+" WHERE r.owner_kind = ? AND r.owner_id = ? ORDER BY r.name",
 		ownerKind, ownerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
 }
 
 // RenameRepo changes a repository's name under the same owner. The unique

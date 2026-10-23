@@ -61,20 +61,7 @@ func (s *Store) ListUsers(state string, limit int, after string) ([]AdminUser, e
 		q += " LIMIT ?"
 		args = append(args, limit)
 	}
-	rows, err := s.DB.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []AdminUser
-	for rows.Next() {
-		u, err := scanAdminUser(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, u)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanAdminUser, q, args...)
 }
 
 // AdminUserByName is the ListUsers row for one account.

@@ -167,7 +167,7 @@ func (s *Store) EnqueuePush(userID int64, title, body, path string) error {
 }
 
 func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, s.scanQueuedPush, `
 		SELECT q.id, q.device_id, d.token, d.user_id, COALESCE(d.token_hash, ''), u.username, q.title, q.body, q.path, q.attempts,
 		       (SELECT COUNT(*) FROM inbox WHERE user_id = d.user_id AND read_at IS NULL)
 		FROM push_queue q
@@ -176,24 +176,22 @@ func (s *Store) DuePush(limit int) ([]QueuedPush, error) {
 		WHERE q.sent_at IS NULL AND q.failed_at IS NULL
 		  AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= ?)
 		ORDER BY q.id LIMIT ?`, fmtTime(time.Now()), limit)
+}
+
+// scanQueuedPush reads a due push and opens its device token.
+func (s *Store) scanQueuedPush(row interface{ Scan(...any) error }) (QueuedPush, error) {
+	var p QueuedPush
+	var uid int64
+	var h string
+	if err := row.Scan(&p.ID, &p.DeviceID, &p.Token, &uid, &h, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts, &p.Badge); err != nil {
+		return p, err
+	}
+	token, err := s.openValue(pushTokenAAD(uid, h), p.Token)
 	if err != nil {
-		return nil, err
+		return p, fmt.Errorf("push device %d: %w", p.DeviceID, err)
 	}
-	defer rows.Close()
-	var out []QueuedPush
-	for rows.Next() {
-		var p QueuedPush
-		var uid int64
-		var h string
-		if err := rows.Scan(&p.ID, &p.DeviceID, &p.Token, &uid, &h, &p.Username, &p.Title, &p.Body, &p.Path, &p.Attempts, &p.Badge); err != nil {
-			return nil, err
-		}
-		if p.Token, err = s.openValue(pushTokenAAD(uid, h), p.Token); err != nil {
-			return nil, fmt.Errorf("push device %d: %w", p.DeviceID, err)
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+	p.Token = token
+	return p, nil
 }
 
 func (s *Store) MarkPushSent(id int64) error {

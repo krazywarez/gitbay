@@ -188,7 +188,10 @@ func Verify(secret []byte, token string, now time.Time) (Grant, bool) {
 	repoID, err1 := strconv.ParseInt(parts[0], 10, 64)
 	keyID, err2 := strconv.ParseInt(parts[1], 10, 64)
 	exp, err3 := strconv.ParseInt(parts[4], 10, 64)
-	if err1 != nil || err2 != nil || err3 != nil || keyID < 0 || now.Unix() > exp {
+	if err1 != nil || err2 != nil || err3 != nil {
+		return Grant{}, false
+	}
+	if keyID < 0 || now.Unix() > exp {
 		return Grant{}, false
 	}
 	if (keyID == 0) != (parts[2] == "") {

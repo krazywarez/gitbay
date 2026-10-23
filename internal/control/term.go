@@ -326,8 +326,10 @@ func (t Term) paintDiffLine(l string) string {
 // "1:  abc1234 = 1:  def5678 subject", either side possibly "-:  -------".
 func rangePair(l string) bool {
 	f := strings.Fields(l)
-	return len(f) >= 5 && strings.HasSuffix(f[0], ":") && strings.HasSuffix(f[3], ":") &&
-		strings.ContainsAny(f[2], "=!<>") && len(f[2]) == 1
+	if len(f) < 5 || len(f[2]) != 1 {
+		return false
+	}
+	return strings.HasSuffix(f[0], ":") && strings.HasSuffix(f[3], ":") && strings.ContainsAny(f[2], "=!<>")
 }
 
 // toolSGR matches the colour sequences build tools print.

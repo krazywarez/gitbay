@@ -92,20 +92,7 @@ func (s *Store) VerifyPageDomain(domain string, repoID int64) error {
 }
 
 func (s *Store) ListPageDomains(repoID int64) ([]PageDomain, error) {
-	rows, err := s.DB.Query(pageDomainSelect+" WHERE repo_id = ? ORDER BY domain", repoID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []PageDomain
-	for rows.Next() {
-		d, err := scanPageDomain(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanPageDomain, pageDomainSelect+" WHERE repo_id = ? ORDER BY domain", repoID)
 }
 
 // PageDomainRepo resolves a request host to the repo serving it. Only

@@ -69,26 +69,13 @@ func (s *Store) AddDiffComment(mrID, authorID int64, headSHA, path, side string,
 // see: everything published, plus their own pending ones. viewer 0 is an
 // anonymous reader, who sees only what is published.
 func (s *Store) ListDiffComments(mrID, viewer int64) ([]DiffComment, error) {
-	rows, err := s.DB.Query(`
+	return queryAll(s.DB, scanDiffComment, `
 		SELECT `+diffCommentCols+`
 		FROM mr_diff_comments c
 		JOIN users u ON u.id = c.author_id
 		LEFT JOIN users r ON r.id = c.resolved_by
 		WHERE c.mr_id = ?1 AND (c.pending = 0 OR c.author_id = ?2)
 		ORDER BY c.id`, mrID, viewer)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []DiffComment
-	for rows.Next() {
-		c, err := scanDiffComment(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
 }
 
 const diffCommentCols = `c.id, u.username, c.head_sha, c.path, c.side, c.line, c.start_line, c.body,

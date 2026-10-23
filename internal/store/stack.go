@@ -12,22 +12,9 @@ import (
 // OpenMRsByTarget lists the open merge requests in repoID targeting
 // targetRef, oldest first.
 func (s *Store) OpenMRsByTarget(repoID int64, targetRef string) ([]MR, error) {
-	rows, err := s.DB.Query(
+	return queryAll(s.DB, scanMR,
 		mrSelect+" WHERE m.repo_id = ? AND m.target_ref = ? AND m.state = 'open' ORDER BY m.number",
 		repoID, targetRef)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []MR
-	for rows.Next() {
-		m, err := scanMR(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
 }
 
 // OpenMRBySource finds the open merge request in repoID whose source is

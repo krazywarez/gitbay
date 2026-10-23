@@ -463,8 +463,7 @@ func (m MailInbound) validate() []error {
 		errs = append(errs, fmt.Errorf("mail.inbound.trusted_authserv_id %q must be a bare host name such as mx.google.com", id))
 	}
 	if a := m.ReplyAddress; a != "" {
-		local, domain, ok := strings.Cut(a, "@")
-		if !ok || local == "" || domain == "" || strings.ContainsAny(a, "+ <>\"\r\n") || strings.Contains(domain, "@") {
+		if !bareAddress(a) {
 			errs = append(errs, fmt.Errorf("mail.inbound.reply_address %q must be a bare address such as reply@example.org, with no + in it", a))
 		}
 	}
@@ -854,4 +853,14 @@ func (h HTTP) TrustedProxyNets() ([]*net.IPNet, error) {
 		nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
 	}
 	return nets, nil
+}
+
+// bareAddress reports whether a is local@domain and nothing else: no +,
+// spaces, angle brackets, quotes or line breaks.
+func bareAddress(a string) bool {
+	local, domain, ok := strings.Cut(a, "@")
+	if !ok || local == "" || domain == "" {
+		return false
+	}
+	return !strings.ContainsAny(a, "+ <>\"\r\n") && !strings.Contains(domain, "@")
 }

@@ -232,8 +232,10 @@ func (c *Ctx) shownAs(registered, full string) string {
 // other command's name, so it keeps its registered path.
 func (c *Ctx) shownBelow(registered, other string) string {
 	reg, cli, o := strings.Fields(registered), strings.Fields(c.CLIPath), strings.Fields(other)
-	if len(cli) == 0 || len(reg) == 0 || len(o) < len(reg) || cli[len(cli)-1] != reg[len(reg)-1] ||
-		!slices.Equal(o[:len(reg)-1], reg[:len(reg)-1]) {
+	if len(cli) == 0 || len(reg) == 0 || len(o) < len(reg) {
+		return other
+	}
+	if cli[len(cli)-1] != reg[len(reg)-1] || !slices.Equal(o[:len(reg)-1], reg[:len(reg)-1]) {
 		return other
 	}
 	return joinPath(append(slices.Clip(cli[:len(cli)-1]), o[len(reg)-1:]...))

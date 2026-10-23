@@ -11,20 +11,7 @@ const visibleCond = `(r.visibility = 'public' OR ` + reachableCond + `)`
 // VisibleRepos returns every repository the user may read, public ones
 // included, ordered by owner then name.
 func (s *Store) VisibleRepos(userID int64) ([]Repo, error) {
-	rows, err := s.DB.Query(repoSelect+" WHERE "+visibleCond+" ORDER BY 4, r.name", userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Repo
-	for rows.Next() {
-		r, err := scanRepo(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanRepo, repoSelect+" WHERE "+visibleCond+" ORDER BY 4, r.name", userID)
 }
 
 // SearchIssues returns issues matching q in title or body, newest

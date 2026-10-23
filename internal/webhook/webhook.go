@@ -69,8 +69,11 @@ func CheckAddrs(host string, ips []net.IP, allowLocal bool) error {
 var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
 
 func isForbidden(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsMulticast() || ip.IsUnspecified() || cgnat.Contains(ip)
+	switch {
+	case ip.IsLoopback(), ip.IsPrivate(), ip.IsLinkLocalUnicast(), ip.IsMulticast(), ip.IsUnspecified():
+		return true
+	}
+	return cgnat.Contains(ip)
 }
 
 type Deliverer struct {

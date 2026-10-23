@@ -172,20 +172,7 @@ func (s *Store) listMilestones(where string, args []any, state string, readable 
 		qargs = append(qargs, state)
 	}
 	q += " ORDER BY m.org_id IS NULL, m.due_date = '', m.due_date, m.title"
-	rows, err := s.DB.Query(q, qargs...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Milestone
-	for rows.Next() {
-		m, err := scanMilestone(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
+	return queryAll(s.DB, scanMilestone, q, qargs...)
 }
 
 // ListMilestones lists the milestones a repository sees, the org's first,
