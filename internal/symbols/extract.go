@@ -162,6 +162,11 @@ func extractGo(data []byte) []Symbol {
 		}
 		out = append(out, Symbol{Name: name, Key: id.Name, Kind: kind, Line: fset.Position(id.Pos()).Line})
 	}
+	addNames := func(ids []*ast.Ident, kind string) {
+		for _, id := range ids {
+			add(id, id.Name, kind)
+		}
+	}
 	for _, d := range f.Decls {
 		switch d := d.(type) {
 		case *ast.FuncDecl:
@@ -176,18 +181,16 @@ func extractGo(data []byte) []Symbol {
 			}
 			add(d.Name, recv+"."+d.Name.Name, "method")
 		case *ast.GenDecl:
+			kind := "var"
+			if d.Tok == token.CONST {
+				kind = "const"
+			}
 			for _, spec := range d.Specs {
 				switch s := spec.(type) {
 				case *ast.TypeSpec:
 					add(s.Name, s.Name.Name, "type")
 				case *ast.ValueSpec:
-					kind := "var"
-					if d.Tok == token.CONST {
-						kind = "const"
-					}
-					for _, n := range s.Names {
-						add(n, n.Name, kind)
-					}
+					addNames(s.Names, kind)
 				}
 			}
 		}

@@ -164,6 +164,12 @@ func runWebhookList(c *Ctx, args []string) int {
 }
 
 func runWebhookRemove(c *Ctx, args []string) int {
+	return runRepoItemAction(c, args, "webhook", c.Store.RemoveWebhook, "removed", "removed webhook %d")
+}
+
+// runRepoItemAction runs act on the <owner/name> <id> in args for a repo
+// admin and reports the id under key, with done as the plain line.
+func runRepoItemAction(c *Ctx, args []string, noun string, act func(repoID, id int64) error, key, done string) int {
 	if len(args) != 2 {
 		return c.usage()
 	}
@@ -173,16 +179,16 @@ func runWebhookRemove(c *Ctx, args []string) int {
 	}
 	id, err := strconv.ParseInt(args[1], 10, 64)
 	if err != nil {
-		return c.fail(protocol.ExitUsage, "bad webhook id %q", args[1])
+		return c.fail(protocol.ExitUsage, "bad %s id %q", noun, args[1])
 	}
-	if err := c.Store.RemoveWebhook(repo.ID, id); err != nil {
+	if err := act(repo.ID, id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "no webhook %d on %s", id, repo.Path())
+			return c.fail(protocol.ExitNotFound, "no %s %d on %s", noun, id, repo.Path())
 		}
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]any{"removed": id}, func(w io.Writer) {
-		fmt.Fprintf(w, "removed webhook %d\n", id)
+	return c.emit(map[string]any{key: id}, func(w io.Writer) {
+		fmt.Fprintf(w, done+"\n", id)
 	})
 }
 
@@ -265,24 +271,5 @@ func runWebhookDeliveries(c *Ctx, args []string) int {
 }
 
 func runWebhookRedeliver(c *Ctx, args []string) int {
-	if len(args) != 2 {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	id, err := strconv.ParseInt(args[1], 10, 64)
-	if err != nil {
-		return c.fail(protocol.ExitUsage, "bad delivery id %q", args[1])
-	}
-	if err := c.Store.Redeliver(repo.ID, id); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "no delivery %d on %s", id, repo.Path())
-		}
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(map[string]any{"requeued": id}, func(w io.Writer) {
-		fmt.Fprintf(w, "delivery %d requeued\n", id)
-	})
+	return runRepoItemAction(c, args, "delivery", c.Store.Redeliver, "requeued", "delivery %d requeued")
 }

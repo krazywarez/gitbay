@@ -166,26 +166,7 @@ func orDash(s string) string {
 }
 
 func runMirrorRemove(c *Ctx, args []string) int {
-	if len(args) != 2 {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
-	if code >= 0 {
-		return code
-	}
-	id, err := strconv.ParseInt(args[1], 10, 64)
-	if err != nil {
-		return c.fail(protocol.ExitUsage, "bad mirror id %q", args[1])
-	}
-	if err := c.Store.RemoveMirror(repo.ID, id); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "no mirror %d on %s", id, repo.Path())
-		}
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(map[string]any{"removed": id}, func(w io.Writer) {
-		fmt.Fprintf(w, "removed mirror %d\n", id)
-	})
+	return runRepoItemAction(c, args, "mirror", c.Store.RemoveMirror, "removed", "removed mirror %d")
 }
 
 func runMirrorSync(c *Ctx, args []string) int {

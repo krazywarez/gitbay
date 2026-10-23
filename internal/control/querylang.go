@@ -69,7 +69,7 @@ func queryTokens(s string) (toks []string, quoted []bool, err error) {
 				startQuoted = true
 			}
 			in, have = !in, true
-		case !in && (r == ' ' || r == '\t' || r == '\n' || r == '\r'):
+		case !in && strings.ContainsRune(" \t\n\r", r):
 			flush()
 		default:
 			cur.WriteRune(r)

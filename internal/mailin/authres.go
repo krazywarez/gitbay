@@ -83,22 +83,7 @@ func tokenize(s string) []token {
 			joined = false
 			i++
 		case c == '(':
-			depth := 0
-			for ; i < len(s); i++ {
-				if s[i] == '\\' {
-					i++
-					continue
-				}
-				if s[i] == '(' {
-					depth++
-				} else if s[i] == ')' {
-					depth--
-					if depth == 0 {
-						i++
-						break
-					}
-				}
-			}
+			i = commentEnd(s, i)
 			joined = false
 		case c == '"':
 			var b strings.Builder
@@ -131,6 +116,26 @@ func tokenize(s string) []token {
 		}
 	}
 	return out
+}
+
+// commentEnd is the index just past the comment opening at s[i], with
+// nested parentheses and backslash escapes; past the end when unclosed.
+func commentEnd(s string, i int) int {
+	depth := 0
+	for ; i < len(s); i++ {
+		switch s[i] {
+		case '\\':
+			i++
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return i
 }
 
 // splitResults splits tokens at each ";".

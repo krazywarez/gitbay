@@ -50,22 +50,29 @@ func (m *Mailer) Run(ctx context.Context) {
 				continue
 			}
 			for _, q := range due {
-				if err := mail.SendReplyTo(m.Cfg, q.Recipient, q.ReplyTo, q.Subject, q.Body); err != nil {
-					attempt := q.Attempts + 1
-					if attempt >= m.MaxAttempts {
-						m.St.MarkMailFailed(q.ID, err.Error(), nil)
-						slog.Warn("notification dead-lettered",
-							"mail", q.ID, "attempts", attempt, "err", redactAddresses(err.Error()))
-					} else {
-						next := time.Now().Add(m.RetryBase << (attempt - 1))
-						m.St.MarkMailFailed(q.ID, err.Error(), &next)
-					}
-					continue
-				}
-				m.St.MarkMailSent(q.ID)
+				m.deliver(q)
 			}
 		}
 	}
+}
+
+// deliver sends one queued mail, marking it sent, due again after a
+// backoff, or failed once it has had MaxAttempts.
+func (m *Mailer) deliver(q store.QueuedMail) {
+	err := mail.SendReplyTo(m.Cfg, q.Recipient, q.ReplyTo, q.Subject, q.Body)
+	if err == nil {
+		m.St.MarkMailSent(q.ID)
+		return
+	}
+	attempt := q.Attempts + 1
+	if attempt >= m.MaxAttempts {
+		m.St.MarkMailFailed(q.ID, err.Error(), nil)
+		slog.Warn("notification dead-lettered",
+			"mail", q.ID, "attempts", attempt, "err", redactAddresses(err.Error()))
+		return
+	}
+	next := time.Now().Add(m.RetryBase << (attempt - 1))
+	m.St.MarkMailFailed(q.ID, err.Error(), &next)
 }
 
 // A relay's rejection usually quotes the address it rejected — "550 5.1.1

@@ -37,35 +37,42 @@ func parsePython(read ReadFile) []Dep {
 		}
 	}
 	if raw, err := read("pyproject.toml"); err == nil {
-		var doc struct {
-			Project struct {
-				Dependencies []string `toml:"dependencies"`
-			} `toml:"project"`
-			Tool struct {
-				Poetry struct {
-					Dependencies    map[string]any `toml:"dependencies"`
-					DevDependencies map[string]any `toml:"dev-dependencies"`
-				} `toml:"poetry"`
-			} `toml:"tool"`
-		}
-		if toml.Unmarshal(raw, &doc) == nil {
-			for _, spec := range doc.Project.Dependencies {
-				name, version := splitPEP508(spec)
-				add(name, version)
-			}
-			poetry := doc.Tool.Poetry
-			for _, set := range []map[string]any{poetry.Dependencies, poetry.DevDependencies} {
-				for name, spec := range set {
-					// Poetry shares Cargo's two forms: a bare string, or a
-					// table that may point somewhere other than PyPI.
-					if req, ok := cargoRequirement(spec); ok {
-						add(name, req)
-					}
-				}
+		pyprojectDeps(raw, add)
+	}
+	return out
+}
+
+// pyprojectDeps adds the dependencies a pyproject.toml lists under
+// [project] and [tool.poetry].
+func pyprojectDeps(raw []byte, add func(name, version string)) {
+	var doc struct {
+		Project struct {
+			Dependencies []string `toml:"dependencies"`
+		} `toml:"project"`
+		Tool struct {
+			Poetry struct {
+				Dependencies    map[string]any `toml:"dependencies"`
+				DevDependencies map[string]any `toml:"dev-dependencies"`
+			} `toml:"poetry"`
+		} `toml:"tool"`
+	}
+	if toml.Unmarshal(raw, &doc) != nil {
+		return
+	}
+	for _, spec := range doc.Project.Dependencies {
+		name, version := splitPEP508(spec)
+		add(name, version)
+	}
+	poetry := doc.Tool.Poetry
+	for _, set := range []map[string]any{poetry.Dependencies, poetry.DevDependencies} {
+		for name, spec := range set {
+			// Poetry shares Cargo's two forms: a bare string, or a
+			// table that may point somewhere other than PyPI.
+			if req, ok := cargoRequirement(spec); ok {
+				add(name, req)
 			}
 		}
 	}
-	return out
 }
 
 // splitPEP508 separates the distribution name from its version specifier,

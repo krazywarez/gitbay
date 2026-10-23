@@ -334,86 +334,95 @@ type diffLayout struct {
 // forms are attached to the lines.
 func splitFiles(files []diffFile) {
 	for f := range files {
-		lines := files[f].Lines
-		var rows []splitRow
-		for i := 0; i < len(lines); {
-			ln := &lines[i]
-			switch ln.Class {
-			case "hunk", "meta":
-				if ln.Class == "meta" && ln.Path == "" && len(rows) > 0 && strings.HasPrefix(ln.Text, `\`) {
-					// a marker after a context line: neither side ends in a newline
-					if last := &rows[len(rows)-1]; last.Old != nil && last.Old == last.New {
-						last.OldNote, last.NewNote = ln.Text, ln.Text
-						i++
-						continue
-					}
-				}
-				rows = append(rows, splitRow{Kind: ln.Class, Text: ln.Text})
-				i++
-			case "ctx":
-				r := splitRow{Kind: "pair", Old: ln, New: ln, Threads: ln.Threads}
-				if ln.Compose {
-					r.Compose = ln
-				}
-				rows = append(rows, r)
-				i++
-			default:
-				var dels, adds []*diffLine
-				marker := func() string {
-					if i < len(lines) && lines[i].Class == "meta" && strings.HasPrefix(lines[i].Text, `\`) {
-						i++
-						return lines[i-1].Text
-					}
-					return ""
-				}
-				var oldNote, newNote string
-				for i < len(lines) && lines[i].Class == "del" {
-					dels = append(dels, &lines[i])
+		files[f].Rows = splitRows(files[f].Lines)
+	}
+}
+
+// splitRows pairs one file's deletions with its additions, side by side.
+func splitRows(lines []diffLine) []splitRow {
+	var rows []splitRow
+	for i := 0; i < len(lines); {
+		ln := &lines[i]
+		switch ln.Class {
+		case "hunk", "meta":
+			if ln.Class == "meta" && ln.Path == "" && len(rows) > 0 && strings.HasPrefix(ln.Text, `\`) {
+				// a marker after a context line: neither side ends in a newline
+				if last := &rows[len(rows)-1]; last.Old != nil && last.Old == last.New {
+					last.OldNote, last.NewNote = ln.Text, ln.Text
 					i++
-				}
-				if len(dels) > 0 {
-					oldNote = marker()
-				}
-				for i < len(lines) && lines[i].Class == "add" {
-					adds = append(adds, &lines[i])
-					i++
-				}
-				if len(adds) > 0 {
-					newNote = marker()
-				}
-				if len(dels)+len(adds) == 0 {
-					i++ // an unknown class: skip rather than loop
 					continue
 				}
-				first := len(rows)
-				for k := 0; k < len(dels) || k < len(adds); k++ {
-					r := splitRow{Kind: "pair"}
-					for _, l := range []*diffLine{pick(dels, k), pick(adds, k)} {
-						if l == nil {
-							continue
-						}
-						if l.Class == "del" {
-							r.Old = l
-						} else {
-							r.New = l
-						}
-						r.Threads = append(r.Threads, l.Threads...)
-						if l.Compose {
-							r.Compose = l
-						}
-					}
-					rows = append(rows, r)
+			}
+			rows = append(rows, splitRow{Kind: ln.Class, Text: ln.Text})
+			i++
+		case "ctx":
+			r := splitRow{Kind: "pair", Old: ln, New: ln, Threads: ln.Threads}
+			if ln.Compose {
+				r.Compose = ln
+			}
+			rows = append(rows, r)
+			i++
+		default:
+			var dels, adds []*diffLine
+			marker := func() string {
+				if i < len(lines) && lines[i].Class == "meta" && strings.HasPrefix(lines[i].Text, `\`) {
+					i++
+					return lines[i-1].Text
 				}
-				if len(dels) > 0 {
-					rows[first+len(dels)-1].OldNote = oldNote
-				}
-				if len(adds) > 0 {
-					rows[first+len(adds)-1].NewNote = newNote
-				}
+				return ""
+			}
+			var oldNote, newNote string
+			for i < len(lines) && lines[i].Class == "del" {
+				dels = append(dels, &lines[i])
+				i++
+			}
+			if len(dels) > 0 {
+				oldNote = marker()
+			}
+			for i < len(lines) && lines[i].Class == "add" {
+				adds = append(adds, &lines[i])
+				i++
+			}
+			if len(adds) > 0 {
+				newNote = marker()
+			}
+			if len(dels)+len(adds) == 0 {
+				i++ // an unknown class: skip rather than loop
+				continue
+			}
+			first := len(rows)
+			for k := 0; k < len(dels) || k < len(adds); k++ {
+				rows = append(rows, pairRow(pick(dels, k), pick(adds, k)))
+			}
+			if len(dels) > 0 {
+				rows[first+len(dels)-1].OldNote = oldNote
+			}
+			if len(adds) > 0 {
+				rows[first+len(adds)-1].NewNote = newNote
 			}
 		}
-		files[f].Rows = rows
 	}
+	return rows
+}
+
+// pairRow is the row showing del beside add; either may be nil.
+func pairRow(del, add *diffLine) splitRow {
+	r := splitRow{Kind: "pair"}
+	for _, l := range []*diffLine{del, add} {
+		if l == nil {
+			continue
+		}
+		if l.Class == "del" {
+			r.Old = l
+		} else {
+			r.New = l
+		}
+		r.Threads = append(r.Threads, l.Threads...)
+		if l.Compose {
+			r.Compose = l
+		}
+	}
+	return r
 }
 
 func pick(s []*diffLine, i int) *diffLine {

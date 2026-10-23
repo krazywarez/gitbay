@@ -164,21 +164,7 @@ func (s *Store) SetMRLabel(repo Repo, mrID int64, name string, add bool) error {
 // SetMRReviewRequest adds or removes a review request by user id — the
 // mr review request counterpart of SetIssueAssignee.
 func (s *Store) SetMRReviewRequest(mrID, userID int64, add bool) error {
-	if add {
-		_, err := s.DB.Exec(
-			"INSERT INTO mr_review_requests (mr_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-			mrID, userID)
-		return err
-	}
-	res, err := s.DB.Exec(
-		"DELETE FROM mr_review_requests WHERE mr_id = ? AND user_id = ?", mrID, userID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return s.setItemUser("mr_review_requests", "mr_id", mrID, userID, add)
 }
 
 // MRReviewRequestIDs returns who has been asked for a review, by id — for
@@ -496,29 +482,7 @@ func (s *Store) AddMRComment(mrID, authorID int64, body, format string) error {
 // UpdateMRText edits title, body, and/or markup format; nil leaves a field
 // unchanged.
 func (s *Store) UpdateMRText(mrID int64, title, body, format *string) error {
-	set, args := []string{}, []any{}
-	if title != nil {
-		set, args = append(set, "title = ?"), append(args, *title)
-	}
-	if body != nil {
-		set, args = append(set, "body = ?"), append(args, *body)
-	}
-	if format != nil {
-		set, args = append(set, "body_format = ?"), append(args, *format)
-	}
-	if len(set) == 0 {
-		return nil
-	}
-	set = append(set, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')")
-	args = append(args, mrID)
-	res, err := s.DB.Exec("UPDATE merge_requests SET "+strings.Join(set, ", ")+" WHERE id = ?", args...)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return s.updateText("merge_requests", mrID, title, body, format)
 }
 
 // AddMRSystemComment is the informational counterpart of AddMRComment.

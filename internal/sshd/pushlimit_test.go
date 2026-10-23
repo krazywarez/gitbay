@@ -35,8 +35,8 @@ func TestSilentPushKilledAtReceiveTimeout(t *testing.T) {
 	codec := make(chan int, 1)
 	start := time.Now()
 	go func() {
-		codec <- Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-			silentStdin(t), io.Discard, io.Discard, nil, nil, nil)
+		codec <- Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+			Streams{Stdin: silentStdin(t), Stdout: io.Discard, Stderr: io.Discard})
 	}()
 	slotTaken(t, pushes)
 	pushEnded(t, codec, pushes, 5*time.Second)
@@ -66,8 +66,8 @@ func TestPushKilledAtIdleOncePackStarts(t *testing.T) {
 	codec := make(chan int, 1)
 	start := time.Now()
 	go func() {
-		codec <- Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-			r, io.Discard, io.Discard, nil, nil, nil)
+		codec <- Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+			Streams{Stdin: r, Stdout: io.Discard, Stderr: io.Discard})
 	}()
 	slotTaken(t, pushes)
 	// The signature split across two writes still arms the rule.
@@ -116,8 +116,8 @@ func TestPushSilentBeforePackCompletes(t *testing.T) {
 		pw.Close()
 	}()
 	var errOut strings.Builder
-	if code := Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-		pr, io.Discard, &errOut, nil, nil, nil); code != 0 {
+	if code := Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+		Streams{Stdin: pr, Stdout: io.Discard, Stderr: &errOut}); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
 	out, err := exec.Command("git", "-C", control.RepoDir(cfg.Server.Root, "alice", "app"), "rev-parse", "refs/heads/main").Output()
@@ -160,8 +160,8 @@ func TestTricklingPushKilledAtReceiveTimeout(t *testing.T) {
 	codec := make(chan int, 1)
 	start := time.Now()
 	go func() {
-		codec <- Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-			r, io.Discard, io.Discard, nil, nil, nil)
+		codec <- Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+			Streams{Stdin: r, Stdout: io.Discard, Stderr: io.Discard})
 	}()
 	slotTaken(t, pushes)
 	pushEnded(t, codec, pushes, 5*time.Second)

@@ -140,20 +140,7 @@ func (s *Store) OwnerExists(name string) bool {
 }
 
 func (s *Store) UserByUsername(name string) (User, error) {
-	var u User
-	var admin, pending, disabled, ghost int
-	var deleteAfter sql.NullString
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled, delete_after, ghost FROM users WHERE username = ?", name).
-		Scan(&u.ID, &u.Username, &admin, &pending, &disabled, &deleteAfter, &ghost)
-	if errors.Is(err, sql.ErrNoRows) {
-		return u, ErrNotFound
-	}
-	u.IsAdmin = admin != 0
-	u.Pending = pending != 0
-	u.Disabled = disabled != 0
-	u.DeleteAfter = deleteAfter.String
-	u.Ghost = ghost != 0
-	return u, err
+	return s.userBy("username", name)
 }
 
 // UserEmailAddresses returns every address on the account, verified or not.
@@ -333,10 +320,15 @@ func (s *Store) SetDiffLayout(userID int64, layout string) error {
 }
 
 func (s *Store) UserByID(id int64) (User, error) {
+	return s.userBy("id", id)
+}
+
+// userBy reads the account whose column equals v.
+func (s *Store) userBy(column string, v any) (User, error) {
 	var u User
 	var admin, pending, disabled, ghost int
 	var deleteAfter sql.NullString
-	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled, delete_after, ghost FROM users WHERE id = ?", id).
+	err := s.DB.QueryRow("SELECT id, username, is_admin, pending, disabled, delete_after, ghost FROM users WHERE "+column+" = ?", v).
 		Scan(&u.ID, &u.Username, &admin, &pending, &disabled, &deleteAfter, &ghost)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
@@ -388,13 +380,19 @@ func (s *Store) AddSSHKeyFrom(userID int64, fingerprint, algo string, blob []byt
 // RemoveSSHKey removes a key owned by userID, bumps the key epoch, and
 // announces the revocation.
 func (s *Store) RemoveSSHKey(userID int64, fingerprint string) error {
+	return s.removeKey("DELETE FROM ssh_keys WHERE user_id = ? AND fingerprint = ? RETURNING id", userID, fingerprint)
+}
+
+// removeKey deletes the key that query (a DELETE ... RETURNING id)
+// matches, bumps the key epoch, and announces the revocation.
+func (s *Store) removeKey(query string, args ...any) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	var id int64
-	err = tx.QueryRow("DELETE FROM ssh_keys WHERE user_id = ? AND fingerprint = ? RETURNING id", userID, fingerprint).Scan(&id)
+	err = tx.QueryRow(query, args...).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -647,27 +645,7 @@ func (s *Store) ListDeployKeys(repoID int64) ([]SSHKey, error) {
 // RemoveDeployKey removes a deploy key from a repository by fingerprint;
 // any repo admin may remove it regardless of who added it.
 func (s *Store) RemoveDeployKey(repoID int64, fingerprint string) error {
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var id int64
-	err = tx.QueryRow(
+	return s.removeKey(
 		"DELETE FROM ssh_keys WHERE fingerprint = ? AND scope LIKE 'deploy:' || ? || ':%' RETURNING id",
-		fingerprint, repoID).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-	if err := bumpKeyEpoch(tx); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	s.announce(Revoked{KeyIDs: []int64{id}})
-	return nil
+		fingerprint, repoID)
 }

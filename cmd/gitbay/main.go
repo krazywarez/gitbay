@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -379,7 +380,7 @@ func isEmptyReader(r io.Reader) bool {
 // usesStdin reports whether the arguments request stdin content.
 func usesStdin(args []string) bool {
 	for i, a := range args {
-		if (a == "--file" || a == "--key" || a == "--secret") && i+1 < len(args) && args[i+1] == "-" {
+		if slices.Contains([]string{"--file", "--key", "--secret"}, a) && i+1 < len(args) && args[i+1] == "-" {
 			return true
 		}
 		if a == "--token-stdin" {
@@ -475,27 +476,33 @@ func local(use, short string, fn func(args []string) int) *cobra.Command {
 	}
 }
 
-func authCmd() *cobra.Command {
-	keysAdd := pass("add", passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
-	// keys add always reads stdin on the server; wire it through directly.
-	keysAdd.RunE = func(cmd *cobra.Command, args []string) error {
+// runWithStdin runs the server command with the args and what, read
+// from stdin, as its payload.
+func runWithStdin(server []string, what string) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
 		cliPath := cliPathOf(cmd)
 		for _, a := range args {
 			if a == "--help" || a == "-h" {
-				os.Exit(runServerHelp(passOpts{server: []string{"keys", "add"}}, cliPath))
+				os.Exit(runServerHelp(passOpts{server: server}, cliPath))
 			}
 		}
 		t, err := resolveTarget()
 		if err != nil {
 			return err
 		}
-		in, err := stdinPayload(os.Stdin, "an SSH public key", false)
+		in, err := stdinPayload(os.Stdin, what, false)
 		if err != nil {
 			return err
 		}
-		os.Exit(runSSH(t, withCLIPath(cliPath, "keys add", append([]string{"keys", "add"}, args...)), in))
+		os.Exit(runSSH(t, withCLIPath(cliPath, strings.Join(server, " "), slices.Concat(server, args)), in))
 		return nil
 	}
+}
+
+func authCmd() *cobra.Command {
+	keysAdd := pass("add", passOpts{server: []string{"keys", "add"}, alwaysStdin: true, stdinWhat: "an SSH public key"})
+	// keys add always reads stdin on the server; wire it through directly.
+	keysAdd.RunE = runWithStdin([]string{"keys", "add"}, "an SSH public key")
 	pgpAdd := &cobra.Command{
 		Use: "add", Short: "register an OpenPGP public key (armored, on stdin)",
 		Annotations: map[string]string{
@@ -504,24 +511,7 @@ func authCmd() *cobra.Command {
 			stdinWhat:  "an armored OpenPGP public key",
 		},
 		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cliPath := cliPathOf(cmd)
-			for _, a := range args {
-				if a == "--help" || a == "-h" {
-					os.Exit(runServerHelp(passOpts{server: []string{"pgp", "add"}}, cliPath))
-				}
-			}
-			t, err := resolveTarget()
-			if err != nil {
-				return err
-			}
-			in, err := stdinPayload(os.Stdin, "an armored OpenPGP public key", false)
-			if err != nil {
-				return err
-			}
-			os.Exit(runSSH(t, withCLIPath(cliPath, "pgp add", append([]string{"pgp", "add"}, args...)), in))
-			return nil
-		},
+		RunE:               runWithStdin([]string{"pgp", "add"}, "an armored OpenPGP public key"),
 	}
 	tokens := group("token", "API tokens (minted over SSH, used with the JSON API)",
 		pass("create", passOpts{server: []string{"token", "create"}}),

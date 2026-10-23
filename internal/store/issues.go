@@ -264,6 +264,12 @@ func (s *Store) QueryIssues(repoID int64, f IssueFilter) ([]Issue, error) {
 // UpdateIssueText edits title, body, and/or markup format; nil leaves a field
 // unchanged.
 func (s *Store) UpdateIssueText(issueID int64, title, body, format *string) error {
+	return s.updateText("issues", issueID, title, body, format)
+}
+
+// updateText sets whichever of title, body and body_format are given on
+// the row of table with id, and its updated_at.
+func (s *Store) updateText(table string, id int64, title, body, format *string) error {
 	set, args := []string{}, []any{}
 	if title != nil {
 		set, args = append(set, "title = ?"), append(args, *title)
@@ -278,8 +284,8 @@ func (s *Store) UpdateIssueText(issueID int64, title, body, format *string) erro
 		return nil
 	}
 	set = append(set, "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')")
-	args = append(args, issueID)
-	res, err := s.DB.Exec("UPDATE issues SET "+strings.Join(set, ", ")+" WHERE id = ?", args...)
+	args = append(args, id)
+	res, err := s.DB.Exec("UPDATE "+table+" SET "+strings.Join(set, ", ")+" WHERE id = ?", args...)
 	if err != nil {
 		return err
 	}
@@ -388,14 +394,18 @@ func (s *Store) SetIssueLabel(repo Repo, issueID int64, name string, add bool) e
 
 // SetIssueAssignee adds or removes an assignee by user id.
 func (s *Store) SetIssueAssignee(issueID, userID int64, add bool) error {
+	return s.setItemUser("issue_assignees", "issue_id", issueID, userID, add)
+}
+
+// setItemUser adds or removes the (item, user) row of a join table.
+func (s *Store) setItemUser(table, itemCol string, itemID, userID int64, add bool) error {
 	if add {
 		_, err := s.DB.Exec(
-			"INSERT INTO issue_assignees (issue_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-			issueID, userID)
+			"INSERT INTO "+table+" ("+itemCol+", user_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+			itemID, userID)
 		return err
 	}
-	res, err := s.DB.Exec(
-		"DELETE FROM issue_assignees WHERE issue_id = ? AND user_id = ?", issueID, userID)
+	res, err := s.DB.Exec("DELETE FROM "+table+" WHERE "+itemCol+" = ? AND user_id = ?", itemID, userID)
 	if err != nil {
 		return err
 	}

@@ -7,9 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
-
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
@@ -229,56 +226,23 @@ func trimPageExt(target string) string {
 // other relative targets (images) to the wiki raw route. Targets resolve
 // from the current page's folder, as wikiResolve describes.
 func rewriteWikiLinks(rendered template.HTML, p repoPage, page string, isPage, isFile func(string) bool) template.HTML {
-	ctx := &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div}
-	nodes, err := html.ParseFragment(strings.NewReader(string(rendered)), ctx)
-	if err != nil {
-		return rendered
-	}
 	base := "/" + p.Repo.Path() + "/wiki"
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-			for i, a := range n.Attr {
-				isHref := a.Key == "href" && n.Data == "a"
-				isSrc := a.Key == "src" && (n.Data == "img" || n.Data == "video" || n.Data == "source")
-				if !isHref && !isSrc {
-					continue
-				}
-				v := a.Val
-				if v == "" || strings.Contains(v, "://") || strings.HasPrefix(v, "/") ||
-					strings.HasPrefix(v, "#") || strings.HasPrefix(v, "mailto:") ||
-					strings.HasPrefix(v, "data:") {
-					continue
-				}
-				if isSrc {
-					if target, ok := wikiResolve(page, v, isFile); ok {
-						n.Attr[i].Val = base + "/_raw/" + target
-					}
-					continue
-				}
-				// A plain link is usually to another page, but a link to
-				// an existing non-page file (an .svg, .txt, .pdf) must
-				// go to _raw the same as an image src, or it 404s
-				// against the page route (#283).
-				if target, ok := wikiResolve(page, trimPageExt(v), isPage); ok {
-					if raw, rok := wikiResolve(page, v, isFile); rok && isFile(raw) && !isPage(target) {
-						n.Attr[i].Val = base + "/_raw/" + raw
-					} else {
-						n.Attr[i].Val = base + "/" + target
-					}
-				}
-			}
+	return rewriteRelativeTargets(rendered, func(v string, src bool) (string, bool) {
+		if src {
+			target, ok := wikiResolve(page, v, isFile)
+			return base + "/_raw/" + target, ok
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+		// A plain link is usually to another page, but a link to an
+		// existing non-page file (an .svg, .txt, .pdf) must go to _raw
+		// the same as an image src, or it 404s against the page route
+		// (#283).
+		target, ok := wikiResolve(page, trimPageExt(v), isPage)
+		if !ok {
+			return "", false
 		}
-	}
-	var out strings.Builder
-	for _, n := range nodes {
-		walk(n)
-		if err := html.Render(&out, n); err != nil {
-			return rendered
+		if raw, rok := wikiResolve(page, v, isFile); rok && isFile(raw) && !isPage(target) {
+			return base + "/_raw/" + raw, true
 		}
-	}
-	return template.HTML(out.String())
+		return base + "/" + target, true
+	})
 }

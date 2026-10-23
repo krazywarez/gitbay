@@ -682,8 +682,8 @@ func (c Config) Validate() error {
 			errs = append(errs, fmt.Errorf("registration.pending_expiry %q must be a positive duration such as 168h", c.Registration.PendingExpiry))
 		}
 	}
-	if c.Limits.MaxReposPerUser < 0 || c.Limits.MaxBytesPerUser < 0 || c.Limits.MaxSnippetsPerUser < 0 ||
-		c.Limits.MaxOrgsPerUser < 0 || c.Limits.MaxReposPerOrg < 0 || c.Limits.MaxBytesPerOrg < 0 {
+	if min(c.Limits.MaxReposPerUser, c.Limits.MaxSnippetsPerUser, c.Limits.MaxOrgsPerUser, c.Limits.MaxReposPerOrg) < 0 ||
+		min(c.Limits.MaxBytesPerUser, c.Limits.MaxBytesPerOrg) < 0 {
 		errs = append(errs, errors.New("limits.max_repos_per_user, max_bytes_per_user, max_snippets_per_user, max_orgs_per_user, max_repos_per_org and max_bytes_per_org must not be negative"))
 	}
 	for _, w := range []struct{ name, val string }{

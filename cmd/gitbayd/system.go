@@ -101,7 +101,7 @@ func shellCmd() *cobra.Command {
 			}
 			// Each forced command is its own process, so there is no
 			// shared pack or push budget in system mode.
-			code := sshd.Exec(cfg, st, nil, nil, user, key, control.ParseTerm(os.Getenv("GITBAY_TERM")), cmdline, os.Stdin, os.Stdout, os.Stderr, nil, nil, nil)
+			code := sshd.Exec(sshd.Backend{Cfg: cfg, St: st}, user, key, control.ParseTerm(os.Getenv("GITBAY_TERM")), cmdline, sshd.Streams{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
 			st.Close()
 			os.Exit(code)
 			return nil

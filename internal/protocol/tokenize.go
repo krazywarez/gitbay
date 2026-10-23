@@ -39,28 +39,9 @@ func Tokenize(s string) ([]string, error) {
 			i += end + 2
 		case c == '"':
 			inWord = true
-			i++
-			closed := false
-			for i < len(s) {
-				c = s[i]
-				if c == '"' {
-					closed = true
-					i++
-					break
-				}
-				if c == '\\' && i+1 < len(s) {
-					switch s[i+1] {
-					case '\\', '"', '$', '`':
-						cur.WriteByte(s[i+1])
-						i += 2
-						continue
-					}
-				}
-				cur.WriteByte(c)
-				i++
-			}
-			if !closed {
-				return nil, errors.New("unterminated double quote")
+			var err error
+			if i, err = doubleQuoted(s, i, &cur); err != nil {
+				return nil, err
 			}
 		case c == '\\':
 			if i+1 >= len(s) {
@@ -69,9 +50,7 @@ func Tokenize(s string) ([]string, error) {
 			inWord = true
 			cur.WriteByte(s[i+1])
 			i += 2
-		case c == '$' || c == '`' || c == ';' || c == '&' || c == '|' ||
-			c == '<' || c == '>' || c == '(' || c == ')' || c == '*' ||
-			c == '?' || c == '[' || c == '#' || c == '~':
+		case strings.IndexByte("$`;&|<>()*?[#~", c) >= 0:
 			// Unquoted shell metacharacters are rejected outright rather
 			// than passed through: there is no shell here, and silently
 			// treating them as literals would mask client quoting bugs.
@@ -86,4 +65,22 @@ func Tokenize(s string) ([]string, error) {
 		argv = append(argv, cur.String())
 	}
 	return argv, nil
+}
+
+// doubleQuoted writes the double-quoted string opening at s[i] to cur,
+// unescaping \\, \", \$ and \`, and returns the index past its closing
+// quote.
+func doubleQuoted(s string, i int, cur *strings.Builder) (int, error) {
+	for i++; i < len(s); i++ {
+		c := s[i]
+		if c == '"' {
+			return i + 1, nil
+		}
+		if c == '\\' && i+1 < len(s) && strings.IndexByte("\\\"$`", s[i+1]) >= 0 {
+			i++
+			c = s[i]
+		}
+		cur.WriteByte(c)
+	}
+	return i, errors.New("unterminated double quote")
 }

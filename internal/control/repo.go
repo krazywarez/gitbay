@@ -1266,10 +1266,12 @@ func runRepoPin(c *Ctx, args []string) int   { return setPinned(c, args, true) }
 func runRepoUnpin(c *Ctx, args []string) int { return setPinned(c, args, false) }
 
 func setPinned(c *Ctx, args []string, pin bool) int {
-	verb := "pin"
-	if !pin {
-		verb = "unpin"
-	}
+	return setRepoMark(c, args, pin, "pinned", "unpinned", c.Store.PinRepo, c.Store.UnpinRepo)
+}
+
+// setRepoMark marks a repository the caller can read with mark, or clears
+// it with unmark; done and undone are the words the output uses.
+func setRepoMark(c *Ctx, args []string, on bool, done, undone string, mark, unmark func(userID, repoID int64) error) int {
 	if len(args) != 1 {
 		return c.usage()
 	}
@@ -1277,53 +1279,33 @@ func setPinned(c *Ctx, args []string, pin bool) int {
 	if code >= 0 {
 		return code
 	}
-	if pin {
-		if err := c.Store.PinRepo(c.User.ID, repo.ID); err != nil {
+	word := done
+	if on {
+		if err := mark(c.User.ID, repo.ID); err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-	} else if err := c.Store.UnpinRepo(c.User.ID, repo.ID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "%s is not pinned", repo.Path())
+	} else {
+		word = undone
+		if err := unmark(c.User.ID, repo.ID); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return c.fail(protocol.ExitNotFound, "%s is not %s", repo.Path(), done)
+			}
+			return c.fail(protocol.ExitFailure, "%v", err)
 		}
-		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	return c.emit(map[string]string{verb + "ned": repo.Path()}, func(w io.Writer) {
-		fmt.Fprintf(w, "%sned %s\n", verb, repo.Path())
+	return c.emit(map[string]string{word: repo.Path()}, func(w io.Writer) {
+		fmt.Fprintf(w, "%s %s\n", word, repo.Path())
 	})
 }
 
 func runRepoBookmark(c *Ctx, args []string) int   { return setBookmarked(c, args, true) }
 func runRepoUnbookmark(c *Ctx, args []string) int { return setBookmarked(c, args, false) }
 
-// setBookmarked mirrors setPinned. A bookmark needs only read access —
-// bookmarking is something you do to someone else's repository, which is
-// the whole point of it — and a private repository you cannot read is
-// not found, as everywhere.
+// A bookmark needs only read access — bookmarking is something you do to
+// someone else's repository, which is the whole point of it — and a
+// private repository you cannot read is not found, as everywhere.
 func setBookmarked(c *Ctx, args []string, on bool) int {
-	verb := "bookmark"
-	if !on {
-		verb = "unbookmark"
-	}
-	if len(args) != 1 {
-		return c.usage()
-	}
-	repo, code := resolveRepo(c, args[0], policy.CanRead)
-	if code >= 0 {
-		return code
-	}
-	if on {
-		if err := c.Store.BookmarkRepo(c.User.ID, repo.ID); err != nil {
-			return c.fail(protocol.ExitFailure, "%v", err)
-		}
-	} else if err := c.Store.UnbookmarkRepo(c.User.ID, repo.ID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return c.fail(protocol.ExitNotFound, "%s is not bookmarked", repo.Path())
-		}
-		return c.fail(protocol.ExitFailure, "%v", err)
-	}
-	return c.emit(map[string]string{verb + "ed": repo.Path()}, func(w io.Writer) {
-		fmt.Fprintf(w, "%sed %s\n", verb, repo.Path())
-	})
+	return setRepoMark(c, args, on, "bookmarked", "unbookmarked", c.Store.BookmarkRepo, c.Store.UnbookmarkRepo)
 }
 
 // BookmarkOut is one row of `repo bookmarks`: the repository and how many

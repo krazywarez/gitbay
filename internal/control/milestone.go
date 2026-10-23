@@ -217,13 +217,7 @@ func runIssueMilestone(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	if code := refuseArchived(c, repo); code >= 0 {
-		return code
-	}
-	if len(args) != 3 {
-		return c.usage()
-	}
-	return setItemMilestone(c, repo, "issue", issue.Number, args[2], func(id int64) error {
+	return setItemMilestone(c, repo, args, "issue", issue.Number, func(id int64) error {
 		return c.Store.SetIssueMilestone(issue.ID, id)
 	})
 }
@@ -233,13 +227,7 @@ func runMRMilestone(c *Ctx, args []string) int {
 	if code >= 0 {
 		return code
 	}
-	if code := refuseArchived(c, repo); code >= 0 {
-		return code
-	}
-	if len(args) != 3 {
-		return c.usage()
-	}
-	return setItemMilestone(c, repo, "mr", mr.Number, args[2], func(id int64) error {
+	return setItemMilestone(c, repo, args, "mr", mr.Number, func(id int64) error {
 		return c.Store.SetMRMilestone(mr.ID, id)
 	})
 }
@@ -255,8 +243,16 @@ func recordItemMilestone(c *Ctx, repo store.Repo, noun string, number, id int64,
 	return nil
 }
 
-// noun and number name what the milestone was set on, for the event.
-func setItemMilestone(c *Ctx, repo store.Repo, noun string, number int64, title string, set func(int64) error) int {
+// setItemMilestone sets the milestone args[2] titles through set. noun and
+// number name what it was set on, for the event.
+func setItemMilestone(c *Ctx, repo store.Repo, args []string, noun string, number int64, set func(int64) error) int {
+	if code := refuseArchived(c, repo); code >= 0 {
+		return code
+	}
+	if len(args) != 3 {
+		return c.usage()
+	}
+	title := args[2]
 	var id int64
 	if title != "none" {
 		m, err := c.Store.MilestoneByTitle(repo, title)

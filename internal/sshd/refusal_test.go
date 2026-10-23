@@ -58,8 +58,8 @@ func TestRefusedPushIsAudited(t *testing.T) {
 		bob.Pending = pending
 		key := store.SSHKey{Scope: "full", Fingerprint: "SHA256:test"}
 		var out, errOut bytes.Buffer
-		code := Exec(cfg, st, nil, nil, bob, key, control.Term{}, "git-receive-pack alice/app",
-			strings.NewReader(""), &out, &errOut, nil, nil, nil)
+		code := Exec(Backend{Cfg: cfg, St: st}, bob, key, control.Term{}, "git-receive-pack alice/app",
+			Streams{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut})
 		if code != protocol.ExitDenied {
 			t.Fatalf("pending %v: exit %d: %s", pending, code, errOut.String())
 		}
@@ -85,8 +85,8 @@ func TestCloneRefusedWhenPackSlotsAreFull(t *testing.T) {
 	key := store.SSHKey{Scope: "full", Fingerprint: "SHA256:test"}
 	for _, service := range []string{"git-upload-pack", "git-upload-archive"} {
 		var out, errOut bytes.Buffer
-		code := Exec(cfg, st, packs, nil, bob, key, control.Term{}, service+" alice/app",
-			strings.NewReader(""), &out, &errOut, nil, nil, nil)
+		code := Exec(Backend{Cfg: cfg, St: st, Packs: packs}, bob, key, control.Term{}, service+" alice/app",
+			Streams{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut})
 		if code != protocol.ExitFailure || !strings.Contains(errOut.String(), "busy") {
 			t.Fatalf("%s: exit %d: %q", service, code, errOut.String())
 		}
@@ -108,8 +108,8 @@ func TestPushBypassesPackLimitAndCloneReleasesSlot(t *testing.T) {
 	packs := packlimit.New(1, 0, 0, time.Second)
 
 	var out, errOut bytes.Buffer
-	if code := Exec(cfg, st, packs, nil, alice, key, control.Term{}, "git-upload-pack alice/app",
-		strings.NewReader("0000"), &out, &errOut, nil, nil, nil); code != protocol.ExitOK {
+	if code := Exec(Backend{Cfg: cfg, St: st, Packs: packs}, alice, key, control.Term{}, "git-upload-pack alice/app",
+		Streams{Stdin: strings.NewReader("0000"), Stdout: &out, Stderr: &errOut}); code != protocol.ExitOK {
 		t.Fatalf("clone: exit %d: %s", code, errOut.String())
 	}
 	hold, err := packs.Acquire(nil, "ip:elsewhere")
@@ -120,8 +120,8 @@ func TestPushBypassesPackLimitAndCloneReleasesSlot(t *testing.T) {
 
 	out.Reset()
 	errOut.Reset()
-	if code := Exec(cfg, st, packs, nil, alice, key, control.Term{}, "git-receive-pack alice/app",
-		strings.NewReader("0000"), &out, &errOut, nil, nil, nil); code != protocol.ExitOK {
+	if code := Exec(Backend{Cfg: cfg, St: st, Packs: packs}, alice, key, control.Term{}, "git-receive-pack alice/app",
+		Streams{Stdin: strings.NewReader("0000"), Stdout: &out, Stderr: &errOut}); code != protocol.ExitOK {
 		t.Fatalf("push with slots full: exit %d: %s", code, errOut.String())
 	}
 }
@@ -161,8 +161,8 @@ func killedClone(t *testing.T, stdout io.Writer, done, stopping, revoked <-chan 
 	packs := packlimit.New(1, 0, 0, time.Second)
 	codec := make(chan int, 1)
 	go func() {
-		codec <- Exec(cfg, st, packs, nil, alice, key, control.Term{}, "git-upload-pack alice/app",
-			silentStdin(t), stdout, io.Discard, done, stopping, revoked)
+		codec <- Exec(Backend{Cfg: cfg, St: st, Packs: packs}, alice, key, control.Term{}, "git-upload-pack alice/app",
+			Streams{Stdin: silentStdin(t), Stdout: stdout, Stderr: io.Discard, Done: done, Stopping: stopping, Revoked: revoked})
 	}()
 	select {
 	case code := <-codec:
@@ -210,8 +210,8 @@ func TestCloneRunsOnDuringRestart(t *testing.T) {
 	key := store.SSHKey{Scope: "full", Fingerprint: "SHA256:test"}
 	packs := packlimit.New(1, 0, 0, time.Second)
 	var errOut bytes.Buffer
-	if code := Exec(cfg, st, packs, nil, alice, key, control.Term{}, "git-upload-pack alice/app",
-		strings.NewReader("0000"), io.Discard, &errOut, closed(), closed(), nil); code != protocol.ExitOK {
+	if code := Exec(Backend{Cfg: cfg, St: st, Packs: packs}, alice, key, control.Term{}, "git-upload-pack alice/app",
+		Streams{Stdin: strings.NewReader("0000"), Stdout: io.Discard, Stderr: &errOut, Done: closed(), Stopping: closed()}); code != protocol.ExitOK {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
 }
@@ -235,8 +235,8 @@ func TestRefusedCloneStaysOffLimiter(t *testing.T) {
 	defer hold()
 	key := store.SSHKey{Scope: "full", Fingerprint: "SHA256:test"}
 	var out, errOut bytes.Buffer
-	code := Exec(cfg, st, packs, nil, bob, key, control.Term{}, "git-upload-pack alice/secret",
-		strings.NewReader(""), &out, &errOut, nil, nil, nil)
+	code := Exec(Backend{Cfg: cfg, St: st, Packs: packs}, bob, key, control.Term{}, "git-upload-pack alice/secret",
+		Streams{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut})
 	if code != protocol.ExitNotFound || strings.Contains(errOut.String(), "busy") {
 		t.Fatalf("exit %d: %q", code, errOut.String())
 	}
@@ -282,8 +282,8 @@ func TestPushPerPrincipalCap(t *testing.T) {
 	push := func(k store.SSHKey, stdin io.Reader, errOut io.Writer) <-chan int {
 		codec := make(chan int, 1)
 		go func() {
-			codec <- Exec(cfg, st, nil, pushes, alice, k, control.Term{}, "git-receive-pack alice/app",
-				stdin, io.Discard, errOut, nil, nil, nil)
+			codec <- Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, k, control.Term{}, "git-receive-pack alice/app",
+				Streams{Stdin: stdin, Stdout: io.Discard, Stderr: errOut})
 		}()
 		return codec
 	}
@@ -320,8 +320,8 @@ func TestPushPerPrincipalCap(t *testing.T) {
 	queuedFor(t, pushes, principal)
 
 	var errOut bytes.Buffer
-	if code := Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-		strings.NewReader(""), io.Discard, &errOut, nil, nil, nil); code != protocol.ExitFailure ||
+	if code := Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+		Streams{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: &errOut}); code != protocol.ExitFailure ||
 		!strings.Contains(errOut.String(), "limit of concurrent pushes") {
 		t.Fatalf("third push: exit %d: %q", code, errOut.String())
 	}
@@ -354,8 +354,8 @@ func TestPushKilledWhenKeyRevokedReleasesSlot(t *testing.T) {
 	revoked := make(chan struct{})
 	codec := make(chan int, 1)
 	go func() {
-		codec <- Exec(cfg, st, nil, pushes, alice, key, control.Term{}, "git-receive-pack alice/app",
-			silentStdin(t), io.Discard, io.Discard, nil, nil, revoked)
+		codec <- Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, alice, key, control.Term{}, "git-receive-pack alice/app",
+			Streams{Stdin: silentStdin(t), Stdout: io.Discard, Stderr: io.Discard, Revoked: revoked})
 	}()
 	slotTaken(t, pushes)
 	close(revoked)
@@ -407,8 +407,8 @@ func TestRefusedPushStaysOffLimiter(t *testing.T) {
 	defer hold()
 	key := store.SSHKey{Scope: "full", Fingerprint: "SHA256:test"}
 	var errOut bytes.Buffer
-	code := Exec(cfg, st, nil, pushes, bob, key, control.Term{}, "git-receive-pack alice/app",
-		strings.NewReader(""), io.Discard, &errOut, nil, nil, nil)
+	code := Exec(Backend{Cfg: cfg, St: st, Pushes: pushes}, bob, key, control.Term{}, "git-receive-pack alice/app",
+		Streams{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: &errOut})
 	if code != protocol.ExitDenied || strings.Contains(errOut.String(), "busy") {
 		t.Fatalf("exit %d: %q", code, errOut.String())
 	}

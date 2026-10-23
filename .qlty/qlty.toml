@@ -76,3 +76,11 @@ enabled = false
 
 [smells.file_complexity]
 enabled = false
+
+# Six or seven parameters is ordinary for an unexported Go helper.
+[smells.function_parameters]
+threshold = 8
+
+# The store's hand-written queries each scan their rows in the same loop.
+[language.go.smells.duplication]
+filter_patterns = ["(import_declaration _)", "(for_statement (call_expression function: (selector_expression field: (field_identifier) @_f)) (#eq? @_f \"Next\"))"]

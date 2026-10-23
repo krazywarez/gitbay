@@ -111,6 +111,22 @@ type helpEntry struct {
 	Examples []string `json:"examples,omitempty"`
 }
 
+// aliasPaths maps each registered command path under an aliased noun to
+// the path the CLI shows for it.
+func aliasPaths(aliased []nounAlias) map[string]string {
+	paths := map[string]string{}
+	for _, cmd := range registry {
+		p := joinPath(cmd.Path)
+		for _, a := range aliased {
+			if p == a.Registered || strings.HasPrefix(p, a.Registered+" ") {
+				paths[p] = a.CLI + strings.TrimPrefix(p, a.Registered)
+				break
+			}
+		}
+	}
+	return paths
+}
+
 // runHelp lists the registry, sorted, so a noun's commands sit together.
 // Bare `help` stays one line per command. A prefix that names one command
 // exactly renders its full USAGE/FLAGS/EXAMPLES; a prefix that names a
@@ -125,15 +141,7 @@ func runHelp(c *Ctx, args []string) int {
 			prefixes = append(prefixes, a.Registered)
 		}
 		if c.CLIPath != "" {
-			for _, cmd := range registry {
-				p := joinPath(cmd.Path)
-				for _, a := range aliased {
-					if p == a.Registered || strings.HasPrefix(p, a.Registered+" ") {
-						override[p] = a.CLI + strings.TrimPrefix(p, a.Registered)
-						break
-					}
-				}
-			}
+			override = aliasPaths(aliased)
 		}
 	}
 	var matched []Command

@@ -427,7 +427,8 @@ func (s *Server) runExec(c *conn, sconn *ssh.ServerConn, ch ssh.Channel, term co
 		return protocol.ExitDenied
 	}
 	_ = s.st.TouchSSHKey(keyID)
-	return Exec(s.cfg, s.st, s.packs, s.pushes, user, key, term, cmdline, ch, ch, ch.Stderr(), done, s.stopping, c.revoked)
+	return Exec(Backend{Cfg: s.cfg, St: s.st, Packs: s.packs, Pushes: s.pushes}, user, key, term, cmdline,
+		Streams{Stdin: ch, Stdout: ch, Stderr: ch.Stderr(), Done: done, Stopping: s.stopping, Revoked: c.revoked})
 }
 
 // runAnonymous handles a session from an unregistered key: the register
@@ -460,13 +461,29 @@ func (s *Server) runAnonymous(ch ssh.Channel, keyB64, cmdline string) int {
 	return control.RunRegister(s.cfg, s.st, pub, argv, ch, ch.Stderr())
 }
 
+// Backend is what a command runs against. Packs bounds clones and fetches,
+// and repo download; Pushes bounds receive-pack. A nil limiter is no limit.
+type Backend struct {
+	Cfg           config.Config
+	St            *store.Store
+	Packs, Pushes *packlimit.Limiter
+}
+
+// Streams are a command's input and output and the channels that end it.
+// Closing Revoked kills a git transport.
+type Streams struct {
+	Stdin                   io.Reader
+	Stdout, Stderr          io.Writer
+	Done, Stopping, Revoked <-chan struct{}
+}
+
 // Exec runs one SSH exec command line for an authenticated key. It is the
 // single dispatch path shared by the embedded listener and the system-sshd
-// forced command (gitbayd shell). Closing revoked kills a git transport.
-// packs bounds clones and fetches, and repo download; pushes bounds
-// receive-pack. A nil limiter is no limit.
-func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, user store.User, key store.SSHKey, term control.Term, cmdline string,
-	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
+// forced command (gitbayd shell).
+func Exec(b Backend, user store.User, key store.SSHKey, term control.Term, cmdline string, s Streams) int {
+	cfg, st, packs := b.Cfg, b.St, b.Packs
+	stdin, stdout, stderr := s.Stdin, s.Stdout, s.Stderr
+	done, stopping := s.Done, s.Stopping
 	// A person signing in with a full-scope key cancels a scheduled
 	// deletion; automation on narrower keys is refused and cannot.
 	if user.Disabled && user.DeleteAfter != "" && key.Scope == "full" && control.CancelScheduledDeletion(st, &user, "ssh") {
@@ -492,7 +509,7 @@ func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, 
 			if user.Pending {
 				fmt.Fprintln(stderr, "your account is not active yet: verify your email first")
 			} else {
-				code = runGit(cfg, st, packs, pushes, user, key, argv, stdin, stdout, stderr, done, stopping, revoked)
+				code = runGit(b, user, key, argv, s)
 			}
 			// A refused push is a refused write, audited like one. runGit
 			// refuses only with the path as the one argument, so argv[1:]
@@ -530,9 +547,40 @@ func Exec(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, 
 	return control.Dispatch(ctx, argv)
 }
 
+// cutStalledPush closes kill and the client's streams when the key is
+// revoked, the push goes idle, or receiving fires before pre-receive has
+// started. started arms the idle rule and retires receiving. It returns
+// when finished closes.
+func cutStalledPush(finished, started, revoked, idle <-chan struct{}, receiving <-chan time.Time, arm func(), kill chan struct{}, client ...any) {
+	for {
+		select {
+		case <-finished:
+			return
+		case <-started:
+			arm()
+			started, receiving = nil, nil
+			continue
+		case <-revoked:
+		case <-idle:
+		case <-receiving:
+		}
+		close(kill)
+		// A read blocked on a silent client outlives git; closing the
+		// channel ends it and the stdin copy, so Transport's Wait returns.
+		for _, c := range client {
+			if c, ok := c.(io.Closer); ok {
+				c.Close()
+			}
+		}
+		return
+	}
+}
+
 // runGit streams a git transport service after access checks.
-func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter, user store.User, key store.SSHKey, argv []string,
-	stdin io.Reader, stdout, stderr io.Writer, done, stopping, revoked <-chan struct{}) int {
+func runGit(b Backend, user store.User, key store.SSHKey, argv []string, s Streams) int {
+	cfg, st, packs, pushes := b.Cfg, b.St, b.Packs, b.Pushes
+	stdin, stdout, stderr := s.Stdin, s.Stdout, s.Stderr
+	done, stopping, revoked := s.Done, s.Stopping, s.Revoked
 	service, scope := argv[0], key.Scope
 	if len(argv) != 2 {
 		fmt.Fprintf(stderr, "usage: %s <path>\n", service)
@@ -663,32 +711,7 @@ func runGit(cfg config.Config, st *store.Store, packs, pushes *packlimit.Limiter
 			kill := make(chan struct{})
 			finished := make(chan struct{})
 			defer close(finished)
-			go func() {
-				receiving := deadline.C
-				for {
-					select {
-					case <-finished:
-						return
-					case <-started:
-						arm()
-						started, receiving = nil, nil
-						continue
-					case <-revoked:
-					case <-idle:
-					case <-receiving:
-					}
-					close(kill)
-					// A read blocked on a silent client outlives git;
-					// closing the channel ends it and the stdin copy, so
-					// Transport's Wait returns.
-					for _, c := range []any{client, clientOut} {
-						if c, ok := c.(io.Closer); ok {
-							c.Close()
-						}
-					}
-					return
-				}
-			}()
+			go cutStalledPush(finished, started, revoked, idle, deadline.C, arm, kill, client, clientOut)
 			cancel = kill
 		}
 	}

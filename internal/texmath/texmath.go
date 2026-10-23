@@ -66,7 +66,7 @@ func Convert(tex string, display bool) (string, error) {
 		return "", errors.New("texmath: invalid UTF-8")
 	}
 	for _, r := range tex {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7F || r == 0xFFFE || r == 0xFFFF {
+		if isControl(r) {
 			return "", errors.New("texmath: control character")
 		}
 	}
@@ -206,6 +206,19 @@ func (p *parser) next() token {
 var starred = map[string]bool{"operatorname": true}
 
 func isASCIILetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
+func isDigit(c byte) bool       { return c >= '0' && c <= '9' }
+
+// isControl is a C0 control other than tab and the line ends, DEL, or
+// the noncharacters U+FFFE and U+FFFF.
+func isControl(r rune) bool {
+	switch r {
+	case '\t', '\n', '\r':
+		return false
+	case 0x7F, 0xFFFE, 0xFFFF:
+		return true
+	}
+	return r < 0x20
+}
 
 func (p *parser) unexpected(t token) error {
 	switch t.kind {
@@ -402,7 +415,7 @@ func (p *parser) charAtom(t token) (*node, error) {
 		num := t.val
 		for p.pos < len(p.src) {
 			c := p.src[p.pos]
-			if c >= '0' && c <= '9' || c == '.' && p.pos+1 < len(p.src) && p.src[p.pos+1] >= '0' && p.src[p.pos+1] <= '9' {
+			if isDigit(c) || c == '.' && p.pos+1 < len(p.src) && isDigit(p.src[p.pos+1]) {
 				num += string(c)
 				p.pos++
 				continue

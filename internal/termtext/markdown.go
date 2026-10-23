@@ -80,12 +80,12 @@ func (r mdRenderer) block(n ast.Node, first, rest string) {
 			for c := item.FirstChild(); c != nil; c = c.NextSibling() {
 				if c == item.FirstChild() {
 					r.block(c, p+marker, hang)
-				} else {
-					if !n.IsTight {
-						r.w.blank()
-					}
-					r.block(c, hang, hang)
+					continue
 				}
+				if !n.IsTight {
+					r.w.blank()
+				}
+				r.block(c, hang, hang)
 			}
 			p = rest
 		}
