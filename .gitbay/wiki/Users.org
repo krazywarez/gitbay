@@ -238,6 +238,9 @@ gitbay repo settings require-mr you/project on      # protected branches: merge 
 gitbay repo settings protect-tag you/project 'v*'   # matching tags: created once, never moved or deleted
 gitbay repo settings default-branch you/project trunk # HEAD, and what the web shows
 gitbay repo settings require-signed you/project on  # every commit must verify
+gitbay repo settings secret-scan you/project block  # off | warn (default) | block
+gitbay repo settings secret-scan-allow you/project 'testdata/**'  # paths whose findings are ignored
+gitbay repo secret-scan you/project                 # scan the whole history
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
 gitbay repo search forge                            # find repos by name/description/topic
@@ -248,6 +251,21 @@ gitbay repo unpin you/project
 gitbay repo archive you/project                     # read-only: pushes and issue/MR
 gitbay repo unarchive you/project                   #   writes refused, browsing intact
 #+end_src
+
+Every push is scanned for credentials in formats that identify
+themselves: private key blocks, cloud and forge tokens with a vendor
+prefix (AWS, GitHub, GitLab, gitbay, Slack, Stripe, Google, npm, PyPI,
+OpenAI, Anthropic, SendGrid, DigitalOcean, Shopify), and age secret
+keys. The pre-receive hook reads the files the push adds or changes
+and reports the commit, path, line and kind of each match, never the
+value. Under =warn=, the default, the push is accepted and the pusher
+sees where; the finding is recorded in the audit log. Under =block= the
+push is refused, and so is a push the scan could not complete. A scan
+reads at most 64 MiB, skips files over 1 MiB and binary files, and
+stops after 90 seconds; a scan cut short says so. Merge commits are not
+diffed. Content that does not pass through a push — =repo import=, pull
+mirrors, the web editor, applied suggestions — is covered only by
+=repo secret-scan=, which an admin runs over every ref.
 
 A push to the default branch queues a symbol index of its tree, built in
 the background after the push completes; a tree that is already indexed

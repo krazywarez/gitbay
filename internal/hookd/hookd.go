@@ -6,6 +6,10 @@
 // pre-receive is two-phase when the repo requires signed commits: the first
 // response sets NeedCommits, and the hook answers with the raw commit
 // objects (only the hook can read them out of quarantine) for verification.
+// A further phase follows when the repo's secret scan is on: the response
+// sets ScanSecrets, the hook scans the incoming blobs and answers with a
+// leaks.Report — where each match is, never what it matched — and the
+// daemon decides what the findings mean for the push.
 package hookd
 
 import (
@@ -16,12 +20,14 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/leaks"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/sig"
 	"gitbay.org/gitbay/internal/store"
@@ -64,10 +70,13 @@ type RawCommit struct {
 // Done marks the end of the commit stream.
 func (c RawCommit) Done() bool { return c.SHA == "" }
 
+// Response is the daemon's answer. A Message on an allowed push is a
+// warning the hook prints for the pusher.
 type Response struct {
 	Allow       bool   `json:"allow"`
 	Message     string `json:"message,omitempty"`
 	NeedCommits bool   `json:"need_commits,omitempty"`
+	ScanSecrets bool   `json:"scan_secrets,omitempty"`
 }
 
 // SocketPath returns the hook socket location. It prefers the server root,
@@ -204,14 +213,41 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		s.refusePush(enc, req, repo, msg)
 		return
 	}
-	if !repo.Settings.RequireSignedCommits {
-		enc.Encode(Response{Allow: true})
-		return
+	if repo.Settings.RequireSignedCommits {
+		if msg, ok := s.verifyIncoming(dec, enc); !ok {
+			return
+		} else if msg != "" {
+			s.refusePush(enc, req, repo, msg)
+			return
+		}
 	}
+	warning := ""
+	if leaks.Mode(repo.Settings.SecretScan) != leaks.ModeOff {
+		if err := enc.Encode(Response{Allow: true, ScanSecrets: true}); err != nil {
+			return
+		}
+		var rep leaks.Report
+		if err := dec.Decode(&rep); err != nil {
+			enc.Encode(Response{Allow: false, Message: "bad secret scan payload"})
+			return
+		}
+		msg, refuse := s.judgeSecrets(req, repo, rep)
+		if refuse {
+			s.refusePush(enc, req, repo, msg)
+			return
+		}
+		warning = msg
+	}
+	enc.Encode(Response{Allow: true, Message: warning})
+}
 
-	// Phase two: ask the hook for the incoming commit objects.
+// verifyIncoming is the signed-commits phase: it asks the hook for the
+// incoming commit objects and verifies each. ok is false when the exchange
+// itself failed and has been answered; otherwise msg is the refusal, or ""
+// when every commit verified.
+func (s *Server) verifyIncoming(dec *json.Decoder, enc *json.Encoder) (msg string, ok bool) {
 	if err := enc.Encode(Response{Allow: true, NeedCommits: true}); err != nil {
-		return
+		return "", false
 	}
 	// Each commit is verified as it arrives, so nothing holds the push in
 	// memory. The first refusal decides the answer, but the stream is
@@ -224,7 +260,7 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 		var rc RawCommit
 		if err := dec.Decode(&rc); err != nil {
 			enc.Encode(Response{Allow: false, Message: "bad commits payload"})
-			return
+			return "", false
 		}
 		if rc.Done() {
 			break
@@ -246,11 +282,45 @@ func (s *Server) preReceive(req Request, dec *json.Decoder, enc *json.Encoder) {
 			refusal = fmt.Sprintf("this repository requires signed commits: %.10s is %s", rc.SHA, state)
 		}
 	}
-	if refusal != "" {
-		s.refusePush(enc, req, repo, refusal)
-		return
+	return refusal, true
+}
+
+// judgeSecrets applies the repository's mode and allowlist to the hook's
+// scan. It returns the message for the pusher, and whether the push is
+// refused. A scan that failed refuses under block, since block promises
+// nothing unscanned lands, and warns under warn. Accepted findings are
+// audited, so they are on record after the warning scrolls away.
+func (s *Server) judgeSecrets(req Request, repo store.Repo, rep leaks.Report) (string, bool) {
+	block := leaks.Mode(repo.Settings.SecretScan) == leaks.ModeBlock
+	if rep.Error != "" {
+		msg := "secret scan failed: " + rep.Error
+		if block {
+			return msg + "\nthis repository blocks pushes it cannot scan", true
+		}
+		return msg, false
 	}
-	enc.Encode(Response{Allow: true})
+	found := leaks.Allowed(rep.Findings, repo.Settings.SecretScanAllow)
+	if len(found) == 0 {
+		return "", false
+	}
+	if block {
+		return leaks.Describe("secret scan: refused, "+leaks.Plural(len(found))+" in this push:", found, rep.Truncated) +
+			"\nremove them from the commits and push again; an admin can allow a path with" +
+			"\n  repo settings secret-scan-allow " + repo.Path() + " <glob>...", true
+	}
+	rules := map[string]bool{}
+	for _, f := range found {
+		rules[f.Rule] = true
+	}
+	ruleList := make([]string, 0, len(rules))
+	for r := range rules {
+		ruleList = append(ruleList, r)
+	}
+	slices.Sort(ruleList)
+	s.st.Audit(req.UserID, "push.secrets", map[string]any{
+		"repo": repo.Path(), "findings": len(found), "rules": ruleList, "truncated": rep.Truncated})
+	return leaks.Describe("secret scan: "+leaks.Plural(len(found))+" in this push:", found, rep.Truncated) +
+		"\nthe push was accepted. A real credential is now in this repository's history: revoke it.", false
 }
 
 // releaseAnchors refuses deleting or moving a tag that a release is
@@ -282,8 +352,9 @@ func (s *Server) postReceive(req Request) {
 
 // Ask sends one request from the hook process to the daemon. stream is
 // called if the daemon asks for the incoming commit objects; it hands each
-// commit to the callback, which writes it on the wire.
-func Ask(socketPath string, req Request, stream func(emit func(RawCommit) error) error) (Response, error) {
+// commit to the callback, which writes it on the wire. scan is called if
+// the daemon asks for a secret scan of the incoming blobs.
+func Ask(socketPath string, req Request, stream func(emit func(RawCommit) error) error, scan func() leaks.Report) (Response, error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
 		return Response{}, err
@@ -294,21 +365,27 @@ func Ask(socketPath string, req Request, stream func(emit func(RawCommit) error)
 	if err := enc.Encode(req); err != nil {
 		return Response{}, err
 	}
-	var resp Response
-	if err := dec.Decode(&resp); err != nil {
-		return Response{}, err
+	for {
+		var resp Response
+		if err := dec.Decode(&resp); err != nil {
+			return Response{}, err
+		}
+		switch {
+		case resp.NeedCommits:
+			if err := stream(func(rc RawCommit) error { return enc.Encode(rc) }); err != nil {
+				return Response{}, err
+			}
+			if err := enc.Encode(RawCommit{}); err != nil { // end of stream
+				return Response{}, err
+			}
+		case resp.ScanSecrets:
+			if err := enc.Encode(scan()); err != nil {
+				return Response{}, err
+			}
+		default:
+			return resp, nil
+		}
 	}
-	if !resp.NeedCommits {
-		return resp, nil
-	}
-	if err := stream(func(rc RawCommit) error { return enc.Encode(rc) }); err != nil {
-		return Response{}, err
-	}
-	if err := enc.Encode(RawCommit{}); err != nil { // end of stream
-		return Response{}, err
-	}
-	err = dec.Decode(&resp)
-	return resp, err
 }
 
 // WriteHookScripts (re)generates the shared hooks directory. Called at

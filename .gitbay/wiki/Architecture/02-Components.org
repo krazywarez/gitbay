@@ -36,7 +36,8 @@ the hidden =hook= used by git (=cmd/gitbayd/main.go=,
 | =internal/notify=, =internal/mail= | Mail queue drain and SMTP.                                      |
 | =internal/push=      | APNs queue drain and provider-token signing.                                    |
 | =internal/mailin=, =internal/imapc=, =internal/mailreply= | Reply by mail: the IMAP client, the reply token, and the processor that posts a reply through =issue comment= / =mr comment=. |
-| =internal/deps=      | Dependency manifest parsing and registry checks (opt-in per repository).        |
+| =internal/deps=      | Dependency manifest and lockfile parsing; registry and OSV checks (opt-in per repository). |
+| =internal/leaks=     | Credential rules and the blob scan pre-receive and =repo secret-scan= run.      |
 | =internal/config=    | Configuration load and validation.                                             |
 | =internal/web=       | Embedded templates, stylesheet and fonts.                                      |
 | =internal/protocol=  | Exit codes, JSON envelope, argv tokenizer.                                     |

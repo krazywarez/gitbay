@@ -13,6 +13,7 @@ import (
 
 	"gitbay.org/gitbay/internal/backuplock"
 	"gitbay.org/gitbay/internal/gitutil"
+	"gitbay.org/gitbay/internal/leaks"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -841,6 +842,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 			"require checks", strconv.FormatBool(repo.Settings.RequireChecks),
 			"required contexts", strings.Join(repo.Settings.RequiredContexts, ", "),
 			"require signed commits", strconv.FormatBool(repo.Settings.RequireSignedCommits),
+			"secret scan", leaks.Mode(repo.Settings.SecretScan),
+			"secret scan allow", strings.Join(repo.Settings.SecretScanAllow, ", "),
 			"git daemon", strconv.FormatBool(repo.Settings.GitDaemon),
 			"archived", strconv.FormatBool(repo.Settings.Archived),
 		)
@@ -877,6 +880,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 			{"Resolved threads", []cell{onOff(set.RequireResolved)}},
 			{"Code owners", []cell{onOff(set.RequireCodeowners)}},
 			{"Signed commits", []cell{onOff(set.RequireSignedCommits)}},
+			{"Secret scan", []cell{cText(leaks.Mode(set.SecretScan))}},
+			{"Scan allows", []cell{list(set.SecretScanAllow)}},
 			{"Git daemon", []cell{onOff(set.GitDaemon)}},
 			{"Archived", []cell{onOff(set.Archived)}},
 		}, actions: []action{

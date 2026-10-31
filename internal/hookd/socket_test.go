@@ -59,7 +59,7 @@ func TestHookRequestNeedsItsPushToken(t *testing.T) {
 	sock, st, repoID, uid := serveSocket(t)
 	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full"}
 
-	resp, err := Ask(sock, req, nil)
+	resp, err := Ask(sock, req, nil, noScan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestHookRequestNeedsItsPushToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Token = token
-	if resp, err = Ask(sock, req, nil); err != nil || !resp.Allow {
+	if resp, err = Ask(sock, req, nil, noScan); err != nil || !resp.Allow {
 		t.Fatalf("with token: %+v, %v", resp, err)
 	}
 
@@ -82,7 +82,7 @@ func TestHookRequestNeedsItsPushToken(t *testing.T) {
 	}
 	forged := req
 	forged.UserID = other
-	if resp, err = Ask(sock, forged, nil); err != nil || resp.Allow {
+	if resp, err = Ask(sock, forged, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("token for another account: %+v, %v", resp, err)
 	}
 
@@ -92,20 +92,20 @@ func TestHookRequestNeedsItsPushToken(t *testing.T) {
 	}
 	forged = req
 	forged.RepoID = otherRepo
-	if resp, err = Ask(sock, forged, nil); err != nil || resp.Allow {
+	if resp, err = Ask(sock, forged, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("token for another repository: %+v, %v", resp, err)
 	}
 
 	forged = req
 	forged.Scope = "read"
-	if resp, err = Ask(sock, forged, nil); err != nil || resp.Allow {
+	if resp, err = Ask(sock, forged, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("token for another scope: %+v, %v", resp, err)
 	}
 
 	if err := st.DeletePushToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if resp, err = Ask(sock, req, nil); err != nil || resp.Allow {
+	if resp, err = Ask(sock, req, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("finished push: %+v, %v", resp, err)
 	}
 }
@@ -125,7 +125,7 @@ func TestHookRefusalsAreAudited(t *testing.T) {
 	sock, st, repoID, uid := serveSocket(t)
 
 	forged := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: "not-a-live-token"}
-	if resp, err := Ask(sock, forged, nil); err != nil || resp.Allow {
+	if resp, err := Ask(sock, forged, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("forged: %+v, %v", resp, err)
 	}
 	rows := refusedRows(t, st, "refused hook")
@@ -140,7 +140,7 @@ func TestHookRefusalsAreAudited(t *testing.T) {
 	}
 	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: token,
 		Updates: []policy.RefUpdate{{Ref: "refs/merge-requests/1/head", Old: zeroSHA40, New: strings.Repeat("a", 40)}}}
-	if resp, err := Ask(sock, req, nil); err != nil || resp.Allow {
+	if resp, err := Ask(sock, req, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("push to a server-owned ref: %+v, %v", resp, err)
 	}
 	rows = refusedRows(t, st, "refused push")
@@ -159,7 +159,7 @@ func TestPeerRefusalIsAudited(t *testing.T) {
 	// The server answers and closes without reading the request, so the
 	// client may see the refusal or a broken pipe; either way it is not
 	// allowed, and the row is written before the connection closes.
-	if resp, err := Ask(sock, Request{Hook: "pre-receive", RepoID: repoID, UserID: uid}, nil); err == nil && resp.Allow {
+	if resp, err := Ask(sock, Request{Hook: "pre-receive", RepoID: repoID, UserID: uid}, nil, noScan); err == nil && resp.Allow {
 		t.Fatalf("refused peer was allowed: %+v", resp)
 	}
 	rows := refusedRows(t, st, "refused hook")
@@ -181,7 +181,7 @@ func TestRefusedPushCapsRefs(t *testing.T) {
 		req.Updates = append(req.Updates, policy.RefUpdate{Ref: fmt.Sprintf("refs/merge-requests/%d/head", i),
 			Old: zeroSHA40, New: strings.Repeat("a", 40)})
 	}
-	if resp, err := Ask(sock, req, nil); err != nil || resp.Allow {
+	if resp, err := Ask(sock, req, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("push: %+v, %v", resp, err)
 	}
 	rows := refusedRows(t, st, "refused push")
@@ -211,7 +211,7 @@ func TestPreReceiveSignalsItsPush(t *testing.T) {
 	started, forget := AwaitPreReceive(token)
 	defer forget()
 	forged := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "read", Token: token}
-	if resp, err := Ask(sock, forged, nil); err != nil || resp.Allow {
+	if resp, err := Ask(sock, forged, nil, noScan); err != nil || resp.Allow {
 		t.Fatalf("forged: %+v, %v", resp, err)
 	}
 	select {
@@ -220,7 +220,7 @@ func TestPreReceiveSignalsItsPush(t *testing.T) {
 	default:
 	}
 	req := Request{Hook: "pre-receive", RepoID: repoID, UserID: uid, Scope: "full", Token: token}
-	if resp, err := Ask(sock, req, nil); err != nil || !resp.Allow {
+	if resp, err := Ask(sock, req, nil, noScan); err != nil || !resp.Allow {
 		t.Fatalf("pre-receive: %+v, %v", resp, err)
 	}
 	select {

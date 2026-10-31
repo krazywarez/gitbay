@@ -9,11 +9,13 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/hookd"
+	"gitbay.org/gitbay/internal/leaks"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/toolpath"
 )
@@ -129,6 +131,27 @@ func streamIncomingCommits(updates []policy.RefUpdate, emit func(hookd.RawCommit
 	return nil
 }
 
+// scanDeadline bounds the secret scan of one push. Past it the scan is
+// reported as truncated: the pusher is waiting.
+const scanDeadline = 90 * time.Second
+
+// scanIncoming scans the blobs this push introduces. Like incomingSHAs it
+// runs in the hook process, the only one that can read the quarantine.
+func scanIncoming(updates []policy.RefUpdate) leaks.Report {
+	var revs []string
+	for _, u := range updates {
+		if !u.IsDelete {
+			revs = append(revs, u.New)
+		}
+	}
+	if len(revs) == 0 {
+		return leaks.Report{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), scanDeadline)
+	defer cancel()
+	return leaks.Scan(ctx, ".", append(revs, "--not", "--all")...)
+}
+
 // hookCmd runs inside a git hook. It computes git facts here — the hook
 // process inherits git's quarantine environment, so incoming objects are
 // visible — and asks the daemon for a policy decision over the unix socket.
@@ -176,6 +199,8 @@ func hookCmd() *cobra.Command {
 				Updates: updates,
 			}, func(emit func(hookd.RawCommit) error) error {
 				return streamIncomingCommits(updates, emit)
+			}, func() leaks.Report {
+				return scanIncoming(updates)
 			})
 			if err != nil {
 				return fmt.Errorf("gitbay daemon unreachable: %w", err)
@@ -183,6 +208,9 @@ func hookCmd() *cobra.Command {
 			if !resp.Allow {
 				fmt.Fprintln(os.Stderr, resp.Message)
 				os.Exit(1)
+			}
+			if resp.Message != "" {
+				fmt.Fprintln(os.Stderr, resp.Message)
 			}
 			return nil
 		},

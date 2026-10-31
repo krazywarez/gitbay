@@ -243,6 +243,8 @@ there shows the app's rendering rather than the one the web page shows.
 | build trigger               | yes | yes | yes |
 | build cancel                | yes | yes | yes |
 | job image (ci.yml)          | yes | n/a | n/a |
+| secret scan mode, allowlist | yes | yes | yes |
+| secret scan of the history  | yes | no  | yes |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
 | delete, transfer            | yes | yes | yes |

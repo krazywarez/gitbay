@@ -155,6 +155,10 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "require-mr", repo, onOff(v("require-mr"))}
 	case "require-signed":
 		argv = []string{"repo", "settings", "require-signed", repo, onOff(v("require-signed"))}
+	case "secret-scan":
+		argv = []string{"repo", "settings", "secret-scan", repo, v("secret-scan")}
+	case "secret-scan-allow":
+		argv = append([]string{"repo", "settings", "secret-scan-allow", repo}, strings.Fields(v("secret-scan-allow"))...)
 	case "require-approvals":
 		argv = []string{"repo", "settings", "require-approvals", repo, v("approvals")}
 	case "protect":

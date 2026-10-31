@@ -38,6 +38,10 @@ type RepoSettings struct {
 	GitDaemon         bool     `json:"git_daemon,omitempty"`
 	Archived          bool     `json:"archived,omitempty"`
 	Website           string   `json:"website,omitempty"`
+	// SecretScan is off, warn or block; empty is warn (leaks.Mode).
+	SecretScan string `json:"secret_scan,omitempty"`
+	// SecretScanAllow are CI path globs whose findings are ignored.
+	SecretScanAllow []string `json:"secret_scan_allow,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

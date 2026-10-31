@@ -171,6 +171,21 @@
 </form>
 </section>
 
+<section id="secret-scan"><h2>Secret scan</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="secret-scan">
+  <div><label for="secret-scan">Pushes</label><p class="hint">Each push's new files are checked for credentials in known formats. Warn accepts the push and tells the pusher where; block refuses it. Only the path, line and kind of credential are reported, never the value.</p></div>
+  <div><select id="secret-scan" name="secret-scan">{{$mode := or .Repo.Settings.SecretScan "warn"}}<option value="off"{{if eq $mode "off"}} selected{{end}}>off</option><option value="warn"{{if eq $mode "warn"}} selected{{end}}>warn</option><option value="block"{{if eq $mode "block"}} selected{{end}}>block</option></select></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="secret-scan-allow">
+  <div><label for="secret-scan-allow">Allowed paths</label><p class="hint">Findings under these paths are ignored, for test fixtures. Path globs separated by spaces: <code>testdata/**</code>, <code>*_test.go</code>.</p></div>
+  <div><input type="text" id="secret-scan-allow" name="secret-scan-allow" value="{{join .Repo.Settings.SecretScanAllow " "}}"></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
+</section>
+
 <section id="branches"><h2>Protected branches</h2>
 {{if .Repo.Settings.ProtectedBranches}}
 <ul class="protlist">
