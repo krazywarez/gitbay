@@ -4,6 +4,38 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.46.0 — 2026-10-31
+
+Migrations 0080 and 0081. Every repository's pushes are secret-scanned
+in =warn= mode from this release on. Code scanning needs an image
+built from =deploy/Containerfile.security= and =[security] image= set;
+without them =repo security enable= refuses. The runner must be
+upgraded too for code scan results to be uploaded.
+
+- Dependency checks also match the resolved dependency set against OSV
+  and keep a second issue, "Known vulnerabilities in dependencies",
+  with the same lifecycle as the updates issue. Versions come from
+  =go.mod= (indirect requirements included), =package-lock.json=,
+  =Cargo.lock=, =uv.lock=, =poetry.lock= and SwiftPM's
+  =Package.resolved=, or exact pins where there is no lockfile. =repo
+  deps status= and the settings page list the matches (#338).
+- Pushes are scanned for credentials in self-identifying formats in
+  pre-receive. Findings name commit, path, line and rule, never the
+  value. =repo settings secret-scan <repo> off|warn|block= (default
+  =warn=: accepted, the pusher is told, the finding is audited as
+  =push.secrets=; =block= refuses, including a scan that failed),
+  =repo settings secret-scan-allow <repo> [<glob>...]= for paths whose
+  findings are ignored, and =repo secret-scan <repo>= over every ref
+  (#339).
+- Scheduled code scanning: =repo security enable|disable|run|status=
+  queue the instance's =gitbay-security= job from =[security]=
+  (=image=, =schedule=, =steps=). It gets no repository secrets and
+  sets no commit status. The runner uploads the SARIF its steps write
+  to =$GITBAY_RESULTS= with =runner results=, and gitbay-bot keeps a
+  "Code scanning findings" issue. The job name =gitbay-security= is
+  reserved in =ci.yml= (#340).
+- =golang.org/x/net= v0.62.0, =modernc.org/sqlite= v1.61.0; Go 1.27.3.
+
 * v1.45.1 — 2026-10-16
 
 No migrations.
