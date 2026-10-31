@@ -177,7 +177,13 @@ func readBlobs(ctx context.Context, dir string, oids []string, fn func(oid strin
 	if err := cmd.Start(); err != nil {
 		return false, fmt.Errorf("cat-file --batch: %w", err)
 	}
-	defer cmd.Wait() // after cancel, which ends git on an early return
+	// Cancel before Wait, in one defer: on an early return git is blocked
+	// writing output nobody reads, and Wait alone would wait for the
+	// deadline to kill it.
+	defer func() {
+		cancel()
+		cmd.Wait()
+	}()
 	// Fed from another goroutine: the pipe holds fewer names than a large
 	// push has, and git blocks writing output nobody is reading yet.
 	go func() {

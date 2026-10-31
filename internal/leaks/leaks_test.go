@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Token-shaped strings are assembled here rather than written out, so this
@@ -137,5 +138,34 @@ func TestAllowed(t *testing.T) {
 	got := Allowed(in, []string{"testdata/**", "*_test.go", "internal/*/*_test.go"})
 	if len(got) != 1 || got[0].Path != "config/prod.env" {
 		t.Errorf("allowed = %+v", got)
+	}
+}
+
+// Stopping part-way returns at once. git is left with more output than a
+// pipe holds, and Wait before cancel used to block until the deadline.
+func TestReadBlobsStopsPromptly(t *testing.T) {
+	dir := t.TempDir()
+	git(t, dir, "init", "-q", "-b", "main")
+	files := map[string]string{}
+	for i := 0; i < 20; i++ {
+		files[fake("f", 4, alnum)+string(rune('a'+i))] = strings.Repeat(string(rune('a'+i)), 200<<10)
+	}
+	commit(t, dir, files, "big")
+	oids, _, _, err := changedBlobs(context.Background(), dir, []string{"--all"})
+	if err != nil || len(oids) != 20 {
+		t.Fatalf("oids %d: %v", len(oids), err)
+	}
+	done := make(chan bool, 1)
+	go func() {
+		more, _ := readBlobs(context.Background(), dir, oids, func(string, []byte) bool { return false })
+		done <- more
+	}()
+	select {
+	case more := <-done:
+		if !more {
+			t.Error("an early stop was not reported")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("readBlobs did not return after fn stopped it")
 	}
 }
