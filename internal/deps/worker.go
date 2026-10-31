@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
+	"gitbay.org/gitbay/internal/botissue"
 	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
@@ -189,14 +189,14 @@ func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 	if err != nil {
 		return err
 	}
-	return w.maintain(repo, tracked{
-		title:   IssueTitle,
-		number:  check.IssueNumber,
-		record:  func(n int64) error { return w.St.SetDepIssue(repo.ID, n) },
-		empty:   len(behind) == 0,
-		changed: !same(previous, behind),
-		save:    func() error { return w.St.ReplaceDepReports(repo.ID, behind) },
-		body:    func() string { return Body(repo.DefaultBranch, behind) },
+	return botissue.Maintain(w.St, w.Cfg, repo, botissue.Tracked{
+		Title:   IssueTitle,
+		Number:  check.IssueNumber,
+		Record:  func(n int64) error { return w.St.SetDepIssue(repo.ID, n) },
+		Empty:   len(behind) == 0,
+		Changed: !same(previous, behind),
+		Save:    func() error { return w.St.ReplaceDepReports(repo.ID, behind) },
+		Body:    func() string { return Body(repo.DefaultBranch, behind) },
 	})
 }
 
@@ -211,123 +211,13 @@ func (w *Worker) reconcileAdvisories(repo store.Repo, matched []store.DepAdvisor
 	if err != nil {
 		return err
 	}
-	return w.maintain(repo, tracked{
-		title:   AdvisoryTitle,
-		number:  check.AdvisoryIssueNumber,
-		record:  func(n int64) error { return w.St.SetDepAdvisoryIssue(repo.ID, n) },
-		empty:   len(matched) == 0,
-		changed: !sameAdvisories(previous, matched),
-		save:    func() error { return w.St.ReplaceDepAdvisories(repo.ID, matched) },
-		body:    func() string { return AdvisoryBody(repo.DefaultBranch, matched) },
+	return botissue.Maintain(w.St, w.Cfg, repo, botissue.Tracked{
+		Title:   AdvisoryTitle,
+		Number:  check.AdvisoryIssueNumber,
+		Record:  func(n int64) error { return w.St.SetDepAdvisoryIssue(repo.ID, n) },
+		Empty:   len(matched) == 0,
+		Changed: !sameAdvisories(previous, matched),
+		Save:    func() error { return w.St.ReplaceDepAdvisories(repo.ID, matched) },
+		Body:    func() string { return AdvisoryBody(repo.DefaultBranch, matched) },
 	})
-}
-
-// tracked is one issue the worker maintains for a repository and the set
-// it reports.
-type tracked struct {
-	title   string
-	number  int64 // the issue last opened, 0 for none
-	record  func(number int64) error
-	empty   bool // nothing to report
-	changed bool // the set differs from the last report
-	save    func() error
-	body    func() string
-}
-
-// maintain opens the issue when something is first reported, rewrites it
-// when the set changes, and closes it when nothing is left.
-func (w *Worker) maintain(repo store.Repo, t tracked) error {
-	issue, hasIssue := w.openIssue(repo, t.number)
-	if t.empty {
-		if hasIssue {
-			w.St.SetIssueState(issue.ID, "closed")
-			t.record(0)
-		}
-		if t.changed {
-			return t.save()
-		}
-		return nil
-	}
-	// Nothing changed since the last report: leave it be, whether the issue
-	// is still open or the maintainer has closed it. Reopening on an
-	// unchanged set would make closing the issue pointless.
-	if !t.changed {
-		return nil
-	}
-	if err := t.save(); err != nil {
-		return err
-	}
-	body := t.body()
-	if hasIssue {
-		if err := w.St.UpdateIssueText(issue.ID, nil, &body, nil); err != nil {
-			return err
-		}
-		w.notify(repo, t.title, issue.Number, fmt.Sprintf("updated issue #%d", issue.Number), body)
-		return nil
-	}
-	author, err := w.St.UserByUsername(store.BotUsername)
-	if err != nil {
-		// Migration 0028 leaves the account uncreated when the name was
-		// already taken, which is the one case worth spelling out: the
-		// feature is stuck until an operator frees the name.
-		return fmt.Errorf("no %s account to author the issue (the name was taken when this instance upgraded): %w",
-			store.BotUsername, err)
-	}
-	number, err := w.St.CreateIssue(repo.ID, author.ID, t.title, body, "md")
-	if err != nil {
-		return err
-	}
-	if err := t.record(number); err != nil {
-		return err
-	}
-	w.St.RecordEvent(repo.ID, author.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, number))
-	w.notify(repo, t.title, number, fmt.Sprintf("opened issue #%d", number), body)
-	return nil
-}
-
-// openIssue loads the issue this worker maintains, if there still is one.
-// A closed issue counts as gone: reopening one the maintainer closed would
-// be arguing with them, so the next change opens a fresh issue.
-func (w *Worker) openIssue(repo store.Repo, number int64) (store.Issue, bool) {
-	if number == 0 {
-		return store.Issue{}, false
-	}
-	issue, err := w.St.IssueByNumber(repo.ID, number)
-	if err != nil || issue.State != "open" {
-		return store.Issue{}, false
-	}
-	return issue, true
-}
-
-// notify files an inbox row for the repo's owners and watchers and mails
-// them, the same targets and shape as an issue opened over SSH.
-// Best-effort, like every other notification.
-func (w *Worker) notify(repo store.Repo, title string, number int64, action, body string) {
-	targets, err := w.St.RepoNotifyTargets(repo)
-	if err != nil {
-		return
-	}
-	author, err := w.St.UserByUsername(store.BotUsername)
-	if err != nil {
-		return
-	}
-	recipients, err := w.St.NotifyRecipients(repo.ID, author.ID, targets, true)
-	if err != nil {
-		return
-	}
-	subject := fmt.Sprintf("[%s] #%d: %s", repo.Path(), number, title)
-	text := fmt.Sprintf("%s %s\n\n%s\n%s/%s/issues/%d\n", store.BotUsername, action, body,
-		strings.TrimSuffix(w.Cfg.Server.SiteURL, "/"), repo.Path(), number)
-	path := fmt.Sprintf("%s/issues/%d", repo.Path(), number)
-	for _, id := range recipients {
-		w.St.AddNotice(id, repo.ID, "issue", store.BotUsername, action, path)
-		if w.Cfg.Mail.SMTPHost == "" {
-			continue
-		}
-		email, err := w.St.ActivityMailAddress(id)
-		if err != nil || email == "" {
-			continue
-		}
-		w.St.EnqueueMail(email, subject, text)
-	}
 }

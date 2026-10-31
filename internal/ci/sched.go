@@ -3,11 +3,13 @@ package ci
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
+	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/store"
 )
@@ -30,10 +32,13 @@ func NextRun(expr string, after time.Time) string {
 }
 
 // Scheduler fires scheduled builds. repoDir maps a repo to its bare path.
+// Security is the instance's code scanning job; with no image it never
+// queues.
 type Scheduler struct {
-	St      *store.Store
-	RepoDir func(owner, name string) string
-	SiteURL string
+	St       *store.Store
+	RepoDir  func(owner, name string) string
+	SiteURL  string
+	Security config.Security
 }
 
 // Run ticks until the context ends. GITBAY_SCHED_TICK overrides the
@@ -62,6 +67,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 // ticker for tests.
 func (s *Scheduler) RunDue(now time.Time) {
 	s.reapStale()
+	s.runSecurityDue(now)
 	due, err := s.St.DueSchedules(isoNow(now))
 	if err != nil {
 		slog.Error("scheduler: listing due builds", "err", err)
@@ -119,6 +125,46 @@ func (s *Scheduler) RunDue(now time.Time) {
 		url := fmt.Sprintf("%s/%s/builds/%d", s.SiteURL, repo.Path(), n)
 		s.St.SetCommitStatus(repo.ID, sha, "ci/"+job.Name, "pending", "scheduled", url, 0)
 	}
+}
+
+// runSecurityDue queues the code scan for every repository whose next scan
+// is due, and advances it.
+func (s *Scheduler) runSecurityDue(now time.Time) {
+	if s.Security.Image == "" {
+		return
+	}
+	due, err := s.St.DueSecurityScans(isoNow(now))
+	if err != nil {
+		slog.Error("scheduler: listing due security scans", "err", err)
+		return
+	}
+	for _, repo := range due {
+		s.St.SetSecurityNext(repo.ID, NextRun(s.Security.Schedule, now))
+		if _, err := QueueSecurityScan(s.St, s.Security, s.RepoDir(repo.OwnerName, repo.Name), repo); err != nil {
+			slog.Warn("scheduler: queueing security scan", "repo", repo.Path(), "err", err)
+		}
+	}
+}
+
+// ErrScanPending is QueueSecurityScan finding the last scan of the
+// default branch's tip still pending or running.
+var ErrScanPending = errors.New("a scan of this commit is already pending or running")
+
+// QueueSecurityScan queues the code scan of the default branch's tip. It
+// sets no commit status: the scan reports through its issue, and a status
+// would put it in front of merge gates that never asked for it.
+func QueueSecurityScan(st *store.Store, sec config.Security, dir string, repo store.Repo) (int64, error) {
+	sha, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch)
+	if err != nil {
+		return 0, fmt.Errorf("%s has no commits on %s", repo.Path(), repo.DefaultBranch)
+	}
+	if built, err := st.BuildsForCommit(repo.ID, sha); err == nil {
+		if b, ok := built[SecurityJob]; ok && (b.Status == "pending" || b.Status == "running") {
+			return 0, ErrScanPending
+		}
+	}
+	steps, _ := json.Marshal(sec.Steps)
+	return st.CreateBuild(repo.ID, SecurityJob, sha, repo.DefaultBranch, string(steps), sec.Image, "", true)
 }
 
 // reapStale resolves builds running past the deadline, so a runner that

@@ -14,6 +14,8 @@
     <li><a href="#access">Access</a></li>
     <li><a href="#webhooks">Webhooks</a></li>
     <li><a href="#gates">Merge gates</a></li>
+    {{if or .ScanAvailable .Security.Enabled}}<li><a href="#security">Code scanning</a></li>{{end}}
+    <li><a href="#secrets">Secret scan</a></li>
     <li><a href="#branches">Protected branches</a></li>
     <li><a href="#tags">Protected tags</a></li>
     <li><a href="#deps">Dependencies</a></li>
@@ -171,7 +173,29 @@
 </form>
 </section>
 
-<section id="secret-scan"><h2>Secret scan</h2>
+{{if or .ScanAvailable .Security.Enabled}}<section id="security"><h2>Code scanning</h2>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="security">
+  <div><label for="security-enabled">Scheduled scan</label><p class="hint">Runs the instance's code scanner over <code>{{.Repo.DefaultBranch}}</code> on its schedule, on a runner attached to this repository, and keeps an issue of what it finds.</p></div>
+  <div class="check"><input type="checkbox" id="security-enabled" name="security" value="on"{{if .Security.Enabled}} checked{{end}}></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
+{{if .Security.Enabled}}
+<p class="meta">Next scan {{.Security.NextRun}} · last results {{if .Security.LastResults}}{{when .Security.LastResults}}{{else}}never{{end}}{{if .Security.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Security.IssueNumber}}">#{{.Security.IssueNumber}}</a>{{end}}</p>
+{{if .Security.Findings}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">location</th><th scope="col">rule</th><th scope="col">level</th></tr>
+{{range .Security.Findings}}<tr>
+  <td class="mono">{{.Path}}:{{.Line}}</td>
+  <td class="mono">{{.Rule}}</td>
+  <td>{{.Level}}</td>
+</tr>
+{{end}}</table></div>
+{{else if .Security.LastResults}}<p class="none">The last scan found nothing.</p>{{end}}
+{{end}}
+</section>
+{{end}}
+
+<section id="secrets"><h2>Secret scan</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="secret-scan">
   <div><label for="secret-scan">Pushes</label><p class="hint">Each push's new files are checked for credentials in known formats. Warn accepts the push and tells the pusher where; block refuses it. Only the path, line and kind of credential are reported, never the value.</p></div>

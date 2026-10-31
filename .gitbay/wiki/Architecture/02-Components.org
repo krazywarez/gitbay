@@ -38,6 +38,8 @@ the hidden =hook= used by git (=cmd/gitbayd/main.go=,
 | =internal/mailin=, =internal/imapc=, =internal/mailreply= | Reply by mail: the IMAP client, the reply token, and the processor that posts a reply through =issue comment= / =mr comment=. |
 | =internal/deps=      | Dependency manifest and lockfile parsing; registry and OSV checks (opt-in per repository). |
 | =internal/leaks=     | Credential rules and the blob scan pre-receive and =repo secret-scan= run.      |
+| =internal/codescan=  | SARIF from the code scan, and the findings issue's body.                        |
+| =internal/botissue=  | The issues gitbay-bot keeps: open on first report, rewrite on change, close when empty. |
 | =internal/config=    | Configuration load and validation.                                             |
 | =internal/web=       | Embedded templates, stylesheet and fonts.                                      |
 | =internal/protocol=  | Exit codes, JSON envelope, argv tokenizer.                                     |

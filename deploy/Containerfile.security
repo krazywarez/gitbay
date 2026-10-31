@@ -1,0 +1,56 @@
+# The image the instance's code scan runs in ([security] image in
+# /etc/gitbay/config.toml, #340). Build it on each runner host that
+# serves a repository with `repo security enable`, the same way as
+# Containerfile.ci:
+#
+#   scp -P 2222 deploy/Containerfile.security root@gitbay.org:/var/lib/gitbay-runner/gitbay-security.Containerfile
+#   ssh -p 2222 root@gitbay.org 'chown ci-runner /var/lib/gitbay-runner/gitbay-security.Containerfile \
+#     && su - ci-runner -s /bin/sh -c "podman build -t localhost/gitbay-security:1 -f gitbay-security.Containerfile ." \
+#     && rm /var/lib/gitbay-runner/gitbay-security.Containerfile'
+#
+# Everything fetched is pinned to a version and checked against a sha256
+# taken when it was pinned, so a rebuild cannot pick up a different
+# binary or rule set. Bump both together and the tag with them.
+#
+# Opengrep v1.31.0 (2026-10-15), LGPL-2.1. The rules are
+# opengrep/opengrep-rules at its last commit, a fork of semgrep-rules
+# from before that project's licence change: LGPL-2.1 with the Commons
+# Clause, which forbids selling a service whose value is the rules. An
+# instance that charges for hosting should mount its own rules at
+# /opt/opengrep-rules instead.
+FROM docker.io/library/debian:trixie-slim
+
+LABEL org.gitbay.keep=true
+
+ARG OPENGREP_VERSION=v1.31.0
+ARG OPENGREP_SHA256=dbbe3c2058dbe600c449a8ba22ea79a1643a6660658400090d0323a8d0d31147
+ARG RULES_COMMIT=f1d2b562b414783763fd02a6ed2736eaed622efa
+ARG RULES_SHA256=9a5f1cd5c625418cc1c776120123e2d4371df9bb66e099426b17c3488e13619d
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL -o /usr/local/bin/opengrep \
+        "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86" \
+    && echo "${OPENGREP_SHA256}  /usr/local/bin/opengrep" | sha256sum -c - \
+    && chmod 0755 /usr/local/bin/opengrep
+
+# Only the language directories, and without the rules' own test inputs
+# (*.test.*, *.fixed.*), which would otherwise be read as rules or match
+# as findings.
+RUN curl -fsSL -o /tmp/rules.tar.gz \
+        "https://codeload.github.com/opengrep/opengrep-rules/tar.gz/${RULES_COMMIT}" \
+    && echo "${RULES_SHA256}  /tmp/rules.tar.gz" | sha256sum -c - \
+    && mkdir -p /opt/opengrep-rules /tmp/rules \
+    && tar -xzf /tmp/rules.tar.gz -C /tmp/rules --strip-components=1 \
+    && for d in bash c dockerfile generic go java javascript kotlin php python ruby rust swift terraform typescript yaml; do \
+           cp -r "/tmp/rules/$d" /opt/opengrep-rules/; \
+       done \
+    && find /opt/opengrep-rules -type f \( -name '*.test.*' -o -name '*.fixed.*' \) -delete \
+    && find /opt/opengrep-rules -type f ! -name '*.yaml' ! -name '*.yml' -delete \
+    && rm -rf /tmp/rules /tmp/rules.tar.gz
+
+WORKDIR /workspace

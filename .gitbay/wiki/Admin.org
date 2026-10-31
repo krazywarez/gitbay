@@ -454,6 +454,32 @@ push=.
   the worker logs an error at start and syncs no mirror, recording the
   reason on each. Sync ignores the system and global gitconfig.
 
+** [security]
+The instance's code scan, which a repository admin turns on with
+=repo security enable=. Off until =image= is set.
+
+- =image= ("") — the image the scan runs in, provisioned on every
+  runner host that serves a scanned repository. Build it from
+  =deploy/Containerfile.security= (Opengrep and its rules, both pinned
+  by sha256); the file has the commands.
+- =schedule= ("0 4 * * *") — when each enabled repository's default
+  branch is scanned. =repo security run= queues one now.
+- =steps= — shell steps that write SARIF into =$GITBAY_RESULTS=. The
+  default runs Opengrep with the rules in the image at
+  =/opt/opengrep-rules=.
+
+The scan is a build of the reserved job =gitbay-security= on a runner
+attached to the repository. It gets none of the repository's secrets
+and sets no commit status. When its steps succeed the runner uploads
+the SARIF (=runner results=, gitbay-runner from this release on) and
+the findings replace the repository's last set; =gitbay-bot= keeps a
+"Code scanning findings" issue, opened, rewritten and closed the way
+the dependency issues are. An older runner runs the steps and uploads
+nothing, so the issue stays as it was.
+
+The bundled rules are =opengrep/opengrep-rules=, LGPL-2.1 with the
+Commons Clause: an instance that sells hosting should supply its own.
+
 ** [go_import]
 Vanity Go module paths, one per line: ="host/module" = "owner/repo"=.
 Requests with =?go-get=1= at or under the module path answer with the
@@ -1337,7 +1363,10 @@ trusts and refuses to do. Operational checklist:
   tagging a release. CI's own =vuln= job runs =govulncheck= nightly
   against main rather than per push, because =@latest= scans today's
   advisory database and an advisory lands without anyone pushing;
-  =build trigger krz/gitbay vuln= runs it on demand.
+  =build trigger krz/gitbay vuln= runs it on demand. Repositories can
+  also opt into the dependency advisory check (=repo deps enable=),
+  the push-time secret scan (on by default as =warn=), and the
+  scheduled code scan (=repo security enable=, see [security]).
 - *Web responses* carry a scripts-forbidden CSP, =X-Frame-Options:
   DENY=, =nosniff=, =no-referrer=, and HSTS when TLS is on — no
   configuration needed.

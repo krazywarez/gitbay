@@ -65,6 +65,7 @@ type Config struct {
 	Mail         Mail         `toml:"mail"`
 	Mirrors      Mirrors      `toml:"mirrors"`
 	Deps         Deps         `toml:"deps"`
+	Security     Security     `toml:"security"`
 	Retention    Retention    `toml:"retention"`
 	Push         Push         `toml:"push"`
 	Backup       Backup       `toml:"backup"`
@@ -224,6 +225,23 @@ type Mirrors struct {
 // tells a public registry what it depends on.
 type Deps struct {
 	CheckIntervalHours int `toml:"check_interval_hours"`
+}
+
+// Security configures the built-in code scanning job that `repo security
+// enable` schedules. It is unavailable until an operator names Image, an
+// image built from deploy/Containerfile.security and provisioned on the
+// runner hosts. Steps write SARIF into $GITBAY_RESULTS; the runner uploads
+// it when they succeed.
+type Security struct {
+	Image    string   `toml:"image"`
+	Schedule string   `toml:"schedule"`
+	Steps    []string `toml:"steps"`
+}
+
+// DefaultSecuritySteps run Opengrep with the rules the image carries.
+var DefaultSecuritySteps = []string{
+	`mkdir -p "$GITBAY_RESULTS"`,
+	`opengrep scan --quiet --disable-version-check --config /opt/opengrep-rules --sarif-output="$GITBAY_RESULTS/opengrep.sarif" .`,
 }
 
 type Limits struct {
@@ -573,6 +591,7 @@ func Default() Config {
 		GitDaemon: GitDaemon{Port: 9418},
 		Mirrors:   Mirrors{PullIntervalMinutes: 15},
 		Deps:      Deps{CheckIntervalHours: 24},
+		Security:  Security{Schedule: "0 4 * * *", Steps: DefaultSecuritySteps},
 		Limits: Limits{
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,
@@ -655,6 +674,14 @@ func (c Config) Validate() error {
 
 	if c.Server.Root == "" {
 		errs = append(errs, errors.New("server.root is required"))
+	}
+	if c.Security.Image != "" {
+		if len(strings.Fields(c.Security.Schedule)) != 5 {
+			errs = append(errs, errors.New("security.schedule must be a five-field cron expression"))
+		}
+		if len(c.Security.Steps) == 0 {
+			errs = append(errs, errors.New("security.steps must name at least one step when security.image is set"))
+		}
 	}
 	if d := c.Pages.Domain; d != "" {
 		if d == c.SiteHost() {

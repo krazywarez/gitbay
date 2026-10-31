@@ -49,6 +49,9 @@ type job struct {
 	// over loopback takes its port for its builds (#260).
 	SSH     string            `json:"ssh"`
 	Secrets map[string]string `json:"secrets"`
+	// Results asks for the SARIF the steps leave in $GITBAY_RESULTS to be
+	// uploaded once they succeed. Only the instance's code scan sets it.
+	Results bool `json:"results"`
 }
 
 type runner struct {
@@ -450,7 +453,29 @@ func (r *runner) run(j job) *failure {
 	}
 
 	env := stepEnv(j, home, r.buildSSH(j.SSH))
-	return r.runSteps(j, dir, env, sink, deadline, runStep)
+	if !j.Results {
+		return r.runSteps(j, dir, env, sink, deadline, runStep)
+	}
+	// Cleared first: the checkout is the repository's, and a results
+	// directory committed to it would otherwise be uploaded as the scan's.
+	results := filepath.Join(dir, resultsDir)
+	if err := os.RemoveAll(results); err != nil {
+		fmt.Fprintf(sink, "preparing %s: %v\n", resultsDir, err)
+		return &failure{Reason: "preparing the results directory failed"}
+	}
+	inBuild := results
+	if r.isolation == isolationPodman {
+		inBuild = "/workspace/" + resultsDir
+	}
+	if f := r.runSteps(j, dir, append(env, "GITBAY_RESULTS="+inBuild), sink, deadline, runStep); f != nil {
+		return f
+	}
+	if err := r.uploadResults(j.ID, results); err != nil {
+		fmt.Fprintf(sink, "uploading results: %v\n", err)
+		return &failure{Reason: "uploading results failed"}
+	}
+	fmt.Fprintln(sink, "results uploaded")
+	return nil
 }
 
 // buildHome is a build's HOME and what to do with it when the build ends.

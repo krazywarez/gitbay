@@ -244,7 +244,7 @@ func serveCmd() *cobra.Command {
 			}
 			go purgeDeletions(whCtx, st, cfg)
 			go sweep(whCtx, st, cfg)
-			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL,
+			go (&ci.Scheduler{St: st, SiteURL: cfg.Server.SiteURL, Security: cfg.Security,
 				RepoDir: func(owner, name string) string {
 					return control.RepoDir(cfg.Server.Root, owner, name)
 				}}).Run(whCtx)

@@ -19,7 +19,8 @@ content (as confidential as the repository), *O* operational.
 | Notifications   | =notifications= (mail queue), =inbox=, =push_devices= (APNs token), =push_queue=, =mail_replies= (Message-IDs of posted replies) | P     | device tokens sealed; looked up by SHA-256      |
 | Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
 | Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows, a hash chain (=prev_hash=, =hash=) |
-| Dependencies    | =dep_checks=, =dep_reports=, =dep_advisories=                                               | O     |                                                 |
+| Dependencies    | =dep_checks=, =dep_reports=, =dep_advisories=                                               | O     |
+| Code scanning   | =security_scans=, =security_findings=                                                       | O     |                                                 |
 
 Outside the database:
 

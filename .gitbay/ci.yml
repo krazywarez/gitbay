@@ -21,12 +21,13 @@ jobs:
       - .gitbay/wiki/**
   # Static analysis through Qlty (.qlty/qlty.toml). Secrets and gofmt fail
   # the build. The full report, including radarlint-go's Sonar rules, is
-  # printed without failing it. The CLI is pinned, and unpacked with Python
-  # because this image has no xz.
+  # printed without failing it. The CLI is pinned and checked against the
+  # sha256 Qlty publishes beside it, and unpacked with Python because this
+  # image has no xz.
   quality:
     image: localhost/gitbay-ci:3
     steps:
-      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
+      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && echo "fa07eb51fbb32a0854113e81ce2d957b73f1c027c58b478d32c233b6aba7a977  /tmp/qlty.tar.xz" | sha256sum -c - && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --filter trufflehog,gofmt
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --no-fail
     paths-ignore:
@@ -51,5 +52,5 @@ jobs:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       # osv-scanner also reports advisories in dependencies the code does not
       # call, which govulncheck skips.
-      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
+      - curl -fsSL -o /tmp/qlty.tar.xz https://qlty-releases.s3.amazonaws.com/qlty/v0.661.0/qlty-x86_64-unknown-linux-gnu.tar.xz && echo "fa07eb51fbb32a0854113e81ce2d957b73f1c027c58b478d32c233b6aba7a977  /tmp/qlty.tar.xz" | sha256sum -c - && python3 -c "import tarfile; tarfile.open('/tmp/qlty.tar.xz').extractall('/tmp', filter='data')"
       - QLTY_TELEMETRY=off /tmp/qlty-x86_64-unknown-linux-gnu/qlty check --all --no-progress --filter osv-scanner

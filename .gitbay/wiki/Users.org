@@ -241,6 +241,8 @@ gitbay repo settings require-signed you/project on  # every commit must verify
 gitbay repo settings secret-scan you/project block  # off | warn (default) | block
 gitbay repo settings secret-scan-allow you/project 'testdata/**'  # paths whose findings are ignored
 gitbay repo secret-scan you/project                 # scan the whole history
+gitbay repo security enable you/project             # scheduled code scan, where the instance offers one
+gitbay repo security status you/project             # its findings, also kept in an issue
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
 gitbay repo search forge                            # find repos by name/description/topic

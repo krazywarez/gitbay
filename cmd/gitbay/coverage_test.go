@@ -16,6 +16,7 @@ var notInCLI = map[string]string{
 	"runner next":           "the CI runner's wire protocol, not for humans",
 	"runner done":           "the CI runner's wire protocol, not for humans",
 	"runner log":            "the CI runner's wire protocol, not for humans",
+	"runner results":        "the CI runner's wire protocol, not for humans",
 	"account import-bundle": "the wire format behind `gitbay migrate`",
 }
 

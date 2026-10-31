@@ -143,6 +143,7 @@ func TestReadOnlyCommandsWriteNothing(t *testing.T) {
 		"repo domain list":            {"alice/app"},
 		"repo deps status":            {"alice/app"},
 		"repo secret-scan":            {"alice/app"},
+		"repo security status":        {"alice/app"},
 		"status list":                 {"alice/app", sha},
 		"issue list":                  {"alice/app"},
 		"issue show":                  {"alice/app", "1"},

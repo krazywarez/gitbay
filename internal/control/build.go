@@ -743,8 +743,10 @@ func runRunnerNext(c *Ctx, args []string) int {
 	json.Unmarshal([]byte(b.Steps), &steps)
 	// Secrets ride the claim: this channel is admin-only and the values
 	// land in the build's environment, nowhere else.
+	// The code scan is the operator's job, and reads code rather than
+	// running it: it gets none of the repository's secrets.
 	var secrets map[string]string
-	if b.Trusted {
+	if b.Trusted && b.Job != ci.SecurityJob {
 		secrets, err = c.Store.BuildSecrets(b.RepoID)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
@@ -766,8 +768,13 @@ func runRunnerNext(c *Ctx, args []string) int {
 		// over loopback takes its port for the build's GITBAY_SSH (#260).
 		SSH     string            `json:"ssh,omitempty"`
 		Secrets map[string]string `json:"secrets,omitempty"`
+		// Results asks the runner to upload the SARIF its steps leave in
+		// $GITBAY_RESULTS with runner results. An older runner ignores it,
+		// and the scan's issue stays as it was.
+		Results bool `json:"results,omitempty"`
 	}{ID: b.ID, Repo: repo.Path(), Number: b.Number, Job: b.Job, SHA: b.SHA, Ref: b.Ref,
-		Steps: steps, Image: b.Image, Trusted: b.Trusted, SSH: publicSSH(c), Secrets: secrets}
+		Steps: steps, Image: b.Image, Trusted: b.Trusted, SSH: publicSSH(c), Secrets: secrets,
+		Results: b.Job == ci.SecurityJob}
 	return c.emit(d, func(w io.Writer) {
 		fmt.Fprintf(w, "build %d: %s %s @ %.10s\n", d.ID, d.Repo, d.Job, d.SHA)
 	})
@@ -908,8 +915,11 @@ func runRunnerDone(c *Ctx, args []string) int {
 	}
 	url := fmt.Sprintf("%s/%s/builds/%d", c.Cfg.Server.SiteURL, repo.Path(), b.Number)
 	desc := "build " + outcome
-	if err := c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, outcome, desc, url, c.User.ID); err != nil {
-		return c.fail(protocol.ExitFailure, "%v", err)
+	// The code scan reports through its issue; see ci.QueueSecurityScan.
+	if b.Job != ci.SecurityJob {
+		if err := c.Store.SetCommitStatus(repo.ID, b.SHA, "ci/"+b.Job, outcome, desc, url, c.User.ID); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
 	}
 	c.Store.RecordEvent(repo.ID, c.User.ID, "build."+outcome,
 		fmt.Sprintf(`{"number":%d,"job":%q,"sha":%q}`, b.Number, b.Job, b.SHA))

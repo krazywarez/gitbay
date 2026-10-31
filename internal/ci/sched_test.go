@@ -4,9 +4,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -134,5 +136,71 @@ func TestSchedulerRunDue(t *testing.T) {
 	s.RunDue(now)
 	if builds, _ = st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 2 {
 		t.Fatalf("tick after the last build finished did not queue: %+v", builds)
+	}
+}
+
+// The code scan has its own schedule: a due repository gets one build of
+// the instance's job, with no commit status, and none while one is pending
+// or while the instance has no image.
+func TestSchedulerQueuesSecurityScan(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := st.CreateUser("alice", false)
+	repoID, _ := st.CreateRepo("user", uid, "app", "public")
+	work := t.TempDir()
+	bare := filepath.Join(work, "bare.git")
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main", "src"},
+		{"-C", "src", "-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "--allow-empty", "-m", "base"},
+		{"clone", "-q", "--bare", "src", "bare.git"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	now := time.Now()
+	if err := st.EnableSecurityScan(repoID, now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05Z")); err != nil {
+		t.Fatal(err)
+	}
+	s := &Scheduler{St: st, SiteURL: "https://x.test", RepoDir: func(owner, name string) string { return bare }}
+	s.RunDue(now)
+	if builds, _ := st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 0 {
+		t.Fatalf("queued with no image: %+v", builds)
+	}
+
+	s.Security = config.Security{Image: "localhost/gitbay-security:1", Schedule: "0 4 * * *", Steps: []string{"true"}}
+	st.SetSecurityNext(repoID, now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05Z"))
+	s.RunDue(now)
+	builds, _ := st.ListBuilds(repoID, store.BuildFilter{}, 10)
+	if len(builds) != 1 || builds[0].Job != SecurityJob || builds[0].Image != "localhost/gitbay-security:1" {
+		t.Fatalf("builds = %+v", builds)
+	}
+	if statuses, _ := st.CommitStatusesFor(repoID, []string{builds[0].SHA}); len(statuses[builds[0].SHA]) != 0 {
+		t.Errorf("a status was set: %+v", statuses)
+	}
+	if sc, _ := st.SecurityScanFor(repoID); sc.NextRun <= now.UTC().Format("2006-01-02T15:04:05Z") {
+		t.Errorf("next run not advanced: %q", sc.NextRun)
+	}
+
+	// Due again while the first is pending: nothing more.
+	st.SetSecurityNext(repoID, now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05Z"))
+	s.RunDue(now)
+	if builds, _ := st.ListBuilds(repoID, store.BuildFilter{}, 10); len(builds) != 1 {
+		t.Errorf("queued over a pending scan: %d builds", len(builds))
+	}
+}
+
+func TestSecurityJobNameIsReserved(t *testing.T) {
+	if _, err := Parse([]byte("jobs:\n  gitbay-security:\n    steps: [echo]\n")); err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("Parse = %v", err)
 	}
 }

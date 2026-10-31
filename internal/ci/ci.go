@@ -21,6 +21,11 @@ import (
 // ConfigPath is where the build configuration lives in a repository.
 const ConfigPath = ".gitbay/ci.yml"
 
+// SecurityJob is the instance's code scanning job, defined by the server's
+// [security] configuration rather than the repository's ci.yml. The name is
+// reserved so a repository's own job cannot be mistaken for it.
+const SecurityJob = "gitbay-security"
+
 const (
 	maxJobs     = 10
 	maxSteps    = 50
@@ -78,6 +83,9 @@ func Parse(raw []byte) ([]Job, error) {
 	for name, j := range doc.Jobs {
 		if !jobName.MatchString(name) {
 			return nil, fmt.Errorf("bad job name %q: lowercase letters, digits, - and _; max 40 chars", name)
+		}
+		if name == SecurityJob {
+			return nil, fmt.Errorf("job name %q is reserved for the instance's code scan", name)
 		}
 		if len(j.Steps) == 0 {
 			return nil, fmt.Errorf("job %q has no steps", name)

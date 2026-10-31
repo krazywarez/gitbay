@@ -22,14 +22,18 @@ type settingsPage struct {
 	Branches    []gitutil.Ref
 	DepsEnabled bool
 	Deps        control.DepsOut
-	Runners     []store.RepoRunner
-	Access      []accessRow
-	Hooks       []hookRow
-	Deliveries  []deliveryRow
-	Notice      string
-	Saved       bool
-	Reauth      bool // Notice is the stale-session refusal: link to sign in
-	Submitted   map[string]string
+	Security    control.SecurityOut
+	// ScanAvailable is whether the instance has a code scanning image;
+	// without one the toggle would only ever be refused.
+	ScanAvailable bool
+	Runners       []store.RepoRunner
+	Access        []accessRow
+	Hooks         []hookRow
+	Deliveries    []deliveryRow
+	Notice        string
+	Saved         bool
+	Reauth        bool // Notice is the stale-session refusal: link to sign in
+	Submitted     map[string]string
 }
 
 type accessRow struct {
@@ -79,6 +83,8 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 	// prints (#164).
 	var deps control.DepsOut
 	s.runControlInto(u, []string{"repo", "deps", "status", repo.Path()}, &deps)
+	var security control.SecurityOut
+	s.runControlInto(u, []string{"repo", "security", "status", repo.Path()}, &security)
 	var runners []store.RepoRunner
 	s.runControlInto(u, []string{"repo", "runner", "list", repo.Path()}, &runners)
 	var access []accessRow
@@ -105,6 +111,7 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 	s.render(w, "settings.html", settingsPage{
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: deps.Enabled, Deps: deps,
+		Security: security, ScanAvailable: s.cfg.Security.Image != "",
 		Runners: runners,
 		Access:  access, Hooks: hooks, Deliveries: deliveries,
 		Notice:    notice,
@@ -155,6 +162,12 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 		argv = []string{"repo", "settings", "require-mr", repo, onOff(v("require-mr"))}
 	case "require-signed":
 		argv = []string{"repo", "settings", "require-signed", repo, onOff(v("require-signed"))}
+	case "security":
+		verb := "disable"
+		if v("security") == "on" {
+			verb = "enable"
+		}
+		argv = []string{"repo", "security", verb, repo}
 	case "secret-scan":
 		argv = []string{"repo", "settings", "secret-scan", repo, v("secret-scan")}
 	case "secret-scan-allow":
