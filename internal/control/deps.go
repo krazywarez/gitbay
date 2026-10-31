@@ -12,11 +12,11 @@ import (
 )
 
 func init() {
-	// Dependency update checks. Opt-in per repository: the check tells a
-	// public registry what the repository depends on, which is the owner's
-	// disclosure to make, not the instance's.
+	// Dependency update and advisory checks. Opt-in per repository: the
+	// check tells a public registry and OSV what the repository depends on,
+	// which is the owner's disclosure to make, not the instance's.
 	register(Command{Path: []string{"repo", "deps", "enable"},
-		Summary:  "check dependencies for updates",
+		Summary:  "check dependencies for updates and advisories",
 		Usage:    "repo deps enable <owner/name>",
 		Examples: []string{"repo deps enable krz/gitbay"},
 		Run:      runDepsEnable})
@@ -33,14 +33,16 @@ func init() {
 }
 
 // DepsOut is what `repo deps status` emits: the check's state and what
-// the last run found behind. Named so the web decodes the same struct
-// the command writes.
+// the last run found behind or matching an advisory. Named so the web
+// decodes the same struct the command writes.
 type DepsOut struct {
-	Enabled     bool        `json:"enabled"`
-	LastCheck   string      `json:"last_check,omitempty"`
-	LastError   string      `json:"last_error,omitempty"`
-	IssueNumber int64       `json:"issue_number,omitempty"`
-	Behind      []DepBehind `json:"behind"`
+	Enabled             bool          `json:"enabled"`
+	LastCheck           string        `json:"last_check,omitempty"`
+	LastError           string        `json:"last_error,omitempty"`
+	IssueNumber         int64         `json:"issue_number,omitempty"`
+	AdvisoryIssueNumber int64         `json:"advisory_issue_number,omitempty"`
+	Behind              []DepBehind   `json:"behind"`
+	Advisories          []DepAdvisory `json:"advisories"`
 }
 
 // DepBehind is one dependency with a newer release than the manifest pins.
@@ -49,6 +51,17 @@ type DepBehind struct {
 	Name      string `json:"name"`
 	Current   string `json:"current"`
 	Latest    string `json:"latest"`
+}
+
+// DepAdvisory is one published advisory matching a resolved dependency.
+type DepAdvisory struct {
+	Ecosystem string `json:"ecosystem"`
+	Name      string `json:"name"`
+	Version   string `json:"version"`
+	ID        string `json:"id"`
+	Summary   string `json:"summary"`
+	Severity  string `json:"severity,omitempty"`
+	Fixed     string `json:"fixed,omitempty"`
 }
 
 func runDepsEnable(c *Ctx, args []string) int {
@@ -110,15 +123,27 @@ func runDepsStatus(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
+	advisories, err := c.Store.ReportedAdvisories(repo.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	out := DepsOut{Enabled: true, LastCheck: check.LastCheck, LastError: check.LastError,
-		IssueNumber: check.IssueNumber, Behind: []DepBehind{}}
+		IssueNumber: check.IssueNumber, AdvisoryIssueNumber: check.AdvisoryIssueNumber,
+		Behind: []DepBehind{}, Advisories: []DepAdvisory{}}
 	for _, r := range reports {
 		out.Behind = append(out.Behind, DepBehind{r.Ecosystem, r.Name, r.Current, r.Latest})
 	}
+	for _, a := range advisories {
+		out.Advisories = append(out.Advisories,
+			DepAdvisory{a.Ecosystem, a.Name, a.Version, a.ID, a.Summary, a.Severity, a.Fixed})
+	}
 	return c.emitView(out, func(w io.Writer) {
-		tracked := ""
+		tracked, advised := "", ""
 		if check.IssueNumber != 0 {
 			tracked = fmt.Sprintf("#%d", check.IssueNumber)
+		}
+		if check.AdvisoryIssueNumber != 0 {
+			advised = fmt.Sprintf("#%d", check.AdvisoryIssueNumber)
 		}
 		v := c.view(w)
 		v.fields(
@@ -126,12 +151,21 @@ func runDepsStatus(c *Ctx, args []string) int {
 			"last check", c.when(check.LastCheck),
 			"last error", check.LastError,
 			"tracked in", tracked,
+			"advisories in", advised,
 		)
 		if len(out.Behind) > 0 {
 			v.section("behind")
 			tb := c.table(w, "ECOSYSTEM", "NAME", "CURRENT", "LATEST")
 			for _, b := range out.Behind {
 				tb.row(cText(b.Ecosystem), cRef(b.Name), cText(b.Current), cText(b.Latest))
+			}
+			tb.flush()
+		}
+		if len(out.Advisories) > 0 {
+			v.section("advisories")
+			tb := c.table(w, "ECOSYSTEM", "NAME", "VERSION", "ADVISORY", "FIXED")
+			for _, a := range out.Advisories {
+				tb.row(cText(a.Ecosystem), cRef(a.Name), cText(a.Version), cText(a.ID), cText(a.Fixed))
 			}
 			tb.flush()
 		}
@@ -149,11 +183,23 @@ func runDepsStatus(c *Ctx, args []string) int {
 			n := strconv.FormatInt(check.IssueNumber, 10)
 			s.fields = append(s.fields, field{"Tracked in", []cell{cLink("#"+n, c.siteURL(repo.Path(), "issues", n))}})
 		}
+		if check.AdvisoryIssueNumber != 0 {
+			n := strconv.FormatInt(check.AdvisoryIssueNumber, 10)
+			s.fields = append(s.fields, field{"Advisories in", []cell{cLink("#"+n, c.siteURL(repo.Path(), "issues", n))}})
+		}
 		behind := section{title: "Behind", n: len(out.Behind)}
 		for _, b := range out.Behind {
 			behind.rows = append(behind.rows, rowOf(cRef(b.Name), cText(b.Ecosystem), cMeta(b.Current+" → "+b.Latest)))
 		}
-		s.sections = []section{behind}
+		advised := section{title: "Advisories", n: len(out.Advisories)}
+		for _, a := range out.Advisories {
+			fix := a.Version
+			if a.Fixed != "" {
+				fix += " → " + a.Fixed
+			}
+			advised.rows = append(advised.rows, rowOf(cRef(a.Name), cMark(a.ID, sgrRed), cMeta(fix)))
+		}
+		s.sections = []section{behind, advised}
 		s.actions = []action{{"Deps", []string{"repo", "deps", "disable", repo.Path()}}}
 		return s
 	})

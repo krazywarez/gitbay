@@ -23,7 +23,8 @@ const manifestLimit = 1 << 20
 const lookups = 4
 
 // Worker sweeps repositories that have opted in, comparing their manifests
-// against the registries and maintaining one issue per repository.
+// against the registries and OSV and maintaining up to two issues per
+// repository: one for updates, one for advisories.
 type Worker struct {
 	St      *store.Store
 	Cfg     config.Config
@@ -83,17 +84,32 @@ func (w *Worker) Sweep(ctx context.Context) {
 	}
 }
 
-// check compares one repository against the registries and reconciles its
-// issue with the result.
+// check compares one repository against the registries and OSV, and
+// reconciles its two issues with the result. A failure on one side leaves
+// the other reconciled, and leaves its own issue as it was rather than
+// closing it on an answer that never came.
 func (w *Worker) check(ctx context.Context, repo store.Repo) error {
 	dir := w.RepoDir(repo.OwnerName, repo.Name)
 	sha, err := gitutil.ResolveRef(dir, "refs/heads/"+repo.DefaultBranch)
 	if err != nil {
 		return nil // empty repo, or no default branch yet
 	}
-	found := Scan(func(path string) ([]byte, error) {
+	read := func(path string) ([]byte, error) {
 		return gitutil.ReadBlob(dir, sha, path, manifestLimit)
-	})
+	}
+	var root []string
+	if entries, err := gitutil.ListTree(dir, sha, ""); err == nil {
+		for _, e := range entries {
+			root = append(root, e.Name)
+		}
+	}
+	return errors.Join(
+		w.checkUpdates(ctx, repo, Scan(read)),
+		w.checkAdvisories(ctx, repo, Resolved(read, root)),
+	)
+}
+
+func (w *Worker) checkUpdates(ctx context.Context, repo store.Repo, found []Dep) error {
 	if len(found) == 0 {
 		return w.reconcile(repo, nil)
 	}
@@ -102,6 +118,17 @@ func (w *Worker) check(ctx context.Context, repo store.Repo) error {
 		return err
 	}
 	return w.reconcile(repo, behind)
+}
+
+func (w *Worker) checkAdvisories(ctx context.Context, repo store.Repo, resolved []Dep) error {
+	if len(resolved) == 0 {
+		return w.reconcileAdvisories(repo, nil)
+	}
+	matched, err := w.Client.Advisories(ctx, resolved)
+	if err != nil {
+		return fmt.Errorf("advisories: %w", err)
+	}
+	return w.reconcileAdvisories(repo, matched)
 }
 
 // behind queries the registries and keeps the dependencies whose latest
@@ -152,9 +179,7 @@ func (w *Worker) behind(ctx context.Context, found []Dep) ([]store.DepReport, er
 	return out, nil
 }
 
-// reconcile brings the repository's issue in line with what is behind:
-// opened when something first falls behind, rewritten when the set changes,
-// closed when nothing is behind any more.
+// reconcile brings the updates issue in line with what is behind.
 func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 	check, err := w.St.DepCheckFor(repo.ID)
 	if err != nil {
@@ -164,32 +189,80 @@ func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 	if err != nil {
 		return err
 	}
-	issue, hasIssue := w.openIssue(repo, check.IssueNumber)
-	if len(behind) == 0 {
+	return w.maintain(repo, tracked{
+		title:   IssueTitle,
+		number:  check.IssueNumber,
+		record:  func(n int64) error { return w.St.SetDepIssue(repo.ID, n) },
+		empty:   len(behind) == 0,
+		changed: !same(previous, behind),
+		save:    func() error { return w.St.ReplaceDepReports(repo.ID, behind) },
+		body:    func() string { return Body(repo.DefaultBranch, behind) },
+	})
+}
+
+// reconcileAdvisories brings the advisories issue in line with what
+// matches.
+func (w *Worker) reconcileAdvisories(repo store.Repo, matched []store.DepAdvisory) error {
+	check, err := w.St.DepCheckFor(repo.ID)
+	if err != nil {
+		return err
+	}
+	previous, err := w.St.ReportedAdvisories(repo.ID)
+	if err != nil {
+		return err
+	}
+	return w.maintain(repo, tracked{
+		title:   AdvisoryTitle,
+		number:  check.AdvisoryIssueNumber,
+		record:  func(n int64) error { return w.St.SetDepAdvisoryIssue(repo.ID, n) },
+		empty:   len(matched) == 0,
+		changed: !sameAdvisories(previous, matched),
+		save:    func() error { return w.St.ReplaceDepAdvisories(repo.ID, matched) },
+		body:    func() string { return AdvisoryBody(repo.DefaultBranch, matched) },
+	})
+}
+
+// tracked is one issue the worker maintains for a repository and the set
+// it reports.
+type tracked struct {
+	title   string
+	number  int64 // the issue last opened, 0 for none
+	record  func(number int64) error
+	empty   bool // nothing to report
+	changed bool // the set differs from the last report
+	save    func() error
+	body    func() string
+}
+
+// maintain opens the issue when something is first reported, rewrites it
+// when the set changes, and closes it when nothing is left.
+func (w *Worker) maintain(repo store.Repo, t tracked) error {
+	issue, hasIssue := w.openIssue(repo, t.number)
+	if t.empty {
 		if hasIssue {
 			w.St.SetIssueState(issue.ID, "closed")
-			w.St.SetDepIssue(repo.ID, 0)
+			t.record(0)
 		}
-		if len(previous) > 0 {
-			return w.St.ReplaceDepReports(repo.ID, nil)
+		if t.changed {
+			return t.save()
 		}
 		return nil
 	}
 	// Nothing changed since the last report: leave it be, whether the issue
 	// is still open or the maintainer has closed it. Reopening on an
 	// unchanged set would make closing the issue pointless.
-	if same(previous, behind) {
+	if !t.changed {
 		return nil
 	}
-	if err := w.St.ReplaceDepReports(repo.ID, behind); err != nil {
+	if err := t.save(); err != nil {
 		return err
 	}
-	body := Body(repo.DefaultBranch, behind)
+	body := t.body()
 	if hasIssue {
 		if err := w.St.UpdateIssueText(issue.ID, nil, &body, nil); err != nil {
 			return err
 		}
-		w.notify(repo, issue.Number, fmt.Sprintf("updated issue #%d", issue.Number), body)
+		w.notify(repo, t.title, issue.Number, fmt.Sprintf("updated issue #%d", issue.Number), body)
 		return nil
 	}
 	author, err := w.St.UserByUsername(store.BotUsername)
@@ -200,15 +273,15 @@ func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 		return fmt.Errorf("no %s account to author the issue (the name was taken when this instance upgraded): %w",
 			store.BotUsername, err)
 	}
-	number, err := w.St.CreateIssue(repo.ID, author.ID, IssueTitle, body, "md")
+	number, err := w.St.CreateIssue(repo.ID, author.ID, t.title, body, "md")
 	if err != nil {
 		return err
 	}
-	if err := w.St.SetDepIssue(repo.ID, number); err != nil {
+	if err := t.record(number); err != nil {
 		return err
 	}
 	w.St.RecordEvent(repo.ID, author.ID, "issue.created", fmt.Sprintf(`{"number":%d}`, number))
-	w.notify(repo, number, fmt.Sprintf("opened issue #%d", number), body)
+	w.notify(repo, t.title, number, fmt.Sprintf("opened issue #%d", number), body)
 	return nil
 }
 
@@ -229,7 +302,7 @@ func (w *Worker) openIssue(repo store.Repo, number int64) (store.Issue, bool) {
 // notify files an inbox row for the repo's owners and watchers and mails
 // them, the same targets and shape as an issue opened over SSH.
 // Best-effort, like every other notification.
-func (w *Worker) notify(repo store.Repo, number int64, action, body string) {
+func (w *Worker) notify(repo store.Repo, title string, number int64, action, body string) {
 	targets, err := w.St.RepoNotifyTargets(repo)
 	if err != nil {
 		return
@@ -242,7 +315,7 @@ func (w *Worker) notify(repo store.Repo, number int64, action, body string) {
 	if err != nil {
 		return
 	}
-	subject := fmt.Sprintf("[%s] #%d: %s", repo.Path(), number, IssueTitle)
+	subject := fmt.Sprintf("[%s] #%d: %s", repo.Path(), number, title)
 	text := fmt.Sprintf("%s %s\n\n%s\n%s/%s/issues/%d\n", store.BotUsername, action, body,
 		strings.TrimSuffix(w.Cfg.Server.SiteURL, "/"), repo.Path(), number)
 	path := fmt.Sprintf("%s/issues/%d", repo.Path(), number)

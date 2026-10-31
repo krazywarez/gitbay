@@ -66,6 +66,7 @@ a database check.
 | Webhook URLs           | recorded events               | yes when https; certificate verified         | private, shared, loopback, link-local and multicast targets refused at save and again at connect time; no redirects (=internal/webhook/webhook.go=) |
 | Mirror URLs            | mirror schedule               | per URL                                      | address check at save and before each sync; git pinned to the checked addresses, no redirects (=internal/mirror/mirror.go=) |
 | Package registries     | dependency checks             | yes                                          | fixed hosts; only the package name varies (=internal/deps/registry.go=) |
+| OSV (=api.osv.dev=)    | dependency checks             | yes                                          | fixed host; sent ecosystem, package name and version (=internal/deps/osv.go=) |
 
 * Host firewall
 

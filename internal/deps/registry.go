@@ -34,6 +34,7 @@ var safeName = regexp.MustCompile(`^@?[A-Za-z0-9][A-Za-z0-9._/@+-]*$`)
 type Client struct {
 	HTTP    *http.Client
 	Hosts   map[string]string // overridden in tests
+	OSV     string            // osvAPI unless overridden in tests
 	Version string            // reported in User-Agent
 }
 

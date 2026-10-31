@@ -166,7 +166,7 @@ var summaries = map[string]string{
 	"repo deploy-key list":             "list deploy keys",
 	"repo deploy-key remove":           "remove a deploy key",
 	"repo deps disable":                "stop checking dependencies",
-	"repo deps enable":                 "check dependencies for updates",
+	"repo deps enable":                 "check dependencies for updates and advisories",
 	"repo deps status":                 "show dependency check state",
 	"repo diff":                        "the patch between two refs, from their merge base",
 	"repo domain add":                  "claim a custom pages domain (verify with a DNS TXT record)",

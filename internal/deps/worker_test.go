@@ -223,3 +223,51 @@ func TestReconcileLeavesClosedIssueClosedOnUnchangedSet(t *testing.T) {
 		t.Error("the closed issue came back")
 	}
 }
+
+func TestReconcileAdvisoriesKeepsItsOwnIssue(t *testing.T) {
+	w, repo := testWorker(t)
+	if err := w.reconcile(repo, reports("github.com/a/b", "v1.0.0", "v1.1.0")); err != nil {
+		t.Fatal(err)
+	}
+	matched := []store.DepAdvisory{{Ecosystem: EcoGo, Name: "github.com/a/b", Version: "v1.0.0",
+		ID: "GO-1", Summary: "bad", Fixed: "1.1.0"}}
+	if err := w.reconcileAdvisories(repo, matched); err != nil {
+		t.Fatal(err)
+	}
+	check, _ := w.St.DepCheckFor(repo.ID)
+	if check.AdvisoryIssueNumber == 0 || check.AdvisoryIssueNumber == check.IssueNumber {
+		t.Fatalf("advisory issue #%d, updates issue #%d", check.AdvisoryIssueNumber, check.IssueNumber)
+	}
+	issue, _ := w.St.IssueByNumber(repo.ID, check.AdvisoryIssueNumber)
+	if issue.Title != AdvisoryTitle || !strings.Contains(issue.Body, "GO-1") {
+		t.Errorf("advisory issue = %q\n%s", issue.Title, issue.Body)
+	}
+	mail, _ := w.St.DueMail(10)
+	if len(mail) != 2 || !strings.Contains(mail[1].Subject, AdvisoryTitle) {
+		t.Fatalf("mail = %+v", mail)
+	}
+
+	// An upstream edit to the summary is not a change worth mailing.
+	edited := []store.DepAdvisory{matched[0]}
+	edited[0].Summary = "reworded"
+	if err := w.reconcileAdvisories(repo, edited); err != nil {
+		t.Fatal(err)
+	}
+	if mail, _ := w.St.DueMail(10); len(mail) != 2 {
+		t.Errorf("summary edit mailed: %d messages", len(mail))
+	}
+
+	// Fixed: the advisories issue closes, the updates issue stays open.
+	if err := w.reconcileAdvisories(repo, nil); err != nil {
+		t.Fatal(err)
+	}
+	if closed, _ := w.St.IssueByNumber(repo.ID, check.AdvisoryIssueNumber); closed.State != "closed" {
+		t.Errorf("advisory issue state = %q", closed.State)
+	}
+	if open, _ := w.St.IssueByNumber(repo.ID, check.IssueNumber); open.State != "open" {
+		t.Errorf("updates issue state = %q", open.State)
+	}
+	if left, _ := w.St.ReportedAdvisories(repo.ID); len(left) != 0 {
+		t.Errorf("advisories left behind: %v", left)
+	}
+}

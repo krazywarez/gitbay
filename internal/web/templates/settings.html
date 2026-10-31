@@ -220,12 +220,12 @@
 <section id="deps"><h2>Dependencies</h2>
 <form method="post" action="{{$base}}" class="setform">
   <input type="hidden" name="field" value="deps">
-  <div><label for="deps-enabled">Check for updates</label><p class="hint">Evaluates the manifests on <code>{{.Repo.DefaultBranch}}</code> and opens an issue. Go, NPM, Crates, and PyPI only.</p></div>
+  <div><label for="deps-enabled">Check for updates and advisories</label><p class="hint">Evaluates the manifests and lockfiles on <code>{{.Repo.DefaultBranch}}</code> against the registries and OSV, and opens an issue for each. Updates for Go, NPM, Crates, and PyPI; advisories for those and SwiftPM.</p></div>
   <div class="check"><input type="checkbox" id="deps-enabled" name="deps" value="on"{{if .DepsEnabled}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
 {{if .DepsEnabled}}
-<p class="meta">Last checked {{if .Deps.LastCheck}}{{when .Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}</p>
+<p class="meta">Last checked {{if .Deps.LastCheck}}{{when .Deps.LastCheck}}{{else}}never{{end}}{{if .Deps.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.IssueNumber}}">#{{.Deps.IssueNumber}}</a>{{end}}{{if .Deps.AdvisoryIssueNumber}} · advisories <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Deps.AdvisoryIssueNumber}}">#{{.Deps.AdvisoryIssueNumber}}</a>{{end}}</p>
 {{if .Deps.LastError}}<p class="error" role="alert">{{.Deps.LastError}}</p>{{end}}
 {{if .Deps.Behind}}<div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">dependency</th><th scope="col">pinned</th><th scope="col">latest</th></tr>
@@ -236,6 +236,16 @@
 </tr>
 {{end}}</table></div>
 {{else}}<p class="none">Nothing behind{{if not .Deps.LastCheck}} — the first check has not run yet{{end}}.</p>{{end}}
+{{if .Deps.Advisories}}<div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">dependency</th><th scope="col">version</th><th scope="col">advisory</th><th scope="col">fixed in</th></tr>
+{{range .Deps.Advisories}}<tr>
+  <td class="mono">{{.Ecosystem}} {{.Name}}</td>
+  <td class="mono">{{.Version}}</td>
+  <td class="mono"><a href="https://osv.dev/vulnerability/{{.ID}}">{{.ID}}</a></td>
+  <td class="mono">{{.Fixed}}</td>
+</tr>
+{{end}}</table></div>
+{{else if .Deps.LastCheck}}<p class="none">No known advisories.</p>{{end}}
 {{end}}
 </section>
 

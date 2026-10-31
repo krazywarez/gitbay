@@ -17,6 +17,9 @@ type DepCheck struct {
 	LastCheck   string
 	LastError   string
 	IssueNumber int64 // 0 until an issue has been opened
+	// AdvisoryIssueNumber is the advisories issue, kept apart from the
+	// updates one.
+	AdvisoryIssueNumber int64
 }
 
 // DepReport is one dependency found to be behind, as last reported.
@@ -25,6 +28,18 @@ type DepReport struct {
 	Name      string
 	Current   string
 	Latest    string
+}
+
+// DepAdvisory is one published advisory matching a resolved dependency,
+// as last reported.
+type DepAdvisory struct {
+	Ecosystem string
+	Name      string
+	Version   string
+	ID        string
+	Summary   string
+	Severity  string
+	Fixed     string // the first release past Version that fixes it, if any
 }
 
 func (s *Store) EnableDepCheck(repoID int64) error {
@@ -43,6 +58,9 @@ func (s *Store) DisableDepCheck(repoID int64) error {
 	if _, err := tx.Exec("DELETE FROM dep_reports WHERE repo_id = ?", repoID); err != nil {
 		return err
 	}
+	if _, err := tx.Exec("DELETE FROM dep_advisories WHERE repo_id = ?", repoID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec("DELETE FROM dep_checks WHERE repo_id = ?", repoID); err != nil {
 		return err
 	}
@@ -52,8 +70,8 @@ func (s *Store) DisableDepCheck(repoID int64) error {
 func (s *Store) DepCheckFor(repoID int64) (DepCheck, error) {
 	var d DepCheck
 	err := s.DB.QueryRow(
-		"SELECT repo_id, last_check, last_error, issue_number FROM dep_checks WHERE repo_id = ?", repoID).
-		Scan(&d.RepoID, &d.LastCheck, &d.LastError, &d.IssueNumber)
+		"SELECT repo_id, last_check, last_error, issue_number, advisory_issue_number FROM dep_checks WHERE repo_id = ?", repoID).
+		Scan(&d.RepoID, &d.LastCheck, &d.LastError, &d.IssueNumber, &d.AdvisoryIssueNumber)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, ErrNotFound
 	}
@@ -101,6 +119,11 @@ func (s *Store) SetDepIssue(repoID, number int64) error {
 	return err
 }
 
+func (s *Store) SetDepAdvisoryIssue(repoID, number int64) error {
+	_, err := s.DB.Exec("UPDATE dep_checks SET advisory_issue_number = ? WHERE repo_id = ?", number, repoID)
+	return err
+}
+
 func (s *Store) ReportedDeps(repoID int64) ([]DepReport, error) {
 	rows, err := s.DB.Query(`
 		SELECT ecosystem, name, current, latest FROM dep_reports
@@ -135,6 +158,47 @@ func (s *Store) ReplaceDepReports(repoID int64, reports []DepReport) error {
 		if _, err := tx.Exec(`
 			INSERT INTO dep_reports (repo_id, ecosystem, name, current, latest)
 			VALUES (?, ?, ?, ?, ?)`, repoID, d.Ecosystem, d.Name, d.Current, d.Latest); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ReportedAdvisories(repoID int64) ([]DepAdvisory, error) {
+	rows, err := s.DB.Query(`
+		SELECT ecosystem, name, version, advisory_id, summary, severity, fixed FROM dep_advisories
+		WHERE repo_id = ? ORDER BY ecosystem, name, version, advisory_id`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DepAdvisory
+	for rows.Next() {
+		var a DepAdvisory
+		if err := rows.Scan(&a.Ecosystem, &a.Name, &a.Version, &a.ID, &a.Summary, &a.Severity, &a.Fixed); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// ReplaceDepAdvisories swaps in the current matching set wholesale, as
+// ReplaceDepReports does for updates.
+func (s *Store) ReplaceDepAdvisories(repoID int64, advisories []DepAdvisory) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM dep_advisories WHERE repo_id = ?", repoID); err != nil {
+		return err
+	}
+	for _, a := range advisories {
+		if _, err := tx.Exec(`
+			INSERT INTO dep_advisories (repo_id, ecosystem, name, version, advisory_id, summary, severity, fixed)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			repoID, a.Ecosystem, a.Name, a.Version, a.ID, a.Summary, a.Severity, a.Fixed); err != nil {
 			return err
 		}
 	}

@@ -41,3 +41,19 @@ func TestBodyAlignsColumns(t *testing.T) {
 		t.Errorf("row not padded to its column:\n%s", body)
 	}
 }
+
+func TestAdvisoryBody(t *testing.T) {
+	body := AdvisoryBody("main", []store.DepAdvisory{
+		{Ecosystem: EcoGo, Name: "golang.org/x/net", Version: "v0.1.0", ID: "GO-2", Summary: "HTTP/2 reset", Severity: "", Fixed: "0.7.0"},
+		{Ecosystem: EcoPyPI, Name: "flask", Version: "2.0.0", ID: "GHSA-aaaa", Summary: "cookie leak", Severity: "high", Fixed: "2.2.5"},
+	})
+	for _, want := range []string{
+		"| `golang.org/x/net` | v0.1.0  | GO-2     |          | 0.7.0    |",
+		"- GHSA-aaaa: cookie leak https://osv.dev/vulnerability/GHSA-aaaa",
+		"### PyPI",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q:\n%s", want, body)
+		}
+	}
+}

@@ -10,7 +10,10 @@ import (
 // that name one release are reported: a bare `requests` or a `>=2,<3` range
 // says the project accepts whatever is current, so there is nothing to tell
 // its maintainer.
-func parsePython(read ReadFile) []Dep {
+func parsePython(read ReadFile) []Dep { return pythonDeps(read, pin) }
+
+// pythonDeps reads both files, reducing each requirement with pinned.
+func pythonDeps(read ReadFile, pinned func(string) string) []Dep {
 	seen := map[string]bool{}
 	var out []Dep
 	add := func(name, version string) {
@@ -18,7 +21,7 @@ func parsePython(read ReadFile) []Dep {
 		if name == "" || name == "python" || seen[name] {
 			return
 		}
-		if v := pin(version); v != "" {
+		if v := pinned(version); v != "" {
 			seen[name] = true
 			out = append(out, Dep{Ecosystem: EcoPyPI, Name: name, Current: v})
 		}

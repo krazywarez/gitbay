@@ -6,7 +6,12 @@ import "strings"
 // requirements are the module graph's business rather than the maintainer's,
 // and a replaced module does not come from the proxy at all, so both are
 // skipped.
-func parseGoMod(read ReadFile) []Dep {
+func parseGoMod(read ReadFile) []Dep { return goRequires(read, false) }
+
+// goRequires reads go.mod's requirements, the indirect ones too when asked.
+// Since Go 1.17 go.mod lists every module the build selects, so with them it
+// is the resolved set.
+func goRequires(read ReadFile, withIndirect bool) []Dep {
 	raw, err := read("go.mod")
 	if err != nil {
 		return nil
@@ -41,7 +46,7 @@ func parseGoMod(read ReadFile) []Dep {
 		}
 		fields := strings.Fields(line)
 		switch {
-		case directive == "require" && !indirect && len(fields) >= 2:
+		case directive == "require" && (withIndirect || !indirect) && len(fields) >= 2:
 			reqs = append(reqs, [2]string{fields[0], fields[1]})
 		case directive == "replace" && len(fields) >= 1:
 			replaced[fields[0]] = true

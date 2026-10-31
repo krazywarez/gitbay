@@ -3,6 +3,7 @@ package control
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -317,4 +318,35 @@ func TestRepoScreensFitSixtyColumns(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRepoDepsStatusAdvisories(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	dispatchIn(t, st, u, root, "", "repo", "deps", "enable", p)
+	if err := st.ReplaceDepAdvisories(repo.ID, []store.DepAdvisory{{Ecosystem: "go", Name: "golang.org/x/net",
+		Version: "v0.1.0", ID: "GO-2026-1", Summary: "reset flood", Severity: "high", Fixed: "0.7.0"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetDepAdvisoryIssue(repo.ID, 7); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Data DepsOut `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(dispatchIn(t, st, u, root, "", "repo", "deps", "status", p, "--json")), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Data.AdvisoryIssueNumber != 7 || len(got.Data.Advisories) != 1 || got.Data.Advisories[0].ID != "GO-2026-1" {
+		t.Errorf("status = %+v", got.Data)
+	}
+	plain := dispatchIn(t, st, u, root, "", "repo", "deps", "status", p)
+	if !strings.Contains(plain, "advisories in  #7") || !strings.Contains(plain, "GO-2026-1") {
+		t.Errorf("plain:\n%s", plain)
+	}
+	out := atTerminalIn(t, st, u, root, "repo", "deps", "status", p)
+	if !strings.Contains(out, "Advisories (1)") || !strings.Contains(out, "v0.1.0 → 0.7.0") {
+		t.Errorf("screen:\n%s", out)
+	}
+	checkLegend(t, out)
 }
