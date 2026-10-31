@@ -35,6 +35,10 @@ const (
 
 var jobName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,39}$`)
 
+// ValidJobName reports whether name could name a job: one of ci.yml's, or
+// SecurityJob.
+func ValidJobName(name string) bool { return jobName.MatchString(name) }
+
 // imageRef matches an OCI image reference conservatively: registry path
 // segments, an optional :tag and an optional @sha256: digest. This string
 // becomes an argument to `podman run`, and a repository's config file must

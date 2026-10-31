@@ -106,6 +106,7 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 			"events":      submitted.Get("events"),
 			"name":        submitted.Get("name"),
 			"new-owner":   submitted.Get("new-owner"),
+			"jobs":        submitted.Get("jobs"),
 		}
 	}
 	s.render(w, "settings.html", settingsPage{
@@ -247,7 +248,11 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			s.settingsRedirect(w, r, "paste the runner's public key")
 			return
 		}
-		msg, ok := s.runControlStdin(u, []string{"repo", "runner", "add", repo}, body+"\n")
+		argv := []string{"repo", "runner", "add", repo}
+		if jobs := strings.Join(strings.Fields(strings.ReplaceAll(v("jobs"), ",", " ")), ","); jobs != "" {
+			argv = append(argv, "--jobs", jobs)
+		}
+		msg, ok := s.runControlStdin(u, argv, body+"\n")
 		if !ok {
 			s.settingsFormWith(w, r, u, msg, r.Form)
 			return

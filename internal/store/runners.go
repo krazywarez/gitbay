@@ -1,6 +1,9 @@
 package store
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // Runner is one runner key as the instance admin sees it.
 type Runner struct {
@@ -26,11 +29,13 @@ type RepoRunner struct {
 	Algo        string `json:"algo"`
 	Username    string `json:"username"`
 	AddedAt     string `json:"added_at"`
-	LastSeen    string `json:"last_seen,omitempty"`
-	BuildRepo   string `json:"build_repo,omitempty"`
-	BuildNumber int64  `json:"build_number,omitempty"`
-	BuildJob    string `json:"build_job,omitempty"`
-	StartedAt   string `json:"started_at,omitempty"`
+	// Jobs are the only jobs this runner claims here; none is every job.
+	Jobs        []string `json:"jobs,omitempty"`
+	LastSeen    string   `json:"last_seen,omitempty"`
+	BuildRepo   string   `json:"build_repo,omitempty"`
+	BuildNumber int64    `json:"build_number,omitempty"`
+	BuildJob    string   `json:"build_job,omitempty"`
+	StartedAt   string   `json:"started_at,omitempty"`
 }
 
 // AttachRunner lets a key claim a repository's builds. Attaching twice is
@@ -38,6 +43,34 @@ type RepoRunner struct {
 func (s *Store) AttachRunner(keyID, repoID int64) error {
 	_, err := s.DB.Exec("INSERT OR IGNORE INTO runner_repos (key_id, repo_id) VALUES (?, ?)", keyID, repoID)
 	return err
+}
+
+// SetRunnerJobs narrows an attachment to the named jobs; none restores
+// every job.
+func (s *Store) SetRunnerJobs(keyID, repoID int64, jobs []string) error {
+	_, err := s.DB.Exec("UPDATE runner_repos SET jobs = ? WHERE key_id = ? AND repo_id = ?",
+		strings.Join(jobs, ","), keyID, repoID)
+	return err
+}
+
+// RunnerJobFilters maps each repository a key is attached to with a job
+// list to that list. Repositories it may claim every job in are absent.
+func (s *Store) RunnerJobFilters(keyID int64) (map[int64][]string, error) {
+	rows, err := s.DB.Query("SELECT repo_id, jobs FROM runner_repos WHERE key_id = ? AND jobs != ''", keyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var id int64
+		var jobs string
+		if err := rows.Scan(&id, &jobs); err != nil {
+			return nil, err
+		}
+		out[id] = strings.Split(jobs, ",")
+	}
+	return out, rows.Err()
 }
 
 // DetachRunner removes one attachment by fingerprint. The key itself stays.
@@ -104,7 +137,7 @@ func (s *Store) RunnerAttached(keyID, repoID int64) (bool, error) {
 // ListRepoRunners is every key attached to a repository with its last
 // poll and the build it holds, oldest attachment first.
 func (s *Store) ListRepoRunners(repoID int64) ([]RepoRunner, error) {
-	rows, err := s.DB.Query(`SELECT k.fingerprint, k.algo, u.username, rr.added_at,
+	rows, err := s.DB.Query(`SELECT k.fingerprint, k.algo, u.username, rr.added_at, rr.jobs,
 		COALESCE(rs.last_seen, ''),
 		COALESCE(COALESCE(bu.username, bo.name) || '/' || br.name, ''),
 		COALESCE(b.number, 0), COALESCE(b.job, ''), COALESCE(b.started_at, '')
@@ -124,9 +157,13 @@ func (s *Store) ListRepoRunners(repoID int64) ([]RepoRunner, error) {
 	var out []RepoRunner
 	for rows.Next() {
 		var r RepoRunner
-		if err := rows.Scan(&r.Fingerprint, &r.Algo, &r.Username, &r.AddedAt, &r.LastSeen,
+		var jobs string
+		if err := rows.Scan(&r.Fingerprint, &r.Algo, &r.Username, &r.AddedAt, &jobs, &r.LastSeen,
 			&r.BuildRepo, &r.BuildNumber, &r.BuildJob, &r.StartedAt); err != nil {
 			return nil, err
+		}
+		if jobs != "" {
+			r.Jobs = strings.Split(jobs, ",")
 		}
 		out = append(out, r)
 	}

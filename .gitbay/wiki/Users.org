@@ -890,6 +890,13 @@ detaches one (the key stays on your account; =keys remove= drops it).
 A runner key reaches only the runner protocol and read-only git, so a
 build step that reads it off disk cannot administer your account.
 
+=repo runner add owner/name --jobs a,b < key.pub= narrows an
+attachment to the named jobs, so two runners can share a repository by
+job: one that reaches a geo-blocked data source for the repository's
+own job (=--jobs daily-pull=), another with the code scanning image
+(=--jobs gitbay-security=). A re-add without =--jobs= keeps the list;
+=--jobs all= restores every job. =repo runner list= shows it.
+
 * Large files (LFS)
 
 Standard Git LFS works over both transports with no setup beyond the

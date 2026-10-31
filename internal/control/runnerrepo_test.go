@@ -122,3 +122,38 @@ func TestRepoRunnerAddRefusesWrongKeys(t *testing.T) {
 		t.Fatalf("attached anyway: %+v", runners)
 	}
 }
+
+// --jobs narrows an attachment, a re-add without it keeps the list, and
+// all restores every job; runner next claims accordingly.
+func TestRepoRunnerAddJobs(t *testing.T) {
+	st, repo, uid := newQueueTestRepo(t)
+	add := func(args ...string) string {
+		t.Helper()
+		c, out := repoRunnerCtx(t, st, uid, false, testRunnerPub)
+		if code := runRepoRunnerAdd(c, append([]string{repo.Path()}, args...)); code != protocol.ExitOK {
+			t.Fatalf("add %v: exit %d %s", args, code, out.String())
+		}
+		c, out = repoRunnerCtx(t, st, uid, false, "")
+		runRepoRunnerList(c, []string{repo.Path()})
+		return out.String()
+	}
+	if out := add("--jobs", "gitbay-security,gitbay-security"); !strings.Contains(out, `"jobs":["gitbay-security"]`) {
+		t.Fatalf("list after --jobs: %s", out)
+	}
+	if out := add(); !strings.Contains(out, `"jobs":["gitbay-security"]`) {
+		t.Fatalf("a re-add without --jobs dropped the list: %s", out)
+	}
+	c, out := repoRunnerCtx(t, st, uid, false, testRunnerPub)
+	if code := runRepoRunnerAdd(c, []string{repo.Path(), "--jobs", "Bad Name"}); code != protocol.ExitUsage {
+		t.Fatalf("bad job name: exit %d %s", code, out.String())
+	}
+
+	keys, _ := st.ListSSHKeys(uid)
+	filters, err := st.RunnerJobFilters(keys[0].ID)
+	if err != nil || len(filters[repo.ID]) != 1 {
+		t.Fatalf("filters = %v %v", filters, err)
+	}
+	if out := add("--jobs", "all"); strings.Contains(out, `"jobs"`) {
+		t.Fatalf("all did not restore every job: %s", out)
+	}
+}

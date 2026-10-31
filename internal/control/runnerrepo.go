@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 
+	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/policy"
 	"gitbay.org/gitbay/internal/protocol"
 	"gitbay.org/gitbay/internal/store"
@@ -19,9 +22,12 @@ import (
 // read-only git.
 func init() {
 	register(Command{Path: []string{"repo", "runner", "add"},
-		Summary:         "attach a runner's public key to a repository",
-		Usage:           "repo runner add <owner/name> < key.pub",
-		Examples:        []string{"repo runner add krz/gitbay < key.pub"},
+		Summary: "attach a runner's public key to a repository",
+		Usage:   "repo runner add <owner/name> [--jobs <job,...>|all] < key.pub",
+		Flags: []Flag{
+			{"--jobs", "<job,...>", "claim only these jobs here; all restores every job", "every job, or as before on a re-add"},
+		},
+		Examples:        []string{"repo runner add krz/gitbay < key.pub", "repo runner add krz/app --jobs gitbay-security < key.pub"},
 		ReadsStdin:      true,
 		MintsCredential: true, NeedsRecentSignIn: true, Run: runRepoRunnerAdd})
 	register(Command{Path: []string{"repo", "runner", "list"},
@@ -37,9 +43,20 @@ func init() {
 }
 
 func runRepoRunnerAdd(c *Ctx, args []string) int {
-	f, err := c.parseArgs(args, flagSpec{MaxPos: 1, Usage: "repo runner add <owner/name> < key.pub"})
+	f, err := c.parseArgs(args, flagSpec{Values: []string{"--jobs"}, MaxPos: 1, Usage: c.Cmd.Usage})
 	if err != nil || len(f.Pos) != 1 {
 		return c.usage()
+	}
+	var jobs []string
+	if v := f.Value("--jobs"); v != "" && v != "all" {
+		for _, j := range strings.Split(v, ",") {
+			if !ci.ValidJobName(j) {
+				return c.fail(protocol.ExitUsage, "bad job name %q", j)
+			}
+			if !slices.Contains(jobs, j) {
+				jobs = append(jobs, j)
+			}
+		}
 	}
 	repo, code := resolveRepo(c, f.Pos[0], policy.CanAdmin)
 	if code >= 0 {
@@ -92,9 +109,26 @@ func runRepoRunnerAdd(c *Ctx, args []string) int {
 	if err := c.Store.AttachRunner(key.ID, repo.ID); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	c.Store.Audit(c.User.ID, "repo.runner.add", map[string]any{"repo": repo.Path(), "fingerprint": fp})
-	d := map[string]string{"fingerprint": fp, "repo": repo.Path()}
+	// Without --jobs a re-add leaves the attachment's jobs as they were.
+	if f.Has("--jobs") {
+		if err := c.Store.SetRunnerJobs(key.ID, repo.ID, jobs); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	audit := map[string]any{"repo": repo.Path(), "fingerprint": fp}
+	if f.Has("--jobs") {
+		audit["jobs"] = strings.Join(jobs, ",")
+	}
+	c.Store.Audit(c.User.ID, "repo.runner.add", audit)
+	d := map[string]any{"fingerprint": fp, "repo": repo.Path()}
+	if len(jobs) > 0 {
+		d["jobs"] = jobs
+	}
 	return c.emit(d, func(w io.Writer) {
+		if len(jobs) > 0 {
+			fmt.Fprintf(w, "runner %s attached to %s for %s\n", fp, repo.Path(), strings.Join(jobs, ", "))
+			return
+		}
 		fmt.Fprintf(w, "runner %s attached to %s\n", fp, repo.Path())
 	})
 }
@@ -115,7 +149,7 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 		runners = []store.RepoRunner{}
 	}
 	return c.emitView(runners, func(w io.Writer) {
-		tb := c.table(w, "FINGERPRINT", "ALGO", "USER", "SEEN", "HELD")
+		tb := c.table(w, "FINGERPRINT", "ALGO", "USER", "SEEN", "HELD", "JOBS")
 		for _, r := range runners {
 			seen := r.LastSeen
 			if seen == "" {
@@ -125,7 +159,11 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 			if r.BuildNumber != 0 {
 				held = fmt.Sprintf("%s #%d %s since %s", r.BuildRepo, r.BuildNumber, r.BuildJob, r.StartedAt)
 			}
-			tb.row(cRef(r.Fingerprint), cText(r.Algo), cText(r.Username), cAge(seen), cText(held))
+			jobs := "all"
+			if len(r.Jobs) > 0 {
+				jobs = strings.Join(r.Jobs, ",")
+			}
+			tb.row(cRef(r.Fingerprint), cText(r.Algo), cText(r.Username), cAge(seen), cText(held), cText(jobs))
 		}
 		tb.flush()
 	}, func() screen {
@@ -139,7 +177,11 @@ func runRepoRunnerList(c *Ctx, args []string) int {
 			if r.LastSeen != "" {
 				seen = "seen " + relAge(r.LastSeen, termNow())
 			}
-			rows[i] = rowOf(cFlexRef(r.Fingerprint), lead, cText(r.Username), cMeta(r.Algo, seen, held))
+			only := ""
+			if len(r.Jobs) > 0 {
+				only = "only " + strings.Join(r.Jobs, ",")
+			}
+			rows[i] = rowOf(cFlexRef(r.Fingerprint), lead, cText(r.Username), cMeta(r.Algo, seen, held, only))
 		}
 		return listScreen("Runners", rows,
 			action{"Runners", []string{"repo", "runner", "remove", repo.Path(), "<fingerprint>"}},

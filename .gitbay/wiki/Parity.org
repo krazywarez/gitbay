@@ -220,6 +220,7 @@ there shows the app's rendering rather than the one the web page shows.
 | mirrors                     | yes | no  | yes |
 | custom pages domains        | yes | no  | yes |
 | runners attach, list, detach | yes | yes | n/a |
+| runner attached for some jobs | yes | yes | n/a |
 | import from a remote        | yes | yes | yes |
 | topics, website             | yes | yes | yes |
 | visibility                  | yes | yes | yes |

@@ -291,7 +291,7 @@
 <section id="runners"><h2>Runners</h2>
 {{if .Runners}}
 <ul class="protlist">
-{{range .Runners}}<li><code>{{.Fingerprint}}</code> <span class="meta">{{.Username}}{{if .LastSeen}}, last poll {{when .LastSeen}}{{else}}, never polled{{end}}{{if .BuildNumber}}, running {{.BuildRepo}} #{{.BuildNumber}} {{.BuildJob}}{{end}}</span>
+{{range .Runners}}<li><code>{{.Fingerprint}}</code> <span class="meta">{{.Username}}{{if .LastSeen}}, last poll {{when .LastSeen}}{{else}}, never polled{{end}}{{if .BuildNumber}}, running {{.BuildRepo}} #{{.BuildNumber}} {{.BuildJob}}{{end}}{{if .Jobs}}, only {{join .Jobs ", "}}{{end}}</span>
   <form method="post" action="{{$base}}" class="inline">
     <input type="hidden" name="field" value="runner-remove">
     <input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
@@ -305,6 +305,9 @@
   <label for="runner-key">Attach a runner</label>
   <p class="hint">Install <code>gitbay-runner</code>, run <code>gitbay-runner init</code>, and paste the key it prints. The runner builds your commits with the repository's secrets; merge requests from forks wait unless it runs with <code>-untrusted</code>.</p>
   <textarea id="runner-key" name="key" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAA… (from gitbay-runner init)">{{index .Submitted "key"}}</textarea>
+  <label for="runner-jobs">Jobs</label>
+  <p class="hint">Leave empty for every job. Name jobs, comma-separated, to have this runner claim only those here, for instance <code>gitbay-security</code> on a runner with the code scanning image.</p>
+  <input type="text" id="runner-jobs" name="jobs" value="{{index .Submitted "jobs"}}">
   <button type="submit" class="btn">Attach</button>
 </form>
 </section>

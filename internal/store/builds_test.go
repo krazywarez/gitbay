@@ -653,3 +653,40 @@ func TestBuildIDsNotReusedAfterRepoDelete(t *testing.T) {
 		t.Fatalf("next build took id %d; a runner may still hold %d", got, claimed)
 	}
 }
+
+// A repository narrowed to some jobs yields only those; the others in the
+// claim are unaffected.
+func TestClaimBuildForNarrowsByJob(t *testing.T) {
+	s := open(t)
+	if err := s.MigrateUp(); err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := s.CreateUser("cmc", true)
+	blotter, _ := s.CreateRepo("user", uid, "blotter", "public")
+	site, _ := s.CreateRepo("user", uid, "site", "public")
+	s.CreateBuild(blotter, "daily-pull", "a1", "main", `["true"]`, "", "", true)
+	scan, _ := s.CreateBuild(blotter, "gitbay-security", "a1", "main", `["true"]`, "", "", true)
+	site1, _ := s.CreateBuild(site, "deploy", "b1", "main", `["true"]`, "", "", true)
+
+	jobs := map[int64][]string{blotter: {"gitbay-security"}}
+	var got []string
+	for {
+		b, ok, err := s.ClaimBuildFor([]int64{blotter, site}, false, jobs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			break
+		}
+		got = append(got, b.Job)
+		if (b.RepoID == blotter && b.Number != scan) || (b.RepoID == site && b.Number != site1) {
+			t.Errorf("claimed %+v", b)
+		}
+	}
+	if strings.Join(got, ",") != "gitbay-security,deploy" {
+		t.Fatalf("claimed %v; daily-pull must stay for another runner", got)
+	}
+	if b, ok, _ := s.ClaimBuild([]int64{blotter}, false); !ok || b.Job != "daily-pull" {
+		t.Fatalf("unnarrowed claim = %+v %v", b, ok)
+	}
+}

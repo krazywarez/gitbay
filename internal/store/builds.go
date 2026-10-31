@@ -106,6 +106,12 @@ func scanBuild(row interface{ Scan(...any) error }) (Build, error) {
 // repository — are skipped unless untrusted is set: they run a stranger's
 // code, which only a runner that isolates should take.
 func (s *Store) ClaimBuild(repoIDs []int64, untrusted bool) (Build, bool, error) {
+	return s.ClaimBuildFor(repoIDs, untrusted, nil)
+}
+
+// ClaimBuildFor is ClaimBuild where jobs narrows some repositories to the
+// jobs named for them (RunnerJobFilters).
+func (s *Store) ClaimBuildFor(repoIDs []int64, untrusted bool, jobs map[int64][]string) (Build, bool, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return Build{}, false, err
@@ -117,11 +123,33 @@ func (s *Store) ClaimBuild(repoIDs []int64, untrusted bool) (Build, bool, error)
 		query += " AND trusted = 1"
 	}
 	if len(repoIDs) > 0 {
-		marks := strings.TrimSuffix(strings.Repeat("?,", len(repoIDs)), ",")
-		query += " AND repo_id IN (" + marks + ")"
+		var whole []int64
+		var narrowed []string
 		for _, id := range repoIDs {
+			names, ok := jobs[id]
+			if !ok {
+				whole = append(whole, id)
+				continue
+			}
+			narrowed = append(narrowed, "(repo_id = ? AND job IN ("+marks(len(names))+"))")
 			args = append(args, id)
+			for _, n := range names {
+				args = append(args, n)
+			}
 		}
+		var alts []string
+		if len(whole) > 0 {
+			alts = append(alts, "repo_id IN ("+marks(len(whole))+")")
+			// The narrowed repos' args were appended first; put these in
+			// front to match the clause order.
+			front := make([]any, len(whole))
+			for i, id := range whole {
+				front[i] = id
+			}
+			args = append(front, args...)
+		}
+		alts = append(alts, narrowed...)
+		query += " AND (" + strings.Join(alts, " OR ") + ")"
 	}
 	query += " ORDER BY id LIMIT 1"
 	var id int64
@@ -518,3 +546,5 @@ func (s *Store) SuccessBuildFor(repoID int64, sha, job string) (Build, bool, err
 	}
 	return b, err == nil, err
 }
+
+func marks(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }

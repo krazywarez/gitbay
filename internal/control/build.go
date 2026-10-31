@@ -701,11 +701,16 @@ func runRunnerNext(c *Ctx, args []string) int {
 		}
 	}
 	untrusted := f.Has("--untrusted")
+	// An attachment may name the jobs this key claims in its repository.
+	jobs, err := c.Store.RunnerJobFilters(key.ID)
+	if err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
 	var b store.Build
 	var repo store.Repo
 	var ok bool
 	for attempt := 0; attempt < maxOrphanSkip; attempt++ {
-		b, ok, err = c.Store.ClaimBuild(repoIDs, untrusted)
+		b, ok, err = c.Store.ClaimBuildFor(repoIDs, untrusted, jobs)
 		if err != nil {
 			return c.fail(protocol.ExitFailure, "%v", err)
 		}
