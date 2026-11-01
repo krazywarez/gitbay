@@ -43,17 +43,36 @@ func TestBodyAlignsColumns(t *testing.T) {
 }
 
 func TestAdvisoryBody(t *testing.T) {
-	body := AdvisoryBody("main", []store.DepAdvisory{
+	body := AdvisoryBody(AdvisoryReport{Repo: "krz/x", Branch: "main", Open: []store.DepAdvisory{
 		{Ecosystem: EcoGo, Name: "golang.org/x/net", Version: "v0.1.0", ID: "GO-2", Summary: "HTTP/2 reset", Severity: "", Fixed: "0.7.0"},
 		{Ecosystem: EcoPyPI, Name: "flask", Version: "2.0.0", ID: "GHSA-aaaa", Summary: "cookie leak", Severity: "high", Fixed: "2.2.5"},
-	})
+	}, Dismissed: 2, NotImported: []store.DepAdvisory{{Ecosystem: EcoGo, Name: "golang.org/x/crypto", ID: "GO-3"}}})
 	for _, want := range []string{
 		"| `golang.org/x/net` | v0.1.0  | GO-2     |          | 0.7.0    |",
 		"- GHSA-aaaa: cookie leak https://osv.dev/vulnerability/GHSA-aaaa",
 		"### PyPI",
+		"Not listed: 2 dismissed; for Go packages no file here imports: GO-3 (`golang.org/x/crypto`).",
+		"repo deps dismiss krz/x <advisory>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body missing %q:\n%s", want, body)
+		}
+	}
+}
+
+// An advisory naming packages is set aside unless one of them is imported;
+// one naming none, or of another ecosystem, is left alone.
+func TestMarkNotImported(t *testing.T) {
+	matched := []store.DepAdvisory{
+		{Ecosystem: EcoGo, ID: "GO-1", Imports: []string{"golang.org/x/crypto/openpgp", "golang.org/x/crypto/openpgp/armor"}},
+		{Ecosystem: EcoGo, ID: "GO-2", Imports: []string{"golang.org/x/crypto/ssh"}},
+		{Ecosystem: EcoGo, ID: "GO-3"},
+		{Ecosystem: EcoNPM, ID: "GHSA-1", Imports: []string{"x"}},
+	}
+	MarkNotImported(matched, map[string]bool{"golang.org/x/crypto/ssh": true})
+	for i, want := range []bool{true, false, false, false} {
+		if matched[i].NotImported != want {
+			t.Errorf("%s: NotImported = %v", matched[i].ID, matched[i].NotImported)
 		}
 	}
 }

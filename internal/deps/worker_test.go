@@ -2,6 +2,8 @@ package deps
 
 import (
 	"context"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -269,5 +271,74 @@ func TestReconcileAdvisoriesKeepsItsOwnIssue(t *testing.T) {
 	}
 	if left, _ := w.St.ReportedAdvisories(repo.ID); len(left) != 0 {
 		t.Errorf("advisories left behind: %v", left)
+	}
+}
+
+// A Go advisory for packages nothing imports opens no issue, and one
+// alongside an open advisory is counted rather than listed.
+func TestReconcileAdvisoriesNotImported(t *testing.T) {
+	w, repo := testWorker(t)
+	aside := store.DepAdvisory{Ecosystem: EcoGo, Name: "golang.org/x/crypto", Version: "v0.58.0",
+		ID: "GO-2026-5932", Summary: "openpgp is unmaintained", NotImported: true}
+	if err := w.reconcileAdvisories(repo, []store.DepAdvisory{aside}); err != nil {
+		t.Fatal(err)
+	}
+	if check, _ := w.St.DepCheckFor(repo.ID); check.AdvisoryIssueNumber != 0 {
+		t.Fatalf("opened #%d for an advisory nothing imports", check.AdvisoryIssueNumber)
+	}
+	if kept, _ := w.St.ReportedAdvisories(repo.ID); len(kept) != 1 || !kept[0].NotImported {
+		t.Fatalf("stored %+v", kept)
+	}
+	open := store.DepAdvisory{Ecosystem: EcoGo, Name: "golang.org/x/net", Version: "v0.1.0", ID: "GO-2", Summary: "reset"}
+	if err := w.reconcileAdvisories(repo, []store.DepAdvisory{aside, open}); err != nil {
+		t.Fatal(err)
+	}
+	check, _ := w.St.DepCheckFor(repo.ID)
+	issue, _ := w.St.IssueByNumber(repo.ID, check.AdvisoryIssueNumber)
+	if !strings.Contains(issue.Body, "GO-2:") || strings.Contains(issue.Body, "- GO-2026-5932:") ||
+		!strings.Contains(issue.Body, "no file here imports: GO-2026-5932") {
+		t.Errorf("issue:\n%s", issue.Body)
+	}
+}
+
+// GoImports reads every Go file's imports, tests included, and leaves out
+// vendor and testdata.
+func TestGoImports(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	files := map[string]string{
+		"main.go":       "package main\n\nimport (\n\t\"fmt\"\n\tx \"golang.org/x/crypto/ssh\"\n)\n",
+		"a_test.go":     "package main\n\nimport \"golang.org/x/net/html\"\n",
+		"vendor/v/v.go": "package v\n\nimport \"golang.org/x/crypto/openpgp\"\n",
+		"testdata/t.go": "package t\n\nimport \"golang.org/x/crypto/openpgp/armor\"\n",
+		"broken.go":     "this is not go",
+	}
+	for name, body := range files {
+		os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o755)
+		os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644)
+	}
+	run("init", "-q", "-b", "main")
+	run("add", ".")
+	run("commit", "-q", "-m", "x")
+	got, ok := GoImports(context.Background(), dir, run("rev-parse", "HEAD"))
+	if !ok {
+		t.Fatal("not ok")
+	}
+	for p, want := range map[string]bool{"fmt": true, "golang.org/x/crypto/ssh": true, "golang.org/x/net/html": true,
+		"golang.org/x/crypto/openpgp": false, "golang.org/x/crypto/openpgp/armor": false} {
+		if got[p] != want {
+			t.Errorf("%s: %v", p, got[p])
+		}
 	}
 }

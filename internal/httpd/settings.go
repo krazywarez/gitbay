@@ -169,6 +169,10 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			verb = "enable"
 		}
 		argv = []string{"repo", "security", verb, repo}
+	case "deps-dismiss":
+		argv = []string{"repo", "deps", "dismiss", repo, v("advisory"), "--reason", v("reason")}
+	case "deps-reopen":
+		argv = []string{"repo", "deps", "reopen", repo, v("advisory")}
 	case "security-dismiss":
 		argv = []string{"repo", "security", "dismiss", repo, v("fingerprint"), "--reason", v("reason")}
 	case "security-reopen":

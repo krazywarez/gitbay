@@ -74,3 +74,31 @@ func TestSettingsPageRendersSecurityTriage(t *testing.T) {
 		}
 	}
 }
+
+// The advisories offer dismissal, the dismissed ones reopening, and the
+// ones nothing imports are named.
+func TestSettingsPageRendersAdvisoryTriage(t *testing.T) {
+	var sb strings.Builder
+	err := web.Render(&sb, "settings.html", settingsPage{
+		repoPage:    testRepoPage(),
+		DepsEnabled: true,
+		Deps: control.DepsOut{
+			Enabled: true, LastCheck: "2026-11-01T04:02:00Z",
+			Advisories:  []control.DepAdvisory{{Ecosystem: "go", Name: "golang.org/x/net", Version: "v0.1.0", ID: "GO-2026-1"}},
+			Dismissed:   []control.DepAdvisory{{Ecosystem: "npm", Name: "undici", ID: "GHSA-x", Reason: "dev-only", By: "alice"}},
+			NotImported: []control.DepAdvisory{{Ecosystem: "go", Name: "golang.org/x/crypto", ID: "GO-2026-5932"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := sb.String()
+	for _, want := range []string{
+		`value="deps-dismiss"`, `name="advisory" value="GO-2026-1"`, `value="deps-reopen"`, `value="GHSA-x"`,
+		"dev-only", "by alice", "GO-2026-5932</a> (golang.org/x/crypto)",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("settings page does not show %q", want)
+		}
+	}
+}

@@ -40,6 +40,12 @@ type DepAdvisory struct {
 	Summary   string
 	Severity  string
 	Fixed     string // the first release past Version that fixes it, if any
+	// NotImported marks a Go advisory whose packages no Go file in the
+	// repository imports; it is kept but not reported.
+	NotImported bool
+	// Imports are the packages the advisory names (Go), for deciding
+	// NotImported. Not stored.
+	Imports []string
 }
 
 func (s *Store) EnableDepCheck(repoID int64) error {
@@ -166,7 +172,7 @@ func (s *Store) ReplaceDepReports(repoID int64, reports []DepReport) error {
 
 func (s *Store) ReportedAdvisories(repoID int64) ([]DepAdvisory, error) {
 	rows, err := s.DB.Query(`
-		SELECT ecosystem, name, version, advisory_id, summary, severity, fixed FROM dep_advisories
+		SELECT ecosystem, name, version, advisory_id, summary, severity, fixed, not_imported FROM dep_advisories
 		WHERE repo_id = ? ORDER BY ecosystem, name, version, advisory_id`, repoID)
 	if err != nil {
 		return nil, err
@@ -175,7 +181,7 @@ func (s *Store) ReportedAdvisories(repoID int64) ([]DepAdvisory, error) {
 	var out []DepAdvisory
 	for rows.Next() {
 		var a DepAdvisory
-		if err := rows.Scan(&a.Ecosystem, &a.Name, &a.Version, &a.ID, &a.Summary, &a.Severity, &a.Fixed); err != nil {
+		if err := rows.Scan(&a.Ecosystem, &a.Name, &a.Version, &a.ID, &a.Summary, &a.Severity, &a.Fixed, &a.NotImported); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -196,11 +202,75 @@ func (s *Store) ReplaceDepAdvisories(repoID int64, advisories []DepAdvisory) err
 	}
 	for _, a := range advisories {
 		if _, err := tx.Exec(`
-			INSERT INTO dep_advisories (repo_id, ecosystem, name, version, advisory_id, summary, severity, fixed)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			repoID, a.Ecosystem, a.Name, a.Version, a.ID, a.Summary, a.Severity, a.Fixed); err != nil {
+			INSERT INTO dep_advisories (repo_id, ecosystem, name, version, advisory_id, summary, severity, fixed, not_imported)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			repoID, a.Ecosystem, a.Name, a.Version, a.ID, a.Summary, a.Severity, a.Fixed, a.NotImported); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
+}
+
+// AdvisoryDismissal is an advisory a repository dismissed.
+type AdvisoryDismissal struct {
+	ID        string
+	Reason    string
+	By        string // username, '' once the account is gone
+	CreatedAt string
+}
+
+// DismissAdvisories dismisses advisories by id, replacing the reason of
+// any already dismissed.
+func (s *Store) DismissAdvisories(repoID, byID int64, ids []string, reason string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, id := range ids {
+		if _, err := tx.Exec(`
+			INSERT INTO dep_advisory_dismissals (repo_id, advisory_id, reason, by_id) VALUES (?, ?, ?, ?)
+			ON CONFLICT (repo_id, advisory_id) DO UPDATE SET reason = excluded.reason, by_id = excluded.by_id,
+				created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+			repoID, id, reason, byID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ReopenAdvisories takes dismissals back.
+func (s *Store) ReopenAdvisories(repoID int64, ids []string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, id := range ids {
+		if _, err := tx.Exec("DELETE FROM dep_advisory_dismissals WHERE repo_id = ? AND advisory_id = ?", repoID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// AdvisoryDismissals returns a repo's dismissals by advisory id.
+func (s *Store) AdvisoryDismissals(repoID int64) (map[string]AdvisoryDismissal, error) {
+	rows, err := s.DB.Query(`
+		SELECT d.advisory_id, d.reason, COALESCE(u.username, ''), d.created_at
+		FROM dep_advisory_dismissals d LEFT JOIN users u ON u.id = d.by_id
+		WHERE d.repo_id = ?`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]AdvisoryDismissal{}
+	for rows.Next() {
+		var d AdvisoryDismissal
+		if err := rows.Scan(&d.ID, &d.Reason, &d.By, &d.CreatedAt); err != nil {
+			return nil, err
+		}
+		out[d.ID] = d
+	}
+	return out, rows.Err()
 }

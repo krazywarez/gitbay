@@ -350,3 +350,58 @@ func TestRepoDepsStatusAdvisories(t *testing.T) {
 	}
 	checkLegend(t, out)
 }
+
+// Dismissing an advisory takes it out of the issue and closes the issue
+// once none are open; one nothing imports is listed apart; reopening brings
+// a dismissed one back.
+func TestRepoDepsDismiss(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	dispatchIn(t, st, u, root, "", "repo", "deps", "enable", p)
+	matched := []store.DepAdvisory{
+		{Ecosystem: "go", Name: "golang.org/x/net", Version: "v0.1.0", ID: "GO-2026-1", Summary: "reset flood"},
+		{Ecosystem: "go", Name: "golang.org/x/crypto", Version: "v0.58.0", ID: "GO-2026-5932", Summary: "openpgp", NotImported: true},
+	}
+	if err := st.ReplaceDepAdvisories(repo.ID, matched); err != nil {
+		t.Fatal(err)
+	}
+	c, out := runnerCtx(st, u.ID, root)
+	if code := runDepsDismiss(c, []string{p, "GO-2026-1", "--reason", "nope"}); code != protocol.ExitUsage {
+		t.Errorf("bad reason: %d %s", code, out)
+	}
+	c, out = runnerCtx(st, u.ID, root)
+	if code := runDepsDismiss(c, []string{p, "GO-9", "--reason", "not-affected"}); code != protocol.ExitNotFound {
+		t.Errorf("unknown advisory: %d %s", code, out)
+	}
+	// Reopen first so there is an issue to watch: a reopen of nothing
+	// dismissed still rewrites it.
+	c, out = runnerCtx(st, u.ID, root)
+	if code := runDepsReopen(c, []string{p, "GO-2026-1"}); code != protocol.ExitOK {
+		t.Fatalf("reopen: %d %s", code, out)
+	}
+	check, _ := st.DepCheckFor(repo.ID)
+	issue, _ := st.IssueByNumber(repo.ID, check.AdvisoryIssueNumber)
+	if issue.State != "open" || !strings.Contains(issue.Body, "GO-2026-1:") || !strings.Contains(issue.Body, "imports: GO-2026-5932") {
+		t.Fatalf("issue (%s):\n%s", issue.State, issue.Body)
+	}
+	c, out = runnerCtx(st, u.ID, root)
+	if code := runDepsDismiss(c, []string{p, "GO-2026-1", "--reason", "not-affected"}); code != protocol.ExitOK {
+		t.Fatalf("dismiss: %d %s", code, out)
+	}
+	if closed, _ := st.IssueByNumber(repo.ID, check.AdvisoryIssueNumber); closed.State != "closed" {
+		t.Errorf("issue with nothing open is %s", closed.State)
+	}
+	var got struct {
+		Data DepsOut `json:"data"`
+	}
+	json.Unmarshal([]byte(dispatchIn(t, st, u, root, "", "repo", "deps", "status", p, "--json")), &got)
+	if len(got.Data.Advisories) != 0 || len(got.Data.Dismissed) != 1 || got.Data.Dismissed[0].Reason != "not-affected" ||
+		len(got.Data.NotImported) != 1 || got.Data.NotImported[0].ID != "GO-2026-5932" {
+		t.Errorf("status = %+v", got.Data)
+	}
+	screen := atTerminalIn(t, st, u, root, "repo", "deps", "status", p)
+	if !strings.Contains(screen, "Dismissed (1)") || !strings.Contains(screen, "Not imported (1)") {
+		t.Errorf("screen:\n%s", screen)
+	}
+	checkLegend(t, screen)
+}

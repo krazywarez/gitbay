@@ -55,7 +55,7 @@ func TestAdvisories(t *testing.T) {
 			"affected":[{"package":{"ecosystem":"PyPI","name":"flask"},
 				"ranges":[{"events":[{"introduced":"0"},{"fixed":"1.9.0"}]},{"events":[{"introduced":"2.0.0"},{"fixed":"2.3.2"}]},{"events":[{"introduced":"2.0.0"},{"fixed":"2.2.5"}]}]}]}`,
 		"PYSEC-1":      `{"id":"PYSEC-1","summary":"duplicate","aliases":["GHSA-aaaa"]}`,
-		"GO-2":         `{"id":"GO-2","details":"First line.\nSecond line.","affected":[{"package":{"ecosystem":"Go","name":"golang.org/x/net"},"ranges":[{"events":[{"fixed":"0.7.0"}]}]}]}`,
+		"GO-2":         `{"id":"GO-2","details":"First line.\nSecond line.","affected":[{"package":{"ecosystem":"Go","name":"golang.org/x/net"},"ranges":[{"events":[{"fixed":"0.7.0"}]}],"ecosystem_specific":{"imports":[{"path":"golang.org/x/net/http2"}]}}]}`,
 		"GO-withdrawn": `{"id":"GO-withdrawn","withdrawn":"2026-01-01T00:00:00Z"}`,
 		"GHSA-vapor":   `{"id":"GHSA-vapor","summary":"no fix"}`,
 	})
@@ -73,7 +73,8 @@ func TestAdvisories(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("advisories = %+v, want GO-2, GHSA-aaaa once, GHSA-vapor", got)
 	}
-	if a := got[0]; a.ID != "GO-2" || a.Summary != "First line." || a.Fixed != "0.7.0" || a.Severity != "" {
+	if a := got[0]; a.ID != "GO-2" || a.Summary != "First line." || a.Fixed != "0.7.0" || a.Severity != "" ||
+		strings.Join(a.Imports, " ") != "golang.org/x/net/http2" {
 		t.Errorf("go advisory = %+v", a)
 	}
 	// The alias is folded in, the summary's whitespace collapsed, and the

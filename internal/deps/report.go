@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"gitbay.org/gitbay/internal/botissue"
+	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/store"
 )
 
@@ -53,15 +55,25 @@ func Body(branch string, reports []store.DepReport) string {
 	return b.String()
 }
 
+// AdvisoryReport is what the advisories issue says: the advisories still
+// open, how many were dismissed, and the Go ones set aside because no file
+// imports the packages they name.
+type AdvisoryReport struct {
+	Repo, Branch string
+	Open         []store.DepAdvisory
+	Dismissed    int
+	NotImported  []store.DepAdvisory
+}
+
 // AdvisoryBody renders the advisories issue: a table per ecosystem, then
 // each advisory's summary and link, which would make the table too wide to
-// read as plain text.
-func AdvisoryBody(branch string, matched []store.DepAdvisory) string {
+// read as plain text, then what is not listed.
+func AdvisoryBody(r AdvisoryReport) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Dependencies resolved on `%s` match published advisories. "+
-		"This issue is kept up to date as that changes, and closed once none match.\n", branch)
+		"This issue is kept up to date as that changes, and closed once none are open.\n", r.Branch)
 	byEco := map[string][]store.DepAdvisory{}
-	for _, a := range matched {
+	for _, a := range r.Open {
 		byEco[a.Ecosystem] = append(byEco[a.Ecosystem], a)
 	}
 	for _, eco := range order {
@@ -76,16 +88,71 @@ func AdvisoryBody(branch string, matched []store.DepAdvisory) string {
 		}
 		b.WriteString(table(cells))
 	}
-	b.WriteString("\n### Advisories\n\n")
-	seen := map[string]bool{}
-	for _, a := range matched {
-		if seen[a.ID] {
-			continue
+	if len(r.Open) > 0 {
+		b.WriteString("\n### Advisories\n\n")
+		seen := map[string]bool{}
+		for _, a := range r.Open {
+			if seen[a.ID] {
+				continue
+			}
+			seen[a.ID] = true
+			fmt.Fprintf(&b, "- %s: %s https://osv.dev/vulnerability/%s\n", a.ID, a.Summary, a.ID)
 		}
-		seen[a.ID] = true
-		fmt.Fprintf(&b, "- %s: %s https://osv.dev/vulnerability/%s\n", a.ID, a.Summary, a.ID)
+	}
+	var notListed []string
+	if r.Dismissed > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d dismissed", r.Dismissed))
+	}
+	if len(r.NotImported) > 0 {
+		var ids []string
+		for _, a := range r.NotImported {
+			ids = append(ids, fmt.Sprintf("%s (`%s`)", a.ID, a.Name))
+		}
+		notListed = append(notListed, "for Go packages no file here imports: "+strings.Join(ids, ", "))
+	}
+	if len(notListed) > 0 {
+		fmt.Fprintf(&b, "\nNot listed: %s. Imports through another module are not seen here. `repo deps status %s` shows them.\n",
+			strings.Join(notListed, "; "), r.Repo)
+	}
+	if len(r.Open) > 0 {
+		fmt.Fprintf(&b, "\nTo dismiss one: `repo deps dismiss %s <advisory> --reason not-affected|wont-fix|dev-only`.\n", r.Repo)
 	}
 	return b.String()
+}
+
+// MaintainAdvisories brings the advisories issue in line with a matching
+// set: the open ones listed, the dismissed and not imported ones counted,
+// closed when none are open.
+func MaintainAdvisories(st *store.Store, cfg config.Config, repo store.Repo, matched []store.DepAdvisory,
+	changed bool, save func() error) error {
+	check, err := st.DepCheckFor(repo.ID)
+	if err != nil {
+		return err
+	}
+	dismissed, err := st.AdvisoryDismissals(repo.ID)
+	if err != nil {
+		return err
+	}
+	r := AdvisoryReport{Repo: repo.Path(), Branch: repo.DefaultBranch}
+	for _, a := range matched {
+		switch {
+		case a.NotImported:
+			r.NotImported = append(r.NotImported, a)
+		case dismissed[a.ID].ID != "":
+			r.Dismissed++
+		default:
+			r.Open = append(r.Open, a)
+		}
+	}
+	return botissue.Maintain(st, cfg, repo, botissue.Tracked{
+		Title:   AdvisoryTitle,
+		Number:  check.AdvisoryIssueNumber,
+		Record:  func(n int64) error { return st.SetDepAdvisoryIssue(repo.ID, n) },
+		Empty:   len(r.Open) == 0,
+		Changed: changed,
+		Save:    save,
+		Body:    func() string { return AdvisoryBody(r) },
+	})
 }
 
 // table pads every cell to its column, because the body is read twice: as
@@ -145,7 +212,8 @@ func sameAdvisories(a, b []store.DepAdvisory) bool {
 	}
 	for i := range a {
 		if a[i].Ecosystem != b[i].Ecosystem || a[i].Name != b[i].Name ||
-			a[i].Version != b[i].Version || a[i].ID != b[i].ID || a[i].Fixed != b[i].Fixed {
+			a[i].Version != b[i].Version || a[i].ID != b[i].ID || a[i].Fixed != b[i].Fixed ||
+			a[i].NotImported != b[i].NotImported {
 			return false
 		}
 	}

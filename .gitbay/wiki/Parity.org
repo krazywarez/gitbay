@@ -253,6 +253,7 @@ there shows the app's rendering rather than the one the web page shows.
 | code scan ignores, rules    | yes | yes | no  |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
+| advisory dismiss, reopen    | yes | yes | no  |
 | delete, transfer            | yes | yes | yes |
 | rename                      | yes | yes | yes |
 | release delete              | yes | yes | yes |
@@ -294,6 +295,14 @@ resolved set; the repository's settings page renders the same report
 under the toggle — last check, last error, the two tracking issues, and
 the rows. The issues the worker opens, rewrites and closes are still the
 copies every other surface reads.
+
+A Go advisory whose OSV record names packages counts only when a Go
+file at the checked commit (tests included, =vendor= and =testdata=
+left out) imports one of them; the rest are listed as not imported.
+Imports through another module are not seen, which =govulncheck=
+covers. A writer can dismiss an advisory (=repo deps dismiss=, reason
+=not-affected=, =wont-fix= or =dev-only=) and reopen it; the issue
+lists open advisories only and closes when none are left.
 
 The wiki row covers reading. A wiki lives at =.gitbay/wiki/= on the
 default branch, so editing one is editing a file in the repository —

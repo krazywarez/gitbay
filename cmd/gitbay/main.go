@@ -609,6 +609,8 @@ func repoCmd() *cobra.Command {
 			pass("enable", passOpts{server: []string{"repo", "deps", "enable"}, needsRepo: true}),
 			pass("disable", passOpts{server: []string{"repo", "deps", "disable"}, needsRepo: true}),
 			pass("status", passOpts{server: []string{"repo", "deps", "status"}, needsRepo: true}),
+			pass("dismiss", passOpts{server: []string{"repo", "deps", "dismiss"}, needsRepo: true}),
+			pass("reopen", passOpts{server: []string{"repo", "deps", "reopen"}, needsRepo: true}),
 		),
 		group("secret", "build secrets (values on stdin, injected into build env)",
 			pass("set", passOpts{server: []string{"repo", "secret", "set"}, needsRepo: true, alwaysStdin: true, stdinWhat: "the secret value", stdinSecret: true}),

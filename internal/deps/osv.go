@@ -64,6 +64,11 @@ type osvVuln struct {
 				Fixed string `json:"fixed"`
 			} `json:"events"`
 		} `json:"ranges"`
+		EcosystemSpecific struct {
+			Imports []struct {
+				Path string `json:"path"`
+			} `json:"imports"`
+		} `json:"ecosystem_specific"`
 	} `json:"affected"`
 	DatabaseSpecific struct {
 		Severity string `json:"severity"`
@@ -98,7 +103,8 @@ func (c *Client) Advisories(ctx context.Context, found []Dep) ([]store.DepAdviso
 			out = append(out, store.DepAdvisory{
 				Ecosystem: d.Ecosystem, Name: d.Name, Version: d.Current, ID: v.ID,
 				Summary: summarize(v), Severity: strings.ToLower(v.DatabaseSpecific.Severity),
-				Fixed: fixedAfter(v, osvEcosystems[d.Ecosystem], d.Name, d.Current),
+				Fixed:   fixedAfter(v, osvEcosystems[d.Ecosystem], d.Name, d.Current),
+				Imports: importsOf(v, osvEcosystems[d.Ecosystem], d.Name),
 			})
 		}
 	}
@@ -299,4 +305,21 @@ func fixedAfter(v osvVuln, ecosystem, name, current string) string {
 		}
 	}
 	return best
+}
+
+// importsOf returns the packages of a module an advisory names, which Go
+// advisories carry and others do not.
+func importsOf(v osvVuln, ecosystem, name string) []string {
+	var out []string
+	for _, a := range v.Affected {
+		if a.Package.Ecosystem != ecosystem || a.Package.Name != name {
+			continue
+		}
+		for _, imp := range a.EcosystemSpecific.Imports {
+			if imp.Path != "" {
+				out = append(out, imp.Path)
+			}
+		}
+	}
+	return out
 }

@@ -105,7 +105,7 @@ func (w *Worker) check(ctx context.Context, repo store.Repo) error {
 	}
 	return errors.Join(
 		w.checkUpdates(ctx, repo, Scan(read)),
-		w.checkAdvisories(ctx, repo, Resolved(read, root)),
+		w.checkAdvisories(ctx, repo, dir, sha, Resolved(read, root)),
 	)
 }
 
@@ -120,13 +120,24 @@ func (w *Worker) checkUpdates(ctx context.Context, repo store.Repo, found []Dep)
 	return w.reconcile(repo, behind)
 }
 
-func (w *Worker) checkAdvisories(ctx context.Context, repo store.Repo, resolved []Dep) error {
+// checkAdvisories matches the resolved set against OSV. A Go advisory that
+// names packages counts only if a Go file at sha imports one of them; the
+// files are read only when such an advisory matched.
+func (w *Worker) checkAdvisories(ctx context.Context, repo store.Repo, dir, sha string, resolved []Dep) error {
 	if len(resolved) == 0 {
 		return w.reconcileAdvisories(repo, nil)
 	}
 	matched, err := w.Client.Advisories(ctx, resolved)
 	if err != nil {
 		return fmt.Errorf("advisories: %w", err)
+	}
+	for _, a := range matched {
+		if a.Ecosystem == EcoGo && len(a.Imports) > 0 {
+			if imported, ok := GoImports(ctx, dir, sha); ok {
+				MarkNotImported(matched, imported)
+			}
+			break
+		}
 	}
 	return w.reconcileAdvisories(repo, matched)
 }
@@ -203,21 +214,10 @@ func (w *Worker) reconcile(repo store.Repo, behind []store.DepReport) error {
 // reconcileAdvisories brings the advisories issue in line with what
 // matches.
 func (w *Worker) reconcileAdvisories(repo store.Repo, matched []store.DepAdvisory) error {
-	check, err := w.St.DepCheckFor(repo.ID)
-	if err != nil {
-		return err
-	}
 	previous, err := w.St.ReportedAdvisories(repo.ID)
 	if err != nil {
 		return err
 	}
-	return botissue.Maintain(w.St, w.Cfg, repo, botissue.Tracked{
-		Title:   AdvisoryTitle,
-		Number:  check.AdvisoryIssueNumber,
-		Record:  func(n int64) error { return w.St.SetDepAdvisoryIssue(repo.ID, n) },
-		Empty:   len(matched) == 0,
-		Changed: !sameAdvisories(previous, matched),
-		Save:    func() error { return w.St.ReplaceDepAdvisories(repo.ID, matched) },
-		Body:    func() string { return AdvisoryBody(repo.DefaultBranch, matched) },
-	})
+	return MaintainAdvisories(w.St, w.Cfg, repo, matched, !sameAdvisories(previous, matched),
+		func() error { return w.St.ReplaceDepAdvisories(repo.ID, matched) })
 }
