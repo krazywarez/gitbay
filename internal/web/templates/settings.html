@@ -182,16 +182,48 @@
 </form>
 {{if .Security.Enabled}}
 <p class="meta">Next scan {{.Security.NextRun}} · last results {{if .Security.LastResults}}{{when .Security.LastResults}}{{else}}never{{end}}{{if .Security.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Security.IssueNumber}}">#{{.Security.IssueNumber}}</a>{{end}}</p>
+{{with .Security.Aside}}{{if or .Ignored .Unused}}<p class="meta">Set aside by the last scan:{{if .Ignored}} {{.Ignored}} under the paths or rules below, or marked vendored or generated in <code>.gitattributes</code>.{{end}}{{range $lib, $n := .Unused}} {{$n}} from {{$lib}} rules, which no manifest names.{{end}}</p>{{end}}{{end}}
 {{if .Security.Findings}}<div class="tablewrap"><table class="keys">
-<tr class="cols"><th scope="col">location</th><th scope="col">rule</th><th scope="col">level</th></tr>
+<tr class="cols"><th scope="col">location</th><th scope="col">rule</th><th scope="col">level</th><th scope="col"><span class="vh">dismiss</span></th></tr>
 {{range .Security.Findings}}<tr>
   <td class="mono">{{.Path}}:{{.Line}}</td>
   <td class="mono">{{.Rule}}</td>
   <td>{{.Level}}</td>
+  <td><form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="security-dismiss">
+    <input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
+    <select name="reason" aria-label="Reason"><option value="false-positive">False positive</option><option value="wont-fix">Won't fix</option><option value="test">Used in tests</option></select>
+    <button type="submit">Dismiss</button>
+  </form></td>
 </tr>
 {{end}}</table></div>
-{{else if .Security.LastResults}}<p class="none">The last scan found nothing.</p>{{end}}
+{{else if .Security.LastResults}}<p class="none">The last scan found nothing open.</p>{{end}}
+{{if .Security.Dismissed}}<h3>Dismissed</h3><div class="tablewrap"><table class="keys">
+<tr class="cols"><th scope="col">location</th><th scope="col">rule</th><th scope="col">reason</th><th scope="col"><span class="vh">reopen</span></th></tr>
+{{range .Security.Dismissed}}<tr>
+  <td class="mono">{{.Path}}:{{.Line}}</td>
+  <td class="mono">{{.Rule}}</td>
+  <td>{{.Reason}}{{if .DismissedBy}} <span class="meta">by {{.DismissedBy}}</span>{{end}}</td>
+  <td><form method="post" action="{{$base}}" class="inline">
+    <input type="hidden" name="field" value="security-reopen">
+    <input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
+    <button type="submit">Reopen</button>
+  </form></td>
+</tr>
+{{end}}</table></div>{{end}}
 {{end}}
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="security-ignore">
+  <div><label for="security-ignore">Ignored paths</label><p class="hint">Findings under these paths are set aside from the next scan. Path globs separated by spaces: <code>testdata/**</code>, <code>web/templates/*.html</code>. Paths <code>.gitattributes</code> marks <code>linguist-vendored</code> or <code>linguist-generated</code> are set aside without being listed.</p></div>
+  <div><input type="text" id="security-ignore" name="security-ignore" value="{{join .Repo.Settings.SecurityIgnore " "}}"></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
+<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="security-exclude-rule">
+  <div><label for="security-exclude-rule">Excluded rules</label><p class="hint">Findings from these rules are set aside from the next scan. A rule id or a family of them, separated by spaces: <code>swift.lang.crypto.insecure-random</code>, <code>javascript.browser</code>.</p></div>
+  <div><input type="text" id="security-exclude-rule" name="security-exclude-rule" value="{{join .Repo.Settings.SecurityExcludeRules " "}}"></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>
 </section>
 {{end}}
 

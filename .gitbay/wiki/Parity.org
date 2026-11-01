@@ -249,6 +249,8 @@ there shows the app's rendering rather than the one the web page shows.
 | code scanning on/off        | yes | yes | yes |
 | code scanning status        | yes | yes | yes |
 | code scan now               | yes | no  | yes |
+| code scan dismiss, reopen   | yes | yes | no  |
+| code scan ignores, rules    | yes | yes | no  |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
 | delete, transfer            | yes | yes | yes |

@@ -20,7 +20,7 @@ content (as confidential as the repository), *O* operational.
 | Signatures      | =commit_signatures=, =settings.key_epoch=                                                   | O     | verification cache                              |
 | Audit and feed  | =audit_log=, =events=                                                                       | O, P  | actor ids, pruned argv, fingerprints and IPs in some audit rows, a hash chain (=prev_hash=, =hash=) |
 | Dependencies    | =dep_checks=, =dep_reports=, =dep_advisories=                                               | O     |
-| Code scanning   | =security_scans=, =security_findings=                                                       | O     |                                                 |
+| Code scanning   | =security_scans=, =security_findings=, =security_dismissals=                                | O     |                                                 |
 
 Outside the database:
 

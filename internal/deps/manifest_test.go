@@ -174,3 +174,18 @@ func TestScanEmptyTree(t *testing.T) {
 		t.Errorf("Scan of empty tree = %v", got)
 	}
 }
+
+// Names keeps what Scan leaves out for having no single version.
+func TestNames(t *testing.T) {
+	got := found(t, Names(tree(map[string]string{
+		"go.mod":           "module x\n\nrequire github.com/gorilla/mux v1.8.1\n",
+		"requirements.txt": "Django>=4,<6\nrequests\n",
+		"package.json":     `{"dependencies":{"jquery":"^3"},"devDependencies":{"vite":"git+https://x/y"},"peerDependencies":{"react":"*"}}`,
+		"Cargo.toml":       "[dependencies]\nlocal = { path = \"../local\" }\n",
+	})))
+	for _, want := range []string{"go:github.com/gorilla/mux", "pypi:django", "pypi:requests", "npm:jquery", "npm:vite", "npm:react", "cargo:local"} {
+		if v, ok := got[want]; !ok || v != "" {
+			t.Errorf("%s: %q %v in %v", want, v, ok, got)
+		}
+	}
+}

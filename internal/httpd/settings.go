@@ -169,6 +169,14 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			verb = "enable"
 		}
 		argv = []string{"repo", "security", verb, repo}
+	case "security-dismiss":
+		argv = []string{"repo", "security", "dismiss", repo, v("fingerprint"), "--reason", v("reason")}
+	case "security-reopen":
+		argv = []string{"repo", "security", "reopen", repo, v("fingerprint")}
+	case "security-ignore":
+		argv = append([]string{"repo", "settings", "security-ignore", repo}, strings.Fields(v("security-ignore"))...)
+	case "security-exclude-rule":
+		argv = append([]string{"repo", "settings", "security-exclude-rule", repo}, strings.Fields(v("security-exclude-rule"))...)
 	case "secret-scan":
 		argv = []string{"repo", "settings", "secret-scan", repo, v("secret-scan")}
 	case "secret-scan-allow":

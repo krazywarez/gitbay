@@ -21,9 +21,11 @@ import (
 // IssueTitle is fixed so the issue is recognizable across scans.
 const IssueTitle = "Code scanning findings"
 
-// MaxUpload bounds one upload. MaxFindings bounds what is kept from it.
+// MaxUpload bounds one upload, maxResults what is read from it, and
+// MaxFindings what is reported of that once a Scope has set some aside.
 const (
 	MaxUpload   = 8 << 20
+	maxResults  = 10 * MaxFindings
 	MaxFindings = 500
 )
 
@@ -61,7 +63,7 @@ type sarif struct {
 
 // Parse returns the findings in a SARIF document, deduplicated by
 // fingerprint and sorted by path and line. It reports whether results past
-// MaxFindings were dropped.
+// maxResults were dropped.
 func Parse(raw []byte) ([]store.SecurityFinding, bool, error) {
 	var doc sarif
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -110,7 +112,7 @@ func Parse(raw []byte) ([]store.SecurityFinding, bool, error) {
 			continue
 		}
 		seen[h.place()] = true
-		if len(out) >= MaxFindings {
+		if len(out) >= maxResults {
 			truncated = true
 			break
 		}
@@ -248,6 +250,18 @@ func Same(a, b []store.SecurityFinding) bool {
 	return true
 }
 
+// ByPlace sorts a set by path and line, the way a scan lists it.
+func ByPlace(fs []store.SecurityFinding) []store.SecurityFinding {
+	out := append([]store.SecurityFinding(nil), fs...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].Line < out[j].Line
+	})
+	return out
+}
+
 // ByFingerprint sorts a set the way the store returns it, for Same.
 func ByFingerprint(fs []store.SecurityFinding) []store.SecurityFinding {
 	out := append([]store.SecurityFinding(nil), fs...)
@@ -255,14 +269,25 @@ func ByFingerprint(fs []store.SecurityFinding) []store.SecurityFinding {
 	return out
 }
 
-// Body renders the issue: one list per tool, a line per finding.
-func Body(branch string, findings []store.SecurityFinding, truncated bool) string {
+// Report is what the issue says: the findings still open, and how many
+// others were dismissed or set aside.
+type Report struct {
+	Repo, Branch string
+	Open         []store.SecurityFinding
+	Dismissed    int
+	Aside        Aside
+	Truncated    bool
+}
+
+// Body renders the issue: one list per tool, a line per finding with its
+// fingerprint, then what is not listed.
+func Body(r Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "The scheduled code scan of `%s` reported these findings. "+
-		"This issue is kept up to date as that changes, and closed once a scan reports none.\n", branch)
+		"This issue is kept up to date as that changes, and closed once none are open.\n", r.Branch)
 	byTool := map[string][]store.SecurityFinding{}
 	var tools []string
-	for _, f := range findings {
+	for _, f := range r.Open {
 		if _, ok := byTool[f.Tool]; !ok {
 			tools = append(tools, f.Tool)
 		}
@@ -276,11 +301,63 @@ func Body(branch string, findings []store.SecurityFinding, truncated bool) strin
 		}
 		fmt.Fprintf(&b, "\n### %s\n\n", name)
 		for _, f := range byTool[tool] {
-			fmt.Fprintf(&b, "- `%s:%d` %s (%s): %s\n", f.Path, f.Line, f.Rule, f.Level, f.Message)
+			fmt.Fprintf(&b, "- `%s:%d` %s (%s): %s `%s`\n", f.Path, f.Line, f.Rule, f.Level, f.Message, Short(f.Fingerprint))
 		}
 	}
-	if truncated {
-		fmt.Fprintf(&b, "\nOnly the first %d results are listed.\n", MaxFindings)
+	if r.Truncated {
+		fmt.Fprintf(&b, "\nOnly the first %d findings are listed.\n", MaxFindings)
+	}
+	var notListed []string
+	if r.Dismissed > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d dismissed", r.Dismissed))
+	}
+	if r.Aside.Ignored > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d under paths or rules the repository ignores", r.Aside.Ignored))
+	}
+	if len(r.Aside.Unused) > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d from rules for libraries it does not use (%s)", total(r.Aside.Unused), counts(r.Aside.Unused)))
+	}
+	if len(notListed) > 0 {
+		fmt.Fprintf(&b, "\nNot listed: %s. `repo security status %s` shows them.\n", strings.Join(notListed, "; "), r.Repo)
+	}
+	if len(r.Open) > 0 {
+		fmt.Fprintf(&b, "\nTo dismiss one: `repo security dismiss %s <fingerprint> --reason false-positive|wont-fix|test`.\n", r.Repo)
 	}
 	return b.String()
+}
+
+// Short is the fingerprint as the issue prints it; Dismiss takes it back.
+func Short(fingerprint string) string {
+	return fingerprint[:min(len(fingerprint), ShortLen)]
+}
+
+// ShortLen is how much of a fingerprint is printed and the least that
+// names one.
+const ShortLen = 10
+
+func total(m map[string]int) int {
+	n := 0
+	for _, v := range m {
+		n += v
+	}
+	return n
+}
+
+// counts lists a map's keys with their counts, most first.
+func counts(m map[string]int) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if m[keys[i]] != m[keys[j]] {
+			return m[keys[i]] > m[keys[j]]
+		}
+		return keys[i] < keys[j]
+	})
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = fmt.Sprintf("%s %d", k, m[k])
+	}
+	return strings.Join(parts, ", ")
 }

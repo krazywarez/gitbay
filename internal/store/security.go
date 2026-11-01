@@ -12,6 +12,7 @@ type SecurityScan struct {
 	NextRun     string
 	LastResults string // when results were last uploaded, '' for never
 	IssueNumber int64
+	Aside       string // what the last scan set aside, as JSON
 }
 
 // SecurityFinding is one result from a scan, as last reported.
@@ -49,8 +50,8 @@ func (s *Store) DisableSecurityScan(repoID int64) error {
 func (s *Store) SecurityScanFor(repoID int64) (SecurityScan, error) {
 	var sc SecurityScan
 	err := s.DB.QueryRow(
-		"SELECT repo_id, next_run, last_results, issue_number FROM security_scans WHERE repo_id = ?", repoID).
-		Scan(&sc.RepoID, &sc.NextRun, &sc.LastResults, &sc.IssueNumber)
+		"SELECT repo_id, next_run, last_results, issue_number, aside FROM security_scans WHERE repo_id = ?", repoID).
+		Scan(&sc.RepoID, &sc.NextRun, &sc.LastResults, &sc.IssueNumber, &sc.Aside)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sc, ErrNotFound
 	}
@@ -111,13 +112,17 @@ func (s *Store) ReportedFindings(repoID int64) ([]SecurityFinding, error) {
 	return out, rows.Err()
 }
 
-// ReplaceFindings swaps in an upload's findings wholesale.
-func (s *Store) ReplaceFindings(repoID int64, findings []SecurityFinding) error {
+// ReplaceFindings swaps in an upload's findings wholesale, with what it set
+// aside.
+func (s *Store) ReplaceFindings(repoID int64, findings []SecurityFinding, aside string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.Exec("UPDATE security_scans SET aside = ? WHERE repo_id = ?", aside, repoID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec("DELETE FROM security_findings WHERE repo_id = ?", repoID); err != nil {
 		return err
 	}
@@ -137,4 +142,68 @@ func (s *Store) StampSecurityResults(repoID int64) error {
 	_, err := s.DB.Exec(`UPDATE security_scans SET last_results = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 		WHERE repo_id = ?`, repoID)
 	return err
+}
+
+// SecurityDismissal is a finding a repository dismissed.
+type SecurityDismissal struct {
+	Fingerprint string
+	Reason      string
+	By          string // username, '' once the account is gone
+	CreatedAt   string
+}
+
+// DismissFindings dismisses findings by fingerprint, replacing the reason
+// of any already dismissed.
+func (s *Store) DismissFindings(repoID, byID int64, fingerprints []string, reason string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, fp := range fingerprints {
+		if _, err := tx.Exec(`
+			INSERT INTO security_dismissals (repo_id, fingerprint, reason, by_id) VALUES (?, ?, ?, ?)
+			ON CONFLICT (repo_id, fingerprint) DO UPDATE SET reason = excluded.reason, by_id = excluded.by_id,
+				created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+			repoID, fp, reason, byID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ReopenFindings takes dismissals back.
+func (s *Store) ReopenFindings(repoID int64, fingerprints []string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, fp := range fingerprints {
+		if _, err := tx.Exec("DELETE FROM security_dismissals WHERE repo_id = ? AND fingerprint = ?", repoID, fp); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SecurityDismissals returns a repo's dismissals by fingerprint.
+func (s *Store) SecurityDismissals(repoID int64) (map[string]SecurityDismissal, error) {
+	rows, err := s.DB.Query(`
+		SELECT d.fingerprint, d.reason, COALESCE(u.username, ''), d.created_at
+		FROM security_dismissals d LEFT JOIN users u ON u.id = d.by_id
+		WHERE d.repo_id = ?`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]SecurityDismissal{}
+	for rows.Next() {
+		var d SecurityDismissal
+		if err := rows.Scan(&d.Fingerprint, &d.Reason, &d.By, &d.CreatedAt); err != nil {
+			return nil, err
+		}
+		out[d.Fingerprint] = d
+	}
+	return out, rows.Err()
 }

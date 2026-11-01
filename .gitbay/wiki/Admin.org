@@ -477,6 +477,20 @@ the findings replace the repository's last set; =gitbay-bot= keeps a
 the dependency issues are. An older runner runs the steps and uploads
 nothing, so the issue stays as it was.
 
+Not every finding is listed. A rule from one of opengrep-rules' library
+directories (=python/django=, =javascript/jquery=,
+=typescript/react/portability/i18next=, …) counts only where a manifest
+at the scanned commit names that library: =go.mod=, =requirements.txt=,
+=pyproject.toml=, =package.json= or =Cargo.toml=, in any directory
+outside =node_modules=, =vendor= and =third_party=. The =yaml/semgrep=
+lints count only in a repository with a =.semgrep= config. Paths
+=.gitattributes= marks =linguist-vendored= or =linguist-generated= are
+set aside, as are the repository's =security-ignore= paths and
+=security-exclude-rule= rules. The issue says how many were set aside
+and why. A finding a writer dismisses (=repo security dismiss=, by the
+fingerprint the issue prints) stays out of the issue across scans until
+it is reopened; the issue closes when nothing is left open.
+
 The bundled rules are =opengrep/opengrep-rules=, LGPL-2.1 with the
 Commons Clause: an instance that sells hosting should supply its own.
 

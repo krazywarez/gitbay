@@ -844,6 +844,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 			"require signed commits", strconv.FormatBool(repo.Settings.RequireSignedCommits),
 			"secret scan", leaks.Mode(repo.Settings.SecretScan),
 			"secret scan allow", strings.Join(repo.Settings.SecretScanAllow, ", "),
+			"security ignore", strings.Join(repo.Settings.SecurityIgnore, ", "),
+			"security exclude rules", strings.Join(repo.Settings.SecurityExcludeRules, ", "),
 			"git daemon", strconv.FormatBool(repo.Settings.GitDaemon),
 			"archived", strconv.FormatBool(repo.Settings.Archived),
 		)
@@ -882,6 +884,8 @@ func runSettingsShow(c *Ctx, args []string) int {
 			{"Signed commits", []cell{onOff(set.RequireSignedCommits)}},
 			{"Secret scan", []cell{cText(leaks.Mode(set.SecretScan))}},
 			{"Scan allows", []cell{list(set.SecretScanAllow)}},
+			{"Scan ignores", []cell{list(set.SecurityIgnore)}},
+			{"Rules off", []cell{list(set.SecurityExcludeRules)}},
 			{"Git daemon", []cell{onOff(set.GitDaemon)}},
 			{"Archived", []cell{onOff(set.Archived)}},
 		}, actions: []action{

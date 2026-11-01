@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"gitbay.org/gitbay/internal/codescan"
 	"gitbay.org/gitbay/internal/control"
 	"gitbay.org/gitbay/internal/web"
 )
@@ -44,5 +45,32 @@ func TestSettingsPageHidesDepsStatusWhenOff(t *testing.T) {
 	}
 	if strings.Contains(sb.String(), "Last checked") {
 		t.Error("the report shows with checks off")
+	}
+}
+
+// The code scanning section offers each open finding for dismissal, each
+// dismissed one for reopening, and says what the scan set aside.
+func TestSettingsPageRendersSecurityTriage(t *testing.T) {
+	var sb strings.Builder
+	err := web.Render(&sb, "settings.html", settingsPage{
+		repoPage: testRepoPage(),
+		Security: control.SecurityOut{
+			Enabled: true, LastResults: "2026-11-01T04:02:00Z",
+			Findings:  []control.SecurityFinding{{Fingerprint: "aaaa1111bbbb", Rule: "go.lang.x", Path: "a.go", Line: 3}},
+			Dismissed: []control.SecurityFinding{{Fingerprint: "cccc2222dddd", Rule: "go.lang.y", Path: "b.go", Line: 9, Reason: "test", DismissedBy: "alice"}},
+			Aside:     codescan.Aside{Unused: map[string]int{"django": 26}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := sb.String()
+	for _, want := range []string{
+		`value="security-dismiss"`, `value="aaaa1111bbbb"`, `value="security-reopen"`, `value="cccc2222dddd"`,
+		"by alice", "26 from django rules", `name="security-ignore"`, `name="security-exclude-rule"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("settings page does not show %q", want)
+		}
 	}
 }

@@ -45,7 +45,7 @@ func TestParse(t *testing.T) {
 func TestParseTruncates(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(`{"runs":[{"tool":{"driver":{"name":"t"}},"results":[`)
-	for i := 0; i < MaxFindings+5; i++ {
+	for i := 0; i < maxResults+5; i++ {
 		if i > 0 {
 			b.WriteString(",")
 		}
@@ -53,7 +53,7 @@ func TestParseTruncates(t *testing.T) {
 	}
 	b.WriteString(`]}]}`)
 	got, truncated, err := Parse([]byte(b.String()))
-	if err != nil || !truncated || len(got) != MaxFindings {
+	if err != nil || !truncated || len(got) != maxResults {
 		t.Fatalf("len %d truncated %v err %v", len(got), truncated, err)
 	}
 }

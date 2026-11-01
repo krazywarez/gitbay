@@ -42,6 +42,10 @@ type RepoSettings struct {
 	SecretScan string `json:"secret_scan,omitempty"`
 	// SecretScanAllow are CI path globs whose findings are ignored.
 	SecretScanAllow []string `json:"secret_scan_allow,omitempty"`
+	// SecurityIgnore are CI path globs, and SecurityExcludeRules rule ids
+	// or families, whose code scanning findings are set aside.
+	SecurityIgnore       []string `json:"security_ignore,omitempty"`
+	SecurityExcludeRules []string `json:"security_exclude_rules,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

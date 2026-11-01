@@ -243,6 +243,10 @@ gitbay repo settings secret-scan-allow you/project 'testdata/**'  # paths whose 
 gitbay repo secret-scan you/project                 # scan the whole history
 gitbay repo security enable you/project             # scheduled code scan, where the instance offers one
 gitbay repo security status you/project             # its findings, also kept in an issue
+gitbay repo security dismiss you/project 3f9a0c1d2e --reason false-positive  # or wont-fix, test
+gitbay repo security reopen you/project 3f9a0c1d2e
+gitbay repo settings security-ignore you/project 'testdata/**'  # paths set aside from the scan
+gitbay repo settings security-exclude-rule you/project swift.lang.crypto.insecure-random
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
 gitbay repo search forge                            # find repos by name/description/topic
