@@ -1,6 +1,7 @@
 package codescan
 
 import (
+	"gitbay.org/gitbay/internal/store"
 	"strconv"
 	"strings"
 	"testing"
@@ -67,5 +68,78 @@ func TestSameIgnoresLines(t *testing.T) {
 		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"x.go"},"region":{"startLine":40}}}]}]}]}`))
 	if !Same(ByFingerprint(a), ByFingerprint(b)) {
 		t.Error("a moved finding counted as a change")
+	}
+}
+
+// sarifOf builds a one-run document from results given as JSON objects.
+func sarifOf(results ...string) []byte {
+	return []byte(`{"runs":[{"tool":{"driver":{"name":"t"}},"results":[` + strings.Join(results, ",") + `]}]}`)
+}
+
+func result(line int, snippet, extra string) string {
+	region := `"startLine":` + itoa(line)
+	if snippet != "" {
+		region += `,"snippet":{"text":` + strconv.Quote(snippet) + `}`
+	}
+	if extra != "" {
+		extra = "," + extra
+	}
+	return `{"ruleId":"r","message":{"text":"m"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"x.go"},"region":{` +
+		region + `}}}]` + extra + `}`
+}
+
+func fingerprints(t *testing.T, raw []byte) []string {
+	t.Helper()
+	got, _, err := Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, f := range got {
+		out = append(out, f.Fingerprint)
+	}
+	return out
+}
+
+// Hits of one rule in one file are separate findings, and the first keeps
+// the fingerprint a scan without snippets always gave it.
+func TestParseKeepsAlikeHits(t *testing.T) {
+	fps := fingerprints(t, sarifOf(result(3, "", ""), result(9, "", "")))
+	if len(fps) != 2 || fps[0] == fps[1] {
+		t.Fatalf("fingerprints = %v", fps)
+	}
+	if want := fingerprint(hit{f: store.SecurityFinding{Tool: "t", Rule: "r", Path: "x.go", Message: "m"}}, map[string]int{}); fps[0] != want {
+		t.Errorf("first hit = %s, want %s", fps[0], want)
+	}
+	// Moved, they are still the same two.
+	if moved := fingerprints(t, sarifOf(result(13, "", ""), result(19, "", ""))); strings.Join(moved, " ") != strings.Join(fps, " ") {
+		t.Errorf("moved = %v, was %v", moved, fps)
+	}
+}
+
+// With the matched code, a new hit above others leaves theirs alone, and
+// reindenting the code changes nothing.
+func TestParseSnippetsSurviveInsertion(t *testing.T) {
+	before := fingerprints(t, sarifOf(result(3, "a()", ""), result(9, "b(x, y)", "")))
+	after := fingerprints(t, sarifOf(result(1, "c()", ""), result(4, "a()", ""), result(10, "\t  b(x,\n y)", "")))
+	if len(after) != 3 || after[1] != before[0] || after[2] != before[1] {
+		t.Errorf("before %v after %v", before, after)
+	}
+}
+
+// The tool's own fingerprints are used when every result has a distinct
+// one, and ignored when they are placeholders or shared.
+func TestParseOwnFingerprints(t *testing.T) {
+	own := func(v string) string { return `"fingerprints":{"matchBasedId/v1":"` + v + `"}` }
+	a := fingerprints(t, sarifOf(result(3, "", own("aaa")), result(9, "", own("bbb"))))
+	b := fingerprints(t, sarifOf(result(30, "", own("aaa")), result(1, "", own("bbb"))))
+	if len(a) != 2 || a[0] != b[1] || a[1] != b[0] {
+		t.Errorf("own fingerprints not followed: %v %v", a, b)
+	}
+	plain := fingerprints(t, sarifOf(result(3, "", ""), result(9, "", "")))
+	for _, v := range []string{"requires login", "same"} {
+		if got := fingerprints(t, sarifOf(result(3, "", own(v)), result(9, "", own(v)))); strings.Join(got, " ") != strings.Join(plain, " ") {
+			t.Errorf("%q: got %v, want the fallback %v", v, got, plain)
+		}
 	}
 }
