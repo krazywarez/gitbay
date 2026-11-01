@@ -925,6 +925,9 @@ func runSetDefaultBranch(c *Ctx, args []string) int {
 		return code
 	}
 	branch := args[1]
+	if strings.HasPrefix(branch, "-") {
+		return c.fail(protocol.ExitUsage, "a default branch may not start with '-'")
+	}
 	dir := RepoDir(c.Cfg.Server.Root, repo.OwnerName, repo.Name)
 	if _, err := gitutil.ResolveRef(dir, "refs/heads/"+branch); err != nil {
 		return c.fail(protocol.ExitFailure, "no branch named %q on %s", branch, repo.Path())

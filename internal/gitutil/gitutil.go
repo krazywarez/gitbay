@@ -93,7 +93,7 @@ func RunUntil(cmd *exec.Cmd, cancel <-chan struct{}) error {
 // dir. It must run with the caller's environment intact so that quarantined
 // objects during pre-receive remain visible.
 func IsAncestor(dir, old, new string) (bool, error) {
-	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-base", "--is-ancestor", old, new)
+	cmd := exec.Command(toolpath.Look("git"), "-C", dir, "merge-base", "--is-ancestor", "--end-of-options", old, new)
 	err := cmd.Run()
 	if err == nil {
 		return true, nil

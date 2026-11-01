@@ -101,6 +101,10 @@ func TestCheckPush(t *testing.T) {
 		{"delete unprotected", []RefUpdate{{Ref: "refs/heads/dev", IsDelete: true}}, false},
 		{"mr namespace", []RefUpdate{{Ref: "refs/merge-requests/1/head"}}, true},
 		{"tag alongside protected", []RefUpdate{{Ref: "refs/tags/v1"}, {Ref: "refs/heads/main"}}, false},
+		{"branch shaped like an option", []RefUpdate{{Ref: "refs/heads/--output=/x"}}, true},
+		{"tag shaped like an option", []RefUpdate{{Ref: "refs/tags/-v1"}}, true},
+		{"delete a dash branch", []RefUpdate{{Ref: "refs/heads/-old", IsDelete: true}}, false},
+		{"dash inside a name", []RefUpdate{{Ref: "refs/heads/fix-1"}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

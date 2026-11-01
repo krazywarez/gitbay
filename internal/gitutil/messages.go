@@ -20,7 +20,7 @@ type CommitAuthor struct {
 // reachable from new but not old, capped at max. Empty or zero old lists
 // from new alone.
 func RevListAuthors(dir, old, new string, max int) ([]CommitAuthor, error) {
-	args := []string{"-C", dir, "log", fmt.Sprintf("--max-count=%d", max), "--format=%H%x00%ae%x00%as", new}
+	args := []string{"-C", dir, "log", fmt.Sprintf("--max-count=%d", max), "--format=%H%x00%ae%x00%as", "--end-of-options", new}
 	if old != "" && old != zeroSHA {
 		args = append(args, "^"+old)
 	}
@@ -41,7 +41,7 @@ func RevListAuthors(dir, old, new string, max int) ([]CommitAuthor, error) {
 
 // Parents returns a commit's parent shas.
 func Parents(dir, sha string) []string {
-	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%P", sha).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%P", "--end-of-options", sha).Output()
 	if err != nil {
 		return nil
 	}
@@ -51,7 +51,7 @@ func Parents(dir, sha string) []string {
 // LastCommitDate returns the committer date (YYYY-MM-DD) of the ref tip,
 // or "" for empty repos.
 func LastCommitDate(dir, ref string) string {
-	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%cs", ref).Output()
+	out, err := exec.Command(toolpath.Look("git"), "-C", dir, "log", "-1", "--format=%cs", "--end-of-options", ref).Output()
 	if err != nil {
 		return ""
 	}
@@ -74,7 +74,7 @@ type CommitMsg struct {
 // new but not old, newest first, capped at max. An empty or zero old (new
 // branch) lists from new alone, still capped.
 func RevListMessages(dir, old, new string, max int) ([]CommitMsg, error) {
-	args := []string{"-C", dir, "rev-list", fmt.Sprintf("-n%d", max), "--format=%an%x01%ae%x01%B%x00", new}
+	args := []string{"-C", dir, "rev-list", fmt.Sprintf("-n%d", max), "--format=%an%x01%ae%x01%B%x00", "--end-of-options", new}
 	if old != "" && old != zeroSHA {
 		args = append(args, "^"+old)
 	}

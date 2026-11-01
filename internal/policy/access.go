@@ -99,6 +99,11 @@ func CheckPush(repo store.Repo, updates []RefUpdate) string {
 		if strings.HasPrefix(u.Ref, "refs/merge-requests/") {
 			return "refs/merge-requests/* is server-owned and cannot be pushed"
 		}
+		// git reads a name starting with a dash as an option wherever one
+		// reaches a command line. Deleting one is still allowed.
+		if name := RefShortName(u.Ref); strings.HasPrefix(name, "-") && !u.IsDelete {
+			return "ref names may not start with '-': " + name
+		}
 		// A protected tag is created once. Its globs match the tag name.
 		if tag, ok := strings.CutPrefix(u.Ref, "refs/tags/"); ok && TagProtected(repo, tag) {
 			if u.IsDelete {
@@ -139,3 +144,14 @@ func TagProtected(repo store.Repo, tag string) bool {
 }
 
 func isZeroSHA(sha string) bool { return sha != "" && strings.Trim(sha, "0") == "" }
+
+// RefShortName is a branch or tag ref without its refs/heads/ or
+// refs/tags/ prefix, or the ref unchanged.
+func RefShortName(ref string) string {
+	for _, p := range []string{"refs/heads/", "refs/tags/"} {
+		if name, ok := strings.CutPrefix(ref, p); ok {
+			return name
+		}
+	}
+	return ref
+}

@@ -376,6 +376,12 @@ func cmdMRRebase(args []string) int {
 		fmt.Fprintf(os.Stderr, "gitbay: !%s is %s\n", n, state)
 		return protocol.ExitUsage
 	}
+	// The names come from the server and land on git's command line, where
+	// one starting with a dash would be read as an option.
+	if strings.HasPrefix(source, "-") || strings.HasPrefix(target, "-") {
+		fmt.Fprintf(os.Stderr, "gitbay: !%s names a branch starting with '-'; rebase it by hand\n", n)
+		return protocol.ExitUsage
+	}
 	// A fork's branch lives in a repository this clone does not push to,
 	// and guessing which remote that is would be worse than saying so.
 	if strings.Contains(source, ":") {

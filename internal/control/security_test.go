@@ -295,3 +295,18 @@ func TestSecurityDismiss(t *testing.T) {
 		t.Errorf("reopening a finding should open a fresh issue, got #%d", reopened.IssueNumber)
 	}
 }
+
+// A default branch is passed to git by name, so one shaped like an option
+// is refused before it is looked up.
+func TestDefaultBranchRefusesOptionShape(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	c, out := runnerCtx(st, u.ID, root)
+	if code := runSetDefaultBranch(c, []string{repo.Path(), "--output=/tmp/x"}); code != protocol.ExitUsage ||
+		!strings.Contains(out.String(), "may not start with '-'") {
+		t.Errorf("exit %d: %s", code, out)
+	}
+	c, out = runnerCtx(st, u.ID, root)
+	if code := runSetDefaultBranch(c, []string{repo.Path(), "feature"}); code != protocol.ExitOK {
+		t.Errorf("a normal branch: exit %d: %s", code, out)
+	}
+}
