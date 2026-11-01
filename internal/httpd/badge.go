@@ -2,6 +2,7 @@ package httpd
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"strings"
 )
@@ -48,6 +49,7 @@ func badgeSVG(label, state string) string {
 	}
 	lw, sw := badgeWidth(label), badgeWidth(state)
 	total := lw + sw
+	label, state = template.HTMLEscapeString(label), template.HTMLEscapeString(state)
 	return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="20" role="img" aria-label="%s: %s">
 <title>%s: %s</title>
 <rect width="%d" height="20" rx="3" fill="#444d56"/>

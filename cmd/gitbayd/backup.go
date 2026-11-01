@@ -414,8 +414,7 @@ func syncDir(dir string) error {
 // snapshotDB writes a consistent copy of the live database. VACUUM INTO
 // takes a read snapshot, so concurrent daemon writes are safe under WAL.
 func snapshotDB(st *store.Store, dest string) error {
-	quoted := strings.ReplaceAll(dest, "'", "''")
-	_, err := st.DB.Exec(fmt.Sprintf("VACUUM INTO '%s'", quoted))
+	_, err := st.DB.Exec("VACUUM INTO ?", dest)
 	return err
 }
 

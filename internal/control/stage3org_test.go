@@ -20,7 +20,7 @@ func orgScreensFixture(t *testing.T) (*store.Store, store.Repo, store.User) {
 	dispatchAs(t, st, u, "", "org", "create", "acme")
 	dispatchAs(t, st, u, "", "org", "label", "set", "acme", "triage", "--color", "0e8a16")
 	dispatchAs(t, st, u, "", "org", "milestone", "create", "acme", "Q4")
-	dispatchAs(t, st, u, "", "repo", "create", "acme/site")
+	dispatchIn(t, st, u, t.TempDir(), "", "repo", "create", "acme/site")
 	dispatchAs(t, st, u, "", "org", "team", "create", "acme", "core")
 	dispatchAs(t, st, u, "", "org", "team", "add", "acme", "core", "alice")
 	dispatchAs(t, st, u, "", "org", "team", "grant", "acme", "core", "acme/site", "write")

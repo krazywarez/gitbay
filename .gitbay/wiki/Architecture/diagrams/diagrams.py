@@ -115,7 +115,7 @@ class SVG:
 
     def save(self, name):
         self.parts.append("</svg>")
-        with open(f"{OUT}/{name}", "w") as f:
+        with open(f"{OUT}/{name}", "w", encoding="utf-8") as f:
             f.write("\n".join(self.parts) + "\n")
 
 

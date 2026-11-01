@@ -49,7 +49,7 @@ func SendReplyTo(cfg config.Config, to, replyTo, subject, body string) error {
 		}
 	}
 	hostname, _, _ := net.SplitHostPort(host)
-	tlsCfg := &tls.Config{ServerName: hostname, RootCAs: rootCAs}
+	tlsCfg := &tls.Config{ServerName: hostname, RootCAs: rootCAs, MinVersion: tls.VersionTLS12}
 
 	msg := strings.NewReplacer("\n", "\r\n").Replace(fmt.Sprintf(
 		"From: %s\nTo: %s\n%sSubject: %s\nDate: %s\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\n%s\n",

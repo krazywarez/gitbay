@@ -198,4 +198,4 @@ else
     need '12 refused' "12 refused"
 fi
 [ $fail = 0 ] && echo "PASS ($mode): the build's failed logins did not lock the runner out"
-exit $fail
+exit "$fail"
