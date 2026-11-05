@@ -251,6 +251,7 @@ there shows the app's rendering rather than the one the web page shows.
 | code scan now               | yes | no  | yes |
 | code scan dismiss, reopen   | yes | yes | no  |
 | code scan ignores, rules    | yes | yes | no  |
+| code scan frequency         | yes | yes | no  |
 | dependency checks on/off    | yes | yes | yes |
 | dependency status           | yes | yes | yes |
 | advisory dismiss, reopen    | yes | yes | no  |

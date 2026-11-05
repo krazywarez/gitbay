@@ -220,6 +220,7 @@ var summaries = map[string]string{
 	"repo settings secret-scan":           "scan pushes for credentials: off, warn the pusher, or block the push",
 	"repo settings secret-scan-allow":     "paths whose secret scan findings are ignored",
 	"repo settings security-exclude-rule": "code scanning rules, or families of them, whose findings are set aside",
+	"repo settings security-frequency":    "how often the code scan runs, within what the instance allows",
 	"repo settings security-ignore":       "paths whose code scanning findings are set aside",
 	"repo settings show":                  "show settings",
 	"repo settings unprotect":             "unprotect a branch",

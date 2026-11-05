@@ -46,6 +46,9 @@ type RepoSettings struct {
 	// or families, whose code scanning findings are set aside.
 	SecurityIgnore       []string `json:"security_ignore,omitempty"`
 	SecurityExcludeRules []string `json:"security_exclude_rules,omitempty"`
+	// SecurityFrequency is the code scan frequency chosen, empty for the
+	// instance default.
+	SecurityFrequency string `json:"security_frequency,omitempty"`
 }
 
 // Path returns the canonical owner/name form.

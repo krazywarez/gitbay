@@ -75,6 +75,31 @@ func TestSettingsPageRendersSecurityTriage(t *testing.T) {
 	}
 }
 
+// The frequency dropdown offers what the instance allows, with the
+// repository's frequency selected.
+func TestSettingsPageRendersScanFrequency(t *testing.T) {
+	var sb strings.Builder
+	err := web.Render(&sb, "settings.html", settingsPage{
+		repoPage: testRepoPage(), ScanAvailable: true,
+		ScanFrequencies: []string{"weekly", "monthly"}, ScanFrequency: "weekly", ScanHour: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := sb.String()
+	for _, want := range []string{
+		`value="security-frequency"`, `<option value="weekly" selected>weekly</option>`,
+		`<option value="monthly">monthly</option>`, "04:00 UTC",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("settings page does not show %q", want)
+		}
+	}
+	if strings.Contains(page, `value="daily"`) {
+		t.Error("offers a frequency the instance does not allow")
+	}
+}
+
 // The advisories offer dismissal, the dismissed ones reopening, and the
 // ones nothing imports are named.
 func TestSettingsPageRendersAdvisoryTriage(t *testing.T) {

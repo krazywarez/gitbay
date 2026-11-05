@@ -180,6 +180,12 @@
   <div class="check"><input type="checkbox" id="security-enabled" name="security" value="on"{{if .Security.Enabled}} checked{{end}}></div>
   <div><button type="submit" class="btn">Save</button></div>
 </form>
+{{if .ScanAvailable}}<form method="post" action="{{$base}}" class="setform">
+  <input type="hidden" name="field" value="security-frequency">
+  <div><label for="security-frequency">Frequency</label><p class="hint">Daily, weekly on Sunday, or monthly on the 1st, at {{printf "%02d:00" .ScanHour}} UTC.</p></div>
+  <div><select id="security-frequency" name="security-frequency">{{$freq := .ScanFrequency}}{{range .ScanFrequencies}}<option value="{{.}}"{{if eq . $freq}} selected{{end}}>{{.}}</option>{{end}}</select></div>
+  <div><button type="submit" class="btn">Save</button></div>
+</form>{{end}}
 {{if .Security.Enabled}}
 <p class="meta">Next scan {{.Security.NextRun}} · last results {{if .Security.LastResults}}{{when .Security.LastResults}}{{else}}never{{end}}{{if .Security.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Security.IssueNumber}}">#{{.Security.IssueNumber}}</a>{{end}}</p>
 {{with .Security.Aside}}{{if or .Ignored .Unused}}<p class="meta">Set aside by the last scan:{{if .Ignored}} {{.Ignored}} under the paths or rules below, or marked vendored or generated in <code>.gitattributes</code>.{{end}}{{range $lib, $n := .Unused}} {{$n}} from {{$lib}} rules, which no manifest names.{{end}}</p>{{end}}{{end}}

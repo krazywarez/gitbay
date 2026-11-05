@@ -651,6 +651,7 @@ func repoCmd() *cobra.Command {
 			pass("secret-scan-allow", passOpts{server: []string{"repo", "settings", "secret-scan-allow"}, needsRepo: true}),
 			pass("security-ignore", passOpts{server: []string{"repo", "settings", "security-ignore"}, needsRepo: true}),
 			pass("security-exclude-rule", passOpts{server: []string{"repo", "settings", "security-exclude-rule"}, needsRepo: true}),
+			pass("security-frequency", passOpts{server: []string{"repo", "settings", "security-frequency"}, needsRepo: true}),
 			pass("require-mr", passOpts{server: []string{"repo", "settings", "require-mr"}, needsRepo: true}),
 			pass("description", passOpts{server: []string{"repo", "settings", "description"}, needsRepo: true}),
 			pass("website", passOpts{server: []string{"repo", "settings", "website"}, needsRepo: true}),

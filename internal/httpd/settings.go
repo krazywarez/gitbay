@@ -26,14 +26,19 @@ type settingsPage struct {
 	// ScanAvailable is whether the instance has a code scanning image;
 	// without one the toggle would only ever be refused.
 	ScanAvailable bool
-	Runners       []store.RepoRunner
-	Access        []accessRow
-	Hooks         []hookRow
-	Deliveries    []deliveryRow
-	Notice        string
-	Saved         bool
-	Reauth        bool // Notice is the stale-session refusal: link to sign in
-	Submitted     map[string]string
+	// ScanFrequencies are the frequencies the instance allows, ScanFrequency
+	// the one this repository scans at, and ScanHour the hour UTC.
+	ScanFrequencies []string
+	ScanFrequency   string
+	ScanHour        int
+	Runners         []store.RepoRunner
+	Access          []accessRow
+	Hooks           []hookRow
+	Deliveries      []deliveryRow
+	Notice          string
+	Saved           bool
+	Reauth          bool // Notice is the stale-session refusal: link to sign in
+	Submitted       map[string]string
 }
 
 type accessRow struct {
@@ -113,8 +118,11 @@ func (s *Server) settingsFormWith(w http.ResponseWriter, r *http.Request, u stor
 		repoPage: p, Topics: topics, Branches: branches,
 		DepsEnabled: deps.Enabled, Deps: deps,
 		Security: security, ScanAvailable: s.cfg.Security.Image != "",
-		Runners: runners,
-		Access:  access, Hooks: hooks, Deliveries: deliveries,
+		ScanFrequencies: s.cfg.Security.Frequencies(),
+		ScanFrequency:   s.cfg.Security.Frequency(repo.Settings.SecurityFrequency),
+		ScanHour:        s.cfg.Security.Hour,
+		Runners:         runners,
+		Access:          access, Hooks: hooks, Deliveries: deliveries,
 		Notice:    notice,
 		Saved:     strings.HasPrefix(notice, "Saved "),
 		Reauth:    s.reauthNotice(w, notice, r.URL.Path),
@@ -169,6 +177,8 @@ func (s *Server) settingsSubmit(w http.ResponseWriter, r *http.Request, u store.
 			verb = "enable"
 		}
 		argv = []string{"repo", "security", verb, repo}
+	case "security-frequency":
+		argv = []string{"repo", "settings", "security-frequency", repo, v("security-frequency")}
 	case "deps-dismiss":
 		argv = []string{"repo", "deps", "dismiss", repo, v("advisory"), "--reason", v("reason")}
 	case "deps-reopen":

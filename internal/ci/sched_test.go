@@ -177,7 +177,7 @@ func TestSchedulerQueuesSecurityScan(t *testing.T) {
 		t.Fatalf("queued with no image: %+v", builds)
 	}
 
-	s.Security = config.Security{Image: "localhost/gitbay-security:1", Schedule: "0 4 * * *", Steps: []string{"true"}}
+	s.Security = config.Security{Image: "localhost/gitbay-security:1", Hour: 4, MostOften: "daily", LeastOften: "monthly", Default: "daily", Steps: []string{"true"}}
 	st.SetSecurityNext(repoID, now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05Z"))
 	s.RunDue(now)
 	builds, _ := st.ListBuilds(repoID, store.BuildFilter{}, 10)
@@ -202,5 +202,27 @@ func TestSchedulerQueuesSecurityScan(t *testing.T) {
 func TestSecurityJobNameIsReserved(t *testing.T) {
 	if _, err := Parse([]byte("jobs:\n  gitbay-security:\n    steps: [echo]\n")); err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Fatalf("Parse = %v", err)
+	}
+}
+
+func TestSecurityNextRun(t *testing.T) {
+	sec := config.Default().Security
+	sec.Hour = 6
+	// Wednesday 2026-11-04 10:00 UTC.
+	after := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC).In(time.FixedZone("UTC-6", -6*3600))
+	for chosen, want := range map[string]string{
+		"":        "2026-11-05T06:00:00Z",
+		"daily":   "2026-11-05T06:00:00Z",
+		"weekly":  "2026-11-08T06:00:00Z",
+		"monthly": "2026-12-01T06:00:00Z",
+	} {
+		if got := SecurityNextRun(sec, chosen, after); got != want {
+			t.Errorf("%q: %s, want %s", chosen, got, want)
+		}
+	}
+	// A choice the instance no longer allows scans at the nearest allowed.
+	sec.LeastOften, sec.Default = "weekly", "weekly"
+	if got := SecurityNextRun(sec, "monthly", after); got != "2026-11-08T06:00:00Z" {
+		t.Errorf("monthly outside the range: %s", got)
 	}
 }

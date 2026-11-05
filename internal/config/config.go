@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -231,11 +232,46 @@ type Deps struct {
 // enable` schedules. It is unavailable until an operator names Image, an
 // image built from deploy/Containerfile.security and provisioned on the
 // runner hosts. Steps write SARIF into $GITBAY_RESULTS; the runner uploads
-// it when they succeed.
+// it when they succeed. Repositories scan at a frequency between MostOften
+// and LeastOften, Default unless they choose one, at Hour UTC.
 type Security struct {
-	Image    string   `toml:"image"`
-	Schedule string   `toml:"schedule"`
-	Steps    []string `toml:"steps"`
+	Image      string   `toml:"image"`
+	Hour       int      `toml:"hour"`
+	MostOften  string   `toml:"most_often"`
+	LeastOften string   `toml:"least_often"`
+	Default    string   `toml:"default"`
+	Steps      []string `toml:"steps"`
+}
+
+// ScanFrequencies are the code scan frequencies, most often first. Weekly
+// scans run on Sunday, monthly ones on the 1st.
+var ScanFrequencies = []string{"daily", "weekly", "monthly"}
+
+// Frequencies returns the frequencies a repository may choose, most often
+// first.
+func (s Security) Frequencies() []string {
+	lo, hi := s.bounds()
+	return ScanFrequencies[lo : hi+1]
+}
+
+// Frequency is the frequency a repository scans at: its choice, or the
+// default, moved to the nearest one the instance allows.
+func (s Security) Frequency(chosen string) string {
+	if chosen == "" {
+		chosen = s.Default
+	}
+	lo, hi := s.bounds()
+	return ScanFrequencies[max(lo, min(slices.Index(ScanFrequencies, chosen), hi))]
+}
+
+// bounds are the indexes of MostOften and LeastOften in ScanFrequencies,
+// or the whole list when they are unset or out of order.
+func (s Security) bounds() (int, int) {
+	lo, hi := slices.Index(ScanFrequencies, s.MostOften), slices.Index(ScanFrequencies, s.LeastOften)
+	if lo < 0 || hi < lo {
+		return 0, len(ScanFrequencies) - 1
+	}
+	return lo, hi
 }
 
 // DefaultSecuritySteps run Opengrep with the rules the image carries.
@@ -591,7 +627,8 @@ func Default() Config {
 		GitDaemon: GitDaemon{Port: 9418},
 		Mirrors:   Mirrors{PullIntervalMinutes: 15},
 		Deps:      Deps{CheckIntervalHours: 24},
-		Security:  Security{Schedule: "0 4 * * *", Steps: DefaultSecuritySteps},
+		Security: Security{Hour: 4, MostOften: "daily", LeastOften: "monthly", Default: "daily",
+			Steps: DefaultSecuritySteps},
 		Limits: Limits{
 			MaxPackBytes:    2 << 30, // 2 GiB
 			MaxBlobBytes:    100 << 20,
@@ -611,6 +648,9 @@ func Load(path string) (Config, error) {
 	md, err := toml.DecodeFile(path, &cfg)
 	if err != nil {
 		return cfg, err
+	}
+	if md.IsDefined("security", "schedule") {
+		return cfg, errors.New("security.schedule is replaced by security.hour, most_often, least_often and default")
 	}
 	if u := md.Undecoded(); len(u) > 0 {
 		return cfg, fmt.Errorf("unknown config key %q", u[0].String())
@@ -675,10 +715,20 @@ func (c Config) Validate() error {
 	if c.Server.Root == "" {
 		errs = append(errs, errors.New("server.root is required"))
 	}
+	sec := c.Security
+	if sec.Hour < 0 || sec.Hour > 23 {
+		errs = append(errs, fmt.Errorf("security.hour must be 0 to 23, got %d", sec.Hour))
+	}
+	if err := oneOf("security.most_often", sec.MostOften, ScanFrequencies...); err != nil {
+		errs = append(errs, err)
+	} else if err := oneOf("security.least_often", sec.LeastOften, ScanFrequencies...); err != nil {
+		errs = append(errs, err)
+	} else if slices.Index(ScanFrequencies, sec.MostOften) > slices.Index(ScanFrequencies, sec.LeastOften) {
+		errs = append(errs, fmt.Errorf("security.most_often %q is less often than security.least_often %q", sec.MostOften, sec.LeastOften))
+	} else if !slices.Contains(sec.Frequencies(), sec.Default) {
+		errs = append(errs, fmt.Errorf("security.default must be one of %v, got %q", sec.Frequencies(), sec.Default))
+	}
 	if c.Security.Image != "" {
-		if len(strings.Fields(c.Security.Schedule)) != 5 {
-			errs = append(errs, errors.New("security.schedule must be a five-field cron expression"))
-		}
 		if len(c.Security.Steps) == 0 {
 			errs = append(errs, errors.New("security.steps must name at least one step when security.image is set"))
 		}

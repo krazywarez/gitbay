@@ -519,3 +519,38 @@ func TestMailInboundPassword(t *testing.T) {
 		t.Fatal("two lines accepted")
 	}
 }
+
+func TestSecurityFrequencies(t *testing.T) {
+	cfg, err := Load(writeConfig(t, minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := cfg.Security; s.Hour != 4 || s.Default != "daily" || strings.Join(s.Frequencies(), ",") != "daily,weekly,monthly" {
+		t.Fatalf("defaults: %+v %v", s, s.Frequencies())
+	}
+	cfg, err = Load(writeConfig(t, minimal+"\n[security]\nhour = 0\nmost_often = \"weekly\"\ndefault = \"weekly\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cfg.Security
+	if s.Hour != 0 || strings.Join(s.Frequencies(), ",") != "weekly,monthly" {
+		t.Fatalf("narrowed: %+v %v", s, s.Frequencies())
+	}
+	for chosen, want := range map[string]string{"": "weekly", "daily": "weekly", "weekly": "weekly", "monthly": "monthly"} {
+		if got := s.Frequency(chosen); got != want {
+			t.Errorf("Frequency(%q) = %q, want %q", chosen, got, want)
+		}
+	}
+	for body, want := range map[string]string{
+		"schedule = \"0 4 * * *\"\n":                           "security.schedule",
+		"hour = 24\n":                                          "security.hour",
+		"most_often = \"hourly\"\n":                            "security.most_often",
+		"least_often = \"yearly\"\n":                           "security.least_often",
+		"most_often = \"monthly\"\nleast_often = \"weekly\"\n": "security.most_often",
+		"least_often = \"weekly\"\ndefault = \"monthly\"\n":    "security.default",
+	} {
+		if _, err := Load(writeConfig(t, minimal+"\n[security]\n"+body)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("want %q, got %v\n%s", want, err, body)
+		}
+	}
+}

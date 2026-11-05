@@ -462,8 +462,16 @@ The instance's code scan, which a repository admin turns on with
   runner host that serves a scanned repository. Build it from
   =deploy/Containerfile.security= (Opengrep and its rules, both pinned
   by sha256); the file has the commands.
-- =schedule= ("0 4 * * *") — when each enabled repository's default
-  branch is scanned. =repo security run= queues one now.
+- =most_often= ("daily") and =least_often= ("monthly") — the range of
+  frequencies a repository may choose with =repo settings
+  security-frequency=, from =daily=, =weekly= (Sunday) and =monthly=
+  (the 1st). A repository whose choice falls outside a narrowed range
+  scans at the nearest frequency in it, from its next scan on.
+- =default= ("daily") — the frequency of a repository that has not
+  chosen one; within the range.
+- =hour= (4) — the hour, UTC, every scan is due. =repo security run=
+  queues one now.
+- =schedule= is gone; a config that sets it is refused at load.
 - =steps= — shell steps that write SARIF into =$GITBAY_RESULTS=. The
   default runs Opengrep with the rules in the image at
   =/opt/opengrep-rules=.

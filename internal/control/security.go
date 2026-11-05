@@ -15,6 +15,7 @@ import (
 	"gitbay.org/gitbay/internal/botissue"
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/codescan"
+	"gitbay.org/gitbay/internal/config"
 	"gitbay.org/gitbay/internal/deps"
 	"gitbay.org/gitbay/internal/gitutil"
 	"gitbay.org/gitbay/internal/policy"
@@ -70,6 +71,11 @@ func init() {
 		Usage:    "repo settings security-exclude-rule <owner/name> [<rule>...] (none clears the list)",
 		Examples: []string{"repo settings security-exclude-rule krz/gitbay swift.lang.crypto.insecure-random"},
 		Run:      runSecurityExcludeRule})
+	register(Command{Path: []string{"repo", "settings", "security-frequency"},
+		Summary:  "how often the code scan runs, within what the instance allows",
+		Usage:    "repo settings security-frequency <owner/name> daily|weekly|monthly",
+		Examples: []string{"repo settings security-frequency krz/gitbay weekly"},
+		Run:      runSecurityFrequency})
 	register(Command{Path: []string{"runner", "results"},
 		Summary:    "upload a code scan's SARIF from stdin",
 		Usage:      "runner results <build-id>",
@@ -81,6 +87,7 @@ func init() {
 // findings, the ones dismissed, and how many it set aside.
 type SecurityOut struct {
 	Enabled     bool              `json:"enabled"`
+	Frequency   string            `json:"frequency,omitempty"`
 	NextRun     string            `json:"next_run,omitempty"`
 	LastResults string            `json:"last_results,omitempty"`
 	IssueNumber int64             `json:"issue_number,omitempty"`
@@ -116,7 +123,7 @@ func runSecurityEnable(c *Ctx, args []string) int {
 	if c.Cfg.Security.Image == "" {
 		return c.fail(protocol.ExitFailure, "this instance has no code scanning image; an operator sets [security] image")
 	}
-	next := ci.NextRun(c.Cfg.Security.Schedule, time.Now())
+	next := ci.SecurityNextRun(c.Cfg.Security, repo.Settings.SecurityFrequency, time.Now())
 	if err := c.Store.EnableSecurityScan(repo.ID, next); err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
@@ -196,7 +203,8 @@ func runSecurityStatus(c *Ctx, args []string) int {
 	if err != nil {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
-	out := SecurityOut{Enabled: true, NextRun: scan.NextRun, LastResults: scan.LastResults,
+	freq := c.Cfg.Security.Frequency(repo.Settings.SecurityFrequency)
+	out := SecurityOut{Enabled: true, Frequency: freq, NextRun: scan.NextRun, LastResults: scan.LastResults,
 		IssueNumber: scan.IssueNumber, Findings: []SecurityFinding{}, Dismissed: []SecurityFinding{}}
 	json.Unmarshal([]byte(scan.Aside), &out.Aside)
 	for _, f := range codescan.ByPlace(reported) {
@@ -217,6 +225,7 @@ func runSecurityStatus(c *Ctx, args []string) int {
 		v := c.view(w)
 		v.fields(
 			"scanning", "on",
+			"frequency", freq,
 			"next scan", scan.NextRun,
 			"last results", c.when(scan.LastResults),
 			"tracked in", tracked,
@@ -241,6 +250,7 @@ func runSecurityStatus(c *Ctx, args []string) int {
 	}, func() screen {
 		s := screen{fields: []field{
 			{"Scanning", []cell{cGlyph("ok"), cText("on")}},
+			{"Frequency", []cell{cText(freq)}},
 			{"Next scan", []cell{cText(scan.NextRun)}},
 			{"Last results", []cell{cAge(scan.LastResults)}},
 		}}
@@ -566,6 +576,39 @@ func resolveFingerprint(findings []store.SecurityFinding, given string) (string,
 		return "", fmt.Sprintf("no finding %q in the last scan", given)
 	}
 	return match, ""
+}
+
+// runSecurityFrequency sets how often the repository is scanned and, when
+// scanning is on, moves the next scan to match.
+func runSecurityFrequency(c *Ctx, args []string) int {
+	if len(args) != 2 || !slices.Contains(config.ScanFrequencies, args[1]) {
+		return c.usage()
+	}
+	freq := args[1]
+	repo, code := resolveRepo(c, args[0], policy.CanAdmin)
+	if code >= 0 {
+		return code
+	}
+	if allowed := c.Cfg.Security.Frequencies(); !slices.Contains(allowed, freq) {
+		return c.fail(protocol.ExitFailure, "this instance scans %s", strings.Join(allowed, ", "))
+	}
+	if _, err := c.Store.UpdateRepoSettings(repo.ID, func(s *store.RepoSettings) { s.SecurityFrequency = freq }); err != nil {
+		return c.fail(protocol.ExitFailure, "%v", err)
+	}
+	next := ""
+	if _, err := c.Store.SecurityScanFor(repo.ID); err == nil {
+		next = ci.SecurityNextRun(c.Cfg.Security, freq, time.Now())
+		if err := c.Store.SetSecurityNext(repo.ID, next); err != nil {
+			return c.fail(protocol.ExitFailure, "%v", err)
+		}
+	}
+	return c.emit(map[string]any{"frequency": freq, "next_run": next}, func(w io.Writer) {
+		if next == "" {
+			fmt.Fprintf(w, "%s scans %s once scanning is on\n", repo.Path(), freq)
+			return
+		}
+		fmt.Fprintf(w, "%s scans %s; next scan %s\n", repo.Path(), freq, next)
+	})
 }
 
 // maxSecurityList bounds the ignore and exclude-rule settings.

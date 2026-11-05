@@ -31,6 +31,13 @@ func NextRun(expr string, after time.Time) string {
 	return isoNow(n)
 }
 
+// SecurityNextRun is when a repository that chose freq is next scanned:
+// at the configured hour, daily, on Sunday, or on the 1st.
+func SecurityNextRun(sec config.Security, freq string, after time.Time) string {
+	field := map[string]string{"daily": "* * *", "weekly": "* * 0", "monthly": "1 * *"}[sec.Frequency(freq)]
+	return NextRun(fmt.Sprintf("0 %d %s", sec.Hour, field), after.UTC())
+}
+
 // Scheduler fires scheduled builds. repoDir maps a repo to its bare path.
 // Security is the instance's code scanning job; with no image it never
 // queues.
@@ -139,7 +146,7 @@ func (s *Scheduler) runSecurityDue(now time.Time) {
 		return
 	}
 	for _, repo := range due {
-		s.St.SetSecurityNext(repo.ID, NextRun(s.Security.Schedule, now))
+		s.St.SetSecurityNext(repo.ID, SecurityNextRun(s.Security, repo.Settings.SecurityFrequency, now))
 		if _, err := QueueSecurityScan(s.St, s.Security, s.RepoDir(repo.OwnerName, repo.Name), repo); err != nil {
 			slog.Warn("scheduler: queueing security scan", "repo", repo.Path(), "err", err)
 		}

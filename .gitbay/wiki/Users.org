@@ -250,6 +250,7 @@ gitbay repo security dismiss you/project 3f9a0c1d2e --reason false-positive  # o
 gitbay repo security reopen you/project 3f9a0c1d2e
 gitbay repo settings security-ignore you/project 'testdata/**'  # paths set aside from the scan
 gitbay repo settings security-exclude-rule you/project swift.lang.crypto.insecure-random
+gitbay repo settings security-frequency you/project weekly  # daily, weekly or monthly, as the instance allows
 gitbay repo settings git-daemon you/project on      # expose over git://
 gitbay repo topics add you/project cli forge        # free-form tags, shown on the web
 gitbay repo search forge                            # find repos by name/description/topic

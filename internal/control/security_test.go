@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gitbay.org/gitbay/internal/ci"
 	"gitbay.org/gitbay/internal/codescan"
@@ -24,7 +25,8 @@ const testSARIF = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"opengre
 func TestSecurityScanRoundTrip(t *testing.T) {
 	st, repo, u, root := browseFixture(t)
 	p := repo.Path()
-	sec := config.Security{Image: "localhost/gitbay-security:1", Schedule: "0 4 * * *", Steps: config.DefaultSecuritySteps}
+	sec := config.Default().Security
+	sec.Image = "localhost/gitbay-security:1"
 
 	c, out := runnerCtx(st, u.ID, root)
 	if code := runSecurityEnable(c, []string{p}); code != protocol.ExitFailure || !strings.Contains(out.String(), "no code scanning image") {
@@ -202,7 +204,8 @@ const twoFindings = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"openg
 func TestSecurityDismiss(t *testing.T) {
 	st, repo, u, root := browseFixture(t)
 	p := repo.Path()
-	sec := config.Security{Image: "localhost/gitbay-security:1", Schedule: "0 4 * * *", Steps: config.DefaultSecuritySteps}
+	sec := config.Default().Security
+	sec.Image = "localhost/gitbay-security:1"
 	run := func(f func(*Ctx, []string) int, stdin string, args ...string) (int, string) {
 		t.Helper()
 		c, out := runnerCtx(st, u.ID, root)
@@ -308,5 +311,52 @@ func TestDefaultBranchRefusesOptionShape(t *testing.T) {
 	c, out = runnerCtx(st, u.ID, root)
 	if code := runSetDefaultBranch(c, []string{repo.Path(), "feature"}); code != protocol.ExitOK {
 		t.Errorf("a normal branch: exit %d: %s", code, out)
+	}
+}
+
+func TestSecurityFrequency(t *testing.T) {
+	st, repo, u, root := browseFixture(t)
+	p := repo.Path()
+	sec := config.Default().Security
+	sec.Image = "localhost/gitbay-security:1"
+	run := func(f func(*Ctx, []string) int, args ...string) (int, string) {
+		t.Helper()
+		c, out := runnerCtx(st, u.ID, root)
+		c.Cfg.Security = sec
+		c.JSON = true
+		return f(c, args), out.String()
+	}
+	// Before scanning is on the choice is kept and nothing is scheduled.
+	if code, out := run(runSecurityFrequency, p, "monthly"); code != protocol.ExitOK || !strings.Contains(out, `"next_run":""`) {
+		t.Fatalf("monthly while off: %d %s", code, out)
+	}
+	run(runSecurityEnable, p)
+	if sc, _ := st.SecurityScanFor(repo.ID); !strings.Contains(sc.NextRun, "-01T04:00:00Z") {
+		t.Fatalf("enable ignored the monthly choice: %q", sc.NextRun)
+	}
+	code, out := run(runSecurityFrequency, p, "weekly")
+	if code != protocol.ExitOK {
+		t.Fatalf("weekly: %d %s", code, out)
+	}
+	sc, _ := st.SecurityScanFor(repo.ID)
+	next, err := time.Parse("2006-01-02T15:04:05Z", sc.NextRun)
+	if err != nil || next.Weekday() != time.Sunday || next.Hour() != 4 || !strings.Contains(out, sc.NextRun) {
+		t.Fatalf("next run %q (%v), out %s", sc.NextRun, err, out)
+	}
+	if _, out := run(runSecurityStatus, p); !strings.Contains(out, `"frequency":"weekly"`) {
+		t.Fatalf("status: %s", out)
+	}
+	if code, _ := run(runSecurityFrequency, p, "hourly"); code != protocol.ExitUsage {
+		t.Fatalf("hourly: exit %d", code)
+	}
+	// Narrowed: daily is refused, and the stored monthly scans weekly.
+	sec.LeastOften, sec.Default, sec.MostOften = "weekly", "weekly", "weekly"
+	if code, out := run(runSecurityFrequency, p, "daily"); code != protocol.ExitFailure || !strings.Contains(out, "scans weekly") {
+		t.Fatalf("daily outside the range: %d %s", code, out)
+	}
+	sec.MostOften, sec.LeastOften = "daily", "daily"
+	sec.Default = "daily"
+	if _, out := run(runSecurityStatus, p); !strings.Contains(out, `"frequency":"daily"`) {
+		t.Fatalf("weekly outside the range: %s", out)
 	}
 }
