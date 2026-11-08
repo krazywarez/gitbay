@@ -1033,11 +1033,22 @@ ul.repolist .reponame .sep { color: var(--muted); margin: 0 2px; }
 ul.repolist .desc { margin-top: 2px; }
 ul.repolist .topics, ul.repolist .meta { margin-top: var(--sp-1); }
 
-ul.repolist.rows li { display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); }
-ul.repolist.rows .reponame { flex: none; font-size: var(--fs-2); }
-ul.repolist.rows .desc { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-2); margin: 0; }
-ul.repolist.rows .topics, ul.repolist.rows .meta { flex: none; margin: 0; white-space: nowrap; }
-ul.repolist.rows .meta { font-size: var(--fs-1); }
+/* one column per field across every row: name, labels, description,
+   topics, branch, license, updated. Rows are subgrids of the list;
+   the name and meta paragraphs are display: contents so their parts
+   are cells. Cells pad instead of a gap, so an empty column is 0 wide. */
+ul.repolist.rows { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto auto auto; }
+ul.repolist.rows li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--sp-2) var(--sp-4); }
+ul.repolist.rows li > *, ul.repolist.rows .reponame > *, ul.repolist.rows .meta > * { grid-row: 1; padding-left: var(--sp-3); white-space: nowrap; }
+ul.repolist.rows .reponame, ul.repolist.rows .meta { display: contents; }
+ul.repolist.rows .reponame .name { grid-column: 1; padding-left: 0; font-size: var(--fs-2); }
+ul.repolist.rows .labels { grid-column: 2; }
+ul.repolist.rows .desc { grid-column: 3; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: var(--fs-2); margin: 0; }
+ul.repolist.rows .topics { grid-column: 4; margin: 0; }
+ul.repolist.rows .branch { grid-column: 5; }
+ul.repolist.rows .license { grid-column: 6; }
+ul.repolist.rows .updated { grid-column: 7; }
+ul.repolist.rows li.empty { display: block; }
 
 /* pinned repos: a compact wrap of names, no description or meta */
 ul.pinlist { list-style: none; margin: var(--sp-3) 0 var(--sp-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
@@ -1850,8 +1861,11 @@ svg.icon { vertical-align: -0.125em; }
   .withaside { grid-template-columns: 1fr; }
 
   /* rows go back to two lines where one does not fit */
-  ul.issuelist.rows .issuemain, ul.repolist.rows li, ul.loglist.rows .commitmain { display: block; }
+  ul.issuelist.rows .issuemain, ul.repolist.rows, ul.repolist.rows li, ul.loglist.rows .commitmain { display: block; }
   ul.issuelist.rows .title, ul.repolist.rows .desc { white-space: normal; }
+  ul.repolist.rows .reponame, ul.repolist.rows .meta { display: block; }
+  ul.repolist.rows li > *, ul.repolist.rows .reponame > *, ul.repolist.rows .meta > * { padding-left: 0; white-space: normal; }
+  ul.repolist.rows .license::before, ul.repolist.rows .updated::before { content: " · "; }
   /* a nowrap meta or topic line on one of these rows forces horizontal
      page scroll on a phone: a long branch name, a long owner/repo#N */
   ul.issuelist.rows .meta, ul.loglist.rows .meta,

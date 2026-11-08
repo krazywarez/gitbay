@@ -124,10 +124,10 @@
 {{define "width"}}reading{{end}}
 
 {{define "reporow"}}<li>
-  <p class="reponame"><a href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if eq .Visibility "private"}} <span class="chip">Private</span>{{end}}{{if .Archived}} <span class="chip">Archived</span>{{end}}</p>
+  <p class="reponame"><a class="name" href="/{{.OwnerName}}/{{.Name}}">{{.OwnerName}}<span class="sep">/</span><strong>{{.Name}}</strong></a>{{if or (eq .Visibility "private") .Archived}} <span class="labels">{{if eq .Visibility "private"}}<span class="chip">Private</span>{{end}}{{if .Archived}} <span class="chip">Archived</span>{{end}}</span>{{end}}</p>
   {{if .Desc}}<p class="desc">{{.Desc}}</p>{{end}}
   {{if .Topics}}<p class="topics">{{range .Topics}}<a class="chip topic" href="/explore?q={{.}}">{{.}}</a> {{end}}</p>{{end}}
-  <p class="meta">{{template "branchicon"}} {{.DefaultBranch}}{{if .License}} · {{.License}}{{end}}{{if .Updated}} · updated {{.Updated}}{{end}}</p>
+  <p class="meta"><span class="branch">{{template "branchicon"}} {{.DefaultBranch}}</span>{{if .License}}<span class="license">{{.License}}</span>{{end}}{{if .Updated}}<span class="updated">updated {{.Updated}}</span>{{end}}</p>
 </li>{{end}}
 
 {{define "refmenu"}}{{if .Branches}}<details class="refmenu">
