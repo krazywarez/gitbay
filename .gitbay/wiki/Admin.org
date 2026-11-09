@@ -494,7 +494,12 @@ outside =node_modules=, =vendor= and =third_party=. The =yaml/semgrep=
 lints count only in a repository with a =.semgrep= config. Paths
 =.gitattributes= marks =linguist-vendored= or =linguist-generated= are
 set aside, as are the repository's =security-ignore= paths and
-=security-exclude-rule= rules. The issue says how many were set aside
+=security-exclude-rule= rules. A hit of
+=html-templates/security/unquoted-attribute-var=, which matches in
+generic mode and takes a quote inside ={{ }}= for the end of the
+attribute, is checked against the template at the scanned commit: it
+counts only where an expression there is an unquoted attribute value
+or stands in for attributes. The issue says how many were set aside
 and why. A finding a writer dismisses (=repo security dismiss=, by the
 fingerprint the issue prints) stays out of the issue across scans until
 it is reopened; the issue closes when nothing is left open.

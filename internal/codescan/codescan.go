@@ -317,6 +317,9 @@ func Body(r Report) string {
 	if len(r.Aside.Unused) > 0 {
 		notListed = append(notListed, fmt.Sprintf("%d from rules for libraries it does not use (%s)", total(r.Aside.Unused), counts(r.Aside.Unused)))
 	}
+	if r.Aside.Quoted > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d unquoted-attribute hits on attributes the template quotes", r.Aside.Quoted))
+	}
 	if len(notListed) > 0 {
 		fmt.Fprintf(&b, "\nNot listed: %s. `repo security status %s` shows them.\n", strings.Join(notListed, "; "), r.Repo)
 	}

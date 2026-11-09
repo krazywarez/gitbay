@@ -341,7 +341,7 @@ func runRunnerResults(c *Ctx, args []string) int {
 		return c.fail(protocol.ExitFailure, "%v", err)
 	}
 	asideJSON := ""
-	if aside.Ignored > 0 || len(aside.Unused) > 0 {
+	if aside.Any() {
 		j, _ := json.Marshal(aside)
 		asideJSON = string(j)
 	}
@@ -400,12 +400,14 @@ const maxManifestDirs = 50
 // settings, what .gitattributes marks vendored or generated, and findings
 // from rules about libraries no manifest at that commit names. Manifests are
 // read in every directory that has one, outside dependency directories, so
-// a monorepo's web/package.json counts.
+// a monorepo's web/package.json counts. Files at sha are read for rules
+// whose hits are checked against the source.
 func scanScope(dir string, repo store.Repo, sha string) codescan.Scope {
 	sc := codescan.Scope{Ignore: repo.Settings.SecurityIgnore, ExcludeRules: repo.Settings.SecurityExcludeRules}
 	if raw, err := gitutil.ReadBlob(dir, sha, ".gitattributes", manifestLimit); err == nil {
 		sc.Vendored = codescan.Vendored(raw)
 	}
+	sc.Read = func(p string) ([]byte, error) { return gitutil.ReadBlob(dir, sha, p, manifestLimit) }
 	root := map[string]bool{}
 	if entries, err := gitutil.ListTree(dir, sha, ""); err == nil {
 		for _, e := range entries {
@@ -485,6 +487,9 @@ func asideText(a codescan.Aside) string {
 	sort.Strings(libs)
 	for _, l := range libs {
 		parts = append(parts, fmt.Sprintf("%d %s (not used)", a.Unused[l], l))
+	}
+	if a.Quoted > 0 {
+		parts = append(parts, fmt.Sprintf("%d quoted attributes", a.Quoted))
 	}
 	return strings.Join(parts, ", ")
 }

@@ -188,7 +188,7 @@
 </form>{{end}}
 {{if .Security.Enabled}}
 <p class="meta">Next scan {{.Security.NextRun}} · last results {{if .Security.LastResults}}{{when .Security.LastResults}}{{else}}never{{end}}{{if .Security.IssueNumber}} · <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/issues/{{.Security.IssueNumber}}">#{{.Security.IssueNumber}}</a>{{end}}</p>
-{{with .Security.Aside}}{{if or .Ignored .Unused}}<p class="meta">Set aside by the last scan:{{if .Ignored}} {{.Ignored}} under the paths or rules below, or marked vendored or generated in <code>.gitattributes</code>.{{end}}{{range $lib, $n := .Unused}} {{$n}} from {{$lib}} rules, which no manifest names.{{end}}</p>{{end}}{{end}}
+{{with .Security.Aside}}{{if .Any}}<p class="meta">Set aside by the last scan:{{if .Ignored}} {{.Ignored}} under the paths or rules below, or marked vendored or generated in <code>.gitattributes</code>.{{end}}{{range $lib, $n := .Unused}} {{$n}} from {{$lib}} rules, which no manifest names.{{end}}{{if .Quoted}} {{.Quoted}} unquoted-attribute hits on attributes the template quotes.{{end}}</p>{{end}}{{end}}
 {{if .Security.Findings}}<div class="tablewrap"><table class="keys">
 <tr class="cols"><th scope="col">location</th><th scope="col">rule</th><th scope="col">level</th><th scope="col"><span class="vh">dismiss</span></th></tr>
 {{range .Security.Findings}}<tr>
