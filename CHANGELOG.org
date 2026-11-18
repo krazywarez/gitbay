@@ -4,6 +4,42 @@ Versioning follows semver from v0.1.0. Database migrations run
 automatically on daemon start; upgrade notes appear per release when
 anything beyond "replace the binary and restart" is needed.
 
+* v1.48.0 — 2026-11-18
+
+Migrations 0083 and 0084. Built with Go 1.27.4 (GO-2026-6859, an
+HTTP/1 server crash in =net/http=). =[security] schedule= is refused at
+load; replace it with =most_often=, =least_often=, =default= and
+=hour=. gitbay's own CI jobs and the bay1 runner's default image are
+=gitbay-ci:4=, built from =deploy/Containerfile.ci= on the runner host.
+
+- Code scanning sets aside findings that do not apply: rules about a
+  library count only where a manifest names it, =yaml/semgrep= lints
+  only with a =.semgrep= config, and paths marked
+  =linguist-vendored= or =linguist-generated= are skipped. =repo
+  settings security-ignore= (path globs) and =security-exclude-rule=
+  (rule ids or families) set aside more. =html-templates
+  unquoted-attribute-var= hits are checked against the template and
+  kept only where the value is unquoted.
+- =repo security dismiss <repo> <fingerprint>... --reason
+  false-positive|wont-fix|test= and =repo security reopen=. The issue
+  lists open findings, counts dismissed and set-aside ones, and closes
+  when none are open. Hits of one rule in one file are separate
+  findings.
+- A Go advisory naming packages counts only when a Go file imports one
+  of them. =repo deps dismiss <repo> <advisory>... --reason
+  not-affected|wont-fix|dev-only= and =repo deps reopen=; the issue
+  closes when no advisory is open.
+- =repo settings security-frequency= picks daily, weekly or monthly
+  within the instance's range; =repo security status= and the settings
+  page show it. Next runs are computed in UTC.
+- A push may not create a branch or tag whose name starts with =-=,
+  and =repo settings default-branch= and =mr rebase= refuse one.
+- Repository rows on profiles and =/explore= align by column.
+- The SVG badge escapes its label and state; outgoing mail requires
+  TLS 1.2.
+- goldmark 1.8.7, modernc.org/sqlite 1.62.0, go.yaml.in/yaml/v3 3.0.6,
+  and the x/ module bumps.
+
 * v1.47.0 — 2026-10-31
 
 Migration 0082.
