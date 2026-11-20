@@ -320,6 +320,9 @@ func Body(r Report) string {
 	if r.Aside.Quoted > 0 {
 		notListed = append(notListed, fmt.Sprintf("%d unquoted-attribute hits on attributes the template quotes", r.Aside.Quoted))
 	}
+	if r.Aside.Unsplit > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d unquoted-expansion hits on expansions the shell does not split", r.Aside.Unsplit))
+	}
 	if len(notListed) > 0 {
 		fmt.Fprintf(&b, "\nNot listed: %s. `repo security status %s` shows them.\n", strings.Join(notListed, "; "), r.Repo)
 	}

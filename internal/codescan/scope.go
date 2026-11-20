@@ -28,16 +28,18 @@ type Scope struct {
 
 // Aside counts the findings a scope set aside: Ignored by path or rule,
 // Unused by the library a rule is about, Quoted by reading the template an
-// unquoted-attribute hit is in.
+// unquoted-attribute hit is in, Unsplit by reading the script an
+// unquoted-expansion hit is in.
 type Aside struct {
 	Ignored int            `json:"ignored,omitempty"`
 	Unused  map[string]int `json:"unused,omitempty"`
 	Quoted  int            `json:"quoted,omitempty"`
+	Unsplit int            `json:"unsplit,omitempty"`
 }
 
 // Any reports whether anything was set aside.
 func (a Aside) Any() bool {
-	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0
+	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0 || a.Unsplit > 0
 }
 
 // Apply splits findings into those reported, at most MaxFindings of them,
@@ -47,7 +49,7 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 	var kept []store.SecurityFinding
 	var aside Aside
 	truncated := false
-	unquoted := map[string]map[int]bool{}
+	unquoted, unsplit := map[string]map[int]bool{}, map[string]map[int]bool{}
 	for _, f := range findings {
 		if s.ignored(f) {
 			aside.Ignored++
@@ -60,8 +62,12 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 			aside.Unused[l.name()]++
 			continue
 		}
-		if ruleIn(f.Rule, unquotedAttrRule) && !s.unquoted(f, unquoted) {
+		if ruleIn(f.Rule, unquotedAttrRule) && !s.onLine(f, unquoted, unquotedLines) {
 			aside.Quoted++
+			continue
+		}
+		if ruleIn(f.Rule, unquotedExpansionRule) && !s.onLine(f, unsplit, splitLines) {
+			aside.Unsplit++
 			continue
 		}
 		if len(kept) == MaxFindings {
@@ -73,23 +79,22 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 	return kept, aside, truncated
 }
 
-// unquoted reports whether an unquoted-attribute hit is on a line where the
-// template has an unquoted attribute expression, or the file cannot be
-// read to say. Files are read once, into seen.
-func (s Scope) unquoted(f store.SecurityFinding, seen map[string]map[int]bool) bool {
+// onLine reports whether a hit is on a line that lines, reading the file,
+// marks, or the file cannot be read to say. Files are read once, into seen.
+func (s Scope) onLine(f store.SecurityFinding, seen map[string]map[int]bool, lines func([]byte) (map[int]bool, bool)) bool {
 	if s.Read == nil || f.Path == "" || f.Line == 0 {
 		return true
 	}
-	lines, read := seen[f.Path]
+	marked, read := seen[f.Path]
 	if !read {
 		if src, err := s.Read(f.Path); err == nil {
-			if l, ok := unquotedLines(src); ok {
-				lines = l
+			if l, ok := lines(src); ok {
+				marked = l
 			}
 		}
-		seen[f.Path] = lines
+		seen[f.Path] = marked
 	}
-	return lines == nil || lines[f.Line]
+	return marked == nil || marked[f.Line]
 }
 
 func (s Scope) ignored(f store.SecurityFinding) bool {

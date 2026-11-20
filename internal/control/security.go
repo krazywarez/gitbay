@@ -491,6 +491,9 @@ func asideText(a codescan.Aside) string {
 	if a.Quoted > 0 {
 		parts = append(parts, fmt.Sprintf("%d quoted attributes", a.Quoted))
 	}
+	if a.Unsplit > 0 {
+		parts = append(parts, fmt.Sprintf("%d unsplit expansions", a.Unsplit))
+	}
 	return strings.Join(parts, ", ")
 }
 

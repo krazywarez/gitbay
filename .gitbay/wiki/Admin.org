@@ -499,7 +499,12 @@ set aside, as are the repository's =security-ignore= paths and
 generic mode and takes a quote inside ={{ }}= for the end of the
 attribute, is checked against the template at the scanned commit: it
 counts only where an expression there is an unquoted attribute value
-or stands in for attributes. The issue says how many were set aside
+or stands in for attributes. A hit of
+=bash/lang/correctness/unquoted-variable-expansion-in-command=, which
+also reports an expansion inside a =$(( ))= in double quotes, is checked against the script the same way: it
+counts only where the command has an expansion the shell word-splits.
+A file either check cannot read to the end keeps its hits. The issue
+says how many were set aside
 and why. A finding a writer dismisses (=repo security dismiss=, by the
 fingerprint the issue prints) stays out of the issue across scans until
 it is reopened; the issue closes when nothing is left open.
