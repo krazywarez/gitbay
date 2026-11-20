@@ -29,17 +29,19 @@ type Scope struct {
 // Aside counts the findings a scope set aside: Ignored by path or rule,
 // Unused by the library a rule is about, Quoted by reading the template an
 // unquoted-attribute hit is in, Unsplit by reading the script an
-// unquoted-expansion hit is in.
+// unquoted-expansion hit is in, Joined by reading the Python file a
+// string-concat-in-list hit is in.
 type Aside struct {
 	Ignored int            `json:"ignored,omitempty"`
 	Unused  map[string]int `json:"unused,omitempty"`
 	Quoted  int            `json:"quoted,omitempty"`
 	Unsplit int            `json:"unsplit,omitempty"`
+	Joined  int            `json:"joined,omitempty"`
 }
 
 // Any reports whether anything was set aside.
 func (a Aside) Any() bool {
-	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0 || a.Unsplit > 0
+	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0 || a.Unsplit > 0 || a.Joined > 0
 }
 
 // Apply splits findings into those reported, at most MaxFindings of them,
@@ -49,7 +51,7 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 	var kept []store.SecurityFinding
 	var aside Aside
 	truncated := false
-	unquoted, unsplit := map[string]map[int]bool{}, map[string]map[int]bool{}
+	unquoted, unsplit, joined := map[string]map[int]bool{}, map[string]map[int]bool{}, map[string]map[int]bool{}
 	for _, f := range findings {
 		if s.ignored(f) {
 			aside.Ignored++
@@ -68,6 +70,10 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 		}
 		if ruleIn(f.Rule, unquotedExpansionRule) && !s.onLine(f, unsplit, splitLines) {
 			aside.Unsplit++
+			continue
+		}
+		if ruleIn(f.Rule, joinedStringRule) && !s.onLine(f, joined, keepJoined) {
+			aside.Joined++
 			continue
 		}
 		if len(kept) == MaxFindings {

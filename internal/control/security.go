@@ -494,6 +494,9 @@ func asideText(a codescan.Aside) string {
 	if a.Unsplit > 0 {
 		parts = append(parts, fmt.Sprintf("%d unsplit expansions", a.Unsplit))
 	}
+	if a.Joined > 0 {
+		parts = append(parts, fmt.Sprintf("%d strings joined in calls", a.Joined))
+	}
 	return strings.Join(parts, ", ")
 }
 

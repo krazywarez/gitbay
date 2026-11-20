@@ -323,6 +323,9 @@ func Body(r Report) string {
 	if r.Aside.Unsplit > 0 {
 		notListed = append(notListed, fmt.Sprintf("%d unquoted-expansion hits on expansions the shell does not split", r.Aside.Unsplit))
 	}
+	if r.Aside.Joined > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d string-concat-in-list hits on strings joined inside a call, not as a list element", r.Aside.Joined))
+	}
 	if len(notListed) > 0 {
 		fmt.Fprintf(&b, "\nNot listed: %s. `repo security status %s` shows them.\n", strings.Join(notListed, "; "), r.Repo)
 	}

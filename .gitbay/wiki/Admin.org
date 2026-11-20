@@ -503,6 +503,11 @@ or stands in for attributes. A hit of
 =bash/lang/correctness/unquoted-variable-expansion-in-command=, which
 also reports an expansion inside a =$(( ))= in double quotes, is checked against the script the same way: it
 counts only where the command has an expansion the shell word-splits.
+A hit of =python/lang/correctness/common-mistakes/string-concat-in-list=
+is set aside where the joined strings sit inside a call or a tuple
+within the brackets, such as a query split over lines in
+=[r for r in conn.execute("select … " "from …")]=, and kept where they
+are an element of the list or set.
 A file either check cannot read to the end keeps its hits. The issue
 says how many were set aside
 and why. A finding a writer dismisses (=repo security dismiss=, by the
