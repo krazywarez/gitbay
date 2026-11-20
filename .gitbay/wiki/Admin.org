@@ -508,6 +508,16 @@ is set aside where the joined strings sit inside a call or a tuple
 within the brackets, such as a query split over lines in
 =[r for r in conn.execute("select … " "from …")]=, and kept where they
 are an element of the list or set.
+=python/lang/maintainability/return-not-in-function= and
+=python/lang/correctness/return-in-init= hits count only on a line with
+a =return= statement: the rules read a =lambda='s body as one. An
+=is-function-without-parentheses= hit is set aside where the
+repository's Python files define the =is_= name only as an attribute,
+by annotation, assignment or =@property=, and never by a plain =def=.
+=insecure-random= hits in tests are set aside: a =test=, =tests=,
+=__tests__=, =spec= or =testdata= directory, one ending in =Tests=, or a
+file named as a test (=*_test.go=, =test_*.py=, =*.test.js=,
+=*Tests.swift=, …).
 A file either check cannot read to the end keeps its hits. The issue
 says how many were set aside
 and why. A finding a writer dismisses (=repo security dismiss=, by the

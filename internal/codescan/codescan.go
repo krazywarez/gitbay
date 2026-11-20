@@ -326,6 +326,15 @@ func Body(r Report) string {
 	if r.Aside.Joined > 0 {
 		notListed = append(notListed, fmt.Sprintf("%d string-concat-in-list hits on strings joined inside a call, not as a list element", r.Aside.Joined))
 	}
+	if r.Aside.NoReturn > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d return hits on lines with no return statement", r.Aside.NoReturn))
+	}
+	if r.Aside.Attributes > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d is-function-without-parentheses hits on names the repository defines as attributes", r.Aside.Attributes))
+	}
+	if r.Aside.InTests > 0 {
+		notListed = append(notListed, fmt.Sprintf("%d insecure-random hits in tests", r.Aside.InTests))
+	}
 	if len(notListed) > 0 {
 		fmt.Fprintf(&b, "\nNot listed: %s. `repo security status %s` shows them.\n", strings.Join(notListed, "; "), r.Repo)
 	}

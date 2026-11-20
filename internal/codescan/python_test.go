@@ -75,3 +75,103 @@ func TestScopeChecksJoinedStrings(t *testing.T) {
 		t.Errorf("without Read: kept %d aside %+v", len(kept), aside)
 	}
 }
+
+func TestReturnLines(t *testing.T) {
+	src := "TARGETS = {\n" +
+		"    \"a\": lambda p: f\"x:{p['k']}\",\n" +
+		"}\n" +
+		"def f(x):\n" +
+		"    return (\n" +
+		"        x\n" +
+		"    )\n" +
+		"s = \"return\"  # return\n" +
+		"returned = 1\n" +
+		"class A:\n" +
+		"    def __init__(self):\n" +
+		"        self.k = sorted(r, key=lambda r: r[0])\n"
+	lines, ok := returnLines([]byte(src))
+	if !ok || len(lines) != 1 || !lines[5] {
+		t.Errorf("lines = %v ok %v", lines, ok)
+	}
+	if _, ok := returnLines([]byte("x = 'open\n")); ok {
+		t.Error("unclosed string read")
+	}
+}
+
+func TestPyNames(t *testing.T) {
+	n := pyNames{methods: map[string]bool{}, attrs: map[string]bool{}}
+	n.add([]byte("@dataclass\nclass Actor:\n    is_admin: bool\n    is_owner: bool = False\n" +
+		"    @property\n    def is_active(self):\n        return True\n" +
+		"    @functools.cached_property\n    def is_cached(self):\n        return True\n" +
+		"    def is_method(self):\n        return True\n" +
+		"    async def is_async(self):\n        return True\n"))
+	n.add([]byte("class B:\n    def __init__(self):\n        self.is_set = True\n" +
+		"def f(user):\n    if user.is_used:\n        return user.is_used2\n" +
+		"x.is_compared == 1\n"))
+	for name, want := range map[string]bool{
+		"is_admin": true, "is_owner": true, "is_active": true, "is_cached": true, "is_set": true,
+		"is_method": false, "is_async": false, "is_used": false, "is_used2": false, "is_compared": false, "is_unknown": false,
+	} {
+		if got := n.attribute(name); got != want {
+			t.Errorf("%s: attribute = %v, want %v", name, got, want)
+		}
+	}
+	n.add([]byte("class C:\n    def is_admin(self):\n        return False\n"))
+	if n.attribute("is_admin") {
+		t.Error("is_admin is a method somewhere and still an attribute")
+	}
+}
+
+func TestTestPath(t *testing.T) {
+	for p, want := range map[string]bool{
+		"Tests/OrgCoreTests/CalcTests.swift":      true,
+		"Sources/App/AppTests.swift":              true,
+		"internal/x/x_test.go":                    true,
+		"tests/web/test_views.py":                 true,
+		"pkg/test_util.py":                        true,
+		"src/__tests__/a.js":                      true,
+		"web/src/api.test.ts":                     true,
+		"conftest.py":                             true,
+		"Sources/CityAppKit/Audio/AudioMix.swift": false,
+		"src/latest.py":                           false,
+		"contest/main.go":                         false,
+	} {
+		if got := testPath(p); got != want {
+			t.Errorf("%s: test = %v, want %v", p, got, want)
+		}
+	}
+}
+
+func TestScopeChecksPythonNamesReturnsAndTests(t *testing.T) {
+	files := map[string]string{
+		"app/users.py":   "@dataclass\nclass Actor:\n    is_admin: bool\n    def is_live(self):\n        return True\n",
+		"app/records.py": "T = {\n    \"a\": lambda p: p,\n}\ndef f():\n    return 1\n",
+		"vendor/x.py":    "def is_admin(self):\n    pass\n",
+	}
+	read := func(p string) ([]byte, error) {
+		if src, ok := files[p]; ok {
+			return []byte(src), nil
+		}
+		return nil, errors.New("missing")
+	}
+	attr := "opt.opengrep-rules.python.lang.maintainability.is-function-without-parentheses"
+	ret := "opt.opengrep-rules.python.lang.maintainability.return-not-in-function"
+	rnd := "opt.opengrep-rules.swift.lang.crypto.insecure-random"
+	findings := []store.SecurityFinding{
+		{Rule: attr, Path: "app/views.py", Line: 3, Message: `Is "is_admin" a function or an attribute? …`},
+		{Rule: attr, Path: "app/views.py", Line: 4, Message: `Is "is_live" a function or an attribute? …`},
+		{Rule: attr, Path: "app/views.py", Line: 5, Message: `Is "is_dir" a function or an attribute? …`},
+		{Rule: ret, Path: "app/records.py", Line: 2},
+		{Rule: ret, Path: "app/records.py", Line: 5},
+		{Rule: rnd, Path: "Tests/CoreTests/CalcTests.swift", Line: 1},
+		{Rule: rnd, Path: "Sources/Audio/Mix.swift", Line: 1},
+	}
+	paths := []string{"app/users.py", "app/records.py", "vendor/x.py", "README.md"}
+	kept, aside, _ := Scope{Read: read, Paths: paths}.Apply(findings)
+	if aside.Attributes != 1 || aside.NoReturn != 1 || aside.InTests != 1 || len(kept) != 4 {
+		t.Fatalf("kept %+v aside %+v", kept, aside)
+	}
+	if kept, aside, _ := (Scope{Read: read}).Apply(findings); aside.Attributes != 0 || len(kept) != 5 {
+		t.Errorf("without Paths: kept %d aside %+v", len(kept), aside)
+	}
+}

@@ -1,6 +1,10 @@
 package codescan
 
-import "strings"
+import (
+	"regexp"
+	"slices"
+	"strings"
+)
 
 // joinedStringRule flags implicitly joined strings ("a" "b") anywhere inside
 // [...] or {...}. A missing comma only matters where the joined string is
@@ -204,4 +208,116 @@ func fieldEnd(s string, i int) (end, lines int, ok bool) {
 		i++
 	}
 	return 0, 0, false
+}
+
+// returnRules are about a return statement. Opengrep reads a lambda's body
+// as one, so a lambda in a module-level dict, or a sort key in __init__, is
+// reported as a return. returnLines reads the file for the lines that have
+// one.
+var returnRules = []string{
+	"python.lang.maintainability.return-not-in-function",
+	"python.lang.correctness.return-in-init",
+}
+
+// returnLines returns the lines of a Python file with the keyword return
+// outside strings and comments. ok is false when a string is not closed.
+func returnLines(src []byte) (lines map[int]bool, ok bool) {
+	s := string(src)
+	lines = map[int]bool{}
+	line := 1
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c == '\n':
+			line++
+			i++
+			continue
+		case c == '#':
+			if end := strings.IndexByte(s[i:], '\n'); end >= 0 {
+				i += end
+			} else {
+				i = len(s)
+			}
+			continue
+		}
+		if q, n := stringStart(s, i); n >= 0 {
+			end, l, ok := pyString(s, i+n, q, strings.ContainsAny(strings.ToLower(s[i:i+n]), "f"))
+			if !ok {
+				return nil, false
+			}
+			line += l
+			i = end
+			continue
+		}
+		if c == '_' || isLetter(c) || c >= 0x80 {
+			j := i
+			for j < len(s) && isIdentByte(s, j) {
+				j++
+			}
+			if s[i:j] == "return" {
+				lines[line] = true
+			}
+			i = j
+			continue
+		}
+		i++
+	}
+	return lines, true
+}
+
+// attrCallRule flags x.is_name that is not called, asking whether is_name is
+// a method. Where the repository defines is_name only as an attribute or a
+// property, it is not one.
+const attrCallRule = "python.lang.maintainability.is-function-without-parentheses"
+
+// attrCallName is the name in the rule's message.
+var attrCallName = regexp.MustCompile(`^Is "(is_\w+)" a function`)
+
+var (
+	pyDef = regexp.MustCompile(`^(?:async[ \t]+)?def[ \t]+(is_\w+)[ \t]*\(`)
+	// An annotation starts the line; an assignment may be to self.is_name.
+	pyAttr = regexp.MustCompile(`^(is_\w+)[ \t]*(?::[^=]|:$|=[^=])|^[\w.]*\.(is_\w+)[ \t]*=[^=]`)
+)
+
+// pyNames are the is_ names a repository's Python files define: as methods,
+// by a def without a property decorator, and as attributes, by an
+// annotation, an assignment or a property.
+type pyNames struct {
+	methods, attrs map[string]bool
+}
+
+// add reads one file's definitions.
+func (n pyNames) add(src []byte) {
+	var decorators []string
+	for _, raw := range strings.Split(string(src), "\n") {
+		text := strings.TrimSpace(raw)
+		switch {
+		case text == "" || strings.HasPrefix(text, "#"):
+			continue
+		case strings.HasPrefix(text, "@"):
+			decorators = append(decorators, text)
+			continue
+		}
+		if m := pyDef.FindStringSubmatch(text); m != nil {
+			if slices.ContainsFunc(decorators, isProperty) {
+				n.attrs[m[1]] = true
+			} else {
+				n.methods[m[1]] = true
+			}
+		} else if m := pyAttr.FindStringSubmatch(text); m != nil {
+			n.attrs[m[1]+m[2]] = true
+		}
+		decorators = nil
+	}
+}
+
+func isProperty(decorator string) bool {
+	name, _, _ := strings.Cut(strings.TrimPrefix(decorator, "@"), "(")
+	return name == "property" || strings.HasSuffix(name, "cached_property") || strings.HasSuffix(name, ".setter")
+}
+
+// attribute reports whether the repository defines name as an attribute and
+// never as a method.
+func (n pyNames) attribute(name string) bool {
+	return n.attrs[name] && !n.methods[name]
 }

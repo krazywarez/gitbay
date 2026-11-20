@@ -417,7 +417,9 @@ func scanScope(dir string, repo store.Repo, sha string) codescan.Scope {
 	dirs := []string{""}
 	if entries, err := gitutil.ListTreeRecursive(dir, sha, ""); err == nil {
 		seen := map[string]bool{"": true}
+		sc.Paths = make([]string, 0, len(entries))
 		for _, e := range entries {
+			sc.Paths = append(sc.Paths, e.Name)
 			d := path.Dir(e.Name)
 			if seen[d] || len(dirs) == maxManifestDirs || !slices.Contains(deps.ManifestFiles, path.Base(e.Name)) || dependencyDir(d) {
 				continue
@@ -496,6 +498,15 @@ func asideText(a codescan.Aside) string {
 	}
 	if a.Joined > 0 {
 		parts = append(parts, fmt.Sprintf("%d strings joined in calls", a.Joined))
+	}
+	if a.NoReturn > 0 {
+		parts = append(parts, fmt.Sprintf("%d lines with no return", a.NoReturn))
+	}
+	if a.Attributes > 0 {
+		parts = append(parts, fmt.Sprintf("%d is_ attributes", a.Attributes))
+	}
+	if a.InTests > 0 {
+		parts = append(parts, fmt.Sprintf("%d random in tests", a.InTests))
 	}
 	return strings.Join(parts, ", ")
 }

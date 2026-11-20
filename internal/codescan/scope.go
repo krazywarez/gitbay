@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"path"
+	"slices"
 	"strings"
 
 	"gitbay.org/gitbay/internal/ci"
@@ -24,24 +25,37 @@ type Scope struct {
 	// Read returns a file at the scanned commit, for rules whose hits are
 	// checked against the source. Nil checks nothing.
 	Read func(path string) ([]byte, error)
+	// Paths are the files at the scanned commit, for rules whose hits are
+	// checked against the rest of the repository. Nil checks nothing.
+	Paths []string
 }
+
+// maxPythonFiles bounds how many Python files a scope reads for the names
+// they define.
+const maxPythonFiles = 2000
 
 // Aside counts the findings a scope set aside: Ignored by path or rule,
 // Unused by the library a rule is about, Quoted by reading the template an
 // unquoted-attribute hit is in, Unsplit by reading the script an
 // unquoted-expansion hit is in, Joined by reading the Python file a
-// string-concat-in-list hit is in.
+// string-concat-in-list hit is in, NoReturn by reading the line a return
+// hit is on, Attributes by reading what the repository defines an
+// is_ name as, InTests by the path of an insecure-random hit.
 type Aside struct {
-	Ignored int            `json:"ignored,omitempty"`
-	Unused  map[string]int `json:"unused,omitempty"`
-	Quoted  int            `json:"quoted,omitempty"`
-	Unsplit int            `json:"unsplit,omitempty"`
-	Joined  int            `json:"joined,omitempty"`
+	Ignored    int            `json:"ignored,omitempty"`
+	Unused     map[string]int `json:"unused,omitempty"`
+	Quoted     int            `json:"quoted,omitempty"`
+	Unsplit    int            `json:"unsplit,omitempty"`
+	Joined     int            `json:"joined,omitempty"`
+	NoReturn   int            `json:"no_return,omitempty"`
+	Attributes int            `json:"attributes,omitempty"`
+	InTests    int            `json:"in_tests,omitempty"`
 }
 
 // Any reports whether anything was set aside.
 func (a Aside) Any() bool {
-	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0 || a.Unsplit > 0 || a.Joined > 0
+	return a.Ignored > 0 || len(a.Unused) > 0 || a.Quoted > 0 || a.Unsplit > 0 || a.Joined > 0 ||
+		a.NoReturn > 0 || a.Attributes > 0 || a.InTests > 0
 }
 
 // Apply splits findings into those reported, at most MaxFindings of them,
@@ -52,6 +66,8 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 	var aside Aside
 	truncated := false
 	unquoted, unsplit, joined := map[string]map[int]bool{}, map[string]map[int]bool{}, map[string]map[int]bool{}
+	returns := map[string]map[int]bool{}
+	var names *pyNames
 	for _, f := range findings {
 		if s.ignored(f) {
 			aside.Ignored++
@@ -74,6 +90,18 @@ func (s Scope) Apply(findings []store.SecurityFinding) ([]store.SecurityFinding,
 		}
 		if ruleIn(f.Rule, joinedStringRule) && !s.onLine(f, joined, keepJoined) {
 			aside.Joined++
+			continue
+		}
+		if slices.ContainsFunc(returnRules, func(r string) bool { return ruleIn(f.Rule, r) }) && !s.onLine(f, returns, returnLines) {
+			aside.NoReturn++
+			continue
+		}
+		if ruleIn(f.Rule, attrCallRule) && s.attribute(f, &names) {
+			aside.Attributes++
+			continue
+		}
+		if ruleIn(f.Rule, insecureRandomRule) && testPath(f.Path) {
+			aside.InTests++
 			continue
 		}
 		if len(kept) == MaxFindings {
@@ -101,6 +129,46 @@ func (s Scope) onLine(f store.SecurityFinding, seen map[string]map[int]bool, lin
 		seen[f.Path] = marked
 	}
 	return marked == nil || marked[f.Line]
+}
+
+// attribute reports whether an is-function-without-parentheses hit names
+// something the repository's Python files define as an attribute and never
+// as a method. The files are read on the first such hit, into names.
+func (s Scope) attribute(f store.SecurityFinding, names **pyNames) bool {
+	m := attrCallName.FindStringSubmatch(f.Message)
+	if m == nil || s.Read == nil || s.Paths == nil {
+		return false
+	}
+	if *names == nil {
+		n := pyNames{methods: map[string]bool{}, attrs: map[string]bool{}}
+		read := 0
+		for _, p := range s.Paths {
+			if !strings.HasSuffix(p, ".py") || otherProject(p) {
+				continue
+			}
+			if read == maxPythonFiles {
+				break
+			}
+			read++
+			if src, err := s.Read(p); err == nil {
+				n.add(src)
+			}
+		}
+		*names = &n
+	}
+	return (*names).attribute(m[1])
+}
+
+// otherProject reports whether a path is inside a directory of other
+// projects' code or an environment.
+func otherProject(p string) bool {
+	for _, part := range strings.Split(path.Dir(p), "/") {
+		switch part {
+		case "node_modules", "vendor", "third_party", "site-packages", ".venv", "venv":
+			return true
+		}
+	}
+	return false
 }
 
 func (s Scope) ignored(f store.SecurityFinding) bool {
